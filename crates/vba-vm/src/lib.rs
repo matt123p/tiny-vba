@@ -1,6 +1,9 @@
 //! M3 explicit-frame execution, single-use continuations and generation-checked inspection.
 #![forbid(unsafe_code)]
-use std::collections::{BTreeMap, BTreeSet};
+use std::{
+    collections::{BTreeMap, BTreeSet},
+    sync::atomic::{AtomicU32, Ordering},
+};
 use vba_diagnostics::{Diagnostic, Span, StatementId};
 use vba_foreign::{self as foreign, Host};
 use vba_ir::{self as ir, Instruction as I};
@@ -91,9 +94,30 @@ pub enum PauseReason {
     Stop,
     Fault,
 }
+/// Non-reused VM-instance identity, independent of the embedding client's session label.
+/// Opaque because comparison is meaningful only within the loaded engine instance.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
+pub struct SessionInstance(u32);
+static NEXT_INSTANCE: AtomicU32 = AtomicU32::new(1);
+fn fresh_instance() -> Result<SessionInstance> {
+    let mut current = NEXT_INSTANCE.load(Ordering::Relaxed);
+    loop {
+        let next = current.checked_add(1).ok_or_else(resource)?;
+        match NEXT_INSTANCE.compare_exchange_weak(
+            current,
+            next,
+            Ordering::Relaxed,
+            Ordering::Relaxed,
+        ) {
+            Ok(_) => return Ok(SessionInstance(current)),
+            Err(observed) => current = observed,
+        }
+    }
+}
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct Handle {
     pub session: u64,
+    pub instance: SessionInstance,
     pub generation: u64,
     pub frame: u64,
 }
@@ -115,6 +139,7 @@ pub struct FrameSnapshot {
 #[derive(Clone, Debug, PartialEq)]
 pub struct CheckpointView {
     pub session: u64,
+    pub instance: SessionInstance,
     pub frame: u64,
     pub ancestors: Vec<u64>,
     pub procedure: ir::ProcedureId,
@@ -165,10 +190,11 @@ struct Visit {
     view: CheckpointView,
     permit: bool,
 }
-/// Caller provides an identity unique among live sessions (also the location owner identity).
+/// The caller's identity labels a session; an engine-generated instance isolates handles/storage.
 pub struct Session {
     program: ir::VerifiedProgram,
     identity: u64,
+    instance: SessionInstance,
     limits: Limits,
     binding: Option<HostBinding>,
     store: Locations,
@@ -254,12 +280,14 @@ impl Session {
         for (arg, param) in arguments.iter().zip(&entry.parameters) {
             prepared.push(runtime::bind(param.kind, arg).map_err(runtime_diagnostic)?);
         }
+        let instance = fresh_instance()?;
         let mut session = Self {
             program,
             identity,
+            instance,
             limits,
             binding,
-            store: Locations::new(identity),
+            store: Locations::new(u64::from(instance.0)),
             kinds: BTreeMap::new(),
             frames: Vec::new(),
             state: Outcome::Yielded,
@@ -279,6 +307,9 @@ impl Session {
         };
         session.push_frame(entry_id, prepared.into_iter().map(Operand::Value).collect())?;
         Ok(session)
+    }
+    pub fn instance(&self) -> SessionInstance {
+        self.instance
     }
     pub fn identity(&self) -> u64 {
         self.identity
@@ -494,6 +525,7 @@ impl Session {
             .ok_or_else(|| invariant("checkpoint missing"))?;
         Ok(CheckpointView {
             session: self.identity,
+            instance: self.instance,
             frame: frame.id,
             ancestors: self.frames.iter().rev().skip(1).map(|f| f.id).collect(),
             procedure: frame.procedure,
@@ -566,6 +598,7 @@ impl Session {
             reason,
             handle: Handle {
                 session: self.identity,
+                instance: self.instance,
                 generation: self.generation,
                 frame,
             },
@@ -634,6 +667,7 @@ impl Session {
             return Err(command("inspection requires pause"));
         };
         if h.session != self.identity
+            || h.instance != self.instance
             || h.generation != self.generation
             || !self.frames.iter().any(|f| f.id == h.frame)
         {

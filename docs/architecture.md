@@ -44,6 +44,10 @@ Diagnostics, values, foreign, testkit and conformance implement the bounded M0 c
 dev-dependencies. The development CLI has a reviewed normal conformance dependency for validation.
 All packages are currently unpublished. No crate automatically loads corpus code.
 
+M3 runtime instances now use an opaque, non-reused identity independent of the caller's routing
+label for location ownership and debugger/inspection binding. [ADR 0008](decisions/0008-vm-instance-isolation.md)
+records this runtime-only refinement; it changes no IR operands, packages or dependency edges.
+
 ## Ownership boundary
 
 The generic foreign protocol carries invocation kind, target/reference, named/positional/omitted arguments,

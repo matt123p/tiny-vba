@@ -43,6 +43,9 @@ Wordcraft later implements Word objects, live ranges/character units, its bridge
 Python/JavaScript bind directly to fork-owned Office dispatch; they do not pass through the VBA engine.
 Do not duplicate those implementations in tiny-vba to make a local demonstration pass.
 
+The [M2/M3 acceptance audit](m2-m3-acceptance-audit.md) maps M2 gates to tests and records the
+M3 replacement-session isolation correction under ADR 0008.
+
 ## Immediate task sequence
 
 M0 is implemented; see [ADR 0003](decisions/0003-m0-source-scenarios-foreign.md) and

@@ -23,6 +23,7 @@ Updated 2026-10-26. Stage: M0–M3 subset complete. **Only the documented m3-cor
 | Bytecode execution / generic host continuations | Implemented M3 subset | vba-vm/tests/execution.rs and host.rs; permissions, typed patches, wait/cancel, no replay |
 | Breakpoints, stepping, local inspect/edit/resume | Implemented M3 headless API | vba-vm execution tests with vba-debug controller; no graphical UI/DAP |
 | Native / WASM execution | Implemented M3 smoke | cargo xtask wasm-run; identical typed results, pause/edit/host counts and cancellation |
+| Replacement-session isolation | Implemented M3 correction | recycled-client-ID regression in VM tests and native/WASI smoke; [ADR 0008](decisions/0008-vm-instance-isolation.md) |
 | MS-OVBA source decoding | Not implemented | M6 |
 | Oracle comparison / executable scenario runner | Not implemented | M4/M9 |
 | Fuzzing | Not implemented | APIs required before targets |

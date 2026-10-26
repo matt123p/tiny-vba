@@ -68,3 +68,8 @@ Use vba-runtime for operations/edits. VM host dispatch must use checked precommi
 validation and explicit per-site permissions; foreign aliases remain unsupported. Run cargo xtask ci,
 wasm and wasm-run (native plus actual WASI execution). Runtime example results do not mark unrun M0
 or external scenario assertions PASS. Graphical UI, DAP and VBA error-handler semantics remain later work.
+
+[ADR 0008](../../../docs/decisions/0008-vm-instance-isolation.md) distinguishes the caller's routing
+label from the non-reused SessionInstance. Key handles, locations, breakpoints and stepping by the
+engine instance; caller-label/frame/generation equality alone cannot identify an execution. Include
+the replacement-session regression in native/WASI evidence when changing these identities.

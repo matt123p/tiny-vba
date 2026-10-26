@@ -2,6 +2,26 @@
 
 Updated 2026-10-26. Current stage: M0–M3 reviewed subsets complete; M4 semantic depth is next.
 
+## M2/M3 acceptance audit and session-isolation correction
+
+On 2026-10-26, reviewed every adopted M2 gate against the binder/compiler/IR implementation and
+acceptance tests. M2's limited IR 1 scope is complete; no M2 code change was needed. The
+[gate-to-evidence audit](m2-m3-acceptance-audit.md) records source maps, deterministic goldens,
+negative IR cases, bounded verification and valid self-loop evidence.
+
+Continued M3 with a minimized execution-reuse regression. It failed before the correction: a stale
+handle from a dropped/cancelled session could read/edit a replacement session with the same client
+label/frame/pause generation. A retained controller's breakpoints and step target had the same
+label-reuse problem. Added opaque, non-reused SessionInstance identities and used them for handles,
+location ownership, breakpoints and stepping, preserving the client's routing label. ADR 0008 records
+the runtime API refinement; no IR version or instruction change is involved.
+
+Verification: cargo xtask ci (75 integration tests, fmt/strict Clippy/layers/corpus integrity),
+release workspace tests (75), cargo xtask wasm and cargo xtask wasm-run. The same replacement-session
+regression runs natively and in WASI alongside typed results, host waits, edits and cancellation.
+No separate MSRV, remote cross-platform or Office observation is claimed. M4 remains next; the
+scenario assertion runner, broader coercions, On Error and graphical UI remain separate work.
+
 ## M3 completion
 
 Implemented vba-runtime's documented Integer/Long/Boolean/String/Variant/Object assignment and

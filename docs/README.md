@@ -39,3 +39,6 @@ snapshots may also refer to historical locations; use this index to locate avail
 M1 implementation: [frontend subset and API](frontend.md),
 [adopted frontend contract](decisions/0005-m1-frontend.md), and
 [reviewed external grammar results](m1-corpus-report.md).
+
+[M2/M3 acceptance audit](m2-m3-acceptance-audit.md) records the gate review and
+[VM instance isolation](decisions/0008-vm-instance-isolation.md) correction for reused caller labels.

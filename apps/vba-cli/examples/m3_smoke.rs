@@ -1,7 +1,7 @@
 //! The same bounded acceptance program runs natively and under WASI without filesystem access.
 use std::{collections::BTreeSet, error::Error, io};
 use vba_compiler::{CompileOptions, compile};
-use vba_debug::Controller;
+use vba_debug::{Controller, Step};
 use vba_diagnostics::{SourceFile, SourceId};
 use vba_foreign::{self as foreign, Completion, Host, Reply};
 use vba_values::{ObjectRef, Value};
@@ -163,8 +163,66 @@ fn main() -> Result<(), Box<dyn Error>> {
         run(&mut s, &mut vm::NoHost, &Controller::new())? == Outcome::Cancelled,
         "infinite loop cancel",
     )?;
+    let isolation = "Function Answer() As Long\nDim x As Long\nx=1\nx=x+1\nAnswer=x\nEnd Function";
+    let mut previous = build(isolation, vec![], None)?;
+    let mut old_controller = Controller::new();
+    let p = previous.program().program();
+    let source = &p
+        .sources
+        .first()
+        .ok_or_else(|| io::Error::other("source"))?
+        .file;
+    let statement = p
+        .procedures
+        .first()
+        .and_then(|p| {
+            p.checkpoints
+                .iter()
+                .find(|cp| source.slice(cp.span).ok() == Some("x=x+1"))
+        })
+        .ok_or_else(|| io::Error::other("isolation site"))?
+        .statement;
+    old_controller.set_breakpoint(&previous, "source-1", statement)?;
+    let Outcome::Paused(old_pause) = run(&mut previous, &mut vm::NoHost, &old_controller)? else {
+        return Err(io::Error::other("old session pause").into());
+    };
+    old_controller.step(&mut previous, Step::Into)?;
+    previous.cancel(&mut vm::NoHost)?;
+    drop(previous);
+    let mut replacement = build(isolation, vec![], None)?;
+    replacement.request_pause();
+    let Outcome::Paused(new_pause) = run(&mut replacement, &mut vm::NoHost, &Controller::new())?
+    else {
+        return Err(io::Error::other("replacement pause").into());
+    };
+    ensure(
+        old_pause.handle.session == new_pause.handle.session
+            && old_pause.handle.generation == new_pause.handle.generation
+            && old_pause.handle.frame == new_pause.handle.frame,
+        "reused client labels",
+    )?;
+    ensure(
+        old_pause.handle.instance != new_pause.handle.instance,
+        "non-reused VM instance",
+    )?;
+    ensure(
+        replacement.read_local(old_pause.handle, "x").is_err(),
+        "cross-session stale read",
+    )?;
+    ensure(
+        replacement
+            .edit_local(old_pause.handle, "x", Value::Long(99))
+            .is_err(),
+        "cross-session stale edit",
+    )?;
+    replacement.continue_execution()?;
+    ensure(
+        run(&mut replacement, &mut vm::NoHost, &old_controller)?
+            == Outcome::Completed(ReturnValue::Function(Value::Long(2))),
+        "cross-session breakpoints/step target",
+    )?;
     println!(
-        "M3_SMOKE PASS: Long(42), loop/calls Long(18), edited Long(41), invoke=1 polls=2, stale handles and cancellation"
+        "M3_SMOKE PASS: Long(42), loop/calls Long(18), edited Long(41), invoke=1 polls=2, stale handles, cancellation and isolated instances"
     );
     Ok(())
 }

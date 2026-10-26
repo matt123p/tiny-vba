@@ -363,3 +363,40 @@ fn aliased_string_snapshots_are_bounded_and_report_truncation() -> R {
     s.cancel(&mut NoHost)?;
     Ok(())
 }
+
+#[test]
+fn recycled_client_ids_cannot_reuse_old_handles_breakpoints_or_step_targets() -> R {
+    let text = "Function Answer() As Long\nDim x As Long\nx=1\nx=x+1\nAnswer=x\nEnd Function";
+    let mut first = session(text, Limits::default())?;
+    let mut controller = Controller::new();
+    controller.set_breakpoint(&first, "source-1", statement(&first, "x=x+1")?)?;
+    let Outcome::Paused(previous) = drive(&mut first, &controller)? else {
+        return Err("first pause".into());
+    };
+    controller.step(&mut first, Step::Into)?;
+    first.cancel(&mut NoHost)?;
+    drop(first);
+    let mut next = session(text, Limits::default())?;
+    next.request_pause();
+    let Outcome::Paused(current) = drive(&mut next, &Controller::new())? else {
+        return Err("replacement pause".into());
+    };
+    assert_eq!(previous.handle.session, current.handle.session);
+    assert_eq!(previous.handle.generation, current.handle.generation);
+    assert_eq!(previous.handle.frame, current.handle.frame);
+    assert!(
+        next.read_local(previous.handle, "x").is_err(),
+        "old handle crossed session creation"
+    );
+    assert!(
+        next.edit_local(previous.handle, "x", Value::Long(99))
+            .is_err()
+    );
+    assert_eq!(next.read_local(current.handle, "x")?, Value::Long(0));
+    next.continue_execution()?;
+    assert_eq!(
+        drive(&mut next, &controller)?,
+        Outcome::Completed(ReturnValue::Function(Value::Long(2)))
+    );
+    Ok(())
+}

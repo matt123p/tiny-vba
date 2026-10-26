@@ -60,8 +60,11 @@ broad Office compatibility observation is claimed.
 
 ## Session and source control
 
-`Session::new` takes VerifiedProgram, a caller-assigned identity unique among live sessions, ordered
-launch Values, optional HostBinding and Limits. IR 1 launch parameters must be ByVal. Locals and
+`Session::new` takes VerifiedProgram, a caller-assigned routing label, ordered
+launch Values, optional HostBinding and Limits. Each execution also receives a non-reused opaque
+SessionInstance from the loaded engine, independent of that label. The label remains available via
+identity(); instance() identifies the execution. Instance exhaustion returns a resource error; it
+never wraps or reuses a cancelled/dropped execution's token. IR 1 launch parameters must be ByVal. Locals and
 result storage are frame-owned locations; direct ByRef slots are aliases of the caller's canonical
 location. Returning invalidates owned storage while retaining caller aliases. No Rust recursion
 implements VBA calls. Caller operand prefixes survive nested calls and pauses without evaluation replay.
@@ -72,20 +75,22 @@ Hard instruction limits precede yields and breakpoint offers. Terminal queries n
 The synchronous API is cooperatively controlled between bounded slices; callbacks/reentrant execution
 and forcible interruption of a blocked synchronous host are not provided.
 
-At each Checkpoint the VM records a fresh dynamic visit with session/frame/site identity. A breakpoint
+At each Checkpoint the VM records a fresh dynamic visit with instance/session/frame/site identity. A breakpoint
 pause leaves that visit unpassed. Continue permits exactly that visit once; the same loop checkpoint
 can break on a later iteration. Predicate errors retain the unpassed visit and PC. Hidden checkpoints
 still consume budget. Stop advances past itself and pauses before its mandatory Jump. A user pause
 request is served at the next visible checkpoint. `mark_source_changed` blocks edits/continuation until
 cancel/recompile/restart; it never replaces the immutable source underneath paused execution.
 
-`vba-debug::Controller` binds breakpoints to the session, compiled revision and StatementId. Multiple
+`vba-debug::Controller` binds breakpoints to the VM instance, compiled revision and StatementId. Multiple
 statements on a line are separate stops. Step Into targets the next visible visit; Over stays in the
 starting frame or surviving ancestors; Out targets surviving ancestors. Descendant calls finish their
 remaining expression work before an editable caller stop. Explicit breakpoints remain active during steps.
 
 Paused snapshots expose ordered frames, exact PCs/source spans and visible parameters/user locals.
-Handles carry session/frame/pause generation. Continue, host resume, terminal cleanup and new pauses
+Handles carry the caller label, opaque VM instance, frame and pause generation. A reused caller
+label cannot revive historical handles or controller targets; location ownership also uses the
+non-reused instance. See [ADR 0008](decisions/0008-vm-instance-isolation.md). Continue, host resume, terminal cleanup and new pauses
 invalidate old handles. Read-only inspection can read stored locals in paused frames. Editing is restricted
 to visible active-frame locals at ordinary checkpoint/Stop pauses; assignment validates before the write.
 Scratch/result slots, other-frame edits, fault-pause edits and execution of watch expressions are rejected.

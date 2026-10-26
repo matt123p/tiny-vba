@@ -2,7 +2,7 @@
 #![forbid(unsafe_code)]
 use std::collections::BTreeSet;
 use vba_diagnostics::{Diagnostic, Span, StatementId};
-use vba_vm::{CheckpointView, Outcome, PauseReason, Session};
+use vba_vm::{CheckpointView, Outcome, PauseReason, Session, SessionInstance};
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Step {
     Into,
@@ -12,12 +12,12 @@ pub enum Step {
 struct Target {
     step: Step,
     frame: u64,
-    session: u64,
+    instance: SessionInstance,
     ancestors: Vec<u64>,
 }
 #[derive(Default)]
 pub struct Controller {
-    breakpoints: BTreeSet<(u64, u64, u32)>,
+    breakpoints: BTreeSet<(SessionInstance, u64, u32)>,
     target: Option<Target>,
 }
 impl Controller {
@@ -55,7 +55,7 @@ impl Controller {
             return Err(Diagnostic::new("VBA0034", "breakpoint limit"));
         }
         self.breakpoints
-            .insert((session.identity(), statement.source.0, statement.ordinal));
+            .insert((session.instance(), statement.source.0, statement.ordinal));
         Ok(spans)
     }
     pub fn remove_breakpoint(&mut self, statement: StatementId) {
@@ -68,14 +68,14 @@ impl Controller {
             return Ok(false);
         }
         if self.breakpoints.contains(&(
-            view.session,
+            view.instance,
             view.statement.source.0,
             view.statement.ordinal,
         )) {
             return Ok(true);
         }
         Ok(self.target.as_ref().is_some_and(|t| {
-            t.session == view.session
+            t.instance == view.instance
                 && match t.step {
                     Step::Into => true,
                     Step::Over => view.frame == t.frame || t.ancestors.contains(&view.frame),
@@ -96,13 +96,13 @@ impl Controller {
             return Err(Diagnostic::new("VBA0034", "cannot step a pending fault"));
         }
         let frame = pause.handle.frame;
-        let session_id = pause.handle.session;
+        let instance = pause.handle.instance;
         let ancestors = pause.frames.iter().skip(1).map(|f| f.id).collect();
         session.continue_execution()?;
         self.target = Some(Target {
             step,
             frame,
-            session: session_id,
+            instance,
             ancestors,
         });
         Ok(())
