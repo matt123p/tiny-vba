@@ -71,3 +71,10 @@ integer division/remainder, Boolean/string results, Empty/Null/Nothing/CVErr, br
 same-line statements, ByRef, optional/missing and named calls, and runtime division-by-zero.
 Their MIT licensing follows this repository. Their expectations are proposals for later executable
 tests, not a language compatibility result. Missing is also checked directly in protocol/value tests.
+
+M4 hardening under [ADR 0010](decisions/0010-m4-profile-and-verification-hardening.md) makes the
+exit policy explicit: PASS/UNSUPPORTED exit 0, MISMATCH/CRASH/TIMEOUT exit 1, INVALID_FIXTURE exit 2.
+Only explicit capability refusals are UNSUPPORTED; malformed or unbound fixture source is invalid,
+and unknown engine errors are CRASH. Runtime errors must provide an actual VBA number. Float/Date
+expectations compare exact bits; strings compare UTF-16 units and reports use escaped `String(utf16:...)`
+text to preserve lone surrogates and avoid multiline result ambiguity. The schema is unchanged.

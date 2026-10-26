@@ -2,7 +2,8 @@
 
 Status: M0 fixture validation implemented, 2026-10-26. Candidate source inventory and
 [schema 1](scenario-format.md) validation are implemented; scenario execution is not.
-Twenty independently authored cases carry typed, reasoned expectations and remain NOT_RUN.
+Twenty independently authored cases carry typed, reasoned expectations. The M4 runner now asserts
+17 PASS / 3 UNSUPPORTED; validation alone remains NOT_RUN and external execution remains unmeasured.
 CLI validation reports VALID_FIXTURE, never a semantic PASS. External corpus entries are unchanged.
 
 Separate syntax/binding, pure language runtime, generic foreign calls, project decoding and debugger tests.
@@ -38,3 +39,9 @@ self-authored M0 fixture and compares its typed expectation. The asserted invent
 3 UNSUPPORTED (cverr, named, optional-missing); this measures the implemented subset, not Office
 behavior. External/oracle specimens stay NOT_RUN. The same slice enables real division and Double
 widths with exact error numbers 6/11 across widths.
+
+The [M4 hardening contract](decisions/0010-m4-profile-and-verification-hardening.md) requires fail-closed
+engine classification, nonzero failure exits, bit-exact floating expectations and lossless UTF-16
+report text. Verification logs must identify the actual invoking checkout; cached build paths cannot
+establish that the current source was tested. Current m4-scalars-v1 programs opt into the expanded
+numeric matrix explicitly; legacy M3 execution targets must be recompiled.

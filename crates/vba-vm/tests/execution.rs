@@ -433,3 +433,52 @@ fn real_division_and_double_locals_execute_with_exact_double_tags() -> R {
     assert_eq!(failure.number, Some(11));
     Ok(())
 }
+
+#[test]
+fn m4_double_bounds_fail_before_writing_and_comparisons_execute() -> R {
+    let mut s = session(
+        "Function Answer() As Long\nDim x As Long\nx=7\nx=2147483648.0\nAnswer=x\nEnd Function",
+        Limits::default(),
+    )?;
+    let Outcome::Failed(failure) = drive(&mut s, &Controller::new())? else {
+        return Err("overflow required".into());
+    };
+    assert_eq!(failure.number, Some(6));
+    assert!(
+        failure
+            .frames
+            .iter()
+            .flat_map(|f| &f.locals)
+            .any(|l| l.name == "x" && l.value == Value::Long(7))
+    );
+    let mut s = session(
+        "Function Answer() As Double\nIf -0.5 < 1 Then\nAnswer=-3.5\nElse\nAnswer=1\nEnd If\nEnd Function",
+        Limits::default(),
+    )?;
+    assert_eq!(
+        drive(&mut s, &Controller::new())?,
+        Outcome::Completed(ReturnValue::Function(Value::Double(-3.5)))
+    );
+    Ok(())
+}
+#[test]
+fn m4_requires_recompilation_from_the_previous_execution_profile() -> R {
+    let file = SourceFile::new(
+        SourceId(7),
+        "old-profile.bas".into(),
+        "Function Answer() As Long\nAnswer=6*7\nEnd Function".into(),
+    )?;
+    let old_options = CompileOptions {
+        capabilities: vba_ir::Capabilities {
+            profile: "m3-core-v1".into(),
+            ..vm::capabilities()
+        },
+        ..Default::default()
+    };
+    let old = compile(&file, &old_options)?;
+    let error = Session::new(old, 100, vec![], None, Limits::default())
+        .err()
+        .ok_or("old profile must be refused")?;
+    assert_eq!(error.code, "VBA0022");
+    Ok(())
+}

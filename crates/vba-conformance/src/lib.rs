@@ -1,6 +1,6 @@
 //! Bounded M0 scenario validation and M4 typed outcome comparison.
 #![forbid(unsafe_code)]
-use std::collections::BTreeMap;
+use std::{collections::BTreeMap, fmt::Write};
 use vba_diagnostics::{Diagnostic, SourceFile};
 use vba_values::{Value, VbaString};
 
@@ -22,6 +22,22 @@ pub enum Status {
     NotRun,
 }
 impl Status {
+    /// CI exit policy: unsupported capability cases remain distinguishable from failures.
+    pub fn exit_code(self) -> u8 {
+        match self {
+            Self::InvalidFixture => 2,
+            Self::Mismatch | Self::Crash | Self::Timeout => 1,
+            _ => 0,
+        }
+    }
+    pub fn from_diagnostic(diagnostic: &Diagnostic) -> Self {
+        match diagnostic.code {
+            "VBA0001" | "VBA0022" => Self::Unsupported,
+            "VBA0010" | "VBA0100" | "VBA0101" | "VBA0110" | "VBA0034" => Self::InvalidFixture,
+            "VBA0003" | "VBA0102" | "VBA0111" | "VBA0121" | "VBA0021" | "VBA0031" => Self::Timeout,
+            _ => Self::Crash,
+        }
+    }
     pub fn as_str(self) -> &'static str {
         match self {
             Self::Pass => "PASS",
@@ -51,7 +67,15 @@ pub fn describe_value(value: &Value) -> String {
         Value::Double(v) => format!("Double({v:?})"),
         Value::Currency(v) => format!("Currency({v})"),
         Value::Date(v) => format!("Date({v:?})"),
-        Value::String(s) => format!("String({})", String::from_utf16_lossy(s.units())),
+        Value::String(s) => {
+            let mut text = String::with_capacity(16 + s.units().len() * 6);
+            text.push_str("String(utf16:");
+            for unit in s.units() {
+                let _ = write!(&mut text, "\\u{unit:04x}");
+            }
+            text.push(')');
+            text
+        }
         Value::CvErr(code) => format!("CVErr({code})"),
         Value::Object(o) => format!(
             "Object(host {}, object {}, generation {})",
@@ -64,7 +88,20 @@ impl Expected {
     pub fn judge_value(&self, actual: &Value) -> Status {
         match self {
             Self::Value(expected) => {
-                if expected == actual {
+                if expected.validate().is_err() {
+                    return Status::InvalidFixture;
+                }
+                if actual.validate().is_err() {
+                    return Status::Crash;
+                }
+                let equal = match (expected, actual) {
+                    (Value::Single(a), Value::Single(b)) => a.to_bits() == b.to_bits(),
+                    (Value::Double(a), Value::Double(b)) | (Value::Date(a), Value::Date(b)) => {
+                        a.to_bits() == b.to_bits()
+                    }
+                    _ => expected == actual,
+                };
+                if equal {
                     Status::Pass
                 } else {
                     Status::Mismatch

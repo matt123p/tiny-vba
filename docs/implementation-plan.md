@@ -49,11 +49,13 @@ M3 replacement-session isolation correction under ADR 0008.
 ## Immediate task sequence
 
 M0 is implemented; see [ADR 0003](decisions/0003-m0-source-scenarios-foreign.md) and
-[scenario schema 1](scenario-format.md). All 20 VBA scenarios remain NOT_RUN.
+[scenario schema 1](scenario-format.md). The M4 runner asserts the 20 self-authored scenarios as
+17 PASS / 3 UNSUPPORTED; validation alone still reports NOT_RUN.
 
 1. Start M4 with a separately tested scalar conversion/error matrix and a scenario assertion runner;
    preserve NOT_RUN until each manifest's typed expected outcome is actually compared. — **Done
-   2026-10-26 ([ADR 0009](decisions/0009-m4-runner-and-numeric-widths.md)): 17 PASS / 3 UNSUPPORTED.**
+   2026-10-26 ([ADR 0009](decisions/0009-m4-runner-and-numeric-widths.md), hardened by
+   [ADR 0010](decisions/0010-m4-profile-and-verification-hardening.md)): 17 PASS / 3 UNSUPPORTED.**
 2. Specify a handler-capable IR extension for On Error/Resume/Err/Erl, including frame handler state,
    exceptional edges, resumption metadata and nested-handler tests, before enabling those constructs.
 3. Expand numeric/string/array/argument semantics from classified cases, and coordinate the fork-owned

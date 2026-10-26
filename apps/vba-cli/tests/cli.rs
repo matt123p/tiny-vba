@@ -319,7 +319,10 @@ fn conformance_run_reports_mismatch_and_exit_status_truthfully()
     let fixture = root.join("tests/fixtures/m0/arithmetic.vbas");
     let original = std::fs::read_to_string(&fixture)?;
     let temp = std::env::temp_dir().join(format!("tiny-vba-mismatch-{}.vbas", std::process::id()));
-    std::fs::write(&temp, original.replace("expected = Long:42", "expected = Long:43"))?;
+    std::fs::write(
+        &temp,
+        original.replace("expected = Long:42", "expected = Long:43"),
+    )?;
     let output = Command::new(env!("CARGO_BIN_EXE_vba-cli"))
         .args(["conformance", "run"])
         .arg(&temp)
@@ -336,5 +339,56 @@ fn conformance_run_reports_mismatch_and_exit_status_truthfully()
         .output()?;
     assert!(output.status.success());
     assert!(String::from_utf8(output.stdout)?.contains("NOT_RUN"));
+    Ok(())
+}
+
+#[test]
+fn scenario_runner_rejects_invalid_source_and_fails_on_budget_exhaustion()
+-> Result<(), Box<dyn std::error::Error>> {
+    let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../..");
+    let original = std::fs::read_to_string(root.join("tests/fixtures/m0/arithmetic.vbas"))?;
+    let (header, _) = original.split_once("---\n").ok_or("fixture delimiter")?;
+    let temp = std::env::temp_dir().join(format!("tiny-vba-outcome-{}.vbas", std::process::id()));
+    for (body, status, code) in [
+        (
+            "Function Answer() As Long\nAnswer=)\nEnd Function",
+            "INVALID_FIXTURE",
+            2,
+        ),
+        (
+            "Option Explicit\nFunction Answer() As Long\nAnswer=UnknownFunction()\nEnd Function",
+            "INVALID_FIXTURE",
+            2,
+        ),
+        (
+            "Function Answer() As Long\nAnswer=&H2A\nEnd Function",
+            "UNSUPPORTED",
+            0,
+        ),
+        (
+            "Function Answer() As Double\nAnswer=1.5#\nEnd Function",
+            "UNSUPPORTED",
+            0,
+        ),
+        (
+            "Function Answer() As Long\nDim i As Long\nFor i=1 To 1\ni=0\nNext i\nEnd Function",
+            "TIMEOUT",
+            1,
+        ),
+    ] {
+        std::fs::write(&temp, format!("{header}---\n{body}\n"))?;
+        let output = Command::new(env!("CARGO_BIN_EXE_vba-cli"))
+            .args(["conformance", "run"])
+            .arg(&temp)
+            .output()?;
+        assert_eq!(
+            output.status.code(),
+            Some(code),
+            "{}",
+            String::from_utf8_lossy(&output.stdout)
+        );
+        assert!(String::from_utf8(output.stdout)?.contains(&format!(": {status} (")));
+    }
+    std::fs::remove_file(temp)?;
     Ok(())
 }

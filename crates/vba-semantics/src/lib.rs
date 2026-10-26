@@ -685,11 +685,30 @@ impl Binder<'_> {
         if let Some(id) = self.lookup.local.get(&(self.signature.module, name.key())) {
             return Ok(*id);
         }
-        let ids = self
-            .lookup
-            .public
-            .get(&name.key())
-            .ok_or_else(|| err(format!("unknown procedure {}", name.spelling), name.span))?;
+        let ids = self.lookup.public.get(&name.key()).ok_or_else(|| {
+            if matches!(
+                name.key().as_str(),
+                "cverr"
+                    | "ismissing"
+                    | "cint"
+                    | "clng"
+                    | "cdbl"
+                    | "cstr"
+                    | "cbool"
+                    | "cdate"
+                    | "ccur"
+                    | "cbyte"
+                    | "csng"
+                    | "clnglng"
+                    | "len"
+                    | "abs"
+                    | "round"
+            ) {
+                unsupported("intrinsic function binding", name.span)
+            } else {
+                err(format!("unknown procedure {}", name.spelling), name.span)
+            }
+        })?;
         if ids.len() != 1 {
             return Err(err("ambiguous procedure", name.span));
         }
@@ -1079,9 +1098,8 @@ fn literal(expr: &ast::Expr) -> Result<Value> {
             // Decimal/exponent literals are exact finite Double values; radix, currency
             // and other suffixed forms need their own profiled cases.
             let floating = suffix.is_none()
-                && digits.contains(|b: char| {
-                    b.is_ascii_digit()
-                        || matches!(b, '.' | 'e' | 'E' | 'd' | 'D' | '+' | '-')
+                && digits.chars().all(|b: char| {
+                    b.is_ascii_digit() || matches!(b, '.' | 'e' | 'E' | 'd' | 'D' | '+' | '-')
                 })
                 && digits.chars().any(|b: char| b.is_ascii_digit())
                 && digits.chars().any(|b: char| !b.is_ascii_digit());

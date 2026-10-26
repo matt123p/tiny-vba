@@ -4,7 +4,7 @@
 use std::{
     error::Error,
     io,
-    path::Path,
+    path::{Path, PathBuf},
     process::{Command, ExitCode},
 };
 
@@ -16,11 +16,24 @@ fn command(program: &str, args: &[&str]) -> Result<(), Box<dyn Error>> {
     Ok(())
 }
 
+fn workspace_root(start: &Path) -> io::Result<PathBuf> {
+    start
+        .ancestors()
+        .find(|path| {
+            path.join("Cargo.toml").is_file()
+                && path.join("xtask/Cargo.toml").is_file()
+                && path.join("tools/architecture.json").is_file()
+        })
+        .map(Path::to_path_buf)
+        .ok_or_else(|| io::Error::other("run xtask from within a tiny-vba checkout"))
+}
 fn run() -> Result<(), Box<dyn Error>> {
-    let root = Path::new(env!("CARGO_MANIFEST_DIR"))
-        .parent()
-        .ok_or_else(|| io::Error::other("workspace root missing"))?;
-    std::env::set_current_dir(root)?;
+    // The executable may be shared by different checkouts through CARGO_TARGET_DIR.
+    // Resolve the workspace at invocation time; a compiled-in manifest path can be stale.
+    let cwd = std::env::current_dir()?;
+    let root = workspace_root(&cwd)?;
+    std::env::set_current_dir(&root)?;
+    eprintln!("xtask workspace: {}", root.display());
     match std::env::args().nth(1).as_deref() {
         Some("ci") => {
             command("cargo", &["fmt", "--all", "--check"])?;
@@ -57,13 +70,14 @@ fn run() -> Result<(), Box<dyn Error>> {
                     "wasm32-wasip1",
                 ],
             )?;
-            command(
-                "node",
-                &[
-                    "tools/run_wasi.cjs",
-                    "target/wasm32-wasip1/debug/examples/m3_smoke.wasm",
-                ],
-            )?;
+            let target = std::env::var_os("CARGO_TARGET_DIR")
+                .map(PathBuf::from)
+                .unwrap_or_else(|| root.join("target"));
+            let artifact = target.join("wasm32-wasip1/debug/examples/m3_smoke.wasm");
+            let artifact = artifact
+                .to_str()
+                .ok_or_else(|| io::Error::other("non-UTF-8 WASM artifact path"))?;
+            command("node", &["tools/run_wasi.cjs", artifact])?;
         }
         Some("layers") => command("python3", &["tools/check_repository.py", "layers"])?,
         Some("corpora") => command("python3", &["tools/check_repository.py", "corpora"])?,

@@ -1,5 +1,5 @@
 use std::{collections::BTreeSet, fs, path::Path};
-use vba_conformance::{describe_value, Expected, MAX_SCENARIO_BYTES, Scenario, Status};
+use vba_conformance::{Expected, MAX_SCENARIO_BYTES, Scenario, Status, describe_value};
 use vba_diagnostics::{Diagnostic, SourceFile, SourceId};
 use vba_values::{Value, VbaString};
 const VALID: &str = include_str!("../../../tests/fixtures/m0/arithmetic.vbas");
@@ -90,7 +90,7 @@ fn typed_expectations_preserve_states_and_widths() -> Result<(), Diagnostic> {
 }
 #[test]
 fn typed_judgment_passes_only_exact_tag_and_payload() -> Result<(), Diagnostic> {
-    let expected = parse(&VALID.replace("Long:42", "Long:42"))?.expected;
+    let expected = parse(VALID)?.expected;
     assert_eq!(expected.judge_value(&Value::Long(42)), Status::Pass);
     // A different numeric width is a mismatch, not a pass: tags matter.
     assert_eq!(expected.judge_value(&Value::Integer(42)), Status::Mismatch);
@@ -108,4 +108,57 @@ fn typed_judgment_passes_only_exact_tag_and_payload() -> Result<(), Diagnostic> 
     assert_eq!(error.describe(), "expected runtime error 11");
     assert_eq!(describe_value(&Value::Double(3.5)), "Double(3.5)");
     Ok(())
+}
+
+#[test]
+fn judgment_preserves_floating_bits_and_report_text_preserves_utf16() -> Result<(), Diagnostic> {
+    assert_eq!(
+        Expected::Value(Value::Double(f64::NAN)).judge_value(&Value::Double(f64::NAN)),
+        Status::InvalidFixture
+    );
+    assert_eq!(
+        Expected::Value(Value::Double(1.0)).judge_value(&Value::Double(f64::NAN)),
+        Status::Crash
+    );
+    let expected = Expected::Value(Value::Double(-0.0));
+    assert_eq!(expected.judge_value(&Value::Double(0.0)), Status::Mismatch);
+    let expected = Expected::Value(Value::Single(-0.0));
+    assert_eq!(expected.judge_value(&Value::Single(0.0)), Status::Mismatch);
+    let a = Value::String(VbaString::from_units(vec![0xd800, 10])?);
+    let b = Value::String(VbaString::from_units(vec![0xd801, 10])?);
+    assert_ne!(describe_value(&a), describe_value(&b));
+    assert!(!describe_value(&a).contains('\n'));
+    Ok(())
+}
+
+#[test]
+fn classification_and_exit_policy_cannot_hide_engine_or_budget_failures() {
+    for (code, expected) in [
+        ("VBA0001", Status::Unsupported),
+        ("VBA0022", Status::Unsupported),
+        ("VBA0101", Status::InvalidFixture),
+        ("VBA0110", Status::InvalidFixture),
+        ("VBA0021", Status::Timeout),
+        ("VBA0031", Status::Timeout),
+        ("VBA0020", Status::Crash),
+        ("VBA0030", Status::Crash),
+        ("UNKNOWN", Status::Crash),
+    ] {
+        assert_eq!(
+            Status::from_diagnostic(&Diagnostic::new(code, "test")),
+            expected
+        );
+    }
+    for status in [
+        Status::Pass,
+        Status::Unsupported,
+        Status::BlockedByPolicy,
+        Status::NotRun,
+    ] {
+        assert_eq!(status.exit_code(), 0);
+    }
+    for status in [Status::Mismatch, Status::Timeout, Status::Crash] {
+        assert_eq!(status.exit_code(), 1);
+    }
+    assert_eq!(Status::InvalidFixture.exit_code(), 2);
 }

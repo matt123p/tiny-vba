@@ -42,3 +42,6 @@ M1 implementation: [frontend subset and API](frontend.md),
 
 [M2/M3 acceptance audit](m2-m3-acceptance-audit.md) records the gate review and
 [VM instance isolation](decisions/0008-vm-instance-isolation.md) correction for reused caller labels.
+
+[M4 profile and verification hardening](decisions/0010-m4-profile-and-verification-hardening.md)
+records the current consumer profile, truthful fixture outcomes and corrected checkout selection.

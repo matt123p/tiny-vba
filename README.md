@@ -9,7 +9,9 @@ checkpoint-based bytecode lowering, bounded IR 1 verification, explicit-frame ex
 The CLI implements `parse`, `check`, `compile`, `disasm`, `run` and fixture validation.
 See the [M3 runtime matrix](docs/runtime.md) for supported execution and debugger/host APIs.
 The graphical editor/debugger and DAP remain planned. Fixture validation still reports NOT_RUN;
-there is no automatic scenario assertion runner.
+M4 now adds a typed scenario assertion runner (`conformance run`) and Double arithmetic; the
+self-authored fixture set is asserted 17 PASS / 3 UNSUPPORTED. The current execution profile is
+m4-scalars-v1. Broader M4 semantics and error handlers remain in progress.
 
 
 The Excel/Word compatibility layers, Office metadata and application adapters belong in the

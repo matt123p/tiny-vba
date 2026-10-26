@@ -4,6 +4,32 @@ Updated 2026-10-26. Current stage: M0–M3 reviewed subsets complete; M4 first s
 assertion runner, real division and Double widths) implemented under
 [ADR 0009](decisions/0009-m4-runner-and-numeric-widths.md).
 
+## M4 scalar/runner hardening and corrected validation
+
+Continued the incoming M4 first slice after closing the M3 instance-isolation audit. Reproduced and
+fixed two correctness regressions: Double-to-Long conversion could wrap past the 32-bit destination,
+and the scenario runner labeled malformed/invalid source UNSUPPORTED with success status. Resource/
+engine failures also no longer exit successfully. Float/Date judgments compare exact payload bits;
+UTF-16 report text preserves lone surrogates and escapes line breaks.
+
+Published m4-scalars-v1 for the expanded numeric matrix instead of mutating m3-core-v1 in place.
+Added Double negation/mixed comparisons and native/WASI boundary assertions. Existing M3-tagged
+programs must be recompiled; IR 1 is unchanged. Source/engine failures are classified explicitly,
+and known unimplemented intrinsic names retain UNSUPPORTED without hiding unknown-name errors.
+
+Found a verification-root bug: a cached xtask binary could run an older checkout embedded at build
+time. Historical pass claims alone were therefore insufficient. xtask now finds and logs the current
+checkout at runtime, has a failing-before/fixed-after cross-checkout regression, and honors custom
+WASM target paths. Re-ran the current code, not the cached checkout: 89 tests pass in debug and
+release; cargo xtask ci passes format/strict Clippy/layers and seven pins/646 hashes; cargo xtask wasm
+passes all libraries. An isolated CARGO_TARGET_DIR native/WASI smoke agrees on Long(42), Long(18),
+edited Long(41), one invocation/two polls, cancellation/session isolation, Double(3.5), Boolean(true)
+and Long overflow error 6. No remote cross-platform, separate MSRV or Office result is asserted.
+
+The 20 scenario assertions remain 17 PASS / 3 UNSUPPORTED. [ADR 0010](decisions/0010-m4-profile-and-verification-hardening.md)
+records profile/exit/report/gate contracts. M4 is still in progress: next is the handler-capable IR
+specification before On Error implementation, alongside the remaining arrays/arguments/builtins.
+
 ## M4 first slice: assertion runner and numeric widths
 
 Implemented `conformance run <scenario>`: the CLI parses the manifest, compiles only the embedded

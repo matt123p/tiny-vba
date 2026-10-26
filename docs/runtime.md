@@ -1,6 +1,8 @@
-# M3 runtime and debugger
+# M3/M4 runtime and debugger
 
-Implemented 2026-10-26. M3 executes the `m3-core-v1` profile through an explicit-frame IR 1 VM.
+Implemented 2026-10-26. The current consumer executes `m4-scalars-v1` through the explicit-frame
+IR 1 VM introduced at M3. M3-tagged programs require recompilation against current capabilities;
+[ADR 0010](decisions/0010-m4-profile-and-verification-hardening.md) records this explicit matrix revision.
 It provides a headless debugger controller and generic native host continuations. The visual IDE,
 DAP, Office objects and broad VBA coercion/error-handler semantics are later milestones.
 
@@ -39,9 +41,9 @@ cloning the source payload. A caller's capability set cannot enable an unimpleme
 | Add/Subtract/Multiply | Integer/Long pairs; Long if either operand is Long, otherwise Integer; Double when either operand is Double; checked overflow number 6 |
 | Division `/` | Integer/Long/Double operands; the result is always Double; zero divisor number 11; non-finite quotient overflow number 6; String/Boolean/CVErr operands stay Unsupported |
 | IntegerDivide/Modulo | Integer/Long pairs, checked width, division by zero number 11; signed integer quotient/remainder |
-| Comparisons | Integer/Long pairs for =, <>, <, <=, >, >=; Boolean = and <> |
+| Comparisons | Integer/Long/Double numeric pairs for =, <>, <, <=, >, >=; Boolean = and <> |
 | Logical operators | Integer/Long bitwise And/Or/Xor/Eqv/Imp; Boolean equivalents; both source operands evaluated |
-| Unary | Checked Integer/Long negate; Integer/Long bitwise Not and Boolean Not |
+| Unary | Checked Integer/Long negate and finite Double negate; Integer/Long bitwise Not and Boolean Not |
 | Concatenation | String with String, exact UTF-16 units; bounded length |
 | Conditions | Boolean only; no implicit numeric/string truthiness |
 | Explicit Convert | Variant/Integer/Long/Double/Boolean/String with the assignment matrix above |
@@ -159,4 +161,19 @@ If/For/calls, stepping, alias writes/edits, source/handle staleness, quotas/recu
 stack limits, infinite-loop cancellation, bounded alias snapshots, all host kinds, named/omitted args,
 wrong host, repeated waits, duplicate resume, atomic typed patches, permission/alias refusal and
 cancel/disconnect/lost-host cleanup. Existing M0 fixture manifests and external corpus execution
-statuses remain NOT_RUN: their assertion runner has not been implemented merely by adding `run`.
+statuses remain separate from these smoke results. The M4 assertion runner now judges the self-authored
+M0 set as 17 PASS / 3 UNSUPPORTED; external corpus execution remains NOT_RUN.
+
+## M4 execution and assertion hardening
+
+The native/WASI smoke now also checks Double division (3.5), negative/mixed numeric comparisons
+(Boolean true) and out-of-range Double-to-Long failure (6) before destination mutation. Narrowing
+rounds ties to even and then checks Integer/Long bounds before casting; no i64-to-i32 wrapping is
+permitted. Floating arithmetic preserves signed-zero bits. Conformance judgment compares exact
+float/Date bits, while language numeric equality retains its own runtime comparison semantics.
+
+`conformance run` uses explicit diagnostic categories and fails CI for MISMATCH/CRASH/TIMEOUT
+(exit 1) or INVALID_FIXTURE (exit 2); explicit unsupported capabilities remain exit 0. UTF-16 value
+reports are escaped per unit. `conformance validate` executes nothing and keeps NOT_RUN.
+`cargo xtask` prints the runtime-selected checkout root; `wasm-run` honors CARGO_TARGET_DIR so shared
+build artifacts cannot silently redirect tests or select an older WASM executable.

@@ -1,6 +1,7 @@
 //! M3 shared scalar rules. Unsupported combinations are distinct from VBA runtime errors.
 #![forbid(unsafe_code)]
 use vba_values::{ScalarKind, Value, VbaString};
+pub const PROFILE: &str = "m4-scalars-v1";
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum Error {
     Vba { number: i32, message: String },
@@ -9,7 +10,7 @@ pub enum Error {
 }
 pub type Result<T> = std::result::Result<T, Error>;
 fn unsupported() -> Error {
-    Error::Unsupported("operand/conversion combination outside m3-core-v1".into())
+    Error::Unsupported(format!("operand/conversion combination outside {PROFILE}"))
 }
 fn overflow() -> Error {
     Error::Vba {
@@ -28,7 +29,7 @@ fn integer(v: &Value) -> Result<(i64, bool)> {
 fn floating(v: &Value) -> Option<f64> {
     match v {
         Value::Integer(n) => Some(f64::from(*n)),
-        Value::Long(n) => Some(i64::from(*n) as f64),
+        Value::Long(n) => Some(f64::from(*n)),
         Value::Double(n) if n.is_finite() => Some(*n),
         _ => None,
     }
@@ -62,7 +63,7 @@ pub fn assign(kind: ScalarKind, value: &Value, object: bool) -> Result<Value> {
         (ScalarKind::Long, Value::Integer(n)) => Ok(Value::Long(i32::from(*n))),
         (ScalarKind::Integer, Value::Long(n)) => number(*n, false),
         (ScalarKind::Double, Value::Integer(n)) => Ok(Value::Double(f64::from(*n))),
-        (ScalarKind::Double, Value::Long(n)) => Ok(Value::Double(i64::from(*n) as f64)),
+        (ScalarKind::Double, Value::Long(n)) => Ok(Value::Double(f64::from(*n))),
         (ScalarKind::Double, Value::Double(n)) if n.is_finite() => Ok(value.clone()),
         (ScalarKind::Integer, Value::Double(n)) => Ok(Value::Integer(ordinal(*n, false)? as i16)),
         (ScalarKind::Long, Value::Double(n)) => Ok(Value::Long(ordinal(*n, true)? as i32)),
@@ -76,18 +77,16 @@ fn ordinal(value: f64, long: bool) -> Result<i64> {
         return Err(unsupported());
     }
     let rounded = value.round_ties_even();
-    if long {
-        let n = rounded as i64;
-        if n as f64 == rounded {
-            return Ok(n);
-        }
+    let (minimum, maximum) = if long {
+        (f64::from(i32::MIN), f64::from(i32::MAX))
     } else {
-        let n = rounded as i64;
-        if let Ok(n) = i16::try_from(n) {
-            return Ok(i64::from(n));
-        }
+        (f64::from(i16::MIN), f64::from(i16::MAX))
+    };
+    if rounded < minimum || rounded > maximum {
+        return Err(overflow());
     }
-    Err(overflow())
+    // Every in-range destination integer is exactly representable in Double.
+    Ok(rounded as i64)
 }
 
 pub fn bind(kind: ScalarKind, value: &Value) -> Result<Value> {
@@ -109,11 +108,11 @@ pub fn unary(op: &str, value: &Value) -> Result<Value> {
         ("not", Value::Boolean(v)) => Ok(Value::Boolean(!v)),
         ("not", Value::Integer(v)) => Ok(Value::Integer(!v)),
         ("not", Value::Long(v)) => Ok(Value::Long(!v)),
+        ("-", Value::Double(v)) if v.is_finite() => Ok(Value::Double(-v)),
         ("-", _) => {
             let (v, long) = integer(value)?;
             number(
-                i32::try_from(v.checked_neg().ok_or_else(overflow)?)
-                    .map_err(|_| overflow())?,
+                i32::try_from(v.checked_neg().ok_or_else(overflow)?).map_err(|_| overflow())?,
                 long,
             )
         }
@@ -168,32 +167,32 @@ pub fn binary(op: &str, left: &Value, right: &Value) -> Result<Value> {
                     Err(overflow())
                 };
             }
-            return Ok(Value::Double(if quotient == 0.0 {
-                0.0
-            } else {
-                quotient
-            }));
+            return Ok(Value::Double(quotient));
         }
         return Err(unsupported());
     }
     mixed_tail(op, left, right)
 }
-/// Add/Subtract/Multiply over Integer/Long/Double: Double when either operand is Double,
-/// otherwise the existing Integer/Long width rules. Other operators stay integer-only.
+/// Mixed Double arithmetic and comparisons; integer-only operations keep their width rules.
 fn mixed_tail(op: &str, left: &Value, right: &Value) -> Result<Value> {
     let double_involved = matches!(left, Value::Double(_)) || matches!(right, Value::Double(_));
-    if double_involved && matches!(op, "+" | "-" | "*") {
-        if let (Some(a), Some(b)) = (floating(left), floating(right)) {
-            let value = match op {
-                "+" => a + b,
-                "-" => a - b,
-                _ => a * b,
-            };
-            if !value.is_finite() {
-                return Err(overflow());
-            }
-            return Ok(Value::Double(if value == 0.0 { 0.0 } else { value }));
+    if double_involved && let (Some(a), Some(b)) = (floating(left), floating(right)) {
+        let result = match op {
+            "+" => a + b,
+            "-" => a - b,
+            "*" => a * b,
+            "=" => return Ok(Value::Boolean(a == b)),
+            "<>" => return Ok(Value::Boolean(a != b)),
+            "<" => return Ok(Value::Boolean(a < b)),
+            "<=" => return Ok(Value::Boolean(a <= b)),
+            ">" => return Ok(Value::Boolean(a > b)),
+            ">=" => return Ok(Value::Boolean(a >= b)),
+            _ => return Err(unsupported()),
+        };
+        if !result.is_finite() {
+            return Err(overflow());
         }
+        return Ok(Value::Double(result));
     }
     integer_tail(op, left, right)
 }

@@ -208,3 +208,66 @@ fn real_division_and_double_widths_match_the_m4_matrix() -> Result<(), Box<dyn s
     );
     Ok(())
 }
+
+#[test]
+fn double_to_long_checks_the_actual_destination_width_before_casting() {
+    for number in [
+        2147483648.0,
+        -2147483649.0,
+        2147483647.5,
+        4294967296.0,
+        1e30,
+        -1e30,
+    ] {
+        assert!(
+            matches!(
+                r::assign(ScalarKind::Long, &Value::Double(number), false),
+                Err(Error::Vba { number: 6, .. })
+            ),
+            "accepted out-of-range Double {number}"
+        );
+    }
+    for (number, expected) in [
+        (2147483647.0, i32::MAX),
+        (-2147483648.0, i32::MIN),
+        (-2147483648.5, i32::MIN),
+        (-1.5, -2),
+        (-2.5, -2),
+    ] {
+        assert_eq!(
+            r::assign(ScalarKind::Long, &Value::Double(number), false),
+            Ok(Value::Long(expected))
+        );
+    }
+}
+
+#[test]
+fn double_negation_comparisons_and_signed_zero_preserve_the_new_profile() {
+    assert_eq!(
+        r::unary("-", &Value::Double(1.25)),
+        Ok(Value::Double(-1.25))
+    );
+    for (op, expected) in [
+        ("=", false),
+        ("<>", true),
+        ("<", true),
+        ("<=", true),
+        (">", false),
+        (">=", false),
+    ] {
+        assert_eq!(
+            r::binary(op, &Value::Double(0.5), &Value::Long(1)),
+            Ok(Value::Boolean(expected))
+        );
+    }
+    assert_eq!(
+        r::binary("=", &Value::Double(-0.0), &Value::Integer(0)),
+        Ok(Value::Boolean(true))
+    );
+    let quotient = r::binary("/", &Value::Double(-0.0), &Value::Integer(2));
+    assert!(matches!(quotient,Ok(Value::Double(zero)) if zero.to_bits()==(-0.0f64).to_bits()));
+    assert!(matches!(
+        r::binary("+", &Value::Double(f64::MAX), &Value::Double(f64::MAX)),
+        Err(Error::Vba { number: 6, .. })
+    ));
+}

@@ -52,3 +52,7 @@ or external scenario assertions PASS. Graphical UI, DAP and VBA error-handler se
 label from the non-reused SessionInstance. Key handles, locations, breakpoints and stepping by the
 engine instance; caller-label/frame/generation equality alone cannot identify an execution. Include
 the replacement-session regression in native/WASI evidence when changing these identities.
+
+The current scalar consumer is m4-scalars-v1 under [ADR 0010](../../../docs/decisions/0010-m4-profile-and-verification-hardening.md).
+Compile against current VM capabilities; legacy M3-tagged programs require recompilation. Inspect
+the xtask workspace banner before trusting gate evidence from a shared target cache.

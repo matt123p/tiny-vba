@@ -163,6 +163,42 @@ fn main() -> Result<(), Box<dyn Error>> {
         run(&mut s, &mut vm::NoHost, &Controller::new())? == Outcome::Cancelled,
         "infinite loop cancel",
     )?;
+    let mut real = build(
+        "Function Answer() As Double\nAnswer=7/2\nEnd Function",
+        vec![],
+        None,
+    )?;
+    ensure(
+        run(&mut real, &mut vm::NoHost, &Controller::new())?
+            == Outcome::Completed(ReturnValue::Function(Value::Double(3.5))),
+        "M4 real division",
+    )?;
+    let mut comparison = build(
+        "Function Answer() As Boolean\nAnswer=-0.5<1\nEnd Function",
+        vec![],
+        None,
+    )?;
+    ensure(
+        run(&mut comparison, &mut vm::NoHost, &Controller::new())?
+            == Outcome::Completed(ReturnValue::Function(Value::Boolean(true))),
+        "M4 mixed comparison",
+    )?;
+    let mut overflow = build(
+        "Function Answer() As Long\nAnswer=2147483648.0\nEnd Function",
+        vec![],
+        None,
+    )?;
+    ensure(
+        matches!(
+            run(&mut overflow, &mut vm::NoHost, &Controller::new())?,
+            Outcome::Failed(vm::Failure {
+                kind: vm::FailureKind::Runtime,
+                number: Some(6),
+                ..
+            })
+        ),
+        "M4 Long width overflow",
+    )?;
     let isolation = "Function Answer() As Long\nDim x As Long\nx=1\nx=x+1\nAnswer=x\nEnd Function";
     let mut previous = build(isolation, vec![], None)?;
     let mut old_controller = Controller::new();
@@ -222,7 +258,7 @@ fn main() -> Result<(), Box<dyn Error>> {
         "cross-session breakpoints/step target",
     )?;
     println!(
-        "M3_SMOKE PASS: Long(42), loop/calls Long(18), edited Long(41), invoke=1 polls=2, stale handles, cancellation and isolated instances"
+        "M3_SMOKE PASS: Long(42), loop/calls Long(18), edited Long(41), invoke=1 polls=2, stale handles, cancellation, isolated instances; M4 Double(3.5), Boolean(true), overflow 6"
     );
     Ok(())
 }

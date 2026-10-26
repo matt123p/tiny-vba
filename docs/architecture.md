@@ -96,3 +96,9 @@ Native debugging uses in-process Rust APIs; DAP remains an optional adapter for 
 Keep tools/architecture.json as the graph of actual Cargo packages. Add these nodes and reviewed
 external dependencies when their implementation lands; do not add placeholder APIs or manifests.
 Headless and UI checks must be separate so engine consumers do not pull GUI dependencies.
+
+M4's current execution profile is m4-scalars-v1 (ADR 0010), distinct from the historical M3 matrix.
+Typed scenario judgment and diagnostic/result classification stay in vba-conformance; CLI owns
+compile/run orchestration. Runtime owns narrowing bounds and scalar comparison rules. Infrastructure
+xtask resolves its checkout at runtime and prints that identity before gates. No dependency edge or
+IR operand changes were needed for this hardening.

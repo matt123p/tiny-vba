@@ -2,6 +2,11 @@
 
 Date: 2026-10-26. Status: adopted and implemented for the first M4 slice.
 
+Amended by [ADR 0010](0010-m4-profile-and-verification-hardening.md): the current consumer is
+m4-scalars-v1, failures exit nonzero, destination narrowing is range-checked, and validation roots
+are resolved at runtime. Evidence below records the original slice; current authoritative checks
+are recorded in progress under the hardening entry.
+
 ## Decision
 
 Start M4 with the two tasks the implementation plan sequences first: a typed scenario assertion

@@ -1,7 +1,7 @@
 //! Standalone frontend: help/version, parsing, fixture validation and typed scenario runs.
 #![forbid(unsafe_code)]
 use std::{fs::File, io::Read, process::ExitCode};
-use vba_conformance::{describe_value, Scenario, Status, MAX_SCENARIO_BYTES};
+use vba_conformance::{MAX_SCENARIO_BYTES, Scenario, Status, describe_value};
 use vba_diagnostics::{Diagnostic, SourceFile, SourceId};
 
 fn validate(path: &str) -> Result<(), Box<dyn std::error::Error>> {
@@ -52,14 +52,34 @@ fn run_scenario(path: &str) -> Result<(String, Status, String), Box<dyn std::err
         Err(diagnostic) => {
             return Ok((
                 scenario.id.clone(),
-                Status::Unsupported,
-                format!("compile: {}", diagnostic.message),
+                Status::from_diagnostic(&diagnostic),
+                format!("compile {}: {}", diagnostic.code, diagnostic.message),
             ));
         }
     };
-    let mut session = vba_vm::Session::new(program, 1, vec![], None, vba_vm::Limits::default())?;
+    let mut session =
+        match vba_vm::Session::new(program, 1, vec![], None, vba_vm::Limits::default()) {
+            Ok(session) => session,
+            Err(diagnostic) => {
+                return Ok((
+                    scenario.id,
+                    Status::from_diagnostic(&diagnostic),
+                    format!("launch: {diagnostic}"),
+                ));
+            }
+        };
     let outcome = loop {
-        match session.run_slice(&mut vba_vm::NoHost, 4096, &mut |_| Ok(false))? {
+        let outcome = match session.run_slice(&mut vba_vm::NoHost, 4096, &mut |_| Ok(false)) {
+            Ok(outcome) => outcome,
+            Err(diagnostic) => {
+                return Ok((
+                    scenario.id,
+                    Status::from_diagnostic(&diagnostic),
+                    format!("execution: {diagnostic}"),
+                ));
+            }
+        };
+        match outcome {
             vba_vm::Outcome::Yielded => continue,
             terminal => break terminal,
         }
@@ -82,13 +102,17 @@ fn run_scenario(path: &str) -> Result<(String, Status, String), Box<dyn std::err
             ),
         },
         (vba_vm::Outcome::Failed(failure), _) => match failure.kind {
-            vba_vm::FailureKind::Unsupported => (
-                scenario.id.clone(),
-                Status::Unsupported,
-                failure.message,
-            ),
+            vba_vm::FailureKind::Unsupported => {
+                (scenario.id.clone(), Status::Unsupported, failure.message)
+            }
             vba_vm::FailureKind::Runtime => {
-                let number = failure.number.unwrap_or_default();
+                let Some(number) = failure.number else {
+                    return Ok((
+                        scenario.id,
+                        Status::Crash,
+                        "runtime failure omitted its VBA error number".into(),
+                    ));
+                };
                 let status = scenario.expected.judge_error(number);
                 let detail = if status == Status::Pass {
                     format!("error {number}")
@@ -109,16 +133,17 @@ fn run_scenario(path: &str) -> Result<(String, Status, String), Box<dyn std::err
         (vba_vm::Outcome::Paused(pause), _) => (
             scenario.id.clone(),
             Status::Unsupported,
-            format!("paused at {:?}; fixture must run to completion", pause.reason),
+            format!(
+                "paused at {:?}; fixture must run to completion",
+                pause.reason
+            ),
         ),
         (vba_vm::Outcome::Waiting, _) => (
             scenario.id.clone(),
             Status::Unsupported,
             "waiting on a host; pure-language fixtures must not".into(),
         ),
-        (vba_vm::Outcome::Cancelled, _) => {
-            (scenario.id.clone(), Status::Crash, "cancelled".into())
-        }
+        (vba_vm::Outcome::Cancelled, _) => (scenario.id.clone(), Status::Crash, "cancelled".into()),
         // The run loop above only breaks on non-Yielded outcomes; this arm is unreachable
         // but keeps the match exhaustive without panicking.
         (vba_vm::Outcome::Yielded, _) => (
@@ -281,7 +306,7 @@ fn main() -> ExitCode {
     match args.next().as_deref() {
         None | Some("--help" | "-h" | "help") => {
             println!(
-                "tiny-vba: standalone VBA interpreter scaffold\n\nUsage: vba-cli <command> [options]\n\nImplemented: --help, --version, conformance validate|run <scenario>, parse <source.bas|source.cls>\nM2: check|compile|disasm <source.bas> [--entry <name>]\nM3: run <source.bas> [--entry <name>]\nPlanned commands: debug, dap, inspect-project\nrun executes the m3-core-v1 subset. conformance run executes a validated fixture and compares its typed expectation (MISMATCH exits 1; other statuses exit 0). Unsupported forms and targets fail with exit 2. Fixture validation does not execute scenarios."
+                "tiny-vba: standalone VBA interpreter scaffold\n\nUsage: vba-cli <command> [options]\n\nImplemented: --help, --version, conformance validate|run <scenario>, parse <source.bas|source.cls>\nM2: check|compile|disasm <source.bas> [--entry <name>]\nM3: run <source.bas> [--entry <name>]\nPlanned commands: debug, dap, inspect-project\nrun executes the m4-scalars-v1 subset. conformance run executes a validated fixture and compares its typed expectation (MISMATCH/CRASH/TIMEOUT exit 1; INVALID_FIXTURE exits 2; PASS/UNSUPPORTED exit 0). Unsupported forms and targets fail with exit 2. Fixture validation does not execute scenarios."
             );
             ExitCode::SUCCESS
         }
@@ -328,11 +353,7 @@ fn main() -> ExitCode {
             match path.as_deref().map(run_scenario) {
                 Some(Ok((scenario_id, status, detail))) => {
                     println!("RESULT {scenario_id}: {} ({detail})", status.as_str());
-                    if status == Status::Mismatch {
-                        ExitCode::FAILURE
-                    } else {
-                        ExitCode::SUCCESS
-                    }
+                    ExitCode::from(status.exit_code())
                 }
                 Some(Err(error)) => {
                     eprintln!("{error}");

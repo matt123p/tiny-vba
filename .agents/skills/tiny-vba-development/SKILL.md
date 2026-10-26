@@ -34,3 +34,8 @@ headless native/WASM use and the required editor/debugger UI owned by this repos
 Run the relevant checks plus the repository gates `cargo xtask ci` and `cargo xtask wasm`.
 Report exact verification, unavailable checks and remaining gaps; compilation is not proof of
 VBA compatibility. Leave the next smallest implementable task recorded in progress.
+
+[ADR 0010](../../../docs/decisions/0010-m4-profile-and-verification-hardening.md) publishes
+m4-scalars-v1; do not silently expand m3-core-v1. Keep failure classifications and nonzero
+CRASH/TIMEOUT/MISMATCH exits intact, compare exact payloads, and check narrowing bounds before casts.
+Confirm xtask's logged workspace matches the intended checkout; shared binaries may originate elsewhere.

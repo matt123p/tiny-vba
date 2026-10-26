@@ -10,7 +10,7 @@ use vba_ir::{self as ir, Instruction as I};
 use vba_runtime as runtime;
 use vba_values::{Location, Locations, ScalarKind, Value};
 type Result<T> = std::result::Result<T, Diagnostic>;
-pub const PROFILE: &str = "m3-core-v1";
+pub const PROFILE: &str = runtime::PROFILE;
 pub fn capabilities() -> ir::Capabilities {
     let mut c = ir::Capabilities::ir1_structural();
     c.profile = PROFILE.into();

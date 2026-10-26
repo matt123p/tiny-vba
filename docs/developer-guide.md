@@ -40,3 +40,9 @@ When UI packages land, add separate UI build/snapshot/accessibility checks and e
 package checks; the existing workspace-wide WASM library gate must be reviewed for the new layout.
 Use the same reviewed egui family revisions as the embedding host: Cargo patches are applied
 by the consuming workspace root, so standalone and embedding workspaces must align their pins.
+
+Validation must run from the intended checkout: xtask now discovers its runtime workspace and logs
+`xtask workspace: ...`. It does not trust the executable's compiled-in source path, which can refer
+to a different clone in a shared build cache. The cross-checkout integration test covers this case;
+wasm-run also honors CARGO_TARGET_DIR when finding the built artifact. Current execution uses
+m4-scalars-v1; recompile legacy M3 programs instead of relabeling their verification target.

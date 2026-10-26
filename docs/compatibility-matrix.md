@@ -1,6 +1,6 @@
 # Compatibility matrix
 
-Updated 2026-10-26. Stage: M4 first slice complete. **The documented m3-core-v1 subset plus the M4 real-division/Double widths has execution evidence; the 20 self-authored fixtures are asserted 17 PASS / 3 UNSUPPORTED.**
+Updated 2026-10-26. Stage: M4 first slice complete. **The documented m4-scalars-v1 consumer, including M3 control and M4 scalar widths, has execution evidence; the 20 self-authored fixtures are asserted 17 PASS / 3 UNSUPPORTED.**
 
 | Dimension | Status | Evidence / next gate |
 |---|---|---|
@@ -10,7 +10,7 @@ Updated 2026-10-26. Stage: M4 first slice complete. **The documented m3-core-v1 
 | Source IDs/spans/statements and diagnostic attachment | Implemented M0 | vba-diagnostics/tests/source.rs and vba-syntax/tests/frontend.rs; same-line/control statement mapping |
 | Typed scalar states/UTF-16 strings and bounded locations | Implemented M0 foundations | vba-values/tests/locations.rs; shared M3 runtime rules live in vba-runtime |
 | Generic foreign ownership/error/wait prototype | Implemented M0 | vba-testkit/tests/round_trip.rs and M3 VM host tests; no Office bridge |
-| Scenario validation / 20 independent fixtures | Implemented M0 | vba-conformance/tests/scenarios.rs and CLI; all VBA cases NOT_RUN |
+| Scenario validation / 20 independent fixtures | Implemented M0 | vba-conformance/tests/scenarios.rs and CLI; validation alone reports NOT_RUN; assertion results are separate |
 | Typed scenario assertion runner (M0 fixtures) | Implemented M4 first slice | `conformance run`: 17 PASS / 3 UNSUPPORTED asserted in CLI tests; [ADR 0009](decisions/0009-m4-runner-and-numeric-widths.md); external corpora stay NOT_RUN |
 | Bounded source-preserving lexer/parser | Implemented M1 subset | vba-syntax/tests/frontend.rs; [grammar matrix](frontend.md) |
 | External grammar evaluation | Partial: five reviewed files | [report](m1-corpus-report.md); two unsupported, three intentionally broken rejected |
@@ -19,6 +19,7 @@ Updated 2026-10-26. Stage: M4 first slice complete. **The documented m3-core-v1 
 | Checkpoint IR lowering / deterministic source maps | Implemented M2 subset | Answer golden, nested calls, same-line statements, If/For and unreachable-code tests |
 | IR 1 verifier / disassembly / capabilities / budgets | Implemented M2 structural contract | vba-ir/tests/verification.rs; all instruction shapes, malformed tables/CFG/stacks and limits |
 | Scalar runtime matrix | Implemented M3 subset, extended M4 | [Exact supported combinations](runtime.md), vba-runtime/tests/scalars.rs; `/` and Double widths added at M4 with error numbers 6/11 |
+| Gate-root isolation / M4 scalar bounds and report fidelity | Implemented M4 hardening | cross-checkout xtask regression; numeric boundary, failure status and UTF-16/float-bit tests; ADR 0010 |
 | Broader coercion/arrays/builtins/On Error handlers | Not implemented | Rest of M4; error handlers need a new handler-capable IR contract |
 | Bytecode/VM implementation specification | IR and VM subset implemented | IR 1, ADR 0004/0006/0007 and M2/M3 tests |
 | Bytecode execution / generic host continuations | Implemented M3 subset | vba-vm/tests/execution.rs and host.rs; permissions, typed patches, wait/cancel, no replay |
@@ -32,4 +33,5 @@ Updated 2026-10-26. Stage: M4 first slice complete. **The documented m3-core-v1 
 | COM, DLLs, UserForms, P-code and binary source writing | Deferred / outside MVP | Separate design required |
 
 M3 execution evidence is restricted to its explicit tests/examples and runtime matrix. It does not establish
-workbook/Office compatibility, browser UI behavior or corpus pass rates; M0/external manifests remain NOT_RUN.
+workbook/Office compatibility, browser UI behavior or external corpus pass rates; self-authored
+M0 assertions are 17 PASS / 3 UNSUPPORTED and external corpus execution remains NOT_RUN.

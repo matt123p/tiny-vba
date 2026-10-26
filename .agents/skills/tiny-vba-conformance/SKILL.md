@@ -67,3 +67,8 @@ Use vba-runtime for operations/edits. VM host dispatch must use checked precommi
 validation and explicit per-site permissions; foreign aliases remain unsupported. Run cargo xtask ci,
 wasm and wasm-run (native plus actual WASI execution). Runtime example results do not mark unrun M0
 or external scenario assertions PASS. Graphical UI, DAP and VBA error-handler semantics remain later work.
+
+[ADR 0010](../../../docs/decisions/0010-m4-profile-and-verification-hardening.md) publishes
+m4-scalars-v1; do not silently expand m3-core-v1. Keep failure classifications and nonzero
+CRASH/TIMEOUT/MISMATCH exits intact, compare exact payloads, and check narrowing bounds before casts.
+Confirm xtask's logged workspace matches the intended checkout; shared binaries may originate elsewhere.
