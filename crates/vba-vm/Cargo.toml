@@ -1,0 +1,18 @@
+[package]
+name = "vba-vm"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+publish = false
+
+[lints]
+workspace = true
+
+[dependencies]
+vba-diagnostics.workspace = true
+vba-ir.workspace = true
+vba-values.workspace = true
+vba-runtime.workspace = true
+vba-foreign.workspace = true

@@ -1,0 +1,59 @@
+{
+  "schema_version": 1,
+  "allowed_normal_dependencies": {
+    "vba-conformance": [
+      "vba-diagnostics",
+      "vba-testkit",
+      "vba-vm"
+    ],
+    "vba-diagnostics": [],
+    "vba-testkit": [
+      "vba-diagnostics",
+      "vba-foreign",
+      "vba-values"
+    ],
+    "vba-foreign": [
+      "vba-diagnostics",
+      "vba-values"
+    ],
+    "vba-values": [
+      "vba-diagnostics"
+    ],
+    "vba-vm": [
+      "vba-diagnostics",
+      "vba-foreign",
+      "vba-ir",
+      "vba-runtime",
+      "vba-values"
+    ],
+    "vba-ir": [
+      "vba-diagnostics",
+      "vba-values"
+    ],
+    "vba-runtime": [
+      "vba-diagnostics",
+      "vba-values"
+    ],
+    "vba-dap": [
+      "vba-debug"
+    ],
+    "vba-debug": [
+      "vba-diagnostics",
+      "vba-vm"
+    ],
+    "vba-project": [
+      "vba-diagnostics"
+    ],
+    "vba-semantics": [
+      "vba-diagnostics",
+      "vba-syntax"
+    ],
+    "vba-syntax": [
+      "vba-diagnostics"
+    ],
+    "vba-cli": [
+      "vba-diagnostics"
+    ],
+    "xtask": []
+  }
+}

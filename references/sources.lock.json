@@ -1,0 +1,119 @@
+{
+  "schema_version": 1,
+  "checked_on": "2026-10-26",
+  "sources": [
+    {
+      "id": "reflex-grid",
+      "path": "tests/corpora/reflex-grid",
+      "repository": "https://github.com/milochen0418/reflex_grid.git",
+      "commit": "03a338b214df243f1bc68e50512936ddc5566c76",
+      "declared_license": "MIT",
+      "license_files": [
+        {
+          "path": "LICENSE",
+          "sha256": "a6c7fac3d7ba2a1c58b2dc32880902ef62ccf2e7fe85e2fe25ba74b088dc0031"
+        }
+      ],
+      "role": "language-oracle-and-office-scenarios",
+      "adoption_status": "pending-specimen-review",
+      "execution_policy": "never-auto-execute",
+      "notes": "Mac oracle profile; fixture rights must be assessed separately; implementation code excluded."
+    },
+    {
+      "id": "vba-json",
+      "path": "tests/corpora/vba-json",
+      "repository": "https://github.com/VBA-tools/VBA-JSON.git",
+      "commit": "06b6c45a2e8086a7a761f00bead7460852d6b602",
+      "declared_license": "MIT",
+      "license_files": [
+        {
+          "path": "LICENSE",
+          "sha256": "492fb567280ae8536005805940a3f9588bcf7e97d160c7e8c798a8f178d46e09"
+        }
+      ],
+      "role": "library-integration",
+      "adoption_status": "pending-specimen-review",
+      "execution_policy": "never-auto-execute",
+      "notes": "Workbook specs may require VBA-Dictionary or Microsoft Scripting Runtime."
+    },
+    {
+      "id": "vba-project-starter",
+      "path": "tests/corpora/vba-project-starter",
+      "repository": "https://github.com/jlandgre/VBA_Project_Starter.git",
+      "commit": "7532b5376c1bc0a74fe293aefcb6f054c29082c3",
+      "declared_license": "MIT",
+      "license_files": [
+        {
+          "path": "LICENSE",
+          "sha256": "9423d047090dd950db654edcf1e2aea96f33a118f1c3d07d1d3191253aba7b2d"
+        }
+      ],
+      "role": "advanced-workbooks",
+      "adoption_status": "pending-specimen-review",
+      "execution_policy": "never-auto-execute",
+      "notes": "Cross-workbook references and application dependencies require classification."
+    },
+    {
+      "id": "vba-samples",
+      "path": "tests/corpora/vba-samples",
+      "repository": "https://github.com/chapmjs/vba-samples.git",
+      "commit": "46884daad3297e56fc0d8af2835ae9e2a1a119de",
+      "declared_license": "NOASSERTION",
+      "license_files": [],
+      "role": "workbook-specimens",
+      "adoption_status": "pending-specimen-review",
+      "execution_policy": "never-auto-execute",
+      "notes": "No top-level licence found: rights review required before fixture adoption or redistribution; external IO/forms likely."
+    },
+    {
+      "id": "excel-vba-projects",
+      "path": "tests/corpora/excel-vba-projects",
+      "repository": "https://github.com/dtripathi18/Excel-VBA-Projects.git",
+      "commit": "4a8c2fba01505ed575e768a55d5f5225cd4edcfe",
+      "declared_license": "NOASSERTION",
+      "license_files": [],
+      "role": "workbook-specimens",
+      "adoption_status": "pending-specimen-review",
+      "execution_policy": "never-auto-execute",
+      "notes": "No top-level licence found: rights review required before fixture adoption or redistribution; network/application dependencies require classification."
+    },
+    {
+      "id": "tree-sitter-vba",
+      "path": "tests/corpora/tree-sitter-vba",
+      "repository": "https://github.com/harumiWeb/tree-sitter-vba.git",
+      "commit": "83c5c3c3c7210468fb6745b585b5fb6532aa2376",
+      "declared_license": "MIT",
+      "license_files": [
+        {
+          "path": "LICENSE",
+          "sha256": "f58a3dc0eafdfbb9615856ba74f340c96db45d0f7423cbb28bbdc12bef5c08a1"
+        }
+      ],
+      "role": "grammar-corpus",
+      "adoption_status": "pending-specimen-review",
+      "execution_policy": "never-auto-execute",
+      "notes": "Use examples and test/corpus as data only; third-party fixture licences need independent review; do not link generated C."
+    },
+    {
+      "id": "vba-docs",
+      "path": "references/VBA-Docs",
+      "repository": "https://github.com/MicrosoftDocs/VBA-Docs.git",
+      "commit": "6765796079a1552460769cb633068d387594dc99",
+      "declared_license": "CC-BY-4.0; code samples MIT",
+      "license_files": [
+        {
+          "path": "LICENSE",
+          "sha256": "8b4b326e154373693cfa6db9b3a77b26c45e1b269c140d20f945e7460cc6c6ea"
+        },
+        {
+          "path": "LICENSE-CODE",
+          "sha256": "91f7258203fd43ba6d6f7f72b644eaedee9e3430f035c053beb6f34052f045e2"
+        }
+      ],
+      "role": "official-reference",
+      "adoption_status": "pending-specimen-review",
+      "execution_policy": "never-auto-execute",
+      "notes": "Official language/Excel/Word references; documentation and sample licences remain separate."
+    }
+  ]
+}

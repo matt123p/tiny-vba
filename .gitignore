@@ -1,0 +1,35 @@
+# Rust build output (keep Cargo.lock for reproducible application builds).
+target/
+
+# Fuzzing output and generated reports; preserve checked-in documentation.
+/fuzz/artifacts/
+/fuzz/coverage/
+/reports/*
+!/reports/README.md
+/coverage/
+/lcov.info
+
+# Local fixtures and generated web bundles.
+/tests/fixtures/local/
+/dist/
+
+# Local environment configuration; retain shareable examples.
+.env
+.env.*
+!.env.example
+!.env.*.example
+
+# Editor and operating-system state (agent skills/configuration stay tracked).
+/.idea/
+/.vscode/
+*.swp
+*.swo
+*~
+.DS_Store
+Thumbs.db
+Desktop.ini
+
+# Python maintenance-tool caches.
+__pycache__/
+*.py[cod]
+.venv/

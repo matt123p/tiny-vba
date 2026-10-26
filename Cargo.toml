@@ -1,0 +1,38 @@
+[workspace]
+resolver = "3"
+members = ["crates/*", "apps/*", "xtask"]
+exclude = ["tests/corpora", "references/VBA-Docs", "fuzz"]
+
+[workspace.package]
+version = "0.1.0"
+edition = "2024"
+rust-version = "1.95"
+license = "MIT"
+repository = "https://github.com/matt123p/tiny-vba"
+
+[workspace.dependencies]
+vba-diagnostics = { path = "crates/vba-diagnostics" }
+vba-values = { path = "crates/vba-values" }
+vba-syntax = { path = "crates/vba-syntax" }
+vba-semantics = { path = "crates/vba-semantics" }
+vba-ir = { path = "crates/vba-ir" }
+vba-runtime = { path = "crates/vba-runtime" }
+vba-foreign = { path = "crates/vba-foreign" }
+vba-vm = { path = "crates/vba-vm" }
+vba-debug = { path = "crates/vba-debug" }
+vba-dap = { path = "crates/vba-dap" }
+vba-project = { path = "crates/vba-project" }
+vba-testkit = { path = "crates/vba-testkit" }
+vba-conformance = { path = "crates/vba-conformance" }
+
+[workspace.lints.rust]
+unsafe_code = "forbid"
+
+[workspace.lints.clippy]
+unwrap_used = "deny"
+expect_used = "deny"
+panic = "deny"
+todo = "deny"
+unimplemented = "deny"
+unreachable = "deny"
+indexing_slicing = "deny"
