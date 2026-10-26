@@ -1,0 +1,3 @@
+# Source-map byte offsets and diagnostic goldens must match on every platform.
+# Auto detection leaves binary data unchanged; CRLF inputs are authored explicitly in tests.
+* text=auto eol=lf

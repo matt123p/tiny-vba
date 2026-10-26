@@ -13,6 +13,16 @@ passed. Corrected the fixture-schema documentation's stale claim that compile is
 These checks cover implemented M0–M2 behavior. VM/Office execution remains unavailable; WASM
 runtime, other operating systems and separate MSRV testing are not claimed by these local runs.
 
+### Cross-platform checkout correction
+
+The first pushed M1/M2 commit passed Linux/macOS, WASM and corpus CI; Windows exposed Git's
+CRLF checkout conversion changing source byte offsets and golden line endings. Added root
+`.gitattributes` with `text=auto eol=lf` so tracked text fixtures retain their reviewed bytes on
+all platforms while auto-detected binaries remain untouched. Explicit CRLF/lone-CR parser
+inputs stay covered by authored tests. A fresh `core.autocrlf=true` checkout preserved LF fixture
+bytes and passed `cargo xtask ci`, including all 54 tests, without corpus downloads. Cross-platform
+CI is rerun after this fix; source-map tests stay exact rather than normalizing parser input.
+
 ## M2 completion
 
 Implemented ordered module/procedure scopes and case-insensitive lookup, Option Explicit, scalar
