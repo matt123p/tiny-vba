@@ -16,7 +16,10 @@ Keep generated artifacts under ignored reports/. External macros never run as pa
 For M0 fixtures, run `cargo run -p vba-cli -- conformance validate tests/fixtures/m0/arithmetic.vbas`.
 Validation succeeds for well-formed [schema 1](scenario-format.md), reports NOT_RUN, and never executes VBA.
 See [ADR 0003](decisions/0003-m0-source-scenarios-foreign.md) for source/location identities and explicit
-pending-host cancellation obligations. M1 starts with the bounded source-aware lexer.
+pending-host cancellation obligations. M1 starts with the bounded source-aware lexer. Before compiler/VM work, read the adopted
+[bytecode/VM specification](bytecode-vm-specification.md) and [ADR 0004](decisions/0004-bytecode-vm-contract.md).
+They define the IR 1 layout/verifier/continuation contracts and M2/M3 acceptance cases; no bytecode
+implementation exists yet. Introduce vba-compiler and its reviewed dependencies with real M2 code.
 
 To update a source pin, fetch/checkout an explicitly chosen commit in that submodule, inspect upstream notices
 and specimen changes without running it, then update the source lock and affected inventory hashes together.

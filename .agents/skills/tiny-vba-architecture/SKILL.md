@@ -9,6 +9,10 @@ Read [architecture](../../../docs/architecture.md), the [actual dependency graph
 [ADR 0001](../../../docs/decisions/0001-repository-scope.md) and
 [ADR 0002](../../../docs/decisions/0002-editor-debugger-ui.md).
 Inspect the affected Cargo manifests and callers before designing an API.
+Read the adopted [IR 1 contract](../../../docs/bytecode-vm-specification.md) and
+[ADR 0004](../../../docs/decisions/0004-bytecode-vm-contract.md) for bytecode/VM work.
+Compilation/lowering belongs in a planned upper-layer vba-compiler, introduced with real M2 code;
+do not add documentation-only graph nodes or put reusable lowering inside the CLI/VM.
 
 ## Place responsibility before adding code
 

@@ -7,6 +7,12 @@ application forks or corpus downloads. This repository also owns an optional edi
 and standalone IDE; those upper layers may depend on UI toolkits.
 VBA source flows through syntax → semantics → verified IR → explicit-state VM.
 The dependency graph is separate from this data flow: IR does not need a dependency on the binder.
+The adopted [IR 1 specification](bytecode-vm-specification.md) defines instruction/stack contracts,
+verified immutable programs, calling conventions, continuations and budgets. It is not implemented.
+[ADR 0004](decisions/0004-bytecode-vm-contract.md) plans an upper-layer vba-compiler for orchestration
+and lowering, depending on diagnostics/syntax/semantics/IR/values when it lands at M2. This avoids
+putting reusable compilation inside CLI/VM or reversing the IR/binder boundary. No compiler package
+or reserved DAG node is added by this design-only change.
 
 | Crate | Responsibility | Direct normal dependencies |
 |---|---|---|

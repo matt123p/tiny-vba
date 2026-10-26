@@ -66,6 +66,7 @@ xtask/ and tools/    quality commands and offline repository checks
 
 There is deliberately no root `src/`: Cargo builds `src/` inside each focused crate.
 See [architecture](docs/architecture.md) for crate responsibilities and dependencies,
+[bytecode/VM specification](docs/bytecode-vm-specification.md) for the adopted IR 1 implementation contract,
 [the implementation plan](docs/implementation-plan.md) for gated work,
 and [decisions](docs/decisions/0001-repository-scope.md) for choices and open questions.
 

@@ -1,7 +1,9 @@
 # Plan of action
 
 Prepared 2026-10-26. This plan builds the interpreter and editor/debugger UI here; document/Office integration stays external.
-Setup and M0 are complete. M1 frontend work is next. No parser/VM/corpus pass results are implied.
+Setup and M0 are complete. The detailed [bytecode/VM specification](bytecode-vm-specification.md)
+and [ADR 0004](decisions/0004-bytecode-vm-contract.md) are written before frontend work continues.
+M1 frontend implementation is next. No parser/VM/corpus pass results are implied.
 
 | Stage | Work in tiny-vba | Acceptance gate |
 |---|---|---|
@@ -49,9 +51,15 @@ M0 is implemented; see [ADR 0003](decisions/0003-m0-source-scenarios-foreign.md)
 1. Implement the bounded lexer for Arithmetic.bas with exact source spans, CRLF/continuations/comments,
    colon-separated statements and positive/negative token fixtures; then build the source-preserving parser.
 2. Extend the frontend to the reviewed small procedure/declaration/assignment/If/For/call subset.
-3. Bind names, lower and verify bytecode, then execute Answer() as Long 42.
+3. Implement the IR 1 layouts, bounded verifier/disassembler and lowering/compilation coordinator
+   under the bytecode/VM contract; bind names and then execute Answer() as Long 42.
 4. Wire debugger controls and the generic foreign protocol, including stop/disconnect cancellation.
 5. Coordinate the fork-owned FillCells bridge proof and expand semantics from classified corpus failures.
+
+IR 1 deliberately restricts the first executable language subset; optional/named direct calls,
+arrays, error handlers and full foreign ByRef behavior need later features/IR contracts. M2/M3
+acceptance cases and version/feature refusal rules are listed in the bytecode/VM specification.
+The specification is a design deliverable and does not complete M2 or M3.
 
 ## Measurement and decisions
 

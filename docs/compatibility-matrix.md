@@ -13,6 +13,7 @@ Updated 2026-10-26. Stage: M0 complete. **No VBA feature is executable or verifi
 | Scenario validation / 20 independent fixtures | Implemented M0 | vba-conformance/tests/scenarios.rs and CLI; all VBA cases NOT_RUN |
 | Parser and binder | Not implemented | M1/M2 |
 | VBA values/coercion/builtins | Not implemented | M3/M4 |
+| Bytecode/VM implementation specification | Written, not implemented | IR 1 and ADR 0004; no bytecode acceptance results |
 | Bytecode execution / VM host wiring | Not implemented | M3; standalone protocol prototype only |
 | Breakpoints, stepping and resume | Not implemented | M3 |
 | MS-OVBA source decoding | Not implemented | M6 |

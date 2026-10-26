@@ -2,6 +2,25 @@
 
 Updated 2026-10-26. Current stage: M0 complete; M1 frontend is next.
 
+## Bytecode/VM contract prepared before M1
+
+Authored the adopted IR 1 bytecode/VM implementation specification and ADR 0004. The document
+specifies exact instruction operands/stack effects, program/constants/signatures/slots, source
+checkpoint mapping, canonical direct ByRef, restricted M0 host adaptation and single-use host
+continuations. It defines verifier/disassembly rules, explicit execution states and errors,
+checkpoint visit permits, stepping/inspection generations, resource defaults, lowering examples
+and M2/M3 positive/negative acceptance obligations. A planned upper-layer vba-compiler owns
+compilation/lowering when implemented; no package/dependency graph change is made now.
+
+Updated architecture, debugger, plan, compatibility, development entry points and relevant skills.
+This is documentation only: no instruction enum, verifier, compiler, VM, debugger or runtime
+behavior was added. All M0 VBA fixtures and external corpus candidates retain their prior status.
+M2/M3 remain unimplemented. M1's bounded lexer remains the next smallest implementation task.
+
+Validation: documentation links and instruction/reference consistency reviewed; `cargo xtask ci`
+and `cargo xtask wasm` passed after the documentation change. Existing 16 integration tests still
+cover M0 only; no bytecode acceptance case is claimed to have run.
+
 ## M0 completion
 
 - Implemented SourceId, per-source StatementId, bounded SourceFile, checked UTF-8 byte spans and

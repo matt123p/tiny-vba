@@ -10,6 +10,10 @@ and [compatibility matrix](compatibility-matrix.md) describe development contrac
 [M0 contract decision](decisions/0003-m0-source-scenarios-foreign.md) and
 [scenario format](scenario-format.md) document the implemented foundations and fixture validator.
 
+[Bytecode and VM specification](bytecode-vm-specification.md) defines the adopted IR 1 instruction,
+verification and execution contract; [ADR 0004](decisions/0004-bytecode-vm-contract.md) records the choices.
+The IR/VM implementation remains M2/M3 work.
+
 [Agent design skills](agent-skills.md) lists the shared Codex/OpenCode skills and their task routing.
 
 ## Supplied design inputs (preserved)

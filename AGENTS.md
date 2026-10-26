@@ -28,6 +28,8 @@ Routine implementation choices within the agreed scope do not require another ap
   Keep UI dependencies above compiler/runtime/VM/debugger-controller crates.
 - `vba-foreign` is a minimal host-neutral protocol, not a second Office AutomationHost.
   Test doubles can record generic calls; Office-shaped contract tests belong in the forks.
+- Follow `docs/bytecode-vm-specification.md` and ADR 0004 for IR 1 operands, verification, calls,
+  checkpoint/continuation semantics and budgets; the specification is not implemented support.
 - The VM uses explicit frames/bytecode and statement checkpoints. Debugger hooks exist before feature expansion.
   `vba-debug` controls the VM; the VM never depends on debugger/DAP/UI crates.
 - Follow `docs/architecture.md`; update the reviewed DAG in `tools/architecture.json` when justified.

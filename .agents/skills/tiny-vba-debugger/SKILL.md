@@ -9,6 +9,11 @@ Read [debugger contract](../../../docs/debugger.md) and the state/lifecycle sect
 [editor/debugger UI](../../../docs/editor-debugger-ui.md). Inspect VM checkpoints and controller
 state before adding controls. Use the editor UI skill as well when changing visual interaction.
 
+Follow [IR 1 checkpoint/continuation semantics](../../../docs/bytecode-vm-specification.md): distinguish
+normal checkpoint pauses, post-Stop pauses, fault snapshots, quota yields and host waits. Continue grants
+one permit only for the paused checkpoint visit; step targets use frame identities and dynamic visits.
+The specification is adopted design, not a working VM/debugger.
+
 ## Required invariants
 
 - Pause at source statement boundaries with explicit frames and instruction state. Keep separate

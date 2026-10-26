@@ -15,6 +15,11 @@ checked UTF-8 source spans, caller-assigned source/statement identities, UTF-16 
 scalar states and bounded owner-scoped locations. These are not parser/coercion/VM implementations.
 Reuse these types rather than introducing a second value/source model.
 
+The adopted [IR 1 specification](../../../docs/bytecode-vm-specification.md) defines exact stack effects,
+canonical direct ByRef, empty-stack checkpoint blocks, verifier and version/feature refusal rules.
+Use shared runtime semantics for operators/conversions; IR verification checks shape, not full VBA types.
+Later instructions need an explicit IR-version/contract update. The specification itself is not support.
+
 ## Preserve the language model
 
 - Preserve source spelling while resolving identifiers case-insensitively. Retain module/source

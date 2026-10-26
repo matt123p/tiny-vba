@@ -16,6 +16,11 @@ vba-testkit tests before extending it; final alias/type/error writeback behavior
 Session callers must cancel on close/disconnect; Drop cannot access a host. Host/location owner
 identities must be unique during their session.
 
+The [IR 1 specification](../../../docs/bytecode-vm-specification.md) requires an exactly-once VM-owned
+host continuation and an M3 typed-writeback adapter. The restricted snapshot feature rejects unsupported
+foreign aliases/error writebacks; it does not define full VBA ByRef. Close/stop/disconnect must cancel
+pending host tokens, and a vanished host must not be reported as successfully cleaned up.
+
 ## Keep the boundary generic
 
 vba-foreign carries invocation kind, reference/target, named/positional/omitted arguments, ByRef
