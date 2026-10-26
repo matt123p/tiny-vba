@@ -1,0 +1,18 @@
+tiny-vba-scenario = 1
+id = nothing
+module = Module1
+entry = Answer
+provenance = independently-authored
+license = MIT
+profile = pure-language-unmeasured
+requirements = objects
+capabilities = none
+evidence = reasoned-not-oracle
+expected = Nothing
+rationale = An unset object reference is Nothing.
+---
+Option Explicit
+
+Public Function Answer() As Object
+    Set Answer = Nothing
+End Function

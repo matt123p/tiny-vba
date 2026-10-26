@@ -1,0 +1,18 @@
+tiny-vba-scenario = 1
+id = arithmetic
+module = Module1
+entry = Answer
+provenance = independently-authored
+license = MIT
+profile = pure-language-unmeasured
+requirements = arithmetic
+capabilities = none
+evidence = reasoned-not-oracle
+expected = Long:42
+rationale = Integral multiplication of 6 and 7 yields 42.
+---
+Option Explicit
+
+Public Function Answer() As Long
+    Answer = 6 * 7
+End Function

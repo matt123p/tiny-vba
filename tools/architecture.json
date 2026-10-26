@@ -4,6 +4,7 @@
     "vba-conformance": [
       "vba-diagnostics",
       "vba-testkit",
+      "vba-values",
       "vba-vm"
     ],
     "vba-diagnostics": [],
@@ -52,6 +53,7 @@
       "vba-diagnostics"
     ],
     "vba-cli": [
+      "vba-conformance",
       "vba-diagnostics"
     ],
     "xtask": []

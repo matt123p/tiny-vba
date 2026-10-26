@@ -1,12 +1,12 @@
 # Plan of action
 
 Prepared 2026-10-26. This plan builds the interpreter and editor/debugger UI here; document/Office integration stays external.
-The scaffold is complete; M0 is only partial. No parser/VM/corpus pass results are implied.
+Setup and M0 are complete. M1 frontend work is next. No parser/VM/corpus pass results are implied.
 
 | Stage | Work in tiny-vba | Acceptance gate |
 |---|---|---|
 | Setup — complete | Workspace/src layout, CLI refusal, adapted agent/skill files, docs, CI, corpus gitlinks/pins/hashes | Native scaffold checks and library WASM compilation; no application dependency |
-| M0 — contract and test harness | Source IDs/spans/diagnostics; versioned scenario parser/validator; at least 20 independently authored pure-language cases; foreign-call ownership prototype and deterministic double | CLI validates valid fixtures and rejects malformed ones; missing/empty/null distinctions; fake call/error/wait round trip; no silent execution stub |
+| M0 — contract and test harness — complete | Source IDs/spans/diagnostics; versioned scenario parser/validator; at least 20 independently authored pure-language cases; foreign-call ownership prototype and deterministic double | CLI validates valid fixtures and rejects malformed ones; missing/empty/null distinctions; fake call/error/wait round trip; no silent execution stub |
 | M1 — frontend | Lexer, source-preserving parser, .bas/.cls metadata, procedures/declarations/assignment/If/For/calls; positive/negative fixtures | Exact error spans and same-line statement IDs; bounded recovery; run a reviewed grammar-corpus subset and report unsupported syntax |
 | M2 — binder and bytecode | Scopes, Option Explicit, locals/procedure binding, argument subset, lowering, verifier/disassembler | Compile/disassemble examples; reject invalid branches/slots/stack effects; deterministic source maps |
 | M3 — executable VM + debugger | Minimal typed values/arithmetic, explicit frames, loops/calls, budgets; generic foreign protocol; break/step/inspect/edit/resume | Host-free Answer() returns Long 42; generic host call trace correct; pause/edit/resume without replay; infinite loop cancels; native and WASM execution smoke tests |
@@ -43,14 +43,15 @@ Do not duplicate those implementations in tiny-vba to make a local demonstration
 
 ## Immediate task sequence
 
-1. Define SourceId/Span/StatementId and diagnostic source attachment in vba-diagnostics.
-2. Add a versioned scenario format/validator and author 20 traceable pure-language cases;
-   include both valid and invalid fixture tests. Current candidate inventory is not this harness.
-3. Prove a minimal foreign invocation including omitted/named/ByRef args, error and suspend/resume ownership;
-   record the contract decision before expanding host behavior.
-4. Implement lexer/parser for Arithmetic.bas and a small procedure/loop subset, preserving same-line statements.
-5. Lower verified bytecode and execute Answer(), then add debugger controls and a generic foreign call.
-6. Coordinate the fork-owned FillCells bridge proof and expand semantics from classified corpus failures.
+M0 is implemented; see [ADR 0003](decisions/0003-m0-source-scenarios-foreign.md) and
+[scenario schema 1](scenario-format.md). All 20 VBA scenarios remain NOT_RUN.
+
+1. Implement the bounded lexer for Arithmetic.bas with exact source spans, CRLF/continuations/comments,
+   colon-separated statements and positive/negative token fixtures; then build the source-preserving parser.
+2. Extend the frontend to the reviewed small procedure/declaration/assignment/If/For/call subset.
+3. Bind names, lower and verify bytecode, then execute Answer() as Long 42.
+4. Wire debugger controls and the generic foreign protocol, including stop/disconnect cancellation.
+5. Coordinate the fork-owned FillCells bridge proof and expand semantics from classified corpus failures.
 
 ## Measurement and decisions
 

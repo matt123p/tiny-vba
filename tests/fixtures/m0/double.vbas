@@ -1,0 +1,18 @@
+tiny-vba-scenario = 1
+id = double
+module = Module1
+entry = Answer
+provenance = independently-authored
+license = MIT
+profile = pure-language-unmeasured
+requirements = arithmetic
+capabilities = none
+evidence = reasoned-not-oracle
+expected = Double:3.5
+rationale = Ordinary division yields a Double quotient.
+---
+Option Explicit
+
+Public Function Answer() As Double
+    Answer = 7 / 2
+End Function

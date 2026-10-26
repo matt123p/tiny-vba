@@ -1,0 +1,25 @@
+tiny-vba-scenario = 1
+id = byref
+module = Module1
+entry = Answer
+provenance = independently-authored
+license = MIT
+profile = pure-language-unmeasured
+requirements = calls,byref
+capabilities = none
+evidence = reasoned-not-oracle
+expected = Long:8
+rationale = ByRef writes are observable in the caller.
+---
+Option Explicit
+
+Public Function Answer() As Long
+    Dim x As Long
+    x = 7
+    Increment x
+    Answer = x
+End Function
+
+Private Sub Increment(ByRef value As Long)
+    value = value + 1
+End Sub

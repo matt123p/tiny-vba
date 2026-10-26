@@ -1,0 +1,18 @@
+tiny-vba-scenario = 1
+id = modulo
+module = Module1
+entry = Answer
+provenance = independently-authored
+license = MIT
+profile = pure-language-unmeasured
+requirements = arithmetic
+capabilities = none
+evidence = reasoned-not-oracle
+expected = Long:2
+rationale = The positive remainder of 17 divided by 5 is 2.
+---
+Option Explicit
+
+Public Function Answer() As Long
+    Answer = 17 Mod 5
+End Function

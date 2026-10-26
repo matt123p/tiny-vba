@@ -10,6 +10,11 @@ Read [architecture](../../../docs/architecture.md) and the relevant sections of 
 Use MS-VBAL and documented, profile-tagged observations for semantics; distinguish a proposed
 expectation from a measured Microsoft oracle result.
 
+M0 foundations are in [ADR 0003](../../../docs/decisions/0003-m0-source-scenarios-foreign.md):
+checked UTF-8 source spans, caller-assigned source/statement identities, UTF-16 value strings,
+scalar states and bounded owner-scoped locations. These are not parser/coercion/VM implementations.
+Reuse these types rather than introducing a second value/source model.
+
 ## Preserve the language model
 
 - Preserve source spelling while resolving identifiers case-insensitively. Retain module/source

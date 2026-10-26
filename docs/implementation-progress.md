@@ -1,6 +1,37 @@
 # Implementation progress
 
-Updated 2026-10-26. Current stage: setup complete; M0 harness/contract work remains.
+Updated 2026-10-26. Current stage: M0 complete; M1 frontend is next.
+
+## M0 completion
+
+- Implemented SourceId, per-source StatementId, bounded SourceFile, checked UTF-8 byte spans and
+  attached diagnostics, including Unicode/CRLF/identity/bounds tests.
+- Implemented scalar Value states/widths, scaled Currency/serial Date, exact UTF-16 strings and
+  bounded, invalidatable owner-scoped locations. No runtime coercion or arrays yet.
+- Implemented bounded schema-1 fixture parser/validator and 20 independently authored MIT pure-language
+  cases with typed expectations, rationale, requirements and explicit unmeasured evidence. All remain NOT_RUN.
+- Added `vba-cli conformance validate <scenario>`; CLI tests validate all 20 fixtures and reject malformed
+  input. Execution commands still fail explicitly; fixture validation is not VBA syntax validation.
+- Proved generic Call/Get/Let/Set, omitted/named/ByRef snapshots and ordered delayed writebacks against
+  a deterministic scripted host. Tested errors, repeated waits without replay, cancel, stale locations/
+  references, wrong host identity, invalid/non-ByRef patches, alias order and resource limits.
+- Recorded adopted source/scenario/foreign prototype contracts, lifecycle requirements and M4/M5
+  limitations in ADR 0003; updated architecture, reviewed dependency graph, layer checker and focused skills.
+  The development CLI's conformance dependency is explicitly allowed; shipping libraries remain isolated.
+- No third-party Rust dependencies, downloaded macro execution, Office observations, parser, VM or UI added.
+
+Verification: `cargo xtask ci` passed (format, warning-free Clippy, workspace tests, layers and corpus
+integrity); `cargo xtask wasm` passed for all 13 libraries. Sixteen Rust integration tests cover the
+M0 infrastructure and CLI, including validation of all 20 fixtures. Corpus integrity remains seven
+pins and 646/646 candidate hashes; this is not a corpus compatibility result. WASM runtime behavior,
+Office compatibility, macOS/Windows execution and a separate MSRV run were not tested locally.
+
+Next smallest task: M1 bounded lexer for Arithmetic.bas with exact spans and positive/negative token
+fixtures, including comments, CRLF/continuations and colon-separated statements. Then implement the
+source-preserving parser and record exact unsupported syntax; M0's cases stay NOT_RUN until execution exists.
+
+## Setup history (pre-M0)
+
 
 Created a standalone Cargo workspace with 13 library crates, vba-cli and xtask, each with src/.
 Added current architecture, implementation plan, decisions, adapted AGENTS/CLAUDE and repository-local skill.
@@ -11,7 +42,7 @@ Cloned six documented test repositories and Microsoft VBA-Docs as pinned submodu
 Source lock tracks notices/revisions; candidate inventory tracks SHA-256, size and NOT_RUN status.
 No downloaded macros, oracle scripts, interpreters or workbook files have been executed.
 Contextures is tracked as a manual download source; no Word corpus was identified in the supplied docs.
-No parser, binder, runtime, VM, fake-host implementation, project decoder or scenario runner exists yet.
+At setup, no parser, binder, runtime, VM, fake-host implementation, project decoder or scenario runner existed.
 
 Scope updated on 2026-10-26: this repository owns the reusable egui VBA editor/debugger and
 standalone native/web IDE. ADR 0002 and the UI contract define ownership, Gridcraft design
@@ -27,8 +58,8 @@ dependency-free structural check; bundled quick_validate.py could not run becaus
 `cargo xtask ci` and `cargo xtask wasm` passed after the skill changes. Discovery paths were
 verified against official documentation; live Codex/OpenCode skill activation was not exercised.
 
-Next smallest task: source identity/span/statement diagnostic types, then M0 scenario validation and
-20 independently authored pure-language reference cases. See the plan for acceptance gates.
+The setup's next tasks (source identities, M0 fixture validation and 20 independent cases) are now
+complete as recorded above. See the plan for remaining milestones.
 
 ## Setup validation
 

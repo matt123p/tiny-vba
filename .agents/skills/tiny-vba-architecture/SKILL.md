@@ -22,7 +22,9 @@ Inspect the affected Cargo manifests and callers before designing an API.
 - Office catalogues, document storage, undo/recalc, OOXML and application bridges stay in the forks.
   vba-foreign is a minimal generic protocol. Neither Office types nor application sibling paths
   belong in core or reusable UI dependencies.
-- Testkit/conformance packages are not shipping dependencies. Keep native hot-path host calls
+- Testkit/conformance packages are not shipping library dependencies. ADR 0003 permits the
+  development CLI to depend on conformance for fixture validation; keep that exception out of engine/UI libraries.
+  Keep native hot-path host calls
   in Rust; JSON belongs to manifests, reports and optional debugger transport.
 
 For a new contract, describe the owner, data/identity semantics, errors, cancellation and resource

@@ -1,0 +1,22 @@
+tiny-vba-scenario = 1
+id = optional-missing
+module = Module1
+entry = Answer
+provenance = independently-authored
+license = MIT
+profile = pure-language-unmeasured
+requirements = calls,optional
+capabilities = none
+evidence = reasoned-not-oracle
+expected = Boolean:True
+rationale = An omitted optional Variant argument is observable through IsMissing.
+---
+Option Explicit
+
+Public Function Answer() As Boolean
+    Answer = Probe()
+End Function
+
+Private Function Probe(Optional value As Variant) As Boolean
+    Probe = IsMissing(value)
+End Function

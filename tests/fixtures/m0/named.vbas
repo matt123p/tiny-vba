@@ -1,0 +1,22 @@
+tiny-vba-scenario = 1
+id = named
+module = Module1
+entry = Answer
+provenance = independently-authored
+license = MIT
+profile = pure-language-unmeasured
+requirements = calls,named
+capabilities = none
+evidence = reasoned-not-oracle
+expected = Long:23
+rationale = Named arguments bind by name despite reversed order.
+---
+Option Explicit
+
+Public Function Answer() As Long
+    Answer = Compose(right:=3, left:=2)
+End Function
+
+Private Function Compose(ByVal left As Long, ByVal right As Long) As Long
+    Compose = left * 10 + right
+End Function

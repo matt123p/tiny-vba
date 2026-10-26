@@ -10,6 +10,12 @@ Read [architecture ownership](../../../docs/architecture.md),
 [UI ownership amendment](../../../docs/decisions/0002-editor-debugger-ui.md).
 Inspect real host APIs before proposing an adapter; do not implement imaginary Gridcraft methods.
 
+M0's current owned snapshot/writeback and explicit cancel contract is in
+[ADR 0003](../../../docs/decisions/0003-m0-source-scenarios-foreign.md). Inspect vba-foreign and
+vba-testkit tests before extending it; final alias/type/error writeback behavior is not frozen.
+Session callers must cancel on close/disconnect; Drop cannot access a host. Host/location owner
+identities must be unique during their session.
+
 ## Keep the boundary generic
 
 vba-foreign carries invocation kind, reference/target, named/positional/omitted arguments, ByRef

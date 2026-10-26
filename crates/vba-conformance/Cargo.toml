@@ -14,3 +14,4 @@ workspace = true
 vba-diagnostics.workspace = true
 vba-testkit.workspace = true
 vba-vm.workspace = true
+vba-values.workspace = true

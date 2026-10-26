@@ -1,0 +1,18 @@
+tiny-vba-scenario = 1
+id = boolean
+module = Module1
+entry = Answer
+provenance = independently-authored
+license = MIT
+profile = pure-language-unmeasured
+requirements = comparison
+capabilities = none
+evidence = reasoned-not-oracle
+expected = Boolean:True
+rationale = Four is greater than three.
+---
+Option Explicit
+
+Public Function Answer() As Boolean
+    Answer = (4 > 3)
+End Function

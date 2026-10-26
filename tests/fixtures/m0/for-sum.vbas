@@ -1,0 +1,21 @@
+tiny-vba-scenario = 1
+id = for-sum
+module = Module1
+entry = Answer
+provenance = independently-authored
+license = MIT
+profile = pure-language-unmeasured
+requirements = loops
+capabilities = none
+evidence = reasoned-not-oracle
+expected = Long:10
+rationale = The inclusive loop sums 1 through 4.
+---
+Option Explicit
+
+Public Function Answer() As Long
+    Dim i As Long
+    For i = 1 To 4
+        Answer = Answer + i
+    Next i
+End Function

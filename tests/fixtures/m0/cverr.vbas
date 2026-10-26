@@ -1,0 +1,18 @@
+tiny-vba-scenario = 1
+id = cverr
+module = Module1
+entry = Answer
+provenance = independently-authored
+license = MIT
+profile = pure-language-unmeasured
+requirements = variants,builtins
+capabilities = none
+evidence = reasoned-not-oracle
+expected = CVErr:2001
+rationale = CVErr returns an error value rather than raising a runtime error.
+---
+Option Explicit
+
+Public Function Answer() As Variant
+    Answer = CVErr(2001)
+End Function

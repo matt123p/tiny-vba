@@ -12,3 +12,4 @@ workspace = true
 
 [dependencies]
 vba-diagnostics.workspace = true
+vba-conformance.workspace = true

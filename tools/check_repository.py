@@ -38,7 +38,10 @@ def layers():
         for dependency in dependencies:
             if dependency['name'] not in allowed:
                 raise ValueError(f'{package["name"]}: unreviewed dependency {dependency["name"]}')
-            if package['name'] != 'vba-conformance' and dependency['name'] in {'vba-testkit', 'vba-conformance'}:
+            if dependency['name'] in {'vba-testkit', 'vba-conformance'} and not (
+                package['name'] == 'vba-conformance' or
+                (package['name'] == 'vba-cli' and dependency['name'] == 'vba-conformance')
+            ):
                 if dependency['kind'] != 'dev':
                     raise ValueError('test support leaked into production dependencies')
     if actual != allowed:

@@ -1,6 +1,6 @@
 # Architecture
 
-Status: source scaffold, 2026-10-26. This is the current repository layout; APIs remain to be designed.
+Status: M0 complete, 2026-10-26. Source/scenario/scalar/foreign prototype APIs exist; compiler and VM remain scaffolds.
 
 The current scaffold and future headless engine can compile and test without Office, UI toolkits,
 application forks or corpus downloads. This repository also owns an optional editor/debugger UI
@@ -22,19 +22,22 @@ The dependency graph is separate from this data flow: IR does not need a depende
 | vba-dap | Later DAP adapter | debug |
 | vba-project | Read-only source/project decoder | diagnostics |
 | vba-testkit | Deterministic generic foreign host and trace support | diagnostics, values, foreign |
-| vba-conformance | Scenario validation, typed comparison, reports | diagnostics, testkit, vm |
-| vba-cli | Standalone command frontend | diagnostics (compiler/VM wiring later) |
+| vba-conformance | Scenario validation and typed expectations; comparison/reports later | diagnostics, testkit, values, vm |
+| vba-cli | Standalone command frontend and fixture validation | conformance, diagnostics (compiler/VM wiring later) |
 | xtask | Maintenance commands | none |
 
-These dependencies reserve boundaries, not finished APIs. Most library crates contain only module documentation.
+Some dependencies still reserve boundaries. Syntax, semantics, IR, runtime, VM, debug/DAP and project remain scaffolds.
+Diagnostics, values, foreign, testkit and conformance implement the bounded M0 contracts in
+[ADR 0003](decisions/0003-m0-source-scenarios-foreign.md).
 `tools/architecture.json` is the enforced graph. New external dependencies require explicit graph review.
-`vba-testkit` and `vba-conformance` are development packages; production crates can use them only as dev-dependencies.
+`vba-testkit` and `vba-conformance` are development packages; shipping libraries can use them only as
+dev-dependencies. The development CLI has a reviewed normal conformance dependency for validation.
 All packages are currently unpublished. No crate automatically loads corpus code.
 
 ## Ownership boundary
 
 The generic foreign protocol carries invocation kind, target/reference, named/positional/omitted arguments,
-ByRef obligations and explicit result/error/wait state. Its concrete Rust API must be proven by tests at M0/M3.
+ByRef obligations and explicit result/error/wait state. Its owned M0 Rust prototype is proven against a deterministic host; VM wiring remains M3 work.
 It must not know Excel/Word names, Range behavior, Office enums or document storage.
 The applications implement a bridge to their own Office compatibility layers. The VM owns VBA class instances;
 external object references preserve host identity/lifetime without defining a parallel Office registry.

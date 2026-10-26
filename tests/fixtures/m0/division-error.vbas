@@ -1,0 +1,18 @@
+tiny-vba-scenario = 1
+id = division-error
+module = Module1
+entry = Answer
+provenance = independently-authored
+license = MIT
+profile = pure-language-unmeasured
+requirements = arithmetic,errors
+capabilities = none
+evidence = reasoned-not-oracle
+expected = Error:11
+rationale = Division by zero is a runtime error, distinct from CVErr.
+---
+Option Explicit
+
+Public Function Answer() As Double
+    Answer = 1 / 0
+End Function

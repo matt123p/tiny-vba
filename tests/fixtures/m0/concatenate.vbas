@@ -1,0 +1,18 @@
+tiny-vba-scenario = 1
+id = concatenate
+module = Module1
+entry = Answer
+provenance = independently-authored
+license = MIT
+profile = pure-language-unmeasured
+requirements = strings
+capabilities = none
+evidence = reasoned-not-oracle
+expected = String:tiny-vba
+rationale = Concatenation joins the two literal strings.
+---
+Option Explicit
+
+Public Function Answer() As String
+    Answer = "tiny" & "-vba"
+End Function

@@ -7,6 +7,9 @@ Read [architecture](architecture.md), [implementation plan](implementation-plan.
 [debugger](debugger.md), [conformance](conformance-methodology.md)
 and [compatibility matrix](compatibility-matrix.md) describe development contracts and current limits.
 
+[M0 contract decision](decisions/0003-m0-source-scenarios-foreign.md) and
+[scenario format](scenario-format.md) document the implemented foundations and fixture validator.
+
 [Agent design skills](agent-skills.md) lists the shared Codex/OpenCode skills and their task routing.
 
 ## Supplied design inputs (preserved)

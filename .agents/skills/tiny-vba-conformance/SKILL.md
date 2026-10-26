@@ -12,6 +12,11 @@ Read [methodology](../../../docs/conformance-methodology.md),
 [source lock](../../../references/sources.lock.json) and
 [inventory](../../../tests/corpora/inventory.json).
 
+M0 validates [schema 1](../../../docs/scenario-format.md) self-authored fixtures only.
+`vba-cli conformance validate` reports VALID_FIXTURE and NOT_RUN; it does not parse/execute VBA.
+External/oracle metadata needs a reviewed schema extension. Keep the 20 fixture identities unique
+and matching filenames; update owning integration tests when changing that suite.
+
 ## Select evidence deliberately
 
 Keep syntax/binding, language runtime, generic foreign calls, source import, debugger and UI evidence

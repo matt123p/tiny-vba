@@ -1,0 +1,19 @@
+tiny-vba-scenario = 1
+id = empty
+module = Module1
+entry = Answer
+provenance = independently-authored
+license = MIT
+profile = pure-language-unmeasured
+requirements = variants
+capabilities = none
+evidence = reasoned-not-oracle
+expected = Empty
+rationale = An uninitialized Variant contains Empty.
+---
+Option Explicit
+
+Public Function Answer() As Variant
+    Dim value As Variant
+    Answer = value
+End Function

@@ -1,0 +1,18 @@
+tiny-vba-scenario = 1
+id = null
+module = Module1
+entry = Answer
+provenance = independently-authored
+license = MIT
+profile = pure-language-unmeasured
+requirements = variants
+capabilities = none
+evidence = reasoned-not-oracle
+expected = Null
+rationale = Assignment preserves the Null variant state.
+---
+Option Explicit
+
+Public Function Answer() As Variant
+    Answer = Null
+End Function

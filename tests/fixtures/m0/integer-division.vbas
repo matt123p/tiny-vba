@@ -1,0 +1,18 @@
+tiny-vba-scenario = 1
+id = integer-division
+module = Module1
+entry = Answer
+provenance = independently-authored
+license = MIT
+profile = pure-language-unmeasured
+requirements = arithmetic
+capabilities = none
+evidence = reasoned-not-oracle
+expected = Long:3
+rationale = Positive integer division truncates the quotient.
+---
+Option Explicit
+
+Public Function Answer() As Long
+    Answer = 17 \ 5
+End Function
