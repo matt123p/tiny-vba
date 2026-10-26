@@ -1,9 +1,7 @@
 # Architecture
 
-Status: M0–M3 subset complete; M4 first slice (typed scenario assertion runner, real division and
-Double widths) implemented 2026-10-26 under [ADR 0009](decisions/0009-m4-runner-and-numeric-widths.md).
-Source frontend, binder, compiler, verified IR, runtime subset, VM and headless debugger are
-implemented. DAP/UI remain planned.
+Status: M0–M4 complete for the documented [M4 language profile](m4-language.md), with
+verified IR 1/2 and explicit-frame execution. Graphical IDE, importer and fork integration remain later gates.
 
 The current scaffold and future headless engine can compile and test without Office, UI toolkits,
 application forks or corpus downloads. This repository also owns an optional editor/debugger UI
@@ -11,7 +9,7 @@ and standalone IDE; those upper layers may depend on UI toolkits.
 VBA source flows through syntax → semantics → verified IR → explicit-state VM.
 The dependency graph is separate from this data flow: IR does not need a dependency on the binder.
 The adopted [IR 1 specification](bytecode-vm-specification.md) defines instruction/stack contracts,
-verified immutable programs, calling conventions, continuations and budgets. M2 implements the structural IR/verifier; the runtime subset is implemented at M3; deeper semantics remain M4.
+verified immutable programs, calling conventions, continuations and budgets. M2 implements the structural IR/verifier; the runtime subset is implemented at M3; the M4 extension is adopted in [ADR 0011](decisions/0011-m4-language-extension.md).
 [ADR 0004](decisions/0004-bytecode-vm-contract.md) and
 [ADR 0006](decisions/0006-m2-binding-and-verification.md) place compilation/lowering in vba-compiler,
 which depends on diagnostics/syntax/semantics/IR/values. IR remains independent of the binder.
@@ -23,7 +21,7 @@ See the [M2 compiler contract](compiler.md) for supported source, API and struct
 | vba-diagnostics | Source identities, spans, diagnostic codes | none |
 | vba-values | Typed Variant, arrays, references and l-values | diagnostics |
 | vba-syntax | Lexer/parser and source-preserving AST | diagnostics |
-| vba-semantics | Scope/type/call binding | diagnostics, syntax, values |
+| vba-semantics | Scope/type/call binding | diagnostics, runtime, syntax, values |
 | vba-ir | Bytecode, verifier, constants and source maps | diagnostics, values |
 | vba-compiler | Parse/bind coordination and deterministic verified IR lowering | diagnostics, syntax, semantics, ir, values |
 | vba-runtime | Shared coercion/operators/builtins/error rules | diagnostics, values |
@@ -97,8 +95,13 @@ Keep tools/architecture.json as the graph of actual Cargo packages. Add these no
 external dependencies when their implementation lands; do not add placeholder APIs or manifests.
 Headless and UI checks must be separate so engine consumers do not pull GUI dependencies.
 
-M4's current execution profile is m4-scalars-v1 (ADR 0010), distinct from the historical M3 matrix.
+M4's current execution profile is m4-language-v1 (ADR 0011), distinct from the historical M3 matrix.
 Typed scenario judgment and diagnostic/result classification stay in vba-conformance; CLI owns
 compile/run orchestration. Runtime owns narrowing bounds and scalar comparison rules. Infrastructure
 xtask resolves its checkout at runtime and prints that identity before gates. No dependency edge or
 IR operand changes were needed for this hardening.
+
+Semantics now depends on runtime for constant/default conversion, keeping one coercion implementation.
+IR stays independent of syntax, semantics and execution. Values owns bounded arrays and canonical
+element locations; the VM owns per-frame handlers and explicit project-state transfer. See
+[the IR 2 extension](m4-language.md) and ADR 0011 for versions, ownership and limits.

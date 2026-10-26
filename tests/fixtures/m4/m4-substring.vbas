@@ -1,0 +1,16 @@
+tiny-vba-scenario = 1
+id = m4-substring
+module = Module1
+entry = Answer
+provenance = independently-authored
+license = MIT
+profile = pure-language-unmeasured
+requirements = m4-language-v1
+capabilities = none
+evidence = reasoned-not-oracle
+expected = String:bcd
+rationale = Mid uses one based UTF16 positions.
+---
+Function Answer() As String
+Answer=Mid("abcdef",2,3)
+End Function

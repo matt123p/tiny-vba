@@ -45,3 +45,7 @@ M1 implementation: [frontend subset and API](frontend.md),
 
 [M4 profile and verification hardening](decisions/0010-m4-profile-and-verification-hardening.md)
 records the current consumer profile, truthful fixture outcomes and corrected checkout selection.
+
+[M4 language profile and IR 2](m4-language.md) specifies current semantic support, feature gates,
+error handlers, arrays and persistent state. [ADR 0011](decisions/0011-m4-language-extension.md)
+records the extension and shared default/constant conversion dependency.

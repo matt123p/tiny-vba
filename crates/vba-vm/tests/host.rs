@@ -359,3 +359,36 @@ fn all_member_kinds_and_named_omitted_arguments_reach_generic_host() -> R {
     );
     Ok(())
 }
+
+#[test]
+fn host_numbered_error_after_wait_enters_vba_handler_without_reinvocation() -> R {
+    let text = "Function Answer(ByVal target As Object) As Long\nOn Error GoTo Recover\ntarget.Record 1\nExit Function\nRecover:\nAnswer=Err.Number\nEnd Function";
+    let mut s = session(text, false, Limits::default())?;
+    let mut host = ScriptedHost::new(
+        TARGET,
+        vec![
+            Reply::Wait(7),
+            Reply::Error(ForeignError {
+                number: 513,
+                description: "host failure".into(),
+            }),
+        ],
+    );
+    assert_eq!(
+        drive(&mut s, &mut host, &Controller::new())?,
+        Outcome::Waiting
+    );
+    assert_eq!(s.resume_host(&mut host)?, Outcome::Yielded);
+    assert_eq!(
+        drive(&mut s, &mut host, &Controller::new())?,
+        Outcome::Completed(ReturnValue::Function(Value::Long(513)))
+    );
+    assert_eq!(
+        host.trace
+            .iter()
+            .filter(|e| matches!(e, Event::Invoke(_)))
+            .count(),
+        1
+    );
+    Ok(())
+}

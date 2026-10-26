@@ -1,0 +1,16 @@
+tiny-vba-scenario = 1
+id = m4-date
+module = Module1
+entry = Answer
+provenance = independently-authored
+license = MIT
+profile = pure-language-unmeasured
+requirements = m4-language-v1
+capabilities = none
+evidence = reasoned-not-oracle
+expected = Date:45002
+rationale = Date serial addition retains its Date tag.
+---
+Function Answer() As Date
+Answer=CDate(45000)+2
+End Function

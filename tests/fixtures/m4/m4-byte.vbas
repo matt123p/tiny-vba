@@ -1,0 +1,16 @@
+tiny-vba-scenario = 1
+id = m4-byte
+module = Module1
+entry = Answer
+provenance = independently-authored
+license = MIT
+profile = pure-language-unmeasured
+requirements = m4-language-v1
+capabilities = none
+evidence = reasoned-not-oracle
+expected = Byte:255
+rationale = Byte retains its unsigned eight bit tag.
+---
+Function Answer() As Byte
+Answer=CByte(255)
+End Function

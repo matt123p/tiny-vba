@@ -12,30 +12,9 @@ use vba_values::{Location, Locations, ScalarKind, Value};
 type Result<T> = std::result::Result<T, Diagnostic>;
 pub const PROFILE: &str = runtime::PROFILE;
 pub fn capabilities() -> ir::Capabilities {
-    let mut c = ir::Capabilities::ir1_structural();
+    let mut c = ir::Capabilities::ir2_structural();
     c.profile = PROFILE.into();
-    c.binary.remove(&ir::BinaryOp::Power);
-    c.conversions = [
-        ScalarKind::Variant,
-        ScalarKind::Integer,
-        ScalarKind::Long,
-        ScalarKind::Double,
-        ScalarKind::Boolean,
-        ScalarKind::String,
-    ]
-    .into_iter()
-    .collect();
-    c.declarations = [
-        ScalarKind::Variant,
-        ScalarKind::Integer,
-        ScalarKind::Long,
-        ScalarKind::Double,
-        ScalarKind::Boolean,
-        ScalarKind::String,
-        ScalarKind::Object,
-    ]
-    .into_iter()
-    .collect();
+
     c
 }
 #[derive(Clone, Debug)]
@@ -136,6 +115,7 @@ pub struct FrameSnapshot {
     pub span: Option<Span>,
     pub locals: Vec<LocalSnapshot>,
     pub locals_truncated: bool,
+    pub unavailable_locals: Vec<String>,
 }
 #[derive(Clone, Debug, PartialEq)]
 pub struct CheckpointView {
@@ -177,7 +157,21 @@ enum Operand {
     Value(Value),
     Reference(Location),
 }
+#[derive(Clone, Copy, Default)]
+struct Handler {
+    target: Option<ir::Pc>,
+    resume_next: bool,
+    fault: Option<ir::SiteId>,
+}
+#[derive(Default)]
+struct ErrorState {
+    number: i32,
+    description: String,
+    source: String,
+    erl: i32,
+}
 struct Frame {
+    handler: Handler,
     id: u64,
     procedure: ir::ProcedureId,
     pc: ir::Pc,
@@ -192,7 +186,16 @@ struct Visit {
     permit: bool,
 }
 /// The caller's identity labels a session; an engine-generated instance isolates handles/storage.
+/// Explicit state transfer between invocations of the same compiled revision.
+#[derive(Clone)]
+pub struct ProjectState {
+    revision: String,
+    sources: Vec<(vba_diagnostics::SourceId, String)>,
+    values: BTreeMap<u32, Value>,
+}
 pub struct Session {
+    output: Vec<vba_values::VbaString>,
+    persistent: BTreeMap<u32, Location>,
     program: ir::VerifiedProgram,
     identity: u64,
     instance: SessionInstance,
@@ -211,6 +214,8 @@ pub struct Session {
     stale: bool,
     foreign: foreign::Session,
     pending_fault: Option<Failure>,
+    error: ErrorState,
+    raised_source: Option<String>,
     break_on_error: bool,
     allocation_bytes: usize,
     allocated_locations: usize,
@@ -232,11 +237,9 @@ fn reserve<T>(v: &mut Vec<T>, n: usize) -> Result<()> {
     v.try_reserve(n).map_err(|_| resource())
 }
 fn value_bytes(v: &Value) -> usize {
-    match v {
-        Value::String(s) => 64 + s.units().len() * 2,
-        _ => 64,
-    }
+    v.payload_bytes()
 }
+
 impl Session {
     pub fn new(
         program: ir::VerifiedProgram,
@@ -301,6 +304,10 @@ impl Session {
             stale: false,
             foreign: foreign::Session::default(),
             pending_fault: None,
+            error: ErrorState::default(),
+            raised_source: None,
+            output: Vec::new(),
+            persistent: BTreeMap::new(),
             break_on_error: false,
             allocation_bytes: 0,
             allocated_locations: 0,
@@ -308,6 +315,87 @@ impl Session {
         };
         session.push_frame(entry_id, prepared.into_iter().map(Operand::Value).collect())?;
         Ok(session)
+    }
+    pub fn output(&self) -> &[vba_values::VbaString] {
+        &self.output
+    }
+    pub fn project_state(&self) -> Result<ProjectState> {
+        if !self.terminal() {
+            return Err(command("project state requires a terminal invocation"));
+        }
+        let mut values = BTreeMap::new();
+        for (key, location) in &self.persistent {
+            values.insert(*key, self.store.read(*location)?.clone());
+        }
+        Ok(ProjectState {
+            revision: self.program.program().revision.clone(),
+            sources: self
+                .program
+                .program()
+                .sources
+                .iter()
+                .map(|s| (s.file.id(), s.file.text().to_owned()))
+                .collect(),
+            values,
+        })
+    }
+    /// Restore before executing; omitting restore resets all project/static variables.
+    pub fn restore_project(&mut self, state: ProjectState) -> Result<()> {
+        if self.counters.instructions != 0 || !matches!(self.state, Outcome::Yielded) {
+            return Err(command("restore requires a fresh invocation"));
+        }
+        if state.revision != self.program.program().revision {
+            return Err(command("project revision mismatch"));
+        }
+        if state.sources.len() != self.program.program().sources.len()
+            || state
+                .sources
+                .iter()
+                .zip(&self.program.program().sources)
+                .any(|((id, text), source)| *id != source.file.id() || text != source.file.text())
+        {
+            return Err(command("project source mismatch"));
+        }
+        let mut prepared = Vec::new();
+        for (key, value) in state.values {
+            let kind = self
+                .program
+                .program()
+                .procedures
+                .iter()
+                .flat_map(|p| &p.locals)
+                .find(|l| l.role == ir::SlotRole::Persistent(key))
+                .map(|l| l.kind)
+                .ok_or_else(|| command("unknown persistent slot"))?;
+            let value = runtime::bind(kind, &value).map_err(runtime_diagnostic)?;
+            self.charge(value_bytes(&value))?;
+            prepared.push((key, kind, value));
+        }
+        let extra = prepared
+            .iter()
+            .filter(|(key, _, _)| !self.persistent.contains_key(key))
+            .count();
+        if self
+            .allocated_locations
+            .checked_add(extra)
+            .is_none_or(|n| n > self.limits.locations.min(4096))
+        {
+            return Err(resource());
+        }
+        for (key, kind, value) in prepared {
+            if let Some(location) = self.persistent.get(&key).copied() {
+                self.store.write(location, value)?;
+            } else {
+                if self.allocated_locations >= self.limits.locations {
+                    return Err(resource());
+                }
+                let location = self.store.allocate(value)?;
+                self.allocated_locations += 1;
+                self.persistent.insert(key, location);
+                self.kinds.insert(location, kind);
+            }
+        }
+        Ok(())
     }
     pub fn instance(&self) -> SessionInstance {
         self.instance
@@ -391,6 +479,15 @@ impl Session {
             _ => Err(invariant("Value required")),
         }
     }
+    fn pop_index(&mut self) -> Result<i32> {
+        let value = self.pop_value()?;
+        let Value::Long(index) =
+            runtime::assign(ScalarKind::Long, &value, false).map_err(runtime_diagnostic)?
+        else {
+            return Err(invariant("index conversion"));
+        };
+        Ok(index)
+    }
     fn pop_ref(&mut self) -> Result<Location> {
         match self.pop()? {
             Operand::Reference(l) => Ok(l),
@@ -463,7 +560,16 @@ impl Session {
         let mut values = Vec::new();
         reserve(&mut values, locals.len())?;
         for (i, local) in locals.iter().enumerate() {
-            let v = if let Some(arg) = args.get(i) {
+            let v = if let ir::SlotRole::Persistent(key) = local.role {
+                if let Some(location) = self.persistent.get(&key) {
+                    if self.kinds.get(location) != Some(&local.kind) {
+                        return Err(invariant("persistent kind mismatch"));
+                    }
+                    Operand::Reference(*location)
+                } else {
+                    Operand::Value(local.kind.initial_value())
+                }
+            } else if let Some(arg) = args.get(i) {
                 match (arg, params.get(i).map(|p| p.mode)) {
                     (Operand::Reference(l), Some(ir::ParameterMode::ByRef)) => {
                         if self.kinds.get(l) != Some(&local.kind) {
@@ -496,7 +602,11 @@ impl Session {
                     self.charge(value_bytes(&v))?;
                     let l = self.store.allocate(v)?;
                     self.kinds.insert(l, local.kind);
-                    owned.push(l);
+                    if let ir::SlotRole::Persistent(key) = local.role {
+                        self.persistent.insert(key, l);
+                    } else {
+                        owned.push(l);
+                    }
                     l
                 }
             };
@@ -506,6 +616,7 @@ impl Session {
         self.stack_capacity = stack_capacity;
         self.next_frame = self.next_frame.checked_add(1).ok_or_else(resource)?;
         self.frames.push(Frame {
+            handler: Handler::default(),
             id: self.next_frame,
             procedure: id,
             pc: entry,
@@ -551,9 +662,17 @@ impl Session {
             let mut locals = Vec::new();
             reserve(&mut locals, proc.locals.len().min(4096))?;
             let mut locals_truncated = false;
+            let mut unavailable_locals = Vec::new();
             for (local, location) in proc.locals.iter().zip(&frame.slots) {
                 if local.visible {
-                    let value = self.store.read(*location)?;
+                    let value = match self.store.read(*location) {
+                        Ok(value) => value,
+                        Err(error) if error.code == "VBA0005" => {
+                            unavailable_locals.push(local.name.clone());
+                            continue;
+                        }
+                        Err(error) => return Err(error),
+                    };
                     let next = snapshot_bytes
                         .checked_add(256 + value_bytes(value))
                         .ok_or_else(resource)?;
@@ -580,6 +699,7 @@ impl Session {
                 span,
                 locals,
                 locals_truncated,
+                unavailable_locals,
             });
         }
         Ok(result)
@@ -622,8 +742,8 @@ impl Session {
                 .pending_fault
                 .take()
                 .ok_or_else(|| invariant("missing pending fault"))?;
-            self.cleanup();
-            self.state = Outcome::Failed(failure);
+            self.state = Outcome::Yielded;
+            self.resolve_failure(failure)?;
             return Ok(());
         }
         if reason == PauseReason::Checkpoint {
@@ -703,11 +823,15 @@ impl Session {
         Ok(())
     }
     fn cleanup(&mut self) {
+        let persistent = &self.persistent;
         for location in self.kinds.keys() {
-            let _ = self.store.invalidate(*location);
+            if !persistent.values().any(|l| l == location) {
+                let _ = self.store.invalidate(*location);
+            }
         }
         self.frames.clear();
-        self.kinds.clear();
+        self.kinds
+            .retain(|location, _| persistent.values().any(|l| l == location));
         self.visit = None;
         self.pending_fault = None;
         self.stack_capacity = 0;
@@ -786,6 +910,16 @@ impl Session {
             "VBA_RUNTIME_6" => (FailureKind::Runtime, Some(6)),
             "VBA_RUNTIME_11" => (FailureKind::Runtime, Some(11)),
             "VBA_RUNTIME_13" => (FailureKind::Runtime, Some(13)),
+            "VBA_RUNTIME_5" => (FailureKind::Runtime, Some(5)),
+            "VBA0005" => (FailureKind::Runtime, Some(9)),
+            "VBA_ARRAY_9" => (FailureKind::Runtime, Some(9)),
+            "VBA_ARRAY_10" => (FailureKind::Runtime, Some(10)),
+            "VBA_ARRAY_13" => (FailureKind::Runtime, Some(13)),
+            "VBA_RUNTIME_9" => (FailureKind::Runtime, Some(9)),
+            "VBA_RUNTIME_20" => (FailureKind::Runtime, Some(20)),
+            "VBA_RUNTIME_91" => (FailureKind::Runtime, Some(91)),
+            "VBA_RUNTIME_94" => (FailureKind::Runtime, Some(94)),
+            "VBA_RUNTIME_448" => (FailureKind::Runtime, Some(448)),
             "VBA0001" => (FailureKind::Unsupported, None),
             "VBA0031" | "VBA0003" => (FailureKind::ResourceLimit, None),
             "VBA0033" | "VBA0006" => (FailureKind::HostProtocol, None),
@@ -798,8 +932,125 @@ impl Session {
             self.pending_fault = Some(failure);
             self.pause(PauseReason::Fault)?;
         } else {
-            self.cleanup();
-            self.state = Outcome::Failed(failure);
+            self.resolve_failure(failure)?;
+        }
+        Ok(())
+    }
+    fn resolve_failure(&mut self, failure: Failure) -> Result<()> {
+        if failure.kind == FailureKind::Runtime
+            && let Some(number) = failure.number
+        {
+            self.error.number = number;
+            self.error.description = failure.message.clone();
+            self.error.source = self.raised_source.take().unwrap_or_else(|| {
+                self.frames
+                    .last()
+                    .and_then(|f| {
+                        self.program
+                            .program()
+                            .procedures
+                            .get(f.procedure.0 as usize)
+                    })
+                    .map(|p| p.name.clone())
+                    .unwrap_or_default()
+            });
+            // A numeric source label preceding the fault supplies Erl; unnumbered procedures return 0.
+            self.error.erl = 0;
+            if let Some(site) = self.top()?.checkpoint {
+                let proc = self.proc()?;
+                let fault = proc
+                    .checkpoints
+                    .get(site.0 as usize)
+                    .ok_or_else(|| invariant("Erl site"))?
+                    .span
+                    .start();
+                let source = &self
+                    .program
+                    .program()
+                    .sources
+                    .get(proc.source.0 as usize)
+                    .ok_or_else(|| invariant("Erl source"))?
+                    .file;
+                let mut numbered = 0;
+                for statement in &proc.statements {
+                    if statement.span.start() > fault {
+                        break;
+                    }
+                    let text = source.slice(statement.span)?.trim_end_matches(':');
+                    if let Ok(number) = text.parse::<i32>() {
+                        numbered = number;
+                    }
+                }
+                self.error.erl = numbered;
+            }
+            for index in (0..self.frames.len()).rev() {
+                let frame = self
+                    .frames
+                    .get(index)
+                    .ok_or_else(|| invariant("handler frame"))?;
+                if frame.handler.fault.is_some()
+                    || (frame.handler.target.is_none() && !frame.handler.resume_next)
+                {
+                    continue;
+                }
+                let handler = frame.handler;
+                let site = frame
+                    .checkpoint
+                    .ok_or_else(|| invariant("fault checkpoint"))?;
+                let proc = self
+                    .program
+                    .program()
+                    .procedures
+                    .get(frame.procedure.0 as usize)
+                    .ok_or_else(|| invariant("handler procedure"))?;
+                let cp = proc
+                    .checkpoints
+                    .get(site.0 as usize)
+                    .ok_or_else(|| invariant("fault site"))?;
+                let target = if handler.resume_next {
+                    cp.resume_next
+                        .and_then(|id| proc.checkpoints.get(id.0 as usize))
+                        .map(|cp| cp.enter_pc)
+                } else {
+                    handler.target
+                };
+                let Some(target) = target else {
+                    continue;
+                };
+                while self.frames.len() > index + 1 {
+                    self.unwind_frame()?;
+                }
+                let frame = self.top_mut()?;
+                frame.stack.clear();
+                frame.pc = target;
+                if !handler.resume_next {
+                    frame.handler.fault = Some(site);
+                }
+                self.visit = None;
+                self.state = Outcome::Yielded;
+                return Ok(());
+            }
+        }
+        self.cleanup();
+        self.state = Outcome::Failed(failure);
+        Ok(())
+    }
+    fn unwind_frame(&mut self) -> Result<()> {
+        let frame = self.frames.pop().ok_or_else(|| invariant("unwind frame"))?;
+        let maximum = self
+            .program
+            .program()
+            .procedures
+            .get(frame.procedure.0 as usize)
+            .ok_or_else(|| invariant("unwind procedure"))?
+            .max_stack as usize;
+        self.stack_capacity = self
+            .stack_capacity
+            .checked_sub(maximum)
+            .ok_or_else(resource)?;
+        for location in frame.owned {
+            self.store.invalidate(location)?;
+            self.kinds.remove(&location);
         }
         Ok(())
     }
@@ -873,6 +1124,193 @@ impl Session {
     }
     fn dispatch(&mut self, host: &mut impl Host, instruction: I) -> Result<()> {
         match instruction {
+            I::RefElement { rank, kind } => {
+                let mut indices = Vec::new();
+                reserve(&mut indices, usize::from(rank))?;
+                for _ in 0..rank {
+                    indices.push(self.pop_index()?);
+                }
+                indices.reverse();
+                let owner = self.pop_ref()?;
+                let Value::Array(array) = self.store.read(owner)? else {
+                    return Err(runtime_diagnostic(runtime::Error::Vba {
+                        number: 13,
+                        message: "Array required".into(),
+                    }));
+                };
+                if array.kind() != kind {
+                    return Err(runtime_diagnostic(runtime::Error::Vba {
+                        number: 13,
+                        message: "Array element type mismatch".into(),
+                    }));
+                }
+                let location = self.store.element(owner, &indices)?;
+                if self.kinds.len() >= 65536 {
+                    return Err(resource());
+                }
+                self.kinds.insert(location, kind);
+                self.push(Operand::Reference(location))?;
+                self.advance()?;
+            }
+            I::ArrayResize {
+                rank,
+                kind,
+                preserve,
+                initialize,
+                dynamic,
+            } => {
+                let mut bounds = Vec::new();
+                reserve(&mut bounds, usize::from(rank))?;
+                for _ in 0..rank {
+                    let upper = self.pop_index()?;
+                    let lower = self.pop_index()?;
+                    bounds.push((lower, upper));
+                }
+                bounds.reverse();
+                let owner = self.pop_ref()?;
+                let old = self.store.read(owner)?;
+                if initialize && matches!(old, Value::Array(_)) {
+                    self.advance()?;
+                    return Ok(());
+                }
+                let allocation = vba_values::VbaArray::allocation_bytes(kind, &bounds)?;
+                let preserved = if preserve { value_bytes(old) } else { 0 };
+                self.charge(allocation.checked_add(preserved).ok_or_else(resource)?)?;
+                let old = self.store.read(owner)?;
+                let array = if initialize {
+                    vba_values::VbaArray::new(kind, bounds, dynamic)?
+                } else {
+                    let Value::Array(array) = old else {
+                        return Err(runtime_diagnostic(runtime::Error::Vba {
+                            number: 13,
+                            message: "Array required".into(),
+                        }));
+                    };
+                    array.resize(bounds, preserve)?
+                };
+                self.store.write(owner, Value::Array(array))?;
+                self.advance()?;
+            }
+            I::ArrayErase => {
+                let owner = self.pop_ref()?;
+                let Value::Array(array) = self.store.read(owner)? else {
+                    return Err(runtime_diagnostic(runtime::Error::Vba {
+                        number: 13,
+                        message: "Array required".into(),
+                    }));
+                };
+                let bytes = vba_values::VbaArray::allocation_bytes(array.kind(), array.bounds())?;
+                self.charge(bytes)?;
+                let Value::Array(array) = self.store.read(owner)? else {
+                    return Err(invariant("erase owner"));
+                };
+                let array = array.erase()?;
+                self.store.write(owner, Value::Array(array))?;
+                self.advance()?;
+            }
+            I::OnError {
+                target,
+                resume_next,
+            } => {
+                let handler = &mut self.top_mut()?.handler;
+                handler.target = target;
+                handler.resume_next = resume_next;
+                // Disabling or replacing a handler does not clear an active error context.
+                self.advance()?;
+            }
+            I::Resume { target, next } => {
+                let site = self.top()?.handler.fault.ok_or_else(|| {
+                    runtime_diagnostic(runtime::Error::Vba {
+                        number: 20,
+                        message: "Resume without error".into(),
+                    })
+                })?;
+                let cp = self
+                    .proc()?
+                    .checkpoints
+                    .get(site.0 as usize)
+                    .ok_or_else(|| invariant("resume checkpoint"))?;
+                let pc = if let Some(target) = target {
+                    target
+                } else if next {
+                    cp.resume_next
+                        .and_then(|id| self.proc().ok()?.checkpoints.get(id.0 as usize))
+                        .map(|cp| cp.enter_pc)
+                        .ok_or_else(|| invariant("resume successor"))?
+                } else {
+                    cp.enter_pc
+                };
+                self.top_mut()?.handler.fault = None;
+                self.top_mut()?.stack.clear();
+                self.top_mut()?.pc = pc;
+                self.error = ErrorState::default();
+                self.visit = None;
+            }
+            I::ErrGet(field) => {
+                let value = match field.as_str() {
+                    "number" => Value::Long(self.error.number),
+                    "erl" => Value::Long(self.error.erl),
+                    "description" => {
+                        Value::String(vba_values::VbaString::from_utf8(&self.error.description)?)
+                    }
+                    "source" => {
+                        Value::String(vba_values::VbaString::from_utf8(&self.error.source)?)
+                    }
+                    _ => return Err(invariant("Err field")),
+                };
+                self.push(Operand::Value(value))?;
+                self.advance()?;
+            }
+            I::ErrClear => {
+                self.error = ErrorState::default();
+                self.advance()?;
+            }
+            I::Raise(count) => {
+                let mut values = Vec::new();
+                reserve(&mut values, usize::from(count))?;
+                for _ in 0..count {
+                    values.push(self.pop_value()?);
+                }
+                values.reverse();
+                let value = values.first().ok_or_else(|| invariant("Raise number"))?;
+                let Value::Long(number) =
+                    runtime::assign(ScalarKind::Long, value, false).map_err(runtime_diagnostic)?
+                else {
+                    return Err(invariant("Raise conversion"));
+                };
+                if number == 0 {
+                    return Err(runtime_diagnostic(runtime::Error::Vba {
+                        number: 5,
+                        message: "Invalid procedure call".into(),
+                    }));
+                }
+                let description = if let Some(value) = values.get(2) {
+                    let Value::String(text) = runtime::assign(ScalarKind::String, value, false)
+                        .map_err(runtime_diagnostic)?
+                    else {
+                        return Err(invariant("Raise description"));
+                    };
+                    String::from_utf16(text.units())
+                        .map_err(|_| Diagnostic::unsupported("unpaired Err description"))?
+                } else {
+                    format!("VBA error {number}")
+                };
+                self.raised_source = if let Some(value) = values.get(1) {
+                    let Value::String(text) = runtime::assign(ScalarKind::String, value, false)
+                        .map_err(runtime_diagnostic)?
+                    else {
+                        return Err(invariant("Raise source"));
+                    };
+                    Some(
+                        String::from_utf16(text.units())
+                            .map_err(|_| Diagnostic::unsupported("unpaired Err source"))?,
+                    )
+                } else {
+                    None
+                };
+                let failure = self.failure(FailureKind::Runtime, Some(number), description)?;
+                self.deliver_failure(failure)?;
+            }
             I::Checkpoint(site) => {
                 self.top_mut()?.checkpoint = Some(site);
                 self.visit = None;
@@ -911,9 +1349,12 @@ impl Session {
                     .kinds
                     .get(&location)
                     .ok_or_else(|| invariant("write kind"))?;
-                let value =
+                let value = if mode == ir::AssignmentKind::ArgumentBinding {
+                    runtime::bind(kind, &value)
+                } else {
                     runtime::assign(kind, &value, mode == ir::AssignmentKind::ObjectReference)
-                        .map_err(runtime_diagnostic)?;
+                }
+                .map_err(runtime_diagnostic)?;
                 self.charge(value_bytes(&value))?;
                 self.store.write(location, value)?;
                 self.advance()?;
@@ -926,6 +1367,44 @@ impl Session {
             }
             I::DropValue => {
                 self.pop_value()?;
+                self.advance()?;
+            }
+            I::Intrinsic {
+                function,
+                arguments,
+            } => {
+                let mut values = Vec::new();
+                reserve(&mut values, usize::from(arguments))?;
+                for _ in 0..arguments {
+                    values.push(self.pop_value()?);
+                }
+                values.reverse();
+                let value = if function == vba_values::Intrinsic::DebugPrint {
+                    let mut units = Vec::new();
+                    for (index, value) in values.iter().enumerate() {
+                        if index > 0 {
+                            units.push(9);
+                        }
+                        let Value::String(text) = runtime::assign(ScalarKind::String, value, false)
+                            .map_err(runtime_diagnostic)?
+                        else {
+                            return Err(invariant("print conversion"));
+                        };
+                        if units.len().saturating_add(text.units().len())
+                            > vba_values::VbaString::MAX_UNITS
+                        {
+                            return Err(resource());
+                        }
+                        units.extend_from_slice(text.units());
+                    }
+                    self.charge(units.len() * 2 + 64)?;
+                    reserve(&mut self.output, 1)?;
+                    self.output.push(vba_values::VbaString::from_units(units)?);
+                    Value::Empty
+                } else {
+                    runtime::intrinsic(function, &values).map_err(runtime_diagnostic)?
+                };
+                self.push(Operand::Value(value))?;
                 self.advance()?;
             }
             I::Convert(kind) => {
@@ -1027,6 +1506,9 @@ impl Session {
                 } else {
                     ReturnValue::Sub
                 };
+                if self.top()?.handler.fault.is_some() {
+                    self.error = ErrorState::default();
+                }
                 let frame = self.frames.pop().ok_or_else(|| invariant("return frame"))?;
                 self.stack_capacity = self
                     .stack_capacity
@@ -1247,6 +1729,12 @@ fn runtime_diagnostic(error: runtime::Error) -> Diagnostic {
                 6 => "VBA_RUNTIME_6",
                 11 => "VBA_RUNTIME_11",
                 13 => "VBA_RUNTIME_13",
+                5 => "VBA_RUNTIME_5",
+                9 => "VBA_RUNTIME_9",
+                20 => "VBA_RUNTIME_20",
+                91 => "VBA_RUNTIME_91",
+                94 => "VBA_RUNTIME_94",
+                448 => "VBA_RUNTIME_448",
                 _ => "VBA0030",
             },
             message,

@@ -47,6 +47,7 @@
     ],
     "vba-semantics": [
       "vba-diagnostics",
+      "vba-runtime",
       "vba-syntax",
       "vba-values"
     ],

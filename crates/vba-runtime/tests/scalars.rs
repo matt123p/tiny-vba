@@ -26,14 +26,11 @@ fn exact_width_operations_and_error_numbers() {
         r::unary("not", &Value::Boolean(true)),
         Ok(Value::Boolean(false))
     );
-    assert!(matches!(
-        r::condition(&Value::Long(1)),
-        Err(Error::Unsupported(_))
-    ));
-    assert!(matches!(
+    assert_eq!(r::condition(&Value::Long(1)), Ok(true));
+    assert_eq!(
         r::binary("+", &Value::Null, &Value::Integer(1)),
-        Err(Error::Unsupported(_))
-    ));
+        Ok(Value::Null)
+    );
 }
 #[test]
 fn strings_states_and_object_modes_are_preserved() -> Result<(), Box<dyn std::error::Error>> {
@@ -164,18 +161,18 @@ fn real_division_and_double_widths_match_the_m4_matrix() -> Result<(), Box<dyn s
         r::binary("+", &Value::Integer(6), &Value::Integer(2)),
         Ok(Value::Integer(8))
     );
-    assert!(matches!(
+    assert_eq!(
         r::binary("\\", &Value::Double(7.0), &Value::Integer(2)),
-        Err(Error::Unsupported(_))
-    ));
-    assert!(matches!(
+        Ok(Value::Long(3))
+    );
+    assert_eq!(
         r::binary(
             "/",
-            &Value::String(VbaString::from_units(vec![49]).map_err(|e| e.to_string())?),
+            &Value::String(VbaString::from_utf8("1")?),
             &Value::Integer(2)
         ),
-        Err(Error::Unsupported(_))
-    ));
+        Ok(Value::Double(0.5))
+    );
     // Widening Integer/Long/Double into Double slots is exact.
     assert_eq!(
         r::assign(ScalarKind::Double, &Value::Integer(3), false),

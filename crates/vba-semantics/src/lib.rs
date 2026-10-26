@@ -1,4 +1,4 @@
-//! M2 procedure-local binding. No runtime evaluation or implicit host globals.
+//! Bounded source binding and M4 argument/default elaboration; no implicit host globals.
 #![forbid(unsafe_code)]
 use std::collections::{BTreeMap, BTreeSet};
 use vba_diagnostics::{Diagnostic, Span};
@@ -18,10 +18,14 @@ pub struct BoundParameter {
     pub name: String,
     pub kind: ScalarKind,
     pub by_val: bool,
+    pub optional: bool,
+    pub default: Option<Value>,
     pub span: Span,
 }
 #[derive(Clone, Debug)]
 pub struct BoundLocal {
+    pub persistent: Option<String>,
+    pub array: Option<ScalarKind>,
     pub name: String,
     pub kind: ScalarKind,
     pub span: Span,
@@ -64,6 +68,16 @@ pub struct ForeignArgument {
 }
 #[derive(Clone, Debug)]
 pub enum ExprKind {
+    Element {
+        slot: usize,
+        indices: Vec<Expr>,
+        kind: ScalarKind,
+    },
+    ErrField(String),
+    Intrinsic {
+        function: vba_values::Intrinsic,
+        arguments: Vec<Expr>,
+    },
     Foreign {
         target: Box<Expr>,
         kind: ForeignKind,
@@ -88,6 +102,19 @@ pub enum ExprKind {
 }
 #[derive(Clone, Debug)]
 pub enum Argument {
+    Element {
+        slot: usize,
+        indices: Vec<Expr>,
+        kind: ScalarKind,
+    },
+    Mapped {
+        parameter: usize,
+        argument: Box<Argument>,
+    },
+    Temporary {
+        value: Expr,
+        kind: ScalarKind,
+    },
     Value(Expr),
     Reference(usize),
 }
@@ -104,6 +131,37 @@ pub struct IfArm {
 }
 #[derive(Clone, Debug)]
 pub enum StatementKind {
+    ArrayInit {
+        slot: usize,
+        kind: ScalarKind,
+        dimensions: Vec<(Expr, Expr)>,
+        dynamic: bool,
+    },
+    ReDim {
+        slot: usize,
+        dimensions: Vec<(Expr, Expr)>,
+        preserve: bool,
+    },
+    Erase(usize),
+    ElementAssign {
+        slot: usize,
+        indices: Vec<Expr>,
+        kind: ScalarKind,
+        value: Expr,
+        object: bool,
+    },
+    Label(String),
+    GoTo(String),
+    OnError {
+        target: Option<String>,
+        resume_next: bool,
+    },
+    Resume {
+        target: Option<String>,
+        next: bool,
+    },
+    ErrClear,
+    ErrRaise(Vec<Expr>),
     Foreign(Expr),
     Declare,
     Assign {
@@ -201,6 +259,12 @@ fn preflight(module: &ast::Module, budget: &mut Budget) -> Result<()> {
     )?;
     let mut pending = Vec::new();
     for d in &module.declarations {
+        if let Some(bounds) = &d.dimensions {
+            for (lower, upper) in bounds {
+                push(&mut pending, (Node::Expr(lower), 0), span)?;
+                push(&mut pending, (Node::Expr(upper), 0), span)?;
+            }
+        }
         if let Some(e) = &d.constant {
             push(&mut pending, (Node::Expr(e), 0usize), span)?;
         }
@@ -249,9 +313,21 @@ fn preflight(module: &ast::Module, budget: &mut Budget) -> Result<()> {
                 _ => (),
             },
             Node::Statement(statement) => match &statement.kind {
+                ast::StatementKind::ReDim { dimensions, .. } => {
+                    for (lower, upper) in dimensions {
+                        push(&mut pending, (Node::Expr(lower), depth + 1), span)?;
+                        push(&mut pending, (Node::Expr(upper), depth + 1), span)?;
+                    }
+                }
                 ast::StatementKind::Declare(ds) => {
                     for d in ds {
                         budget.charge(256, d.span)?;
+                        if let Some(bounds) = &d.dimensions {
+                            for (lower, upper) in bounds {
+                                push(&mut pending, (Node::Expr(lower), depth + 1), span)?;
+                                push(&mut pending, (Node::Expr(upper), depth + 1), span)?;
+                            }
+                        }
                         if let Some(e) = &d.constant {
                             push(&mut pending, (Node::Expr(e), depth + 1), span)?;
                         }
@@ -341,20 +417,30 @@ pub fn bind(parsed: &[ast::ParseResult], entry: &str) -> Result<BoundProgram> {
         }
         let mut constants = BTreeMap::new();
         for option in &module.options {
+            if let ast::ModuleOption::Base { value: 1, span } = option {
+                return Err(unsupported("Option Base 1 array defaults", *span));
+            }
             if let ast::ModuleOption::Compare { text: true, span } = option {
                 return Err(unsupported("Option Compare Text compilation", *span));
             }
         }
+        let mut declaration_names = BTreeSet::new();
         for declaration in &module.declarations {
+            if !declaration_names.insert(declaration.name.key()) {
+                return Err(err("duplicate module declaration", declaration.span));
+            }
             kind(None, &declaration.name)?;
             let Some(value) = declaration.constant.as_ref() else {
-                return Err(unsupported("persistent module storage", declaration.span));
+                continue;
             };
-            // Explicitly typed Const needs constant conversion rules, not runtime slot assignment.
-            if declaration.ty.is_some() {
-                return Err(unsupported("typed Const evaluation", declaration.span));
-            }
-            let symbol = Symbol::Constant(literal(value)?);
+            let value = literal(value)?;
+            let value = if declaration.ty.is_some() {
+                vba_runtime::bind(kind(declaration.ty.as_ref(), &declaration.name)?, &value)
+                    .map_err(|_| err("invalid typed constant", declaration.span))?
+            } else {
+                value
+            };
+            let symbol = Symbol::Constant(value);
             if constants.insert(declaration.name.key(), symbol).is_some() {
                 return Err(err("duplicate module declaration", declaration.span));
             }
@@ -365,7 +451,7 @@ pub fn bind(parsed: &[ast::ParseResult], entry: &str) -> Result<BoundProgram> {
                 return Err(limit(procedure.span));
             }
             if !procedure_names.insert((mi, procedure.name.key()))
-                || constants.contains_key(&procedure.name.key())
+                || declaration_names.contains(&procedure.name.key())
             {
                 return Err(err(
                     "duplicate procedure/module symbol",
@@ -380,16 +466,33 @@ pub fn bind(parsed: &[ast::ParseResult], entry: &str) -> Result<BoundProgram> {
                 return Err(limit(procedure.span));
             }
             for parameter in &procedure.parameters {
-                if parameter.optional || parameter.default.is_some() {
-                    return Err(unsupported("optional direct parameters", parameter.span));
-                }
                 let kind = kind(parameter.ty.as_ref(), &parameter.name)?;
+                if !parameter.optional && parameters.iter().any(|p: &BoundParameter| p.optional) {
+                    return Err(err("required parameter after Optional", parameter.span));
+                }
+                let default = if parameter.optional {
+                    let value = if let Some(value) = &parameter.default {
+                        literal(value)?
+                    } else if kind == ScalarKind::Variant {
+                        Value::Missing
+                    } else {
+                        return Err(err("typed Optional requires a default", parameter.span));
+                    };
+                    Some(
+                        vba_runtime::bind(kind, &value)
+                            .map_err(|_| err("invalid optional default", parameter.span))?,
+                    )
+                } else {
+                    None
+                };
                 push(
                     &mut parameters,
                     BoundParameter {
                         name: parameter.name.spelling.clone(),
                         kind,
                         by_val: parameter.by_val,
+                        optional: parameter.optional,
+                        default,
                         span: parameter.span,
                     },
                     parameter.span,
@@ -512,7 +615,59 @@ pub fn bind(parsed: &[ast::ParseResult], entry: &str) -> Result<BoundProgram> {
             )?;
         }
         binder.collect(&syntax.body, &mut local_names)?;
-        let body = binder.block(&syntax.body)?;
+        for declaration in &module.declarations {
+            if declaration.constant.is_some() || local_names.contains(&declaration.name.key()) {
+                continue;
+            }
+            let element = kind(declaration.ty.as_ref(), &declaration.name)?;
+            binder.local(
+                &declaration.name.spelling,
+                if declaration.dimensions.is_some() {
+                    ScalarKind::Variant
+                } else {
+                    element
+                },
+                declaration.span,
+                false,
+                false,
+                &mut local_names,
+            )?;
+            let local = binder
+                .locals
+                .last_mut()
+                .ok_or_else(|| err("module local", declaration.span))?;
+            local.persistent = Some(format!("{}:module:{}", sig.module, declaration.name.key()));
+            local.array = declaration.dimensions.as_ref().map(|_| element);
+        }
+        let mut body = binder.block(&syntax.body)?;
+        let mut initializers = Vec::new();
+        for declaration in &module.declarations {
+            if let Some(dimensions) = &declaration.dimensions {
+                let slot = binder.slot(&declaration.name)?;
+                let kind = binder
+                    .locals
+                    .get(slot)
+                    .and_then(|l| l.array)
+                    .ok_or_else(|| err("module array shadowed", declaration.span))?;
+                let dimensions = binder.constant_bounds(dimensions)?;
+                let site = syntax.body.first().map(|s| s.site).unwrap_or(syntax.end);
+                push(
+                    &mut initializers,
+                    Statement {
+                        site,
+                        kind: StatementKind::ArrayInit {
+                            slot,
+                            kind,
+                            dynamic: dimensions.is_empty(),
+                            dimensions,
+                        },
+                    },
+                    site.span,
+                )?;
+            }
+        }
+        initializers.append(&mut body);
+        let body = initializers;
         push(
             &mut procedures,
             BoundProcedure {
@@ -572,6 +727,8 @@ impl Binder<'_> {
         push(
             &mut self.locals,
             BoundLocal {
+                persistent: None,
+                array: None,
                 name: name.into(),
                 kind,
                 span,
@@ -588,23 +745,45 @@ impl Binder<'_> {
                     for d in declarations {
                         if let Some(expr) = &d.constant {
                             kind(None, &d.name)?;
-                            if d.ty.is_some() {
-                                return Err(unsupported("typed Const evaluation", d.span));
-                            }
+
                             if !names.insert(d.name.key()) {
                                 return Err(err("duplicate local constant", d.span));
                             }
-                            self.symbols
-                                .insert(d.name.key(), Symbol::Constant(literal(expr)?));
+                            let value = literal(expr)?;
+                            let value = if d.ty.is_some() {
+                                vba_runtime::bind(kind(d.ty.as_ref(), &d.name)?, &value)
+                                    .map_err(|_| err("invalid typed constant", d.span))?
+                            } else {
+                                value
+                            };
+                            self.symbols.insert(d.name.key(), Symbol::Constant(value));
                         } else {
+                            let element = kind(d.ty.as_ref(), &d.name)?;
                             self.local(
                                 &d.name.spelling,
-                                kind(d.ty.as_ref(), &d.name)?,
+                                if d.dimensions.is_some() {
+                                    ScalarKind::Variant
+                                } else {
+                                    element
+                                },
                                 d.span,
                                 false,
                                 false,
                                 names,
                             )?;
+                            let local = self
+                                .locals
+                                .last_mut()
+                                .ok_or_else(|| err("declaration local", d.span))?;
+                            local.array = d.dimensions.as_ref().map(|_| element);
+                            if d.persistent {
+                                local.persistent = Some(format!(
+                                    "{}:{}:{}",
+                                    self.signature.module,
+                                    self.signature.name.to_ascii_lowercase(),
+                                    d.name.key()
+                                ));
+                            }
                         }
                     }
                 }
@@ -655,6 +834,8 @@ impl Binder<'_> {
         push(
             &mut self.locals,
             BoundLocal {
+                persistent: None,
+                array: None,
                 name: name.spelling.clone(),
                 kind: ScalarKind::Variant,
                 span: name.span,
@@ -726,38 +907,132 @@ impl Binder<'_> {
             .signatures
             .get(id)
             .ok_or_else(|| err("callee missing", span))?;
-        if args.len() != sig.parameters.len() {
+        if args.len() > sig.parameters.len() {
             return Err(err("argument count mismatch", span));
         }
         let params = sig.parameters.clone();
+        let mut used = BTreeSet::new();
+        let mut named = false;
         let mut result = Vec::new();
-        for (arg, param) in args.iter().zip(params) {
-            if arg.name.is_some() || arg.value.is_none() {
-                return Err(unsupported("named/omitted direct arguments", arg.span));
-            }
-            let expr = arg
-                .value
-                .as_ref()
-                .ok_or_else(|| err("missing argument", arg.span))?;
-            if matches!(expr.kind, ast::ExprKind::Parenthesized(_)) {
-                return Err(unsupported(
-                    "parenthesized direct argument binding",
-                    expr.span,
-                ));
-            }
-            let bound = if param.by_val {
-                Argument::Value(self.expr(expr)?)
+        for (position, arg) in args.iter().enumerate() {
+            let index = if let Some(name) = &arg.name {
+                named = true;
+                params
+                    .iter()
+                    .position(|p| p.name.eq_ignore_ascii_case(&name.spelling))
+                    .ok_or_else(|| err("unknown named argument", name.span))?
             } else {
-                let ast::ExprKind::Name(name) = &expr.kind else {
-                    return Err(unsupported("ByRef requires exact-type local", expr.span));
-                };
-                let slot = self.slot(name)?;
-                if self.locals.get(slot).is_none_or(|l| l.kind != param.kind) {
-                    return Err(err("ByRef declared type mismatch", expr.span));
+                if named {
+                    return Err(err("positional argument after named", arg.span));
                 }
-                Argument::Reference(slot)
+                position
             };
-            push(&mut result, bound, arg.span)?;
+            if !used.insert(index) {
+                return Err(err("duplicate argument", arg.span));
+            }
+            let param = params
+                .get(index)
+                .ok_or_else(|| err("argument count mismatch", span))?;
+            let bound = if let Some(expr) = &arg.value {
+                if param.by_val {
+                    Argument::Value(self.expr(expr)?)
+                } else if let ast::ExprKind::Name(name) = &expr.kind {
+                    let slot = self.slot(name)?;
+                    if self.locals.get(slot).is_none_or(|l| l.kind != param.kind) {
+                        return Err(err("ByRef declared type mismatch", expr.span));
+                    }
+                    Argument::Reference(slot)
+                } else {
+                    let bound = self.expr(expr)?;
+                    if let ExprKind::Element {
+                        slot,
+                        indices,
+                        kind,
+                    } = bound.kind
+                    {
+                        if kind != param.kind {
+                            return Err(err("ByRef array element type mismatch", expr.span));
+                        }
+                        Argument::Element {
+                            slot,
+                            indices,
+                            kind,
+                        }
+                    } else {
+                        Argument::Temporary {
+                            value: bound,
+                            kind: param.kind,
+                        }
+                    }
+                }
+            } else {
+                let value = param
+                    .default
+                    .as_ref()
+                    .ok_or_else(|| err("missing required argument", arg.span))?;
+                let expr = Expr {
+                    span: arg.span,
+                    kind: ExprKind::Constant(value.clone()),
+                };
+                if param.by_val {
+                    Argument::Value(expr)
+                } else {
+                    Argument::Temporary {
+                        value: expr,
+                        kind: param.kind,
+                    }
+                }
+            };
+            push(
+                &mut result,
+                Argument::Mapped {
+                    parameter: index,
+                    argument: Box::new(bound),
+                },
+                arg.span,
+            )?;
+        }
+        for (index, param) in params.iter().enumerate() {
+            if used.contains(&index) {
+                continue;
+            }
+            let value = param
+                .default
+                .as_ref()
+                .ok_or_else(|| err("missing required argument", span))?;
+            let expr = Expr {
+                span,
+                kind: ExprKind::Constant(value.clone()),
+            };
+            let bound = if param.by_val {
+                Argument::Value(expr)
+            } else {
+                Argument::Temporary {
+                    value: expr,
+                    kind: param.kind,
+                }
+            };
+            push(
+                &mut result,
+                Argument::Mapped {
+                    parameter: index,
+                    argument: Box::new(bound),
+                },
+                span,
+            )?;
+        }
+        if args.len() == params.len() && args.iter().all(|a| a.name.is_none() && a.value.is_some())
+        {
+            result = result
+                .into_iter()
+                .map(|a| {
+                    if let Argument::Mapped { argument, .. } = a {
+                        *argument
+                    } else {
+                        a
+                    }
+                })
+                .collect();
         }
         Ok(result)
     }
@@ -827,6 +1102,12 @@ impl Binder<'_> {
         self.budget.charge(256, expr.span)?;
         let bound = match &expr.kind {
             ast::ExprKind::Name(name) => {
+                if name.key() == "erl" {
+                    return Ok(Expr {
+                        span: expr.span,
+                        kind: ExprKind::ErrField("erl".into()),
+                    });
+                }
                 if !self.symbols.contains_key(&name.key())
                     && (self
                         .lookup
@@ -865,6 +1146,50 @@ impl Binder<'_> {
                 let ast::ExprKind::Name(name) = &target.kind else {
                     return Err(unsupported("member/default/array application", expr.span));
                 };
+                if let Some(Symbol::Local(slot)) = self.symbols.get(&name.key()).cloned()
+                    && let Some(kind) = self.locals.get(slot).and_then(|l| l.array)
+                {
+                    return Ok(Expr {
+                        span: expr.span,
+                        kind: ExprKind::Element {
+                            slot,
+                            kind,
+                            indices: self.indices(arguments, expr.span)?,
+                        },
+                    });
+                }
+                if !self
+                    .lookup
+                    .local
+                    .contains_key(&(self.signature.module, name.key()))
+                    && !self.lookup.public.contains_key(&name.key())
+                    && let Some(function) = vba_values::Intrinsic::from_name(&name.spelling)
+                {
+                    if !function.accepts(arguments.len()) {
+                        return Err(err("intrinsic argument count", expr.span));
+                    }
+                    let mut values = Vec::new();
+                    for argument in arguments {
+                        if argument.name.is_some() || argument.value.is_none() {
+                            return Err(err(
+                                "intrinsic requires present positional arguments",
+                                argument.span,
+                            ));
+                        }
+                        let value = argument
+                            .value
+                            .as_ref()
+                            .ok_or_else(|| err("intrinsic argument missing", argument.span))?;
+                        push(&mut values, self.expr(value)?, argument.span)?;
+                    }
+                    return Ok(Expr {
+                        span: expr.span,
+                        kind: ExprKind::Intrinsic {
+                            function,
+                            arguments: values,
+                        },
+                    });
+                }
                 let id = self.callee(name)?;
                 if self
                     .signatures
@@ -899,6 +1224,15 @@ impl Binder<'_> {
                 }
             }
             ast::ExprKind::Member { target, name } => {
+                if matches!(&target.kind,ast::ExprKind::Name(n) if n.key() == "err") {
+                    if !["number", "description", "source"].contains(&name.key().as_str()) {
+                        return Err(err("unknown Err property", name.span));
+                    }
+                    return Ok(Expr {
+                        span: expr.span,
+                        kind: ExprKind::ErrField(name.key()),
+                    });
+                }
                 return self.foreign(target, name, &[], ForeignKind::Get, None);
             }
             _ => ExprKind::Constant(literal(expr)?),
@@ -908,9 +1242,86 @@ impl Binder<'_> {
             kind: bound,
         })
     }
+    fn constant_bounds(
+        &mut self,
+        dimensions: &[(ast::Expr, ast::Expr)],
+    ) -> Result<Vec<(Expr, Expr)>> {
+        let mut result = Vec::new();
+        for (lower, upper) in dimensions {
+            push(
+                &mut result,
+                (
+                    Expr {
+                        span: lower.span,
+                        kind: ExprKind::Constant(literal(lower)?),
+                    },
+                    Expr {
+                        span: upper.span,
+                        kind: ExprKind::Constant(literal(upper)?),
+                    },
+                ),
+                lower.span,
+            )?;
+        }
+        Ok(result)
+    }
+    fn bounds(&mut self, dimensions: &[(ast::Expr, ast::Expr)]) -> Result<Vec<(Expr, Expr)>> {
+        let mut result = Vec::new();
+        for (lower, upper) in dimensions {
+            push(
+                &mut result,
+                (self.expr(lower)?, self.expr(upper)?),
+                lower.span,
+            )?;
+        }
+        Ok(result)
+    }
+    fn indices(&mut self, arguments: &[ast::Argument], span: Span) -> Result<Vec<Expr>> {
+        if arguments.is_empty() || arguments.len() > 8 {
+            return Err(err("array rank", span));
+        }
+        let mut result = Vec::new();
+        for arg in arguments {
+            if arg.name.is_some() {
+                return Err(err("named array index", arg.span));
+            }
+            let value = arg
+                .value
+                .as_ref()
+                .ok_or_else(|| err("missing array index", arg.span))?;
+            push(&mut result, self.expr(value)?, arg.span)?;
+        }
+        Ok(result)
+    }
     fn block(&mut self, body: &[ast::Statement]) -> Result<Vec<Statement>> {
         let mut result = Vec::new();
         for statement in body {
+            if let ast::StatementKind::Declare(declarations) = &statement.kind {
+                for declaration in declarations {
+                    if let Some(dimensions) = &declaration.dimensions {
+                        let slot = self.slot(&declaration.name)?;
+                        let kind = self
+                            .locals
+                            .get(slot)
+                            .and_then(|l| l.array)
+                            .ok_or_else(|| err("array declaration", declaration.span))?;
+                        let dimensions = self.constant_bounds(dimensions)?;
+                        push(
+                            &mut result,
+                            Statement {
+                                site: statement.site,
+                                kind: StatementKind::ArrayInit {
+                                    slot,
+                                    kind,
+                                    dynamic: dimensions.is_empty(),
+                                    dimensions,
+                                },
+                            },
+                            statement.site.span,
+                        )?;
+                    }
+                }
+            }
             let bound = self.statement(statement)?;
             push(&mut result, bound, statement.site.span)?;
         }
@@ -919,6 +1330,43 @@ impl Binder<'_> {
     fn statement(&mut self, statement: &ast::Statement) -> Result<Statement> {
         let site = statement.site;
         let bound = match &statement.kind {
+            ast::StatementKind::ReDim {
+                name,
+                dimensions,
+                ty,
+                preserve,
+            } => {
+                let slot = self.slot(name)?;
+                let element = self
+                    .locals
+                    .get(slot)
+                    .and_then(|l| l.array)
+                    .ok_or_else(|| err("ReDim requires declared array", name.span))?;
+                if let Some(ty) = ty
+                    && kind(Some(ty), name)? != element
+                {
+                    return Err(err("ReDim element type change", ty.span));
+                }
+                StatementKind::ReDim {
+                    slot,
+                    dimensions: self.bounds(dimensions)?,
+                    preserve: *preserve,
+                }
+            }
+            ast::StatementKind::Erase(name) => StatementKind::Erase(self.slot(name)?),
+            ast::StatementKind::Label(name) => StatementKind::Label(name.clone()),
+            ast::StatementKind::GoTo(name) => StatementKind::GoTo(name.clone()),
+            ast::StatementKind::OnError {
+                target,
+                resume_next,
+            } => StatementKind::OnError {
+                target: target.clone(),
+                resume_next: *resume_next,
+            },
+            ast::StatementKind::Resume { target, next } => StatementKind::Resume {
+                target: target.clone(),
+                next: *next,
+            },
             ast::StatementKind::Declare(_) => StatementKind::Declare,
             ast::StatementKind::Assign {
                 target,
@@ -926,6 +1374,31 @@ impl Binder<'_> {
                 object,
                 ..
             } => {
+                if let ast::ExprKind::Apply {
+                    target: array,
+                    arguments,
+                } = &target.kind
+                {
+                    let ast::ExprKind::Name(name) = &array.kind else {
+                        return Err(unsupported("array target", target.span));
+                    };
+                    let slot = self.slot(name)?;
+                    let kind = self
+                        .locals
+                        .get(slot)
+                        .and_then(|l| l.array)
+                        .ok_or_else(|| err("array required", target.span))?;
+                    return Ok(Statement {
+                        site,
+                        kind: StatementKind::ElementAssign {
+                            slot,
+                            kind,
+                            indices: self.indices(arguments, target.span)?,
+                            value: self.expr(value)?,
+                            object: *object,
+                        },
+                    });
+                }
                 if let ast::ExprKind::Member {
                     target: object_target,
                     name,
@@ -972,6 +1445,61 @@ impl Binder<'_> {
                     name,
                 } = &target.kind
                 {
+                    if matches!(&object.kind,ast::ExprKind::Name(n) if n.key() == "debug")
+                        && name.key() == "print"
+                    {
+                        let mut values = Vec::new();
+                        for arg in arguments {
+                            if arg.name.is_some() || arg.value.is_none() {
+                                return Err(unsupported("Debug.Print argument form", arg.span));
+                            }
+                            let value = arg
+                                .value
+                                .as_ref()
+                                .ok_or_else(|| err("Debug.Print argument", arg.span))?;
+                            push(&mut values, self.expr(value)?, arg.span)?;
+                        }
+                        return Ok(Statement {
+                            site,
+                            kind: StatementKind::Foreign(Expr {
+                                span: site.span,
+                                kind: ExprKind::Intrinsic {
+                                    function: vba_values::Intrinsic::DebugPrint,
+                                    arguments: values,
+                                },
+                            }),
+                        });
+                    }
+                    if matches!(&object.kind,ast::ExprKind::Name(n) if n.key() == "err") {
+                        if name.key() == "clear" && arguments.is_empty() {
+                            return Ok(Statement {
+                                site,
+                                kind: StatementKind::ErrClear,
+                            });
+                        }
+                        if name.key() == "raise" && (1..=3).contains(&arguments.len()) {
+                            let mut values = Vec::new();
+                            for arg in arguments {
+                                if arg.name.is_some() {
+                                    return Err(unsupported("named Err.Raise arguments", arg.span));
+                                }
+                                let value = if let Some(value) = &arg.value {
+                                    self.expr(value)?
+                                } else {
+                                    Expr {
+                                        span: arg.span,
+                                        kind: ExprKind::Constant(Value::Empty),
+                                    }
+                                };
+                                push(&mut values, value, arg.span)?;
+                            }
+                            return Ok(Statement {
+                                site,
+                                kind: StatementKind::ErrRaise(values),
+                            });
+                        }
+                        return Err(err("invalid Err method", site.span));
+                    }
                     return Ok(Statement {
                         site,
                         kind: StatementKind::Foreign(self.foreign(
@@ -1085,6 +1613,15 @@ impl Binder<'_> {
 }
 fn literal(expr: &ast::Expr) -> Result<Value> {
     Ok(match &expr.kind {
+        ast::ExprKind::Parenthesized(value) => return literal(value),
+        ast::ExprKind::Unary { op, value } => {
+            return vba_runtime::unary(op, &literal(value)?)
+                .map_err(|_| err("invalid constant expression", expr.span));
+        }
+        ast::ExprKind::Binary { op, left, right } => {
+            return vba_runtime::binary(op, &literal(left)?, &literal(right)?)
+                .map_err(|_| err("invalid constant expression", expr.span));
+        }
         ast::ExprKind::Number(raw) => {
             let (digits, suffix) = if raw.ends_with('%') || raw.ends_with('&') {
                 (

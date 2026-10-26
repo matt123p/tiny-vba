@@ -1,7 +1,9 @@
-//! M3 shared scalar rules. Unsupported combinations are distinct from VBA runtime errors.
+//! Shared M4 scalar coercion, operator and deterministic intrinsic rules.
 #![forbid(unsafe_code)]
+mod coercion;
+pub use coercion::intrinsic;
 use vba_values::{ScalarKind, Value, VbaString};
-pub const PROFILE: &str = "m4-scalars-v1";
+pub const PROFILE: &str = "m4-language-v1";
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum Error {
     Vba { number: i32, message: String },
@@ -54,39 +56,7 @@ pub fn assign(kind: ScalarKind, value: &Value, object: bool) -> Result<Value> {
     if matches!(value, Value::Object(_) | Value::Nothing) {
         return Err(unsupported());
     }
-    match (kind, value) {
-        (ScalarKind::Variant, _) => Ok(value.clone()),
-        (ScalarKind::Integer, Value::Integer(_))
-        | (ScalarKind::Long, Value::Long(_))
-        | (ScalarKind::Boolean, Value::Boolean(_))
-        | (ScalarKind::String, Value::String(_)) => Ok(value.clone()),
-        (ScalarKind::Long, Value::Integer(n)) => Ok(Value::Long(i32::from(*n))),
-        (ScalarKind::Integer, Value::Long(n)) => number(*n, false),
-        (ScalarKind::Double, Value::Integer(n)) => Ok(Value::Double(f64::from(*n))),
-        (ScalarKind::Double, Value::Long(n)) => Ok(Value::Double(f64::from(*n))),
-        (ScalarKind::Double, Value::Double(n)) if n.is_finite() => Ok(value.clone()),
-        (ScalarKind::Integer, Value::Double(n)) => Ok(Value::Integer(ordinal(*n, false)? as i16)),
-        (ScalarKind::Long, Value::Double(n)) => Ok(Value::Long(ordinal(*n, true)? as i32)),
-        _ => Err(unsupported()),
-    }
-}
-/// Narrowing a Double into an Integer/Long slot rounds half to even, as VBA's typed
-/// conversions do; a value outside the destination range is overflow error 6.
-fn ordinal(value: f64, long: bool) -> Result<i64> {
-    if !value.is_finite() {
-        return Err(unsupported());
-    }
-    let rounded = value.round_ties_even();
-    let (minimum, maximum) = if long {
-        (f64::from(i32::MIN), f64::from(i32::MAX))
-    } else {
-        (f64::from(i16::MIN), f64::from(i16::MAX))
-    };
-    if rounded < minimum || rounded > maximum {
-        return Err(overflow());
-    }
-    // Every in-range destination integer is exactly representable in Double.
-    Ok(rounded as i64)
+    coercion::convert(kind, value)
 }
 
 pub fn bind(kind: ScalarKind, value: &Value) -> Result<Value> {
@@ -100,10 +70,42 @@ pub fn bind(kind: ScalarKind, value: &Value) -> Result<Value> {
 pub fn condition(value: &Value) -> Result<bool> {
     match value {
         Value::Boolean(v) => Ok(*v),
-        _ => Err(unsupported()),
+        Value::Null => Ok(false),
+        _ => Ok(coercion::numeric(value)? != 0.0),
     }
 }
 pub fn unary(op: &str, value: &Value) -> Result<Value> {
+    if op == "not" {
+        match value {
+            Value::LongLong(n) => return Ok(Value::LongLong(!n)),
+            Value::Byte(n) => return Ok(Value::Byte(!n)),
+            Value::Empty => return Ok(Value::Integer(-1)),
+            Value::Single(_)
+            | Value::Double(_)
+            | Value::Currency(_)
+            | Value::Date(_)
+            | Value::String(_) => return unary(op, &coercion::convert(ScalarKind::Long, value)?),
+            _ => (),
+        }
+    }
+    if matches!(value, Value::Null) {
+        return Ok(Value::Null);
+    }
+    if op == "-" {
+        match value {
+            Value::LongLong(n) => {
+                return Ok(Value::LongLong(n.checked_neg().ok_or_else(overflow)?));
+            }
+            Value::Currency(n) => {
+                return Ok(Value::Currency(n.checked_neg().ok_or_else(overflow)?));
+            }
+            Value::Single(n) => return Ok(Value::Single(-n)),
+            Value::Date(n) => return Ok(Value::Double(-n)),
+            Value::Byte(n) => return Ok(Value::Integer(-i16::from(*n))),
+            Value::Empty => return Ok(Value::Integer(0)),
+            _ => (),
+        }
+    }
     match (op, value) {
         ("not", Value::Boolean(v)) => Ok(Value::Boolean(!v)),
         ("not", Value::Integer(v)) => Ok(Value::Integer(!v)),
@@ -120,6 +122,190 @@ pub fn unary(op: &str, value: &Value) -> Result<Value> {
     }
 }
 pub fn binary(op: &str, left: &Value, right: &Value) -> Result<Value> {
+    if op == "&" && matches!((left, right), (Value::Null, Value::Null)) {
+        return Ok(Value::Null);
+    }
+    if matches!(op, "\\" | "mod")
+        && (!matches!(
+            left,
+            Value::Integer(_) | Value::Long(_) | Value::LongLong(_)
+        ) || !matches!(
+            right,
+            Value::Integer(_) | Value::Long(_) | Value::LongLong(_)
+        ))
+        && !matches!(left, Value::Null)
+        && !matches!(right, Value::Null)
+    {
+        return binary(
+            op,
+            &coercion::convert(ScalarKind::Long, left)?,
+            &coercion::convert(ScalarKind::Long, right)?,
+        );
+    }
+    if matches!(left, Value::Null) || matches!(right, Value::Null) {
+        if op == "and"
+            && (matches!(left, Value::Boolean(false)) || matches!(right, Value::Boolean(false)))
+        {
+            return Ok(Value::Boolean(false));
+        }
+        if op == "or"
+            && (matches!(left, Value::Boolean(true)) || matches!(right, Value::Boolean(true)))
+        {
+            return Ok(Value::Boolean(true));
+        }
+        if op != "&" {
+            return Ok(Value::Null);
+        }
+    }
+    if matches!(
+        left,
+        Value::CvErr(_) | Value::Missing | Value::Nothing | Value::Object(_)
+    ) {
+        coercion::numeric(left)?;
+    }
+    if matches!(
+        right,
+        Value::CvErr(_) | Value::Missing | Value::Nothing | Value::Object(_)
+    ) {
+        coercion::numeric(right)?;
+    }
+    if op == "&" && !(matches!(left, Value::String(_)) && matches!(right, Value::String(_))) {
+        let a = if matches!(left, Value::Null) {
+            Value::String(VbaString::from_units(Vec::new()).map_err(|_| unsupported())?)
+        } else {
+            Value::String(coercion::text(left)?)
+        };
+        let b = if matches!(right, Value::Null) {
+            Value::String(VbaString::from_units(Vec::new()).map_err(|_| unsupported())?)
+        } else {
+            Value::String(coercion::text(right)?)
+        };
+        return binary(op, &a, &b);
+    }
+    if let (Value::String(a), Value::String(b)) = (left, right) {
+        let cmp = a.units().cmp(b.units());
+        let result = match op {
+            "=" => Some(cmp.is_eq()),
+            "<>" => Some(!cmp.is_eq()),
+            "<" => Some(cmp.is_lt()),
+            "<=" => Some(!cmp.is_gt()),
+            ">" => Some(cmp.is_gt()),
+            ">=" => Some(!cmp.is_lt()),
+            _ => None,
+        };
+        if let Some(result) = result {
+            return Ok(Value::Boolean(result));
+        }
+        if op == "+" {
+            return binary("&", left, right);
+        }
+    }
+    if (matches!(left, Value::Currency(_)) || matches!(right, Value::Currency(_)))
+        && !matches!(left, Value::Double(_) | Value::Single(_) | Value::Date(_))
+        && !matches!(right, Value::Double(_) | Value::Single(_) | Value::Date(_))
+        && matches!(op, "+" | "-" | "*")
+    {
+        let Value::Currency(a) = coercion::convert(ScalarKind::Currency, left)? else {
+            return Err(unsupported());
+        };
+        let Value::Currency(b) = coercion::convert(ScalarKind::Currency, right)? else {
+            return Err(unsupported());
+        };
+        let (a, b) = (i128::from(a), i128::from(b));
+        let n = match op {
+            "+" => a + b,
+            "-" => a - b,
+            _ => coercion::round_ratio(a * b, 10000)?,
+        };
+        return Ok(Value::Currency(i64::try_from(n).map_err(|_| overflow())?));
+    }
+    if (matches!(left, Value::LongLong(_)) || matches!(right, Value::LongLong(_)))
+        && matches!(
+            left,
+            Value::LongLong(_) | Value::Byte(_) | Value::Integer(_) | Value::Long(_) | Value::Empty
+        )
+        && matches!(
+            right,
+            Value::LongLong(_) | Value::Byte(_) | Value::Integer(_) | Value::Long(_) | Value::Empty
+        )
+        && op != "/"
+        && op != "^"
+    {
+        let Value::LongLong(a) = coercion::convert(ScalarKind::LongLong, left)? else {
+            return Err(unsupported());
+        };
+        let Value::LongLong(b) = coercion::convert(ScalarKind::LongLong, right)? else {
+            return Err(unsupported());
+        };
+        return wide_integer(op, a, b);
+    }
+    if (matches!(left, Value::Empty | Value::Byte(_) | Value::Boolean(_))
+        || matches!(right, Value::Empty | Value::Byte(_) | Value::Boolean(_)))
+        && !(matches!(left, Value::Boolean(_)) && matches!(right, Value::Boolean(_)))
+    {
+        let normalize = |v: &Value| -> Result<Value> {
+            Ok(match v {
+                Value::Empty => Value::Integer(0),
+                Value::Byte(n) => Value::Integer(i16::from(*n)),
+                Value::Boolean(b) => Value::Integer(if *b { -1 } else { 0 }),
+                _ => v.clone(),
+            })
+        };
+        return binary(op, &normalize(left)?, &normalize(right)?);
+    }
+    if op != "&"
+        && (matches!(
+            left,
+            Value::Single(_)
+                | Value::Currency(_)
+                | Value::Date(_)
+                | Value::String(_)
+                | Value::LongLong(_)
+        ) || matches!(
+            right,
+            Value::Single(_)
+                | Value::Currency(_)
+                | Value::Date(_)
+                | Value::String(_)
+                | Value::LongLong(_)
+        ) || op == "^")
+    {
+        let (a, b) = (coercion::numeric(left)?, coercion::numeric(right)?);
+        let result = if op == "^" {
+            let n = a.powf(b);
+            if !n.is_finite() {
+                return Err(coercion::error(5, "Invalid procedure call"));
+            }
+            Value::Double(n)
+        } else {
+            binary(op, &Value::Double(a), &Value::Double(b))?
+        };
+        return match result {
+            Value::Double(n)
+                if matches!(op, "+" | "-")
+                    && (matches!(left, Value::Date(_)) || matches!(right, Value::Date(_)))
+                    && !(op == "-"
+                        && matches!((left, right), (Value::Date(_), Value::Date(_)))) =>
+            {
+                coercion::convert(ScalarKind::Date, &Value::Double(n))
+            }
+            Value::Double(n)
+                if matches!(op, "+" | "-" | "*")
+                    && (matches!(left, Value::Single(_)) || matches!(right, Value::Single(_)))
+                    && matches!(
+                        left,
+                        Value::Single(_) | Value::Integer(_) | Value::Byte(_) | Value::Empty
+                    )
+                    && matches!(
+                        right,
+                        Value::Single(_) | Value::Integer(_) | Value::Byte(_) | Value::Empty
+                    ) =>
+            {
+                coercion::convert(ScalarKind::Single, &Value::Double(n))
+            }
+            value => Ok(value),
+        };
+    }
     if let (Value::Boolean(a), Value::Boolean(b)) = (left, right) {
         return match op {
             "and" => Ok(Value::Boolean(*a && *b)),
@@ -232,4 +418,36 @@ fn integer_tail(op: &str, left: &Value, right: &Value) -> Result<Value> {
     }
     .ok_or_else(overflow)?;
     number(i32::try_from(n).map_err(|_| overflow())?, long)
+}
+
+fn wide_integer(op: &str, a: i64, b: i64) -> Result<Value> {
+    let n = match op {
+        "+" => a.checked_add(b),
+        "-" => a.checked_sub(b),
+        "*" => a.checked_mul(b),
+        "\\" | "mod" => {
+            if b == 0 {
+                return Err(coercion::error(11, "Division by zero"));
+            }
+            if op == "mod" {
+                a.checked_rem(b)
+            } else {
+                a.checked_div(b)
+            }
+        }
+        "and" => Some(a & b),
+        "or" => Some(a | b),
+        "xor" => Some(a ^ b),
+        "eqv" => Some(!(a ^ b)),
+        "imp" => Some(!a | b),
+        "=" => return Ok(Value::Boolean(a == b)),
+        "<>" => return Ok(Value::Boolean(a != b)),
+        "<" => return Ok(Value::Boolean(a < b)),
+        "<=" => return Ok(Value::Boolean(a <= b)),
+        ">" => return Ok(Value::Boolean(a > b)),
+        ">=" => return Ok(Value::Boolean(a >= b)),
+        _ => return Err(unsupported()),
+    }
+    .ok_or_else(overflow)?;
+    Ok(Value::LongLong(n))
 }

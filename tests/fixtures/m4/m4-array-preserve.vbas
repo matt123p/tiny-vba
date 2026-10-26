@@ -1,0 +1,24 @@
+tiny-vba-scenario = 1
+id = m4-array-preserve
+module = Module1
+entry = Answer
+provenance = independently-authored
+license = MIT
+profile = pure-language-unmeasured
+requirements = m4-language-v1
+capabilities = none
+evidence = reasoned-not-oracle
+expected = Long:44
+rationale = Preserve keeps column major cells and lower bounds.
+---
+Function Answer() As Long
+Dim a() As Long
+ReDim a(-2 To 1, 3 To 4)
+a(-2,3)=40
+Call Inc(a(-2,3))
+ReDim Preserve a(-2 To 1,3 To 5)
+Answer=a(-2,3)+LBound(a)+UBound(a,2)
+End Function
+Sub Inc(ByRef n As Long)
+n=n+1
+End Sub

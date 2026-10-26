@@ -56,3 +56,8 @@ the replacement-session regression in native/WASI evidence when changing these i
 The current scalar consumer is m4-scalars-v1 under [ADR 0010](../../../docs/decisions/0010-m4-profile-and-verification-hardening.md).
 Compile against current VM capabilities; legacy M3-tagged programs require recompilation. Inspect
 the xtask workspace banner before trusting gate evidence from a shared target cache.
+
+Current M4 support supersedes earlier first-slice limits: read [M4 language/IR 2](../../../docs/m4-language.md)
+and [ADR 0011](../../../docs/decisions/0011-m4-language-extension.md). Compile against m4-language-v1
+VM capabilities. Preserve the IR 1 structural target and explicit IR 2 feature/version gates.
+The authored inventory is 20 M0 plus 24 M4 PASS fixtures; no Microsoft oracle observation is claimed.

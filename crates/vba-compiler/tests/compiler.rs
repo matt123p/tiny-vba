@@ -128,23 +128,23 @@ fn unsupported_and_invalid_binding_never_produces_verified_program() -> Result<(
         ),
         (
             "Function Answer() As Long\nCall F()\nEnd Function\nSub F(ByVal x As Long)\nEnd Sub",
-            "argument count",
+            "missing required",
         ),
         (
             "Function Answer() As Long\nDim x As Integer\nF x\nEnd Function\nSub F(ByRef x As Long)\nEnd Sub",
             "ByRef declared type",
         ),
         (
-            "Function Answer() As Long\nF (1)\nEnd Function\nSub F(ByRef x As Long)\nEnd Sub",
-            "parenthesized",
+            "Function Answer() As Long\nF unknown:=1\nEnd Function\nSub F(ByRef x As Long)\nEnd Sub",
+            "unknown named",
         ),
         (
-            "Function Answer() As Long\nAnswer=F(x:=1)\nEnd Function\nFunction F(ByVal x As Long) As Long\nEnd Function",
-            "named/omitted",
+            "Function Answer() As Long\nAnswer=F(unknown:=1)\nEnd Function\nFunction F(ByVal x As Long) As Long\nEnd Function",
+            "unknown named",
         ),
         (
-            "Function Answer() As Long\nEnd Function\nSub F(Optional x As Long=1)\nEnd Sub",
-            "optional",
+            "Function Answer() As Long\nEnd Function\nSub F(Optional x As Long)\nEnd Sub",
+            "typed Optional",
         ),
         (
             "Function Answer() As Long\nDim i As Long\nFor i=1 To 2\nNext j\nEnd Function",
@@ -159,8 +159,8 @@ fn unsupported_and_invalid_binding_never_produces_verified_program() -> Result<(
             "Exit outside",
         ),
         (
-            "Dim x As Long\nFunction Answer() As Long\nEnd Function",
-            "persistent module",
+            "Dim x As Unknown\nFunction Answer() As Long\nEnd Function",
+            "declared type",
         ),
         (
             "Function Answer() As Long\nAnswer=&H10\nEnd Function",
@@ -168,7 +168,7 @@ fn unsupported_and_invalid_binding_never_produces_verified_program() -> Result<(
         ),
         (
             "Function Answer() As Long\nDim i As Long\nFor i=2 To 1 Step -1\nNext i\nEnd Function",
-            "constant expression",
+            "nonpositive/nonintegral",
         ),
     ] {
         let result = compile(&source(text)?, &CompileOptions::default());

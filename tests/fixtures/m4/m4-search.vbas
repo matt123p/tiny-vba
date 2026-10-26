@@ -1,0 +1,16 @@
+tiny-vba-scenario = 1
+id = m4-search
+module = Module1
+entry = Answer
+provenance = independently-authored
+license = MIT
+profile = pure-language-unmeasured
+requirements = m4-language-v1
+capabilities = none
+evidence = reasoned-not-oracle
+expected = Long:3
+rationale = InStr returns one based binary comparison positions.
+---
+Function Answer() As Long
+Answer=InStr(2,"banana","na")
+End Function

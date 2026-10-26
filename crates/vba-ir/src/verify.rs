@@ -120,7 +120,7 @@ fn validate(
     limits: &VerifyLimits,
     maxima: bool,
 ) -> Result<Vec<u32>> {
-    if p.ir_version != IR_VERSION || p.profile != caps.profile {
+    if !matches!(p.ir_version, IR_VERSION | IR2_VERSION) || p.profile != caps.profile {
         return Err(incompatible("unsupported IR version or profile"));
     }
     name(&p.profile)?;
@@ -166,7 +166,9 @@ fn validate(
         value
             .validate()
             .map_err(|_| invalid("invalid constant payload"))?;
-        if matches!(value, Value::Missing | Value::Object(_)) {
+        if matches!(value, Value::Object(_) | Value::Array(_))
+            || (matches!(value, Value::Missing) && p.ir_version != IR2_VERSION)
+        {
             return Err(invalid("Missing/live Object constant"));
         }
         let payload = match value {
@@ -195,6 +197,7 @@ fn validate(
     let mut statement_ids = BTreeSet::new();
     let mut instruction_count = 0usize;
     let mut depths = reserve(p.procedures.len())?;
+    let mut persistent_kinds = BTreeMap::new();
     for proc in &p.procedures {
         name(&proc.name)?;
         budget.text(&proc.name)?;
@@ -244,7 +247,10 @@ fn validate(
             match local.span {
                 Some(s) => {
                     span(source, s)?;
-                    if s.start() < proc.declaration.start() || s.end() > proc.declaration.end() {
+                    if !matches!(local.role, SlotRole::Persistent(_))
+                        && (s.start() < proc.declaration.start()
+                            || s.end() > proc.declaration.end())
+                    {
                         return Err(invalid("local declaration outside procedure"));
                     }
                 }
@@ -296,6 +302,19 @@ fn validate(
                 SlotRole::Parameter(n) => i < proc.parameters.len() && i == n as usize,
                 SlotRole::Result => {
                     proc.result == Some(LocalSlot(i as u32)) && proc.kind == ProcedureKind::Function
+                }
+                SlotRole::Persistent(id) => {
+                    if p.ir_version != IR2_VERSION || id >= 4096 {
+                        return Err(invalid("persistent slot identifier/version"));
+                    }
+                    feature(p, caps, "persistent-v2")?;
+                    if persistent_kinds
+                        .insert(id, local.kind)
+                        .is_some_and(|kind| kind != local.kind)
+                    {
+                        return Err(invalid("inconsistent persistent slot kind"));
+                    }
+                    i >= proc.parameters.len() && proc.result != Some(LocalSlot(i as u32))
                 }
                 SlotRole::User | SlotRole::Scratch => {
                     i >= proc.parameters.len() && proc.result != Some(LocalSlot(i as u32))
@@ -472,6 +491,8 @@ fn procedure(
     seen_foreign.resize(proc.foreign.len(), false);
     let mut edges = reserve(proc.code.len())?;
     edges.resize(proc.code.len(), None::<(Pc, Option<Pc>)>);
+    let mut exceptional: Vec<Vec<Pc>> = reserve(proc.code.len())?;
+    exceptional.resize_with(proc.code.len(), Vec::new);
     let mut stack = reserve(
         limits
             .stack
@@ -502,6 +523,19 @@ fn procedure(
                 return Err(invalid("duplicate checkpoint or enter_pc mismatch"));
             }
             *seen = true;
+            if p.required_features.contains("error-handlers-v2")
+                && let Some(next) = cp.resume_next
+            {
+                let target = proc
+                    .checkpoints
+                    .get(next.0 as usize)
+                    .ok_or_else(|| invalid("resume site"))?
+                    .enter_pc;
+                exceptional
+                    .get_mut(pc)
+                    .ok_or_else(|| invalid("exception edge"))?
+                    .push(target);
+            }
             active = Some(*id);
             terminated = false;
             empty(&stack)?;
@@ -512,6 +546,130 @@ fn procedure(
         }
         let active_id = active.ok_or_else(|| invalid("missing checkpoint"))?;
         match instruction {
+            Instruction::RefElement { rank, kind } => {
+                if p.ir_version != IR2_VERSION || !(1..=8).contains(rank) {
+                    return Err(invalid("array reference rank/version"));
+                }
+                feature(p, caps, "arrays-v2")?;
+                if !caps.declarations.contains(kind) {
+                    return Err(incompatible("array element kind"));
+                }
+                for _ in 0..*rank {
+                    value(&mut stack)?;
+                }
+                if !matches!(pop(&mut stack)?, Stack::Reference(ScalarKind::Variant)) {
+                    return Err(invalid("array owner reference"));
+                }
+                stack.push(Stack::Reference(*kind));
+            }
+            Instruction::ArrayResize {
+                rank,
+                kind,
+                preserve,
+                initialize,
+                ..
+            } => {
+                if p.ir_version != IR2_VERSION || *rank > 8 || (*preserve && *initialize) {
+                    return Err(invalid("array resize rank/mode/version"));
+                }
+                feature(p, caps, "arrays-v2")?;
+                if !caps.declarations.contains(kind) {
+                    return Err(incompatible("array element kind"));
+                }
+                for _ in 0..u16::from(*rank) * 2 {
+                    value(&mut stack)?;
+                }
+                if !matches!(pop(&mut stack)?, Stack::Reference(ScalarKind::Variant)) {
+                    return Err(invalid("array owner reference"));
+                }
+            }
+            Instruction::ArrayErase => {
+                if p.ir_version != IR2_VERSION {
+                    return Err(invalid("array version"));
+                }
+                feature(p, caps, "arrays-v2")?;
+                if !matches!(pop(&mut stack)?, Stack::Reference(ScalarKind::Variant)) {
+                    return Err(invalid("array owner reference"));
+                }
+            }
+            Instruction::OnError {
+                target,
+                resume_next,
+            }
+            | Instruction::Resume {
+                target,
+                next: resume_next,
+            } => {
+                if p.ir_version != IR2_VERSION {
+                    return Err(invalid("handlers require IR 2"));
+                }
+                feature(p, caps, "error-handlers-v2")?;
+                empty(&stack)?;
+                if *resume_next && target.is_some() {
+                    return Err(invalid("ambiguous handler/resume mode"));
+                }
+                if let Some(target) = target {
+                    target_checkpoint(proc, *target)?;
+                    let source = proc
+                        .checkpoints
+                        .get(active_id.0 as usize)
+                        .ok_or_else(|| invalid("site"))?
+                        .enter_pc;
+                    exceptional
+                        .get_mut(source.0 as usize)
+                        .ok_or_else(|| invalid("exception edge"))?
+                        .push(*target);
+                }
+                if matches!(instruction, Instruction::Resume { .. }) {
+                    terminated = true;
+                }
+            }
+            Instruction::ErrGet(field) => {
+                if p.ir_version != IR2_VERSION {
+                    return Err(invalid("Err requires IR 2"));
+                }
+                feature(p, caps, "error-handlers-v2")?;
+                if !["number", "description", "source", "erl"].contains(&field.as_str()) {
+                    return Err(invalid("unknown Err field"));
+                }
+                stack.push(Stack::Value);
+            }
+            Instruction::ErrClear => {
+                if p.ir_version != IR2_VERSION {
+                    return Err(invalid("Err requires IR 2"));
+                }
+                feature(p, caps, "error-handlers-v2")?;
+                empty(&stack)?;
+            }
+            Instruction::Raise(count) => {
+                if p.ir_version != IR2_VERSION {
+                    return Err(invalid("Raise requires IR 2"));
+                }
+                feature(p, caps, "error-handlers-v2")?;
+                if !(1..=3).contains(count) {
+                    return Err(invalid("Raise arity"));
+                }
+                for _ in 0..*count {
+                    value(&mut stack)?;
+                }
+                empty(&stack)?;
+            }
+            Instruction::Intrinsic {
+                function,
+                arguments,
+            } => {
+                if p.ir_version != IR2_VERSION {
+                    return Err(invalid("intrinsic requires IR 2"));
+                }
+                feature(p, caps, "intrinsics-v2")?;
+                if !function.accepts(usize::from(*arguments)) {
+                    return Err(invalid("intrinsic arity"));
+                }
+                for _ in 0..*arguments {
+                    value(&mut stack)?;
+                }
+                stack.push(Stack::Value);
+            }
             Instruction::Const(id) => {
                 p.constants
                     .get(id.0 as usize)
@@ -535,7 +693,13 @@ fn procedure(
                 }
                 stack.push(Stack::Value);
             }
-            Instruction::WriteRef(_) => {
+            Instruction::WriteRef(mode) => {
+                if *mode == AssignmentKind::ArgumentBinding {
+                    if p.ir_version != IR2_VERSION {
+                        return Err(invalid("argument capture requires IR 2"));
+                    }
+                    feature(p, caps, "argument-defaults-v2")?;
+                }
                 value(&mut stack)?;
                 if !matches!(pop(&mut stack)?, Stack::Reference(_)) {
                     return Err(invalid("WriteRef needs Location"));
@@ -701,6 +865,19 @@ fn procedure(
         .ok_or_else(|| invalid("entry"))? = true;
     while let Some(pc) = pending.pop() {
         budget.charge(1, 0)?;
+        for next in exceptional
+            .get(pc.0 as usize)
+            .ok_or_else(|| invalid("exception edge"))?
+        {
+            budget.charge(1, 0)?;
+            let seen = reached
+                .get_mut(next.0 as usize)
+                .ok_or_else(|| invalid("exception target"))?;
+            if !*seen {
+                *seen = true;
+                pending.push(*next);
+            }
+        }
         if let Some((a, b)) = edges.get(pc.0 as usize).copied().flatten() {
             for next in [Some(a), b].into_iter().flatten() {
                 let seen = reached

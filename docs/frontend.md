@@ -74,3 +74,9 @@ and failure exit codes. M0 cases remain NOT_RUN for execution.
 
 The [reviewed external grammar report](m1-corpus-report.md) records the separate optional
 five-file corpus evaluation. Local tests do not depend on corpus checkouts.
+
+## M4 extension
+
+[The M4 contract](m4-language.md) adds array declarations/indexing, ReDim/Erase, Static local
+declarations, labels/GoTo, On Error and Resume syntax. Optional/named syntax now binds and executes.
+These additions supersede corresponding M1 historical unsupported lists; other limits still apply.

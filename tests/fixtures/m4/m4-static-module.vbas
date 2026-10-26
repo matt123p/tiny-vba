@@ -1,0 +1,23 @@
+tiny-vba-scenario = 1
+id = m4-static-module
+module = Module1
+entry = Answer
+provenance = independently-authored
+license = MIT
+profile = pure-language-unmeasured
+requirements = m4-language-v1
+capabilities = none
+evidence = reasoned-not-oracle
+expected = Long:23
+rationale = Module and static state survives calls in one invocation.
+---
+Dim n As Long
+Function Answer() As Long
+Answer=Counter()+Counter()+n
+End Function
+Function Counter() As Long
+Static s As Long
+s=s+1
+n=n+10
+Counter=s
+End Function

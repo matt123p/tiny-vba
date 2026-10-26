@@ -1,0 +1,16 @@
+tiny-vba-scenario = 1
+id = m4-array-bounds
+module = Module1
+entry = Answer
+provenance = independently-authored
+license = MIT
+profile = pure-language-unmeasured
+requirements = m4-language-v1
+capabilities = none
+evidence = reasoned-not-oracle
+expected = Long:1
+rationale = Array construction retains its zero based bound.
+---
+Function Answer() As Long
+Answer=UBound(Array(3,4))
+End Function

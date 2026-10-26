@@ -1,0 +1,16 @@
+tiny-vba-scenario = 1
+id = m4-split-join
+module = Module1
+entry = Answer
+provenance = independently-authored
+license = MIT
+profile = pure-language-unmeasured
+requirements = m4-language-v1
+capabilities = none
+evidence = reasoned-not-oracle
+expected = String:a-b-c
+rationale = Split produces an array consumed by Join.
+---
+Function Answer() As String
+Answer=Join(Split("a,b,c",","),"-")
+End Function

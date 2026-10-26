@@ -261,7 +261,7 @@ fn m3_run_reports_typed_results_and_rejects_unsupported_execution()
     }
     let temp = std::env::temp_dir().join(format!("tiny-vba-execution-{}.bas", std::process::id()));
     for body in [
-        "Answer=2^10",
+        r#"Answer=CDate("locale-date")"#,
         "Answer=1 \\ 0",
         "Dim v As Integer\nv = 30000\nv = v + v + v\nAnswer = v",
     ] {
@@ -306,9 +306,9 @@ fn conformance_run_asserts_every_m0_fixture_status() -> Result<(), Box<dyn std::
             return Err(format!("unexpected result for {path:?}: {text}").into());
         }
     }
-    // The reviewed subset: cverr, named and optional-missing stay explicit UNSUPPORTED.
-    assert_eq!(pass, 17);
-    assert_eq!(unsupported, 3);
+    // Every independently authored M0 fixture is now executed and asserted.
+    assert_eq!(pass, 20);
+    assert_eq!(unsupported, 0);
     Ok(())
 }
 
@@ -390,5 +390,31 @@ fn scenario_runner_rejects_invalid_source_and_fails_on_budget_exhaustion()
         assert!(String::from_utf8(output.stdout)?.contains(&format!(": {status} (")));
     }
     std::fs::remove_file(temp)?;
+    Ok(())
+}
+
+#[test]
+fn conformance_asserts_the_profile_tagged_m4_inventory() -> Result<(), Box<dyn std::error::Error>> {
+    let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../tests/fixtures/m4");
+    let mut count = 0;
+    for entry in std::fs::read_dir(root)? {
+        let path = entry?.path();
+        if path.extension().and_then(|s| s.to_str()) != Some("vbas") {
+            continue;
+        }
+        let result = Command::new(env!("CARGO_BIN_EXE_vba-cli"))
+            .args(["conformance", "run"])
+            .arg(&path)
+            .output()?;
+        let text = String::from_utf8(result.stdout)?;
+        assert!(
+            result.status.success() && text.contains(": PASS ("),
+            "{}: {text} {}",
+            path.display(),
+            String::from_utf8_lossy(&result.stderr)
+        );
+        count += 1;
+    }
+    assert_eq!(count, 24);
     Ok(())
 }

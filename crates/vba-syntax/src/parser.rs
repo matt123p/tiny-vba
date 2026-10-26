@@ -366,9 +366,11 @@ impl Parser<'_> {
         loop {
             let name = self.name()?;
             let start = name.span;
-            if self.at("(") {
-                return Err(self.unsupported("array declaration"));
-            }
+            let dimensions = if self.eat("(") {
+                Some(self.dimensions()?)
+            } else {
+                None
+            };
             let ty = self.ty()?;
             let value = if constant {
                 self.require("=")?;
@@ -377,6 +379,8 @@ impl Parser<'_> {
                 None
             };
             result.push(Declaration {
+                dimensions,
+                persistent: false,
                 name,
                 ty,
                 constant: value,
@@ -388,6 +392,29 @@ impl Parser<'_> {
             }
         }
         Ok(result)
+    }
+    fn dimensions(&mut self) -> PResult<Vec<(Expr, Expr)>> {
+        let mut dimensions = Vec::new();
+        if !self.at(")") {
+            loop {
+                if dimensions.len() >= 8 {
+                    return Err(self.error("array rank exceeds 8"));
+                }
+                let first = self.expr(0)?;
+                let (lower, upper) = if self.eat("To") {
+                    (first, self.expr(0)?)
+                } else {
+                    let lower = self.expression(first.span, ExprKind::Number("0".into()))?;
+                    (lower, first)
+                };
+                dimensions.push((lower, upper));
+                if !self.eat(",") {
+                    break;
+                }
+            }
+        }
+        self.require(")")?;
+        Ok(dimensions)
     }
     fn procedure(&mut self, visibility: Visibility, declaration_start: Span) -> PResult<Procedure> {
         let token = self.bump();
@@ -477,7 +504,11 @@ impl Parser<'_> {
             let before = self.pos;
             match self.statement() {
                 Ok(statement) => {
+                    let numeric_label = matches!(&statement.kind,StatementKind::Label(label) if label.parse::<u16>().is_ok());
                     body.push(statement);
+                    if numeric_label && !self.end() {
+                        continue;
+                    }
                     if let Err(error) = self.boundary() {
                         self.record(error);
                         self.recover(before);
@@ -497,7 +528,70 @@ impl Parser<'_> {
     fn statement_inner(&mut self) -> PResult<Statement> {
         let start = self.token().span;
         let site = self.site(start)?;
-        let kind = if self.eat("Dim") {
+        let kind = if (self.look(1, ":") && self.token().kind == TokenKind::Word)
+            || (self.token().kind == TokenKind::Number && self.text().parse::<u16>().is_ok())
+        {
+            let label = self.text().to_ascii_lowercase();
+            self.bump();
+            StatementKind::Label(label)
+        } else if self.eat("On") {
+            self.require("Error")?;
+            if self.eat("Resume") {
+                self.require("Next")?;
+                StatementKind::OnError {
+                    target: None,
+                    resume_next: true,
+                }
+            } else {
+                self.require("GoTo")?;
+                let target = self.text().to_ascii_lowercase();
+                if !matches!(self.token().kind, TokenKind::Word | TokenKind::Number) {
+                    return Err(self.error("expected error label or 0"));
+                }
+                self.bump();
+                StatementKind::OnError {
+                    target: if target == "0" { None } else { Some(target) },
+                    resume_next: false,
+                }
+            }
+        } else if self.eat("GoTo") {
+            let target = self.text().to_ascii_lowercase();
+            if !matches!(self.token().kind, TokenKind::Word | TokenKind::Number) {
+                return Err(self.error("expected label"));
+            }
+            self.bump();
+            StatementKind::GoTo(target)
+        } else if self.eat("Resume") {
+            let next = self.eat("Next");
+            let target = if !next && !self.end() {
+                let target = self.text().to_ascii_lowercase();
+                self.bump();
+                Some(target)
+            } else {
+                None
+            };
+            StatementKind::Resume { target, next }
+        } else if self.eat("ReDim") {
+            let preserve = self.eat("Preserve");
+            let name = self.name()?;
+            self.require("(")?;
+            let dimensions = self.dimensions()?;
+            let ty = self.ty()?;
+            StatementKind::ReDim {
+                name,
+                dimensions,
+                ty,
+                preserve,
+            }
+        } else if self.eat("Erase") {
+            StatementKind::Erase(self.name()?)
+        } else if self.eat("Static") {
+            let mut declarations = self.declarations(Visibility::Default, false)?;
+            for declaration in &mut declarations {
+                declaration.persistent = true;
+            }
+            StatementKind::Declare(declarations)
+        } else if self.eat("Dim") {
             StatementKind::Declare(self.declarations(Visibility::Default, false)?)
         } else if self.eat("Const") {
             StatementKind::Declare(self.declarations(Visibility::Default, true)?)

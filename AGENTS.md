@@ -75,3 +75,7 @@ Gridcraft's shared craftrules checkout was not available during setup. Its appli
 clean-room, external-corpus and layering conventions are adapted here; no nonexistent sibling
 path is required for standalone work. Editor/debugger UI must follow the documented theme,
 accessibility, original-asset and font conventions; add UI snapshot/asset checks with the UI implementation.
+
+M4 is implemented for [the reviewed profile](docs/m4-language.md) under ADR 0011. Use the
+versioned IR 2 contract for handlers/arrays/intrinsics/persistent slots. Preserve legacy IR 1
+capability boundaries and the shared runtime coercion path, including constant/default binding.

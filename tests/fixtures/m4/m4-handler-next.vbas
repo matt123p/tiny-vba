@@ -1,0 +1,19 @@
+tiny-vba-scenario = 1
+id = m4-handler-next
+module = Module1
+entry = Answer
+provenance = independently-authored
+license = MIT
+profile = pure-language-unmeasured
+requirements = m4-language-v1
+capabilities = none
+evidence = reasoned-not-oracle
+expected = Long:16
+rationale = Resume Next preserves committed assignments.
+---
+Function Answer() As Long
+On Error Resume Next
+Answer=5
+Answer=1/0
+Answer=Answer+Err.Number
+End Function

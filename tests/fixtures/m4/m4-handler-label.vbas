@@ -1,0 +1,20 @@
+tiny-vba-scenario = 1
+id = m4-handler-label
+module = Module1
+entry = Answer
+provenance = independently-authored
+license = MIT
+profile = pure-language-unmeasured
+requirements = m4-language-v1
+capabilities = none
+evidence = reasoned-not-oracle
+expected = Long:11
+rationale = A label handler reads the exact numbered error.
+---
+Function Answer() As Long
+On Error GoTo Recover
+Answer=1/0
+Exit Function
+Recover:
+Answer=Err.Number
+End Function

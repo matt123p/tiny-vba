@@ -93,6 +93,7 @@ name = "vba-semantics"
 version = "0.1.0"
 dependencies = [
  "vba-diagnostics",
+ "vba-runtime",
  "vba-syntax",
  "vba-values",
 ]

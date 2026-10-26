@@ -1,0 +1,16 @@
+tiny-vba-scenario = 1
+id = m4-currency
+module = Module1
+entry = Answer
+provenance = independently-authored
+license = MIT
+profile = pure-language-unmeasured
+requirements = m4-language-v1
+capabilities = none
+evidence = reasoned-not-oracle
+expected = Currency:17500
+rationale = Scaled Currency addition preserves four decimal places.
+---
+Function Answer() As Currency
+Answer=CCur(1.25)+CCur(0.5)
+End Function

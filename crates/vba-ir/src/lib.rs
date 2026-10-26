@@ -1,4 +1,4 @@
-//! IR 1: immutable verified programs, bounded structural verification and diagnostic disassembly.
+//! IR 1/2: immutable programs, bounded structural verification and diagnostic disassembly.
 #![forbid(unsafe_code)]
 mod disasm;
 mod verify;
@@ -25,13 +25,19 @@ index!(
     Pc
 );
 pub const IR_VERSION: u32 = 1;
-pub const FEATURES: [&str; 6] = [
+pub const IR2_VERSION: u32 = 2;
+pub const FEATURES: [&str; 11] = [
     "scalar-core",
     "integer-long-ops",
     "direct-calls",
     "byref-locals",
     "foreign-snapshot-v1",
     "debug-stop",
+    "intrinsics-v2",
+    "error-handlers-v2",
+    "arrays-v2",
+    "persistent-v2",
+    "argument-defaults-v2",
 ];
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
@@ -84,6 +90,15 @@ pub const BINARY_OPS: [BinaryOp; 19] = [
 ];
 #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
 pub enum Opcode {
+    RefElement,
+    ArrayResize,
+    ArrayErase,
+    OnError,
+    Resume,
+    ErrGet,
+    ErrClear,
+    Raise,
+    Intrinsic,
     Checkpoint,
     Const,
     ReadLocal,
@@ -102,7 +117,16 @@ pub enum Opcode {
     Stop,
     Return,
 }
-pub const OPCODES: [Opcode; 17] = [
+pub const OPCODES: [Opcode; 26] = [
+    Opcode::Intrinsic,
+    Opcode::RefElement,
+    Opcode::ArrayResize,
+    Opcode::ArrayErase,
+    Opcode::OnError,
+    Opcode::Resume,
+    Opcode::ErrGet,
+    Opcode::ErrClear,
+    Opcode::Raise,
     Opcode::Checkpoint,
     Opcode::Const,
     Opcode::ReadLocal,
@@ -123,11 +147,39 @@ pub const OPCODES: [Opcode; 17] = [
 ];
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum AssignmentKind {
+    ArgumentBinding,
     Value,
     ObjectReference,
 }
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum Instruction {
+    RefElement {
+        rank: u8,
+        kind: ScalarKind,
+    },
+    ArrayResize {
+        rank: u8,
+        kind: ScalarKind,
+        preserve: bool,
+        initialize: bool,
+        dynamic: bool,
+    },
+    ArrayErase,
+    OnError {
+        target: Option<Pc>,
+        resume_next: bool,
+    },
+    Resume {
+        target: Option<Pc>,
+        next: bool,
+    },
+    ErrGet(String),
+    ErrClear,
+    Raise(u16),
+    Intrinsic {
+        function: vba_values::Intrinsic,
+        arguments: u16,
+    },
     Checkpoint(SiteId),
     Const(ConstantId),
     ReadLocal(LocalSlot),
@@ -155,6 +207,15 @@ pub enum Instruction {
 impl Instruction {
     pub fn opcode(&self) -> Opcode {
         match self {
+            Self::RefElement { .. } => Opcode::RefElement,
+            Self::ArrayResize { .. } => Opcode::ArrayResize,
+            Self::ArrayErase => Opcode::ArrayErase,
+            Self::OnError { .. } => Opcode::OnError,
+            Self::Resume { .. } => Opcode::Resume,
+            Self::ErrGet(_) => Opcode::ErrGet,
+            Self::ErrClear => Opcode::ErrClear,
+            Self::Raise(_) => Opcode::Raise,
+            Self::Intrinsic { .. } => Opcode::Intrinsic,
             Self::Checkpoint(_) => Opcode::Checkpoint,
             Self::Const(_) => Opcode::Const,
             Self::ReadLocal(_) => Opcode::ReadLocal,
@@ -187,6 +248,7 @@ pub enum ParameterMode {
 }
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum SlotRole {
+    Persistent(u32),
     Parameter(u32),
     Result,
     User,
@@ -313,8 +375,28 @@ pub struct Capabilities {
 }
 impl Capabilities {
     pub fn ir1_structural() -> Self {
+        let mut caps = Self::ir2_structural();
+        caps.profile = "ir1-structural".into();
+        caps.features.retain(|feature| !feature.ends_with("-v2"));
+        caps.instructions.retain(|op| {
+            !matches!(
+                op,
+                Opcode::Intrinsic
+                    | Opcode::OnError
+                    | Opcode::Resume
+                    | Opcode::ErrGet
+                    | Opcode::ErrClear
+                    | Opcode::Raise
+                    | Opcode::RefElement
+                    | Opcode::ArrayResize
+                    | Opcode::ArrayErase
+            )
+        });
+        caps
+    }
+    pub fn ir2_structural() -> Self {
         Self {
-            profile: "ir1-structural".into(),
+            profile: "ir2-structural".into(),
             features: FEATURES.iter().map(|s| (*s).into()).collect(),
             instructions: OPCODES.into_iter().collect(),
             unary: [UnaryOp::Negate, UnaryOp::Not].into_iter().collect(),

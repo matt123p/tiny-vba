@@ -1,8 +1,49 @@
 # Implementation progress
 
-Updated 2026-10-26. Current stage: M0–M3 reviewed subsets complete; M4 first slice (typed scenario
-assertion runner, real division and Double widths) implemented under
-[ADR 0009](decisions/0009-m4-runner-and-numeric-widths.md).
+Updated 2026-10-26. Current stage: M0–M4 complete for the reviewed
+[m4-language-v1 profile](m4-language.md). M5 integration contracts and the graphical IDE slice are next.
+
+## M4 semantic depth completion
+
+Implemented the adopted [IR 2 language extension](decisions/0011-m4-language-extension.md) across
+syntax, semantics, compiler, verifier, values, runtime and explicit-frame VM. The original IR 1
+structural capabilities remain available; the compiler's new structural target is ir2-structural,
+and execution explicitly uses m4-language-v1. New instructions/assignment modes require IR 2 and
+feature gates. No Office or UI dependency was introduced.
+
+Added centralized coercions for all scalar widths, exact LongLong integer operations, scaled
+Currency arithmetic/decimal-boundary conversion, Date serial operations, Empty/Null rules,
+Missing/Nothing/CVErr distinctions, UTF-16 string operations and deterministic intrinsic registry.
+Optional/default/named/omitted calls preserve source-order evaluation. Canonical ByRef locals,
+module/static slots and array cells share locations; evaluated arguments use private typed temporaries.
+Argument capture uses binding rules, preserving Object/Nothing without changing ordinary Let/Set.
+
+Added bounded fixed/dynamic arrays with signed bounds, column-major layout, Preserve/Erase,
+generation-checked cells, representation checks, copy budgets and allocation precharges. Module
+and Static local storage survives calls; explicit project state export/restore checks revision and
+exact source identity, while fresh sessions reset. Debug.Print captures bounded UTF-16 records.
+
+Added per-frame On Error modes/active faults, Err/Erl, retry/next/label Resume, exception edges,
+structured-statement continuation metadata and caller propagation/unwinding. Err.Clear leaves an
+active handler active. Host errors after waits enter VBA handlers without reinvocation. Break-on-error
+continues into a handler once. Engine/resource/protocol failures are not swallowed. A stale array
+alias originally escaped while constructing its failure snapshot; the minimized regression now
+produces runtime error 9 and explicitly lists unavailable locals.
+
+Verification from this checkout: cargo xtask ci passes formatting, strict all-target Clippy,
+**119 integration tests**, 16-crate acyclic layering and seven pins/646 hashes. The same 119 tests
+pass in release. cargo xtask wasm builds every library; cargo xtask wasm-run passes identical native
+and WASI acceptance, including arrays Long(44), static/module state Long(23), restored state Long(47),
+Currency/Date/exact LongLong, optional/named calls and handler Resume Long(12), alongside every M3
+host/debugger/cancellation/isolation check. git diff --check passes.
+
+The 20 original scenarios now assert **20 PASS / 0 UNSUPPORTED**. Added 24 independently authored,
+uniquely identified M4 scenarios tagged m4-language-v1: **24 PASS**. These are reasoned expectations,
+not Microsoft oracle observations; external corpus execution remains NOT_RUN. Profile limitations
+are explicit in the M4 contract (including locale/codepage behavior, nested/whole-array parameters,
+class/default-member binding and selected argument combinations). This completes the reviewed M4
+gate without claiming the entire supplied VBA wishlist. No remote cross-platform or separate MSRV
+run is claimed. Next: M5 API/versioned bridge contract and the required graphical IDE slice.
 
 ## M4 scalar/runner hardening and corrected validation
 

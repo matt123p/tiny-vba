@@ -33,7 +33,7 @@ impl Default for CompileOptions {
         Self {
             entry: "Answer".into(),
             revision: "source-1".into(),
-            capabilities: ir::Capabilities::ir1_structural(),
+            capabilities: ir::Capabilities::ir2_structural(),
             limits: ir::VerifyLimits::default(),
         }
     }
@@ -95,8 +95,12 @@ pub fn compile_modules(
         instructions: 0,
     };
     let mut procedures = Vec::new();
+    let mut persistent_ids = BTreeMap::new();
     let mut features = BTreeSet::from(["scalar-core".to_owned()]);
     for procedure in &program.procedures {
+        if procedure.signature.parameters.iter().any(|p| p.optional) {
+            features.insert("argument-defaults-v2".into());
+        }
         let mut builder = Builder {
             program: &program,
             constants: &mut constants,
@@ -105,6 +109,7 @@ pub fn compile_modules(
             allocation: &mut allocation,
             features: &mut features,
             blocks: Vec::new(),
+            labels: BTreeMap::new(),
             locals: Vec::new(),
             statements: Vec::new(),
             statement_ids: BTreeSet::new(),
@@ -112,7 +117,17 @@ pub fn compile_modules(
         };
         for (i, local) in procedure.locals.iter().enumerate() {
             builder.allocation.charge(256)?;
-            let role = if local.parameter {
+            let role = if let Some(key) = &local.persistent {
+                let id = if let Some(id) = persistent_ids.get(key) {
+                    *id
+                } else {
+                    let id = idx(persistent_ids.len())?;
+                    persistent_ids.insert(key.clone(), id);
+                    id
+                };
+                builder.feature("persistent-v2");
+                ir::SlotRole::Persistent(id)
+            } else if local.parameter {
                 ir::SlotRole::Parameter(idx(i)?)
             } else if local.result {
                 ir::SlotRole::Result
@@ -164,7 +179,11 @@ pub fn compile_modules(
         .get(program.entry)
         .ok_or_else(|| error("entry invariant"))?;
     let mut ir = ir::Program {
-        ir_version: ir::IR_VERSION,
+        ir_version: if features.iter().any(|f| f.ends_with("-v2")) {
+            ir::IR2_VERSION
+        } else {
+            ir::IR_VERSION
+        },
         required_features: features,
         profile: options.capabilities.profile.clone(),
         revision: options.revision.clone(),
@@ -217,6 +236,7 @@ impl Allocation {
     }
 }
 struct Block {
+    resume: Option<usize>,
     site: ast::StatementSite,
     role: ir::SiteRole,
     visible: bool,
@@ -232,6 +252,7 @@ struct Builder<'a> {
     allocation: &'a mut Allocation,
     features: &'a mut BTreeSet<String>,
     blocks: Vec<Block>,
+    labels: BTreeMap<String, usize>,
     locals: Vec<ir::Local>,
     statements: Vec<ir::Statement>,
     statement_ids: BTreeSet<u32>,
@@ -256,6 +277,7 @@ impl Builder<'_> {
         push(
             &mut self.blocks,
             Block {
+                resume: None,
                 site,
                 role,
                 visible,
@@ -283,6 +305,12 @@ impl Builder<'_> {
         for statement in body {
             self.statement(statement.site)?;
             match &statement.kind {
+                bound::StatementKind::Label(name) => {
+                    let block = self.block(statement.site, ir::SiteRole::Source, true)?;
+                    if self.labels.insert(name.clone(), block).is_some() {
+                        return Err(error("duplicate label").at(statement.site.span));
+                    }
+                }
                 bound::StatementKind::If {
                     arms,
                     otherwise,
@@ -392,20 +420,92 @@ impl Builder<'_> {
             }),
         )
     }
+    fn capture_argument(&mut self, block: usize, slot: usize, value: &bound::Expr) -> Result<()> {
+        self.feature("argument-defaults-v2");
+        self.emit(block, ir::Instruction::RefLocal(ir::LocalSlot(idx(slot)?)))?;
+        self.expr(block, value)?;
+        self.emit(
+            block,
+            ir::Instruction::WriteRef(ir::AssignmentKind::ArgumentBinding),
+        )
+    }
     fn call(&mut self, block: usize, callee: usize, args: &[bound::Argument]) -> Result<bool> {
         self.feature("direct-calls");
+        let capture = args.iter().any(|a| {
+            matches!(
+                a,
+                bound::Argument::Mapped { .. } | bound::Argument::Temporary { .. }
+            )
+        });
+        let mut prepared = Vec::new();
+        for (position, arg) in args.iter().enumerate() {
+            let (index, arg) = if let bound::Argument::Mapped {
+                parameter,
+                argument,
+            } = arg
+            {
+                (*parameter, argument.as_ref())
+            } else {
+                (position, arg)
+            };
+            let arg = match arg {
+                bound::Argument::Element {
+                    slot,
+                    indices,
+                    kind,
+                } => {
+                    if capture {
+                        return Err(Diagnostic::unsupported(
+                            "named/omitted calls with ByRef array elements",
+                        ));
+                    }
+                    // Index evaluation occurs in source order; the canonical reference is retained
+                    // on the operand stack only when arguments need no named reordering.
+                    bound::Argument::Element {
+                        slot: *slot,
+                        indices: indices.clone(),
+                        kind: *kind,
+                    }
+                }
+                bound::Argument::Temporary { value, kind } => {
+                    let slot = self.scratch(*kind)?;
+                    self.capture_argument(block, slot, value)?;
+                    bound::Argument::Reference(slot)
+                }
+                bound::Argument::Value(value) if capture => {
+                    let slot = self.scratch(ScalarKind::Variant)?;
+                    self.capture_argument(block, slot, value)?;
+                    bound::Argument::Value(bound::Expr {
+                        span: value.span,
+                        kind: bound::ExprKind::Local(slot),
+                    })
+                }
+                arg => arg.clone(),
+            };
+            push(&mut prepared, (index, arg))?;
+        }
+        prepared.sort_by_key(|(index, _)| *index);
         let mut arguments = Vec::new();
-        for (i, arg) in args.iter().enumerate() {
+        for (i, (_, arg)) in prepared.iter().enumerate() {
             let mode = match arg {
                 bound::Argument::Value(value) => {
                     self.expr(block, value)?;
                     ir::ArgumentMode::Value
+                }
+                bound::Argument::Element {
+                    slot,
+                    indices,
+                    kind,
+                } => {
+                    self.element(block, *slot, indices, *kind)?;
+                    ir::ArgumentMode::Reference
                 }
                 bound::Argument::Reference(slot) => {
                     self.feature("byref-locals");
                     self.emit(block, ir::Instruction::RefLocal(ir::LocalSlot(idx(*slot)?)))?;
                     ir::ArgumentMode::Reference
                 }
+                _ => return Err(error("argument elaboration invariant")),
             };
             push(
                 &mut arguments,
@@ -502,8 +602,84 @@ impl Builder<'_> {
         )?;
         self.emit(block, ir::Instruction::Invoke(id))
     }
+    #[allow(clippy::too_many_arguments)]
+    fn resize(
+        &mut self,
+        block: usize,
+        slot: usize,
+        kind: ScalarKind,
+        dimensions: &[(bound::Expr, bound::Expr)],
+        preserve: bool,
+        initialize: bool,
+        dynamic: bool,
+    ) -> Result<()> {
+        self.feature("arrays-v2");
+        self.emit(block, ir::Instruction::RefLocal(ir::LocalSlot(idx(slot)?)))?;
+        for (lower, upper) in dimensions {
+            self.expr(block, lower)?;
+            self.expr(block, upper)?;
+        }
+        self.emit(
+            block,
+            ir::Instruction::ArrayResize {
+                rank: u8::try_from(dimensions.len()).map_err(|_| resource())?,
+                kind,
+                preserve,
+                initialize,
+                dynamic,
+            },
+        )
+    }
+    fn element(
+        &mut self,
+        block: usize,
+        slot: usize,
+        indices: &[bound::Expr],
+        kind: ScalarKind,
+    ) -> Result<()> {
+        self.feature("arrays-v2");
+        self.emit(block, ir::Instruction::RefLocal(ir::LocalSlot(idx(slot)?)))?;
+        for index in indices {
+            self.expr(block, index)?;
+        }
+        self.emit(
+            block,
+            ir::Instruction::RefElement {
+                rank: u8::try_from(indices.len()).map_err(|_| resource())?,
+                kind,
+            },
+        )
+    }
     fn expr(&mut self, block: usize, expr: &bound::Expr) -> Result<()> {
         match &expr.kind {
+            bound::ExprKind::Element {
+                slot,
+                indices,
+                kind,
+            } => {
+                self.element(block, *slot, indices, *kind)?;
+                self.emit(block, ir::Instruction::ReadRef)
+            }
+            bound::ExprKind::ErrField(field) => {
+                self.feature("error-handlers-v2");
+                self.emit(block, ir::Instruction::ErrGet(field.clone()))
+            }
+            bound::ExprKind::Intrinsic {
+                function,
+                arguments,
+            } => {
+                self.feature("intrinsics-v2");
+                for argument in arguments {
+                    self.expr(block, argument)?;
+                }
+                self.emit(
+                    block,
+                    ir::Instruction::Intrinsic {
+                        function: *function,
+                        arguments: u16::try_from(arguments.len()).map_err(|_| resource())?,
+                    },
+                )
+            }
             bound::ExprKind::Foreign {
                 target,
                 kind,
@@ -576,7 +752,12 @@ impl Builder<'_> {
     ) -> Result<usize> {
         let mut next = next;
         for statement in body.iter().rev() {
-            next = self.lower(statement, next, loop_exit, exit)?;
+            let entry = self.lower(statement, next, loop_exit, exit)?;
+            self.blocks
+                .get_mut(entry)
+                .ok_or_else(|| error("resume block"))?
+                .resume = Some(next);
+            next = entry;
         }
         Ok(next)
     }
@@ -589,6 +770,11 @@ impl Builder<'_> {
     ) -> Result<usize> {
         let site = statement.site;
         match &statement.kind {
+            bound::StatementKind::Label(name) => {
+                let block = *self.labels.get(name).ok_or_else(|| error("label"))?;
+                self.jump(block, next)?;
+                Ok(block)
+            }
             bound::StatementKind::If {
                 arms,
                 otherwise,
@@ -605,6 +791,10 @@ impl Builder<'_> {
                 for arm in arms.iter().rev() {
                     let body = self.sequence(&arm.body, after, loop_exit, exit)?;
                     let header = self.block(arm.site, ir::SiteRole::Source, true)?;
+                    self.blocks
+                        .get_mut(header)
+                        .ok_or_else(|| error("If resume block"))?
+                        .resume = Some(next);
                     self.expr(header, &arm.condition)?;
                     self.emit(
                         header,
@@ -639,6 +829,12 @@ impl Builder<'_> {
                 let later_test = self.block(site, ir::SiteRole::LoopTest, true)?;
                 let advance = self.block(*next_site, ir::SiteRole::LoopAdvance, true)?;
                 let body = self.sequence(body, advance, Some(next), exit)?;
+                for id in [first_test, later_test, advance] {
+                    self.blocks
+                        .get_mut(id)
+                        .ok_or_else(|| error("For resume block"))?
+                        .resume = Some(next);
+                }
                 for header in [first_test, later_test] {
                     self.emit(
                         header,
@@ -730,6 +926,122 @@ impl Builder<'_> {
                         self.feature("debug-stop");
                         self.emit(block, ir::Instruction::Stop)?;
                     }
+                    bound::StatementKind::ArrayInit {
+                        slot,
+                        kind,
+                        dimensions,
+                        dynamic,
+                    } => {
+                        self.resize(block, *slot, *kind, dimensions, false, true, *dynamic)?;
+                    }
+                    bound::StatementKind::ReDim {
+                        slot,
+                        dimensions,
+                        preserve,
+                    } => {
+                        // Runtime checks the existing array's element type; Variant denotes reuse.
+                        self.resize(
+                            block,
+                            *slot,
+                            ScalarKind::Variant,
+                            dimensions,
+                            *preserve,
+                            false,
+                            true,
+                        )?;
+                    }
+                    bound::StatementKind::Erase(slot) => {
+                        self.feature("arrays-v2");
+                        self.emit(block, ir::Instruction::RefLocal(ir::LocalSlot(idx(*slot)?)))?;
+                        self.emit(block, ir::Instruction::ArrayErase)?;
+                    }
+                    bound::StatementKind::ElementAssign {
+                        slot,
+                        indices,
+                        kind,
+                        value,
+                        object,
+                    } => {
+                        self.element(block, *slot, indices, *kind)?;
+                        self.expr(block, value)?;
+                        self.emit(
+                            block,
+                            ir::Instruction::WriteRef(if *object {
+                                ir::AssignmentKind::ObjectReference
+                            } else {
+                                ir::AssignmentKind::Value
+                            }),
+                        )?;
+                    }
+                    bound::StatementKind::GoTo(label) => {
+                        let target = *self
+                            .labels
+                            .get(label)
+                            .ok_or_else(|| error("unknown label").at(site.span))?;
+                        self.jump(block, target)?;
+                        return Ok(block);
+                    }
+                    bound::StatementKind::OnError {
+                        target,
+                        resume_next,
+                    } => {
+                        self.feature("error-handlers-v2");
+                        let target = target
+                            .as_ref()
+                            .map(|label| {
+                                self.labels
+                                    .get(label)
+                                    .copied()
+                                    .ok_or_else(|| error("unknown handler label").at(site.span))
+                            })
+                            .transpose()?;
+                        self.emit(
+                            block,
+                            ir::Instruction::OnError {
+                                target: target.map(|n| idx(n).map(ir::Pc)).transpose()?,
+                                resume_next: *resume_next,
+                            },
+                        )?;
+                    }
+                    bound::StatementKind::Resume {
+                        target,
+                        next: resume_next,
+                    } => {
+                        self.feature("error-handlers-v2");
+                        let target = target
+                            .as_ref()
+                            .map(|label| {
+                                self.labels
+                                    .get(label)
+                                    .copied()
+                                    .ok_or_else(|| error("unknown resume label").at(site.span))
+                            })
+                            .transpose()?;
+                        self.emit(
+                            block,
+                            ir::Instruction::Resume {
+                                target: target.map(|n| idx(n).map(ir::Pc)).transpose()?,
+                                next: *resume_next,
+                            },
+                        )?;
+                        return Ok(block);
+                    }
+                    bound::StatementKind::ErrClear => {
+                        self.feature("error-handlers-v2");
+                        self.emit(block, ir::Instruction::ErrClear)?;
+                    }
+                    bound::StatementKind::ErrRaise(values) => {
+                        self.feature("error-handlers-v2");
+                        for value in values {
+                            self.expr(block, value)?;
+                        }
+                        self.emit(
+                            block,
+                            ir::Instruction::Raise(
+                                u16::try_from(values.len()).map_err(|_| resource())?,
+                            ),
+                        )?;
+                    }
                     bound::StatementKind::Declare => (),
                     _ => return Err(error("statement lowering invariant")),
                 }
@@ -766,7 +1078,27 @@ impl Builder<'_> {
                 .get(id)
                 .and_then(|b| b.code.last())
                 .ok_or_else(|| error("empty block invariant"))?;
+            let block = self.blocks.get(id).ok_or_else(|| error("block"))?;
+            if self.features.contains("error-handlers-v2") {
+                if let Some(next) = block.resume {
+                    push(&mut pending, next)?;
+                }
+                for instruction in &block.code {
+                    if let ir::Instruction::OnError {
+                        target: Some(target),
+                        ..
+                    }
+                    | ir::Instruction::Resume {
+                        target: Some(target),
+                        ..
+                    } = instruction
+                    {
+                        push(&mut pending, target.0 as usize)?;
+                    }
+                }
+            }
             match last {
+                ir::Instruction::Resume { .. } => (),
                 ir::Instruction::Jump(pc) => push(&mut pending, pc.0 as usize)?,
                 ir::Instruction::Branch { if_true, if_false } => {
                     push(&mut pending, if_false.0 as usize)?;
@@ -818,7 +1150,13 @@ impl Builder<'_> {
             for (offset, instruction) in block.code.iter().enumerate() {
                 let mut instruction = instruction.clone();
                 match &mut instruction {
-                    ir::Instruction::Jump(pc) => {
+                    ir::Instruction::OnError {
+                        target: Some(pc), ..
+                    }
+                    | ir::Instruction::Resume {
+                        target: Some(pc), ..
+                    }
+                    | ir::Instruction::Jump(pc) => {
                         *pc = *mapping
                             .get(&(pc.0 as usize))
                             .ok_or_else(|| error("jump mapping"))?
@@ -881,6 +1219,20 @@ impl Builder<'_> {
                     .next()
                     .map(|(_, id)| *id)
             };
+        }
+        if self.features.contains("error-handlers-v2") {
+            let sites: BTreeMap<usize, ir::SiteId> = order
+                .iter()
+                .enumerate()
+                .map(|(i, id)| (*id, ir::SiteId(i as u32)))
+                .collect();
+            for (cp, id) in checkpoints.iter_mut().zip(&order) {
+                cp.resume_next = self
+                    .blocks
+                    .get(*id)
+                    .and_then(|b| b.resume)
+                    .and_then(|id| sites.get(&id).copied());
+            }
         }
         self.statements.sort_by_key(|s| s.id.ordinal);
         let signature = &procedure.signature;

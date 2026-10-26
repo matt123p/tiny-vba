@@ -101,7 +101,12 @@ fn replace(p: &mut Program, pc: usize, instruction: Instruction) -> TestResult {
     Ok(())
 }
 fn check(p: Program) -> Result<VerifiedProgram, vba_diagnostics::Diagnostic> {
-    verify(p, &Capabilities::ir1_structural(), &VerifyLimits::default())
+    let caps = if p.ir_version == IR2_VERSION {
+        Capabilities::ir2_structural()
+    } else {
+        Capabilities::ir1_structural()
+    };
+    verify(p, &caps, &VerifyLimits::default())
 }
 #[test]
 fn malformed_indexes_blocks_stacks_and_metadata_are_rejected() -> TestResult {
@@ -247,7 +252,7 @@ fn reachable_infinite_cycle_is_valid_and_unreachable_block_is_rejected() -> Test
 #[test]
 fn feature_profile_version_opcode_operator_and_conversion_gates_are_checked() -> TestResult {
     let mut p = base()?;
-    p.ir_version = 2;
+    p.ir_version = 3;
     assert_eq!(check(p).err().ok_or("reject")?.code, "VBA0022");
     let mut p = base()?;
     p.required_features.insert("unknown-feature".into());
@@ -650,5 +655,92 @@ fn damaged_foreign_descriptors_and_missing_target_operands_are_rejected() -> Tes
         case(&mut invalid)?;
         assert!(check(invalid).is_err());
     }
+    Ok(())
+}
+
+#[test]
+fn ir2_intrinsic_handler_array_and_persistent_shapes_are_verified() -> TestResult {
+    let cases = [
+        Instruction::Intrinsic {
+            function: vba_values::Intrinsic::Len,
+            arguments: 0,
+        },
+        Instruction::Intrinsic {
+            function: vba_values::Intrinsic::Len,
+            arguments: 1,
+        },
+        Instruction::OnError {
+            target: Some(Pc(999)),
+            resume_next: false,
+        },
+        Instruction::OnError {
+            target: Some(Pc(0)),
+            resume_next: true,
+        },
+        Instruction::Resume {
+            target: Some(Pc(1)),
+            next: false,
+        },
+        Instruction::ErrGet("unknown".into()),
+        Instruction::Raise(0),
+        Instruction::RefElement {
+            rank: 0,
+            kind: ScalarKind::Long,
+        },
+        Instruction::RefElement {
+            rank: 9,
+            kind: ScalarKind::Long,
+        },
+        Instruction::ArrayResize {
+            rank: 9,
+            kind: ScalarKind::Long,
+            preserve: false,
+            initialize: true,
+            dynamic: true,
+        },
+        Instruction::ArrayResize {
+            rank: 0,
+            kind: ScalarKind::Long,
+            preserve: true,
+            initialize: true,
+            dynamic: true,
+        },
+        Instruction::ArrayErase,
+    ];
+    for instruction in cases {
+        let mut program = base()?;
+        program.ir_version = IR2_VERSION;
+        program.profile = "ir2-structural".into();
+        program
+            .required_features
+            .extend(FEATURES.iter().map(|s| (*s).into()));
+        *proc_mut(&mut program)?
+            .code
+            .get_mut(1)
+            .ok_or("instruction")? = instruction.clone();
+        assert!(check(program).is_err(), "accepted {instruction:?}");
+    }
+    let mut program = base()?;
+    program.ir_version = IR2_VERSION;
+    program.profile = "ir2-structural".into();
+    program.required_features.insert("persistent-v2".into());
+    proc_mut(&mut program)?
+        .locals
+        .first_mut()
+        .ok_or("local")?
+        .role = SlotRole::Persistent(0);
+    check(program.clone())?;
+    proc_mut(&mut program)?
+        .locals
+        .first_mut()
+        .ok_or("local")?
+        .role = SlotRole::Persistent(4096);
+    assert!(check(program).is_err());
+    let mut program = base()?;
+    *proc_mut(&mut program)?
+        .code
+        .get_mut(1)
+        .ok_or("instruction")? = Instruction::ErrClear;
+    assert!(check(program).is_err());
     Ok(())
 }

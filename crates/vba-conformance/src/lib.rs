@@ -54,6 +54,12 @@ impl Status {
 /// Deterministic value description: exact tag and payload; never host Debug formatting.
 pub fn describe_value(value: &Value) -> String {
     match value {
+        Value::Array(array) => format!(
+            "Array({:?},bounds={:?},elements={:?})",
+            array.kind(),
+            array.bounds(),
+            array.elements()
+        ),
         Value::Empty => "Empty".into(),
         Value::Null => "Null".into(),
         Value::Missing => "Missing".into(),

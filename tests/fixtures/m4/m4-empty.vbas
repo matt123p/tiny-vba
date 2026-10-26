@@ -1,0 +1,16 @@
+tiny-vba-scenario = 1
+id = m4-empty
+module = Module1
+entry = Answer
+provenance = independently-authored
+license = MIT
+profile = pure-language-unmeasured
+requirements = m4-language-v1
+capabilities = none
+evidence = reasoned-not-oracle
+expected = Long:1
+rationale = Empty supplies numeric zero in arithmetic.
+---
+Function Answer() As Long
+Answer=Empty+1
+End Function

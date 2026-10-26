@@ -1,5 +1,9 @@
 # M2 binding and verified bytecode
 
+Updated for [M4 / IR 2](m4-language.md), adopted by [ADR 0011](decisions/0011-m4-language-extension.md).
+The additions there supersede the historical M2 subset/refusals below. Default compilation targets
+ir2-structural, preserving IR 1 instruction shapes and emitting IR 2 for extension features.
+
 Implemented 2026-10-26. `vba-semantics` binds the M1 AST; `vba-compiler` lowers it;
 `vba-ir` owns IR 1, structural verification, opaque immutable `VerifiedProgram` and disassembly.
 Compilation alone executes no VM or VBA runtime operation. M3 now provides the separate [runtime profile](runtime.md). The target `ir1-structural`

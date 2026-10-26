@@ -3,15 +3,12 @@
 A new, standalone VBA interpreter, editor and debugger in Rust, intended to run natively and in WebAssembly.
 Develop, run and test the language engine without Gridcraft, Wordcraft, Microsoft Office or a graphical interface.
 
-**Current status:** M0–M3 complete for the documented [frontend](docs/frontend.md) and
-[compiler subset](docs/compiler.md): source-preserving parsing, scalar name/signature binding,
-checkpoint-based bytecode lowering, bounded IR 1 verification, explicit-frame execution and a headless debugger.
-The CLI implements `parse`, `check`, `compile`, `disasm`, `run` and fixture validation.
-See the [M3 runtime matrix](docs/runtime.md) for supported execution and debugger/host APIs.
-The graphical editor/debugger and DAP remain planned. Fixture validation still reports NOT_RUN;
-M4 now adds a typed scenario assertion runner (`conformance run`) and Double arithmetic; the
-self-authored fixture set is asserted 17 PASS / 3 UNSUPPORTED. The current execution profile is
-m4-scalars-v1. Broader M4 semantics and error handlers remain in progress.
+**Current status:** M0–M4 are complete for the [reviewed language profile](docs/m4-language.md).
+The Rust engine includes parsing, binding, verified IR 1/2, explicit-frame execution, a headless
+debugger, scalar conversions, Currency/Date, arrays, optional/named calls, static/module state,
+intrinsics and VBA error handlers. The current execution profile is `m4-language-v1`.
+All 44 independently authored fixture assertions pass; no Microsoft oracle result is claimed.
+The graphical editor/debugger, DAP and Office integration remain later milestones.
 
 
 The Excel/Word compatibility layers, Office metadata and application adapters belong in the
@@ -23,7 +20,7 @@ and design conventions. See the [editor/debugger UI contract](docs/editor-debugg
 ## Start here
 
 Rust is pinned by `rust-toolchain.toml`; Python 3.11+ and Git support repository checks only.
-No third-party Rust crates or Office installations are needed for M0–M3. Node 18+ runs the WASI smoke test.
+No third-party Rust crates or Office installations are needed for M0–M4. Node 18+ runs the WASI smoke test.
 
 ```sh
 cargo run -p vba-cli -- --help

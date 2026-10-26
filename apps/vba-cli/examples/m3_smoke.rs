@@ -199,6 +199,57 @@ fn main() -> Result<(), Box<dyn Error>> {
         ),
         "M4 Long width overflow",
     )?;
+    for (text, expected) in [
+        (
+            include_str!("../../../examples/pure-vba/M4Arrays.bas"),
+            Value::Long(44),
+        ),
+        (
+            include_str!("../../../examples/pure-vba/M4State.bas"),
+            Value::Long(23),
+        ),
+        (
+            "Function Answer() As Currency\nAnswer=CCur(1.25)+CCur(0.5)\nEnd Function",
+            Value::Currency(17500),
+        ),
+        (
+            "Function Answer() As Date\nAnswer=CDate(45000)+2\nEnd Function",
+            Value::Date(45002.0),
+        ),
+        (
+            "Function Answer() As LongLong\nAnswer=CLngLng(\"9007199254740993\")+CLngLng(1)\nEnd Function",
+            Value::LongLong(9007199254740994),
+        ),
+        (
+            "Function Answer() As Boolean\nAnswer=Probe()\nEnd Function\nFunction Probe(Optional n As Variant) As Boolean\nProbe=IsMissing(n)\nEnd Function",
+            Value::Boolean(true),
+        ),
+        (
+            "Function Answer() As Long\nAnswer=F(b:=3,a:=2)\nEnd Function\nFunction F(ByVal a As Long,ByVal b As Long) As Long\nF=a*10+b\nEnd Function",
+            Value::Long(23),
+        ),
+        (
+            "Function Answer() As Long\nOn Error GoTo Recover\nAnswer=1/0\nExit Function\nRecover:\nAnswer=Err.Number\nResume Done\nDone:\nAnswer=Answer+1\nEnd Function",
+            Value::Long(12),
+        ),
+    ] {
+        let mut session = build(text, vec![], None)?;
+        ensure(
+            run(&mut session, &mut vm::NoHost, &Controller::new())?
+                == Outcome::Completed(ReturnValue::Function(expected)),
+            "M4 language execution",
+        )?;
+    }
+    let state_source = include_str!("../../../examples/pure-vba/M4State.bas");
+    let mut first = build(state_source, vec![], None)?;
+    run(&mut first, &mut vm::NoHost, &Controller::new())?;
+    let mut next = build(state_source, vec![], None)?;
+    next.restore_project(first.project_state()?)?;
+    ensure(
+        run(&mut next, &mut vm::NoHost, &Controller::new())?
+            == Outcome::Completed(ReturnValue::Function(Value::Long(47))),
+        "project state restore",
+    )?;
     let isolation = "Function Answer() As Long\nDim x As Long\nx=1\nx=x+1\nAnswer=x\nEnd Function";
     let mut previous = build(isolation, vec![], None)?;
     let mut old_controller = Controller::new();
@@ -258,7 +309,7 @@ fn main() -> Result<(), Box<dyn Error>> {
         "cross-session breakpoints/step target",
     )?;
     println!(
-        "M3_SMOKE PASS: Long(42), loop/calls Long(18), edited Long(41), invoke=1 polls=2, stale handles, cancellation, isolated instances; M4 Double(3.5), Boolean(true), overflow 6"
+        "M3_SMOKE PASS: Long(42), loop/calls Long(18), edited Long(41), invoke=1 polls=2, stale handles, cancellation, isolated instances; M4 Double(3.5), Boolean(true), overflow 6, arrays Long(44), state Long(23/47), Currency, Date, exact LongLong, optional/named calls, handler Resume Long(12)"
     );
     Ok(())
 }

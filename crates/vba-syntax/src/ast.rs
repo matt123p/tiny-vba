@@ -74,6 +74,8 @@ pub struct Parameter {
 }
 #[derive(Clone, Debug)]
 pub struct Declaration {
+    pub dimensions: Option<Vec<(Expr, Expr)>>,
+    pub persistent: bool,
     pub name: Name,
     pub ty: Option<Name>,
     pub constant: Option<Expr>,
@@ -92,6 +94,23 @@ pub struct Statement {
 }
 #[derive(Clone, Debug)]
 pub enum StatementKind {
+    ReDim {
+        name: Name,
+        dimensions: Vec<(Expr, Expr)>,
+        ty: Option<Name>,
+        preserve: bool,
+    },
+    Erase(Name),
+    Label(String),
+    GoTo(String),
+    OnError {
+        target: Option<String>,
+        resume_next: bool,
+    },
+    Resume {
+        target: Option<String>,
+        next: bool,
+    },
     Declare(Vec<Declaration>),
     Assign {
         target: Expr,

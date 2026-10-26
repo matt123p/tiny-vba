@@ -78,3 +78,8 @@ the replacement-session regression in native/WASI evidence when changing these i
 m4-scalars-v1; do not silently expand m3-core-v1. Keep failure classifications and nonzero
 CRASH/TIMEOUT/MISMATCH exits intact, compare exact payloads, and check narrowing bounds before casts.
 Confirm xtask's logged workspace matches the intended checkout; shared binaries may originate elsewhere.
+
+Current M4 support supersedes earlier first-slice limits: read [M4 language/IR 2](../../../docs/m4-language.md)
+and [ADR 0011](../../../docs/decisions/0011-m4-language-extension.md). Compile against m4-language-v1
+VM capabilities. Preserve the IR 1 structural target and explicit IR 2 feature/version gates.
+The authored inventory is 20 M0 plus 24 M4 PASS fixtures; no Microsoft oracle observation is claimed.

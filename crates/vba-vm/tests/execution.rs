@@ -75,7 +75,7 @@ fn same_line_pause_edit_and_continue_do_not_repeat_effects_and_stale_handles_fai
         return Err("pause".into());
     };
     assert_eq!(s.read_local(p.handle, "x")?, Value::Long(1));
-    assert!(s.edit_local(p.handle, "x", Value::Boolean(false)).is_err());
+    assert!(s.edit_local(p.handle, "x", Value::Null).is_err());
     assert_eq!(s.read_local(p.handle, "x")?, Value::Long(1));
     assert!(s.read_local(p.handle, "Answer").is_err());
     s.edit_local(p.handle, "x", Value::Long(40))?;
@@ -221,8 +221,8 @@ fn faults_pause_without_retry_and_non_vba_failures_are_separate() -> R {
     let Outcome::Failed(f) = drive(&mut s, &Controller::new())? else {
         return Err("unsupported".into());
     };
-    assert_eq!(f.kind, vm::FailureKind::Unsupported);
-    assert_eq!(f.number, None);
+    assert_eq!(f.kind, vm::FailureKind::Runtime);
+    assert_eq!(f.number, Some(13));
     Ok(())
 }
 #[test]

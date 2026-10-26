@@ -1,10 +1,10 @@
 # M3/M4 runtime and debugger
 
-Implemented 2026-10-26. The current consumer executes `m4-scalars-v1` through the explicit-frame
-IR 1 VM introduced at M3. M3-tagged programs require recompilation against current capabilities;
-[ADR 0010](decisions/0010-m4-profile-and-verification-hardening.md) records this explicit matrix revision.
-It provides a headless debugger controller and generic native host continuations. The visual IDE,
-DAP, Office objects and broad VBA coercion/error-handler semantics are later milestones.
+Implemented 2026-10-26. The current consumer is `m4-language-v1`, using verified IR 1/2.
+The [M4 language contract](m4-language.md) and [ADR 0011](decisions/0011-m4-language-extension.md)
+define scalar coercions, arrays, arguments, persistent state, builtins and VBA handlers. The
+headless debugger and generic host protocol retain their M3 lifecycle contracts. Visual IDE,
+DAP and Office objects remain later milestones.
 
 ```sh
 cargo run -p vba-cli -- run examples/pure-vba/Arithmetic.bas
@@ -29,34 +29,23 @@ Node 22 for this gate. Node may print its WASI experimental-feature notice.
 
 ## Runtime capability matrix
 
-The compiler defaults to `ir1-structural` for check/compile/disasm. To execute, compile with
+The compiler defaults to `ir2-structural` for check/compile/disasm. To execute, compile with
 `CompileOptions { capabilities: vba_vm::capabilities(), ..Default::default() }` and pass the resulting
 VerifiedProgram to Session. Session rechecks immutable IR against its actual capabilities without
 cloning the source payload. A caller's capability set cannot enable an unimplemented operation.
 
-| Operation | M3/M4 combinations |
+| Operation | Current support |
 |---|---|
-| Declarations | Variant, Integer, Long, Double, Boolean, String, generic Object; initialized to exact tagged defaults |
-| Assignment / ByVal | Same-tag Integer/Long/Double/Boolean/String; Integer to Long; range-checked narrowing of Long to Integer and of Double to Integer/Long (round half to even; overflow 6 out of range); Integer/Long into Double slots are exact widenings; Variant preserves scalar tags; Object/Nothing copied through explicit Set or parameter binding |
-| Add/Subtract/Multiply | Integer/Long pairs; Long if either operand is Long, otherwise Integer; Double when either operand is Double; checked overflow number 6 |
-| Division `/` | Integer/Long/Double operands; the result is always Double; zero divisor number 11; non-finite quotient overflow number 6; String/Boolean/CVErr operands stay Unsupported |
-| IntegerDivide/Modulo | Integer/Long pairs, checked width, division by zero number 11; signed integer quotient/remainder |
-| Comparisons | Integer/Long/Double numeric pairs for =, <>, <, <=, >, >=; Boolean = and <> |
-| Logical operators | Integer/Long bitwise And/Or/Xor/Eqv/Imp; Boolean equivalents; both source operands evaluated |
-| Unary | Checked Integer/Long negate and finite Double negate; Integer/Long bitwise Not and Boolean Not |
-| Concatenation | String with String, exact UTF-16 units; bounded length |
-| Conditions | Boolean only; no implicit numeric/string truthiness |
-| Explicit Convert | Variant/Integer/Long/Double/Boolean/String with the assignment matrix above |
-| Calls/control | Required positional ByVal and canonical exact-type local ByRef, Sub/Function, If, positive integral-step Integer/Long For, Exit, Stop |
-| Generic host | Object-local/parameter member Call/Get/Let/Set; names/omitted args retained, per-site permissions, wait/resume/cancel and typed snapshot writebacks |
+| Scalar declarations/conversion | All twelve ScalarKinds; centralized checked coercions and exact tags |
+| Arithmetic | Integer/Long/LongLong, Single/Double, scaled Currency and Date serial rules; overflow 6 and zero divisor 11 |
+| States/strings | Empty/Null rules, distinct Missing/Nothing/CVErr, UTF-16 concatenation/comparison/slicing |
+| Calls | Positional/named/optional/omitted source arguments, exact canonical ByRef and typed temporaries |
+| Arrays/storage | Fixed/dynamic bounded arrays, lower bounds, Preserve/Erase, ByRef cells; module/Static locals and explicit project state |
+| Errors/builtins | On Error, Resume, Err/Erl and deterministic intrinsic registry; see M4 contract for exact boundaries |
+| Generic host/debugger | Existing permitted calls, waits, typed patches, checkpoint stops, stepping, inspection and edits |
 
-Power `^`, the remaining declared numerics (Byte/LongLong/Single/Currency/Date), mixed
-string/numeric/Boolean coercion, Null/Empty arithmetic, default members, arrays/classes, builtins,
-persistent state, optional/named **direct VBA** arguments, temporary ByRef, error handlers and
-arbitrary watch evaluation remain unsupported. Decimal/exponent literals (`1.5`, `1e2`) bind as
-exact finite Double constants; radix and suffixed literal forms stay unsupported. Passive scalar Variant copies preserve Empty/Null/Missing/Nothing/CVErr and existing
-scalar payload tags; that is not arithmetic or conversion support for those states. Bad dynamic
-combinations fail Unsupported, not a guessed VBA error. Host-provided VBA error numbers are preserved.
+The M4 contract lists explicit unsupported forms and profile limits. Source literals retain the
+reviewed decimal forms; additional suffix/radix, locale and class/default-member behavior is refused.
 
 The shared vba-runtime owns these rules; VM, debugger edits and typed parameter binding do not
 implement independent conversion paths. Tests are independently authored; no Microsoft oracle or
@@ -106,7 +95,7 @@ Runtime failures retain bounded source/frame snapshots and error numbers. Infras
 separate Unsupported/ResourceLimit/HostProtocol/HostDisconnected/InternalInvariant kinds. Optional
 break-on-error pauses a saved runtime failure read-only; continue delivers it once and never retries.
 Saved fault PCs identify Call/Invoke even after the caller PC advances to its continuation. Successful
-host effects and direct ByRef writes remain observable after failure. `On Error`/Resume/Err/Erl remain M4.
+host effects and direct ByRef writes remain observable after failure. VBA handlers follow the M4 contract; only numbered errors are catchable.
 
 ## Generic host lifecycle
 
@@ -177,3 +166,7 @@ float/Date bits, while language numeric equality retains its own runtime compari
 reports are escaped per unit. `conformance validate` executes nothing and keeps NOT_RUN.
 `cargo xtask` prints the runtime-selected checkout root; `wasm-run` honors CARGO_TARGET_DIR so shared
 build artifacts cannot silently redirect tests or select an older WASM executable.
+
+Current M4 execution evidence and boundaries supersede the historical first-slice notes above.
+All 44 authored scenario assertions pass. `Session::output`, `project_state` and `restore_project`
+are described in the M4 contract. Fault snapshots include unavailable_locals for expired array cells.
