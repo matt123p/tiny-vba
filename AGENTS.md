@@ -79,3 +79,8 @@ accessibility, original-asset and font conventions; add UI snapshot/asset checks
 M4 is implemented for [the reviewed profile](docs/m4-language.md) under ADR 0011. Use the
 versioned IR 2 contract for handlers/arrays/intrinsics/persistent slots. Preserve legacy IR 1
 capability boundaries and the shared runtime coercion path, including constant/default binding.
+
+M4's external gate is complete under [ADR 0012](docs/decisions/0012-m4-oracle-acceptance.md),
+[the oracle report](docs/m4-oracle-report.md) and IR 3. The reviewed MIT allowlist is the only
+corpus execution exception: never run upstream scripts or import implementation code. Preserve
+Schema 1/2 evidence distinctions, raw results, all 153 cases and legacy IR capability limits.

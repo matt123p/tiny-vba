@@ -431,15 +431,12 @@ impl Parser<'_> {
                 let start = self.token().span;
                 let optional = self.eat("Optional");
                 let by_val = self.eat("ByVal");
-                if !by_val {
-                    self.eat("ByRef");
-                }
-                if self.at("ParamArray") {
-                    return Err(self.unsupported("ParamArray"));
-                }
+                let explicit_by_ref = !by_val && self.eat("ByRef");
+                let param_array = self.eat("ParamArray");
                 let name = self.name()?;
-                if self.at("(") {
-                    return Err(self.unsupported("array parameter"));
+                let array = self.eat("(");
+                if array {
+                    self.require(")")?;
                 }
                 let ty = self.ty()?;
                 let default = if self.eat("=") {
@@ -451,6 +448,9 @@ impl Parser<'_> {
                     None
                 };
                 parameters.push(Parameter {
+                    explicit_by_ref,
+                    array,
+                    param_array,
                     name,
                     by_val,
                     optional,
@@ -528,8 +528,15 @@ impl Parser<'_> {
     fn statement_inner(&mut self) -> PResult<Statement> {
         let start = self.token().span;
         let site = self.site(start)?;
-        let kind = if (self.look(1, ":") && self.token().kind == TokenKind::Word)
-            || (self.token().kind == TokenKind::Number && self.text().parse::<u16>().is_ok())
+        let line_start = self.pos == 0
+            || self
+                .pos
+                .checked_sub(1)
+                .and_then(|index| self.tokens.get(index))
+                .is_some_and(|token| token.kind == TokenKind::Newline);
+        let kind = if line_start
+            && ((self.look(1, ":") && self.token().kind == TokenKind::Word)
+                || (self.token().kind == TokenKind::Number && self.text().parse::<u16>().is_ok()))
         {
             let label = self.text().to_ascii_lowercase();
             self.bump();
@@ -637,9 +644,6 @@ impl Parser<'_> {
             let explicit_let = !object && self.eat("Let");
             // A bare statement target excludes the terminal argument parentheses. Parse a candidate
             // with postfix applications for assignment; rewind for implicit call syntax if no '='.
-            if self.look(1, ":") {
-                return Err(self.unsupported("statement labels"));
-            }
             let target_start = self.pos;
             let candidate = self.target(true);
             if let Ok(target) = candidate.as_ref()

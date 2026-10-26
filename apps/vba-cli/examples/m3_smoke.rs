@@ -1,4 +1,6 @@
 //! The same bounded acceptance program runs natively and under WASI without filesystem access.
+#[path = "support/m4_oracle_fixtures.rs"]
+mod oracle_fixtures;
 use std::{collections::BTreeSet, error::Error, io};
 use vba_compiler::{CompileOptions, compile};
 use vba_debug::{Controller, Step};
@@ -250,6 +252,67 @@ fn main() -> Result<(), Box<dyn Error>> {
             == Outcome::Completed(ReturnValue::Function(Value::Long(47))),
         "project state restore",
     )?;
+    for text in oracle_fixtures::CASES {
+        let file = SourceFile::new(SourceId(7), "oracle.vbas".into(), text.into())?;
+        let scenario = vba_conformance::Scenario::parse(&file)?;
+        let source = SourceFile::new(SourceId(8), format!("{}.bas", scenario.id), scenario.source)?;
+        let program = compile(
+            &source,
+            &CompileOptions {
+                entry: scenario.entry,
+                capabilities: vm::capabilities(),
+                ..Default::default()
+            },
+        )?;
+        let mut session = Session::new(program, 100, vec![], None, Limits::default())?;
+        let out = run(&mut session, &mut vm::NoHost, &Controller::new())?;
+        let status = match out {
+            Outcome::Completed(ReturnValue::Function(value)) => {
+                scenario.expected.judge_value(&value)
+            }
+            Outcome::Failed(failure) if failure.kind == vm::FailureKind::Runtime => {
+                scenario.expected.judge_error(
+                    failure
+                        .number
+                        .ok_or_else(|| io::Error::other("numbered oracle failure"))?,
+                )
+            }
+            _ => {
+                return Err(
+                    io::Error::other(format!("oracle {} failed: {out:?}", scenario.id)).into(),
+                );
+            }
+        };
+        ensure(
+            status == vba_conformance::Status::Pass,
+            &format!("oracle {} mismatch", scenario.id),
+        )?;
+    }
+    for (text, expected) in [
+        (
+            "Option Base 1\nFunction Answer() As Long\nDim a(2) As Long\nAnswer=LBound(a)+LBound(Array(1))\nEnd Function",
+            Value::Long(2),
+        ),
+        (
+            "Function Answer() As Long\nAnswer=F(1,2,3)\nEnd Function\nFunction F(ParamArray a() As Variant) As Long\nF=a(0)+a(1)+a(2)\nEnd Function",
+            Value::Long(6),
+        ),
+        (
+            "Function Answer() As Long\nDim a(2) As Long\nCall F(a)\nAnswer=a(0)\nEnd Function\nSub F(ByRef a() As Long)\na(0)=42\nEnd Sub",
+            Value::Long(42),
+        ),
+        (
+            "Function Answer() As Long\nDim a(2) As Long\na(0)=40\nCall F(n:=a(0))\nAnswer=a(0)\nEnd Function\nSub F(ByRef n As Long)\nn=n+2\nEnd Sub",
+            Value::Long(42),
+        ),
+    ] {
+        let mut session = build(text, vec![], None)?;
+        ensure(
+            run(&mut session, &mut vm::NoHost, &Controller::new())?
+                == Outcome::Completed(ReturnValue::Function(expected)),
+            "M4 array/argument completion",
+        )?;
+    }
     let isolation = "Function Answer() As Long\nDim x As Long\nx=1\nx=x+1\nAnswer=x\nEnd Function";
     let mut previous = build(isolation, vec![], None)?;
     let mut old_controller = Controller::new();
@@ -309,7 +372,7 @@ fn main() -> Result<(), Box<dyn Error>> {
         "cross-session breakpoints/step target",
     )?;
     println!(
-        "M3_SMOKE PASS: Long(42), loop/calls Long(18), edited Long(41), invoke=1 polls=2, stale handles, cancellation, isolated instances; M4 Double(3.5), Boolean(true), overflow 6, arrays Long(44), state Long(23/47), Currency, Date, exact LongLong, optional/named calls, handler Resume Long(12)"
+        "M3_SMOKE PASS: Long(42), loop/calls Long(18), edited Long(41), invoke=1 polls=2, stale handles, cancellation, isolated instances; M4 Double(3.5), Boolean(true), overflow 6, arrays Long(44), state Long(23/47), Currency, Date, exact LongLong, optional/named calls, handler Resume Long(12), 153 inherited Excel oracle cases, array parameters/ParamArray/Option Base/named cell references"
     );
     Ok(())
 }

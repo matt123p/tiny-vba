@@ -418,3 +418,31 @@ fn conformance_asserts_the_profile_tagged_m4_inventory() -> Result<(), Box<dyn s
     assert_eq!(count, 24);
     Ok(())
 }
+
+#[test]
+fn inherited_microsoft_oracle_allowlist_passes_without_submodules_or_office()
+-> Result<(), Box<dyn std::error::Error>> {
+    let root =
+        std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../tests/fixtures/m4-oracle");
+    let mut count = 0;
+    for entry in std::fs::read_dir(root)? {
+        let path = entry?.path();
+        if path.extension().and_then(|s| s.to_str()) != Some("vbas") {
+            continue;
+        }
+        let result = Command::new(env!("CARGO_BIN_EXE_vba-cli"))
+            .args(["conformance", "run"])
+            .arg(&path)
+            .output()?;
+        let stdout = String::from_utf8(result.stdout)?;
+        assert!(
+            result.status.success() && stdout.contains(": PASS ("),
+            "{}: {stdout} {}",
+            path.display(),
+            String::from_utf8_lossy(&result.stderr)
+        );
+        count += 1;
+    }
+    assert_eq!(count, 153);
+    Ok(())
+}

@@ -1,7 +1,7 @@
 # Architecture
 
 Status: M0–M4 complete for the documented [M4 language profile](m4-language.md), with
-verified IR 1/2 and explicit-frame execution. Graphical IDE, importer and fork integration remain later gates.
+verified IR 1/2/3 and explicit-frame execution. Graphical IDE, importer and fork integration remain later gates.
 
 The current scaffold and future headless engine can compile and test without Office, UI toolkits,
 application forks or corpus downloads. This repository also owns an optional editor/debugger UI
@@ -95,7 +95,7 @@ Keep tools/architecture.json as the graph of actual Cargo packages. Add these no
 external dependencies when their implementation lands; do not add placeholder APIs or manifests.
 Headless and UI checks must be separate so engine consumers do not pull GUI dependencies.
 
-M4's current execution profile is m4-language-v1 (ADR 0011), distinct from the historical M3 matrix.
+M4's current execution profile is m4-conformance-v1 (ADR 0012), distinct from the historical M3 matrix.
 Typed scenario judgment and diagnostic/result classification stay in vba-conformance; CLI owns
 compile/run orchestration. Runtime owns narrowing bounds and scalar comparison rules. Infrastructure
 xtask resolves its checkout at runtime and prints that identity before gates. No dependency edge or
@@ -105,3 +105,8 @@ Semantics now depends on runtime for constant/default conversion, keeping one co
 IR stays independent of syntax, semantics and execution. Values owns bounded arrays and canonical
 element locations; the VM owns per-frame handlers and explicit project-state transfer. See
 [the IR 2 extension](m4-language.md) and ADR 0011 for versions, ownership and limits.
+
+[M4 acceptance](m4-oracle-report.md) now includes 153 reviewed inherited Microsoft Excel oracle
+cases under [ADR 0012](decisions/0012-m4-oracle-acceptance.md). IR 3 owns array-layout/parameter
+metadata and same-block canonical reference captures; IR 1/2 targets remain closed. No Cargo DAG
+edge changed. Schema 2 provenance and evidence checks remain above shipping engine layers.

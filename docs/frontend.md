@@ -80,3 +80,8 @@ five-file corpus evaluation. Local tests do not depend on corpus checkouts.
 [The M4 contract](m4-language.md) adds array declarations/indexing, ReDim/Erase, Static local
 declarations, labels/GoTo, On Error and Resume syntax. Optional/named syntax now binds and executes.
 These additions supersede corresponding M1 historical unsupported lists; other limits still apply.
+
+M4 completion adds whole-array/ParamArray parameter syntax and explicit legality checks. Labels
+are recognized at physical line starts; a following colon-separated bare name is parsed as a
+call. Option Base is bound explicitly, duplicate directives are rejected and qualified VBA
+intrinsic calls use the deterministic registry. See [current acceptance](m4-oracle-report.md).

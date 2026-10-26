@@ -392,3 +392,35 @@ fn host_numbered_error_after_wait_enters_vba_handler_without_reinvocation() -> R
     );
     Ok(())
 }
+
+#[test]
+fn host_writeback_preserves_new_scalar_widths_and_rejects_wrong_array_elements() -> R {
+    let text = "Function Answer(ByVal target As Object) As Double\nDim x As Double\ntarget.Record x\nAnswer=x\nEnd Function";
+    let mut s = session(text, true, Limits::default())?;
+    let mut host = ScriptedHost::new(
+        TARGET,
+        vec![Reply::Complete(Completion {
+            value: Value::Empty,
+            writes: vec![(0, Value::Double(2.5))],
+        })],
+    );
+    assert_eq!(
+        drive(&mut s, &mut host, &Controller::new())?,
+        Outcome::Completed(ReturnValue::Function(Value::Double(2.5)))
+    );
+    let text = "Function Answer(ByVal target As Object) As Long\nDim a() As Long\nReDim a(2)\ntarget.Record a\nAnswer=a(0)\nEnd Function";
+    let mut s = session(text, true, Limits::default())?;
+    let bad = vba_values::VbaArray::new(vba_values::ScalarKind::Integer, vec![(0, 2)], true)?;
+    let mut host = ScriptedHost::new(
+        TARGET,
+        vec![Reply::Complete(Completion {
+            value: Value::Empty,
+            writes: vec![(0, Value::Array(bad))],
+        })],
+    );
+    let Outcome::Failed(f) = drive(&mut s, &mut host, &Controller::new())? else {
+        return Err("wrong array patch accepted".into());
+    };
+    assert_eq!(f.kind, vm::FailureKind::HostProtocol);
+    Ok(())
+}

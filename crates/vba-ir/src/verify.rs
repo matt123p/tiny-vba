@@ -120,7 +120,10 @@ fn validate(
     limits: &VerifyLimits,
     maxima: bool,
 ) -> Result<Vec<u32>> {
-    if !matches!(p.ir_version, IR_VERSION | IR2_VERSION) || p.profile != caps.profile {
+    if !matches!(p.ir_version, IR_VERSION | IR2_VERSION | IR3_VERSION)
+        || p.profile != caps.profile
+        || !caps.ir_versions.contains(&p.ir_version)
+    {
         return Err(incompatible("unsupported IR version or profile"));
     }
     name(&p.profile)?;
@@ -167,7 +170,7 @@ fn validate(
             .validate()
             .map_err(|_| invalid("invalid constant payload"))?;
         if matches!(value, Value::Object(_) | Value::Array(_))
-            || (matches!(value, Value::Missing) && p.ir_version != IR2_VERSION)
+            || (matches!(value, Value::Missing) && p.ir_version < IR2_VERSION)
         {
             return Err(invalid("Missing/live Object constant"));
         }
@@ -244,6 +247,22 @@ fn validate(
             if !caps.declarations.contains(&local.kind) {
                 return Err(incompatible("unsupported local kind"));
             }
+            if local.role == SlotRole::ScratchReference {
+                if p.ir_version < IR3_VERSION {
+                    return Err(invalid("reference capture local requires IR 3"));
+                }
+                feature(p, caps, "argument-captures-v3")?;
+            }
+            if let Some(element) = local.array {
+                if p.ir_version < IR3_VERSION
+                    || local.kind != ScalarKind::Variant
+                    || !caps.declarations.contains(&element)
+                    || matches!(local.role, SlotRole::Scratch | SlotRole::ScratchReference)
+                {
+                    return Err(invalid("array local layout/version"));
+                }
+                feature(p, caps, "array-layout-v3")?;
+            }
             match local.span {
                 Some(s) => {
                     span(source, s)?;
@@ -254,10 +273,10 @@ fn validate(
                         return Err(invalid("local declaration outside procedure"));
                     }
                 }
-                None if local.role == SlotRole::Scratch => (),
+                None if matches!(local.role, SlotRole::Scratch | SlotRole::ScratchReference) => (),
                 None => return Err(invalid("missing declared local span")),
             }
-            if local.role == SlotRole::Scratch {
+            if matches!(local.role, SlotRole::Scratch | SlotRole::ScratchReference) {
                 if local.visible {
                     return Err(invalid("visible scratch local"));
                 }
@@ -275,9 +294,19 @@ fn validate(
             if !param.required
                 || local.role != SlotRole::Parameter(i as u32)
                 || local.kind != param.kind
+                || local.array != param.array
                 || local.name != param.name
             {
                 return Err(invalid("invalid parameter layout or optional parameter"));
+            }
+            if let Some(element) = param.array {
+                if p.ir_version < IR3_VERSION
+                    || param.kind != ScalarKind::Variant
+                    || !caps.declarations.contains(&element)
+                {
+                    return Err(invalid("array parameter layout/version"));
+                }
+                feature(p, caps, "array-parameters-v3")?;
             }
             if param.mode == ParameterMode::ByRef {
                 feature(p, caps, "byref-locals")?;
@@ -304,19 +333,19 @@ fn validate(
                     proc.result == Some(LocalSlot(i as u32)) && proc.kind == ProcedureKind::Function
                 }
                 SlotRole::Persistent(id) => {
-                    if p.ir_version != IR2_VERSION || id >= 4096 {
+                    if p.ir_version < IR2_VERSION || id >= 4096 {
                         return Err(invalid("persistent slot identifier/version"));
                     }
                     feature(p, caps, "persistent-v2")?;
                     if persistent_kinds
-                        .insert(id, local.kind)
-                        .is_some_and(|kind| kind != local.kind)
+                        .insert(id, (local.kind, local.array))
+                        .is_some_and(|kind| kind != (local.kind, local.array))
                     {
                         return Err(invalid("inconsistent persistent slot kind"));
                     }
                     i >= proc.parameters.len() && proc.result != Some(LocalSlot(i as u32))
                 }
-                SlotRole::User | SlotRole::Scratch => {
+                SlotRole::User | SlotRole::Scratch | SlotRole::ScratchReference => {
                     i >= proc.parameters.len() && proc.result != Some(LocalSlot(i as u32))
                 }
             };
@@ -500,6 +529,7 @@ fn procedure(
             .ok_or_else(resource)?
             .min(proc.code.len()),
     )?;
+    let mut captured = BTreeSet::new();
     let mut active = None;
     let mut terminated = true;
     let mut max = 0usize;
@@ -536,6 +566,7 @@ fn procedure(
                     .ok_or_else(|| invalid("exception edge"))?
                     .push(target);
             }
+            captured.clear();
             active = Some(*id);
             terminated = false;
             empty(&stack)?;
@@ -546,8 +577,32 @@ fn procedure(
         }
         let active_id = active.ok_or_else(|| invalid("missing checkpoint"))?;
         match instruction {
+            Instruction::SaveReference(slot) | Instruction::LoadReference(slot) => {
+                if p.ir_version < IR3_VERSION {
+                    return Err(invalid("reference capture requires IR 3"));
+                }
+                feature(p, caps, "argument-captures-v3")?;
+                let local = proc
+                    .locals
+                    .get(slot.0 as usize)
+                    .ok_or_else(|| invalid("reference capture slot"))?;
+                if local.role != SlotRole::ScratchReference {
+                    return Err(invalid("reference capture role"));
+                }
+                if matches!(instruction, Instruction::SaveReference(_)) {
+                    if pop(&mut stack)? != Stack::Reference(local.kind) {
+                        return Err(invalid("reference capture kind"));
+                    }
+                    captured.insert(*slot);
+                } else {
+                    if !captured.contains(slot) {
+                        return Err(invalid("reference capture read before assignment"));
+                    }
+                    stack.push(Stack::Reference(local.kind));
+                }
+            }
             Instruction::RefElement { rank, kind } => {
-                if p.ir_version != IR2_VERSION || !(1..=8).contains(rank) {
+                if p.ir_version < IR2_VERSION || !(1..=8).contains(rank) {
                     return Err(invalid("array reference rank/version"));
                 }
                 feature(p, caps, "arrays-v2")?;
@@ -569,7 +624,7 @@ fn procedure(
                 initialize,
                 ..
             } => {
-                if p.ir_version != IR2_VERSION || *rank > 8 || (*preserve && *initialize) {
+                if p.ir_version < IR2_VERSION || *rank > 8 || (*preserve && *initialize) {
                     return Err(invalid("array resize rank/mode/version"));
                 }
                 feature(p, caps, "arrays-v2")?;
@@ -584,7 +639,7 @@ fn procedure(
                 }
             }
             Instruction::ArrayErase => {
-                if p.ir_version != IR2_VERSION {
+                if p.ir_version < IR2_VERSION {
                     return Err(invalid("array version"));
                 }
                 feature(p, caps, "arrays-v2")?;
@@ -600,7 +655,7 @@ fn procedure(
                 target,
                 next: resume_next,
             } => {
-                if p.ir_version != IR2_VERSION {
+                if p.ir_version < IR2_VERSION {
                     return Err(invalid("handlers require IR 2"));
                 }
                 feature(p, caps, "error-handlers-v2")?;
@@ -625,7 +680,7 @@ fn procedure(
                 }
             }
             Instruction::ErrGet(field) => {
-                if p.ir_version != IR2_VERSION {
+                if p.ir_version < IR2_VERSION {
                     return Err(invalid("Err requires IR 2"));
                 }
                 feature(p, caps, "error-handlers-v2")?;
@@ -635,14 +690,14 @@ fn procedure(
                 stack.push(Stack::Value);
             }
             Instruction::ErrClear => {
-                if p.ir_version != IR2_VERSION {
+                if p.ir_version < IR2_VERSION {
                     return Err(invalid("Err requires IR 2"));
                 }
                 feature(p, caps, "error-handlers-v2")?;
                 empty(&stack)?;
             }
             Instruction::Raise(count) => {
-                if p.ir_version != IR2_VERSION {
+                if p.ir_version < IR2_VERSION {
                     return Err(invalid("Raise requires IR 2"));
                 }
                 feature(p, caps, "error-handlers-v2")?;
@@ -658,7 +713,16 @@ fn procedure(
                 function,
                 arguments,
             } => {
-                if p.ir_version != IR2_VERSION {
+                if matches!(
+                    function,
+                    vba_values::Intrinsic::IIf | vba_values::Intrinsic::ArrayBaseOne
+                ) {
+                    if p.ir_version < IR3_VERSION {
+                        return Err(invalid("new intrinsic requires IR 3"));
+                    }
+                    feature(p, caps, "intrinsics-v3")?;
+                }
+                if p.ir_version < IR2_VERSION {
                     return Err(invalid("intrinsic requires IR 2"));
                 }
                 feature(p, caps, "intrinsics-v2")?;
@@ -681,6 +745,9 @@ fn procedure(
                     .locals
                     .get(slot.0 as usize)
                     .ok_or_else(|| invalid("bad local index"))?;
+                if local.role == SlotRole::ScratchReference {
+                    return Err(invalid("reference capture used as value slot"));
+                }
                 stack.push(if matches!(instruction, Instruction::ReadLocal(_)) {
                     Stack::Value
                 } else {
@@ -695,7 +762,7 @@ fn procedure(
             }
             Instruction::WriteRef(mode) => {
                 if *mode == AssignmentKind::ArgumentBinding {
-                    if p.ir_version != IR2_VERSION {
+                    if p.ir_version < IR2_VERSION {
                         return Err(invalid("argument capture requires IR 2"));
                     }
                     feature(p, caps, "argument-defaults-v2")?;

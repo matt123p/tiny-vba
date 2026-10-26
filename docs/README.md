@@ -49,3 +49,6 @@ records the current consumer profile, truthful fixture outcomes and corrected ch
 [M4 language profile and IR 2](m4-language.md) specifies current semantic support, feature gates,
 error handlers, arrays and persistent state. [ADR 0011](decisions/0011-m4-language-extension.md)
 records the extension and shared default/constant conversion dependency.
+
+[M4 oracle acceptance report](m4-oracle-report.md) and [ADR 0012](decisions/0012-m4-oracle-acceptance.md)
+record the completed external gate, schema 2 provenance and IR 3 extension.

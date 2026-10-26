@@ -1,16 +1,17 @@
 # Conformance methodology
 
-Status: M0 fixture validation implemented, 2026-10-26. Candidate source inventory and
-[schema 1](scenario-format.md) validation are implemented; scenario execution is not.
-Twenty independently authored cases carry typed, reasoned expectations. The M4 runner now asserts
-17 PASS / 3 UNSUPPORTED; validation alone remains NOT_RUN and external execution remains unmeasured.
-CLI validation reports VALID_FIXTURE, never a semantic PASS. External corpus entries are unchanged.
+Status: M4 external acceptance implemented, 2026-10-26. Schema 1 preserves authored, unmeasured
+expectations. Schema 2 records reviewed external source hashes, upstream build/OS/date/locale
+availability and raw oracle results, which must agree with typed expectations. The selected
+inventory is 44 authored PASS and 153 inherited Microsoft Excel/ReflexGrid PASS; see
+[the report](m4-oracle-report.md). These are local native/WASI comparisons to upstream-reported
+observations, not a fresh Office run. Unselected external cases remain NOT_RUN.
 
 Separate syntax/binding, pure language runtime, generic foreign calls, project decoding and debugger tests.
 Office model, real document engine, file round-trip and host trust checks belong to the forks.
 Use deterministic time/random/locale/prompts; verify types as well as values, exact errors and side effects.
 
-A future external/oracle schema extends the M0 envelope to record source hashes,
+Schema 2 extends the M0 envelope to record source hashes,
 requirements, capabilities, setup, target Office product/build/OS/locale and independently justified expected
 values/types/errors/output. Arrays include element kind, dimensions and lower bounds.
 A specimen's availability does not establish expected behavior. Initial corpus entries remain NOT_RUN,
@@ -43,5 +44,11 @@ widths with exact error numbers 6/11 across widths.
 The [M4 hardening contract](decisions/0010-m4-profile-and-verification-hardening.md) requires fail-closed
 engine classification, nonzero failure exits, bit-exact floating expectations and lossless UTF-16
 report text. Verification logs must identify the actual invoking checkout; cached build paths cannot
-establish that the current source was tested. Current m4-scalars-v1 programs opt into the expanded
+establish that the current source was tested. Historical m4-scalars-v1 programs opt into the expanded
 numeric matrix explicitly; legacy M3 execution targets must be recompiled.
+
+[ADR 0012](decisions/0012-m4-oracle-acceptance.md) adopts the exact external selection and
+source-preserving Err-state probe. Never broaden its PASS denominator or reuse Mac observations
+as Windows observations. The evidence checker validates raw data, hashes, adaptations and the
+native/WASI bundle; schema parsing alone is not evidence verification. Existing first-slice
+17/3 figures above are historical; current acceptance is the 44+153 inventory reported at the top.

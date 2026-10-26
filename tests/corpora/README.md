@@ -3,7 +3,8 @@
 Six upstream repositories are cloned as Git submodules; Microsoft VBA-Docs is a seventh reference submodule.
 Exact revisions and upstream notice hashes: [source lock](../../references/sources.lock.json).
 Candidate files and SHA-256/size metadata: [inventory.json](inventory.json).
-All candidates are NOT_RUN and pending per-specimen rights, capabilities, profile and expected-behavior review.
+Whole candidate files remain NOT_RUN. The reviewed M4 exception below executes only selected
+pure-language cases, with separate case-level results; other specimens remain pending review.
 No downloaded code or macro is automatically executed, linked or copied into interpreter source.
 
 | Checkout | Intended material | Current restriction |
@@ -46,3 +47,18 @@ rights-reviewed scenarios and measured oracle goldens remains M0/M9 work, not an
 M1 exception to the pending syntax selection: five directly authored tree-sitter-vba example files
 are reviewed for bounded parser ingestion only. See [review and results](../../docs/m1-corpus-report.md).
 Their execution remains NOT_RUN; no third-party or realworld subtree selection is included.
+
+## M4 executable language selection
+
+[ADR 0012](../../docs/decisions/0012-m4-oracle-acceptance.md) reviews 153 directly authored MIT
+ReflexGrid language-data cases and their published Microsoft Excel Mac expectations. The
+[allowlist](../fixtures/m4-oracle/selection.json) pins exact source/expected/report hashes, case
+keys, helpers, adaptation hashes and the upstream oracle environment. The selected source/expected
+files match the recorded oracle run revision byte-for-byte. Their raw results are redistributed
+with the full MIT notice. No upstream implementation, Python oracle script or Office macro runs.
+
+The bounded tiny-vba VM executes the selected source snippets only, using no host capabilities.
+Normal Rust tests need no submodule checkout. CI also checks evidence bytes/adaptations when
+available. [Results and provenance limits](../../docs/m4-oracle-report.md) distinguish inherited
+upstream-reported observations from local native/WASI comparisons. This is the reviewed policy
+exception for M4 acceptance; it does not authorize arbitrary corpus execution or whole-file PASS.

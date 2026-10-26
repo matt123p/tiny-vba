@@ -65,6 +65,9 @@ pub struct Procedure {
 }
 #[derive(Clone, Debug)]
 pub struct Parameter {
+    pub explicit_by_ref: bool,
+    pub array: bool,
+    pub param_array: bool,
     pub name: Name,
     pub by_val: bool,
     pub optional: bool,

@@ -97,10 +97,11 @@
       "sha256": "e5d03d56c4f06433c5c4198c3ac79a4af3ff8c8def9d265337749705caf1cd0e",
       "size_bytes": 21395,
       "status": "NOT_RUN",
-      "rights": "pending-specimen-review",
-      "capabilities": "unclassified",
-      "profile": "unverified",
-      "expected_behavior": "not-curated"
+      "rights": "MIT-reviewed-selected-case-data",
+      "capabilities": "allowlisted-pure-language-host-free",
+      "profile": "excel-mac-upstream-selected-subset",
+      "expected_behavior": "153 selected cases asserted; tests/fixtures/m4-oracle/selection.json",
+      "notes": "Whole upstream file remains NOT_RUN; only reviewed case-level results are asserted. See docs/m4-oracle-report.md."
     },
     {
       "source": "reflex-grid",
@@ -108,10 +109,11 @@
       "sha256": "610f3ed1d17922a8d095179c6c6eb5e62936c81d7cef4993f3a7adb62a40427a",
       "size_bytes": 17512,
       "status": "NOT_RUN",
-      "rights": "pending-specimen-review",
-      "capabilities": "unclassified",
-      "profile": "unverified",
-      "expected_behavior": "not-curated"
+      "rights": "MIT-reviewed-selected-case-data",
+      "capabilities": "allowlisted-pure-language-host-free",
+      "profile": "excel-mac-upstream-selected-subset",
+      "expected_behavior": "153 selected cases asserted; tests/fixtures/m4-oracle/selection.json",
+      "notes": "Whole upstream file remains NOT_RUN; only reviewed case-level results are asserted. See docs/m4-oracle-report.md."
     },
     {
       "source": "reflex-grid",

@@ -126,6 +126,8 @@ def main():
         layers()
     if args.check in {'corpora', 'all'}:
         corpora(args.require_checkouts)
+        from check_m4_evidence import check
+        check(args.require_checkouts)
 
 
 if __name__ == '__main__':

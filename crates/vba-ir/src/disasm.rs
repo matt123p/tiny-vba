@@ -82,12 +82,22 @@ fn render(out: &mut Output, p: &Program) -> fmt::Result {
                 param.name, param.kind, param.mode, param.required
             )?;
         }
+        for (i, param) in proc.parameters.iter().enumerate() {
+            if let Some(element) = param.array {
+                writeln!(out, "  parameter-array {i} element={element:?}")?;
+            }
+        }
         for (i, local) in proc.locals.iter().enumerate() {
             writeln!(
                 out,
                 "  slot {i} {:?} {:?} {:?} visible={} span={:?}",
                 local.name, local.kind, local.role, local.visible, local.span
             )?;
+        }
+        for (i, local) in proc.locals.iter().enumerate() {
+            if let Some(element) = local.array {
+                writeln!(out, "  slot-array {i} element={element:?}")?;
+            }
         }
         for statement in &proc.statements {
             writeln!(

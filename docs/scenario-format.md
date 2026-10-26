@@ -78,3 +78,20 @@ Only explicit capability refusals are UNSUPPORTED; malformed or unbound fixture 
 and unknown engine errors are CRASH. Runtime errors must provide an actual VBA number. Float/Date
 expectations compare exact bits; strings compare UTF-16 units and reports use escaped `String(utf16:...)`
 text to preserve lone surrogates and avoid multiline result ambiguity. The schema is unchanged.
+
+## Schema 2: reviewed external oracle evidence
+
+Schema 1 is unchanged and rejects oracle fields. Schema 2 requires provenance=reviewed-external,
+profile=excel-mac-upstream, evidence=upstream-reported-microsoft-oracle and MIT/host-free policy.
+Required extra headers are source-repository, source-revision, source-path, source-sha256,
+expected-sha256, report-sha256, case-key, oracle-result, oracle-excel, oracle-os, oracle-date,
+oracle-locale and oracle-run-revision. Revisions are lower-case 40-digit hashes, evidence hashes
+are 64 digits, and source paths cannot escape their checkout. Raw oracle TypeName|CStr or E<number>
+results must agree with expected's typed value/error; conflicting/missing metadata is INVALID_FIXTURE.
+
+Parsed evidence is available as Scenario.oracle and preserves unknown per-run locale explicitly.
+This is structural validation, not automatic verification of a publisher's claim. The reviewed
+[selection](../tests/fixtures/m4-oracle/selection.json) and evidence checker pin exact sources,
+raw results, rights, environment and adapters. [The report](m4-oracle-report.md) states observed
+versus inherited evidence, exact decoded comparisons and the original error probe semantics.
+Validation still executes nothing and returns NOT_RUN; only successful judged execution is PASS.

@@ -3,11 +3,14 @@
 A new, standalone VBA interpreter, editor and debugger in Rust, intended to run natively and in WebAssembly.
 Develop, run and test the language engine without Gridcraft, Wordcraft, Microsoft Office or a graphical interface.
 
-**Current status:** M0–M4 are complete for the [reviewed language profile](docs/m4-language.md).
-The Rust engine includes parsing, binding, verified IR 1/2, explicit-frame execution, a headless
-debugger, scalar conversions, Currency/Date, arrays, optional/named calls, static/module state,
-intrinsics and VBA error handlers. The current execution profile is `m4-language-v1`.
-All 44 independently authored fixture assertions pass; no Microsoft oracle result is claimed.
+**Current status:** M4 acceptance is complete. The Rust engine includes verified IR 1/2/3,
+explicit-frame execution, a headless debugger, scalar conversions, Currency/Date, arrays,
+optional/named calls, whole-array ByRef, ParamArray, Option Base, static/module state and VBA handlers.
+The current execution profile is `m4-conformance-v1`.
+
+All **44 authored scenarios and 153 reviewed ReflexGrid cases pass**. The latter match published
+Microsoft Excel Mac oracle expectations; this is inherited evidence, not a new local Excel run.
+See [the acceptance report](docs/m4-oracle-report.md) and [language scope](docs/m4-language.md).
 The graphical editor/debugger, DAP and Office integration remain later milestones.
 
 

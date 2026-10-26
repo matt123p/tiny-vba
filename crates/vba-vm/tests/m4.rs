@@ -293,7 +293,6 @@ fn stale_element_alias_after_redim_is_numbered_not_an_engine_crash() -> R {
 #[test]
 fn unknown_or_duplicate_labels_and_bad_argument_forms_fail_before_execution() -> R {
     for text in [
-        "Option Base 1\nFunction Answer() As Long\nDim a(2) As Long\nEnd Function",
         "Function Answer() As Long\nGoTo absent\nEnd Function",
         "Function Answer() As Long\nSame:\nSame:\nEnd Function",
         "Function Answer() As Long\nOn Error GoTo absent\nEnd Function",
@@ -315,4 +314,101 @@ fn positional_values_before_evaluated_byref_temporaries_keep_source_order() -> R
         "Dim n As Long\nFunction Answer() As Long\nAnswer=F(Tick(),(Tick()))\nEnd Function\nFunction Tick() As Long\nn=n+1\nTick=n\nEnd Function\nFunction F(ByVal a As Long,ByRef b As Long) As Long\nF=a*10+b\nEnd Function",
         Value::Long(12),
     )
+}
+
+#[test]
+fn whole_array_parameters_mutate_and_resize_canonical_storage() -> R {
+    answer(
+        "Function Answer() As Long\nDim a() As Long\nReDim a(1 To 2)\na(1)=10\nCall Grow(a)\nAnswer=UBound(a)+a(1)+a(3)\nEnd Function\nSub Grow(ByRef values() As Long)\nReDim Preserve values(1 To 3)\nvalues(1)=values(1)+1\nvalues(3)=20\nEnd Sub",
+        Value::Long(34),
+    )?;
+    number(
+        "Function Answer() As Long\nDim a() As Long,b() As Integer\nReDim a(2)\nReDim b(2)\na=b\nEnd Function",
+        13,
+    )
+}
+#[test]
+fn paramarray_is_zero_based_empty_or_packed_and_accepts_eager_expressions() -> R {
+    answer(
+        "Option Base 1\nFunction Answer() As String\nAnswer=Probe() & \"|\" & Probe(1,2,3)\nEnd Function\nFunction Probe(ParamArray values() As Variant) As String\nProbe=LBound(values) & \":\" & UBound(values)\nEnd Function",
+        Value::String(VbaString::from_utf8("0:-1|0:2")?),
+    )?;
+    answer(
+        "Function Answer() As Long\nAnswer=Probe(10,2+3,4)\nEnd Function\nFunction Probe(ByVal first As Long,ParamArray rest() As Variant) As Long\nProbe=first+rest(0)+rest(1)\nEnd Function",
+        Value::Long(19),
+    )
+}
+#[test]
+fn option_base_controls_implicit_bounds_but_not_explicit_bounds() -> R {
+    answer(
+        "Option Base 1\nFunction Answer() As String\nAnswer=LBound(Array(1)) & LBound(VBA.Array(1))\nEnd Function",
+        Value::String(VbaString::from_utf8("10")?),
+    )?;
+    answer(
+        "Option Base 1\nFunction Answer() As Long\nDim a(3) As Long,b() As Long\nReDim b(4)\nAnswer=LBound(a)*100+LBound(b)*10+LBound(Array(7))\nEnd Function",
+        Value::Long(111),
+    )?;
+    answer(
+        "Option Base 1\nFunction Answer() As Long\nDim a(-2 To 3) As Long\nAnswer=LBound(a)\nEnd Function",
+        Value::Long(-2),
+    )
+}
+#[test]
+fn named_byref_array_arguments_capture_indices_once_in_source_order() -> R {
+    answer(
+        "Dim visits As Long\nFunction Answer() As Long\nDim a(0 To 1) As Long\na(0)=10\na(1)=20\nCall F(right:=a(Index()),left:=a(Index()))\nAnswer=a(0)*100+a(1)+visits\nEnd Function\nFunction Index() As Long\nIndex=visits\nvisits=visits+1\nEnd Function\nSub F(ByRef left As Long,ByRef right As Long)\nleft=left+1\nright=right+2\nEnd Sub",
+        Value::Long(1223),
+    )
+}
+#[test]
+fn resizing_between_array_reference_capture_and_call_does_not_retarget_the_alias() -> R {
+    number(
+        "Dim a() As Long\nFunction Answer() As Long\nReDim a(2)\nCall F(value:=a(0),other:=Resize())\nEnd Function\nFunction Resize() As Long\nReDim a(3)\nResize=1\nEnd Function\nSub F(ByRef value As Long,ByVal other As Long)\nvalue=99\nEnd Sub",
+        9,
+    )
+}
+#[test]
+fn malformed_array_signatures_and_mismatched_array_arguments_are_rejected() -> R {
+    for text in [
+        "Option Base 1\nOption Base 0\nFunction Answer() As Long\nEnd Function",
+        "Function Answer() As Long\nEnd Function\nSub F(ByRef ParamArray values() As Variant)\nEnd Sub",
+        "Function Answer() As Long\nEnd Function\nSub F(ByVal values() As Long)\nEnd Sub",
+        "Function Answer() As Long\nEnd Function\nSub F(ParamArray values() As Long)\nEnd Sub",
+        "Function Answer() As Long\nEnd Function\nSub F(ParamArray values() As Variant,ByVal other As Long)\nEnd Sub",
+        "Function Answer() As Long\nDim values() As Integer\nCall F(values)\nEnd Function\nSub F(ByRef values() As Long)\nEnd Sub",
+    ] {
+        assert!(session(text).is_err(), "accepted {text}");
+    }
+    Ok(())
+}
+
+#[test]
+fn dynamically_typed_array_reference_mismatch_is_a_numbered_language_error() -> R {
+    number(
+        "Function Answer() As Long\nDim typed(1) As Long,v As Variant\nv=typed\nCall F(v(0))\nEnd Function\nSub F(ByRef x As Variant)\nx=1\nEnd Sub",
+        13,
+    )
+}
+
+#[test]
+fn debugger_array_edits_preserve_declared_element_kinds() -> R {
+    let mut s = session(
+        "Function Answer() As Long\nDim a(1) As Long\na(0)=4\nStop\nAnswer=a(0)\nEnd Function",
+    )?;
+    let Outcome::Paused(p) = drive(&mut s)? else {
+        return Err("array edit pause".into());
+    };
+    let before = s.read_local(p.handle, "a")?;
+    let wrong = vba_values::VbaArray::new(vba_values::ScalarKind::Integer, vec![(0, 1)], true)?;
+    assert!(s.edit_local(p.handle, "a", Value::Array(wrong)).is_err());
+    assert_eq!(s.read_local(p.handle, "a")?, before);
+    let mut right = vba_values::VbaArray::new(vba_values::ScalarKind::Long, vec![(0, 1)], true)?;
+    right.set(0, Value::Long(42))?;
+    s.edit_local(p.handle, "a", Value::Array(right))?;
+    s.continue_execution()?;
+    assert_eq!(
+        drive(&mut s)?,
+        Outcome::Completed(ReturnValue::Function(Value::Long(42)))
+    );
+    Ok(())
 }

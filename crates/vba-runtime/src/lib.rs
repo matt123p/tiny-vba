@@ -3,7 +3,7 @@
 mod coercion;
 pub use coercion::intrinsic;
 use vba_values::{ScalarKind, Value, VbaString};
-pub const PROFILE: &str = "m4-language-v1";
+pub const PROFILE: &str = "m4-conformance-v1";
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum Error {
     Vba { number: i32, message: String },
@@ -122,6 +122,87 @@ pub fn unary(op: &str, value: &Value) -> Result<Value> {
     }
 }
 pub fn binary(op: &str, left: &Value, right: &Value) -> Result<Value> {
+    if (matches!(left, Value::Currency(_)) || matches!(right, Value::Currency(_)))
+        && matches!(op, "+" | "-")
+        && !matches!(left, Value::Date(_))
+        && !matches!(right, Value::Date(_))
+        && !matches!(left, Value::Null)
+        && !matches!(right, Value::Null)
+    {
+        let Value::Currency(a) = coercion::convert(ScalarKind::Currency, left)? else {
+            return Err(unsupported());
+        };
+        let Value::Currency(b) = coercion::convert(ScalarKind::Currency, right)? else {
+            return Err(unsupported());
+        };
+        let n = if op == "+" {
+            i128::from(a) + i128::from(b)
+        } else {
+            i128::from(a) - i128::from(b)
+        };
+        return Ok(Value::Currency(i64::try_from(n).map_err(|_| overflow())?));
+    }
+    if let (Value::Byte(a), Value::Byte(b)) = (left, right) {
+        let n = match op {
+            "+" => Some(u32::from(*a) + u32::from(*b)),
+            "*" => Some(u32::from(*a) * u32::from(*b)),
+            "-" => Some(
+                u32::from(*a)
+                    .checked_sub(u32::from(*b))
+                    .ok_or_else(overflow)?,
+            ),
+            "and" => Some(u32::from(*a & *b)),
+            "or" => Some(u32::from(*a | *b)),
+            "xor" => Some(u32::from(*a ^ *b)),
+            "eqv" => Some(u32::from(!(*a ^ *b))),
+            "imp" => Some(u32::from(!*a | *b)),
+            _ => None,
+        };
+        if let Some(n) = n {
+            return Ok(Value::Byte(u8::try_from(n).map_err(|_| overflow())?));
+        }
+    }
+    if matches!(op, "=" | "<>" | "<" | "<=" | ">" | ">=") {
+        if matches!(left, Value::Empty) && matches!(right, Value::String(_)) {
+            return binary(
+                op,
+                &Value::String(VbaString::from_units(Vec::new()).map_err(|_| unsupported())?),
+                right,
+            );
+        }
+        if matches!(right, Value::Empty) && matches!(left, Value::String(_)) {
+            return binary(
+                op,
+                left,
+                &Value::String(VbaString::from_units(Vec::new()).map_err(|_| unsupported())?),
+            );
+        }
+    }
+    if op == "/"
+        && (matches!(left, Value::Single(_)) || matches!(right, Value::Single(_)))
+        && matches!(
+            left,
+            Value::Single(_) | Value::Integer(_) | Value::Byte(_) | Value::Empty
+        )
+        && matches!(
+            right,
+            Value::Single(_) | Value::Integer(_) | Value::Byte(_) | Value::Empty
+        )
+    {
+        let a = coercion::numeric(left)?;
+        let b = coercion::numeric(right)?;
+        if b == 0.0 {
+            return Err(coercion::error(
+                if a == 0.0 { 6 } else { 11 },
+                if a == 0.0 {
+                    "Overflow"
+                } else {
+                    "Division by zero"
+                },
+            ));
+        }
+        return coercion::convert(ScalarKind::Single, &Value::Double(a / b));
+    }
     if op == "&" && matches!((left, right), (Value::Null, Value::Null)) {
         return Ok(Value::Null);
     }
@@ -274,7 +355,11 @@ pub fn binary(op: &str, left: &Value, right: &Value) -> Result<Value> {
         let result = if op == "^" {
             let n = a.powf(b);
             if !n.is_finite() {
-                return Err(coercion::error(5, "Invalid procedure call"));
+                return Err(if n.is_infinite() && a != 0.0 {
+                    overflow()
+                } else {
+                    coercion::error(5, "Invalid procedure call")
+                });
             }
             Value::Double(n)
         } else {
@@ -315,7 +400,11 @@ pub fn binary(op: &str, left: &Value, right: &Value) -> Result<Value> {
             "imp" => Ok(Value::Boolean(!*a || *b)),
             "=" => Ok(Value::Boolean(a == b)),
             "<>" => Ok(Value::Boolean(a != b)),
-            _ => Err(unsupported()),
+            _ => binary(
+                op,
+                &Value::Integer(if *a { -1 } else { 0 }),
+                &Value::Integer(if *b { -1 } else { 0 }),
+            ),
         };
     }
     if op == "&" {
@@ -344,7 +433,9 @@ pub fn binary(op: &str, left: &Value, right: &Value) -> Result<Value> {
             // integer quotient keeps its fractional part instead of rounding.
             let quotient = a / b;
             if !quotient.is_finite() {
-                return if b == 0.0 {
+                return if a == 0.0 && b == 0.0 {
+                    Err(overflow())
+                } else if b == 0.0 {
                     Err(Error::Vba {
                         number: 11,
                         message: "Division by zero".into(),

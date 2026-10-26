@@ -1,0 +1,1106 @@
+{
+  "source_repository": "https://github.com/milochen0418/reflex_grid",
+  "source_revision": "03a338b214df243f1bc68e50512936ddc5566c76",
+  "oracle_run_revision": "3758c56a39f0c8841fa43eedda0e074414fed3e3",
+  "files": {
+    "tests/vba_excel_cases.py": "e5d03d56c4f06433c5c4198c3ac79a4af3ff8c8def9d265337749705caf1cd0e",
+    "tests/vba_excel_expected.json": "610f3ed1d17922a8d095179c6c6eb5e62936c81d7cef4993f3a7adb62a40427a",
+    "docs/excel-oracle.json": "4144969beac52097fba9ae19bad0e30a03d6ecf1b3278fd1fe424431bc4b61ec",
+    "LICENSE": "a6c7fac3d7ba2a1c58b2dc32880902ef62ccf2e7fe85e2fe25ba74b088dc0031"
+  },
+  "selection": [
+    {
+      "id": "rfx-m4-001",
+      "case_key": "CStr(1/3)",
+      "shape": "expression",
+      "helpers": [],
+      "vba_sha256": "7c1e1ede539d44398e61572eac1eb6dce0d5d10f0d3435a1cc517c538ce87b3e"
+    },
+    {
+      "id": "rfx-m4-002",
+      "case_key": "CStr(2/3)",
+      "shape": "expression",
+      "helpers": [],
+      "vba_sha256": "c01ddef08da9626af9a7fcacc9a74f26194e17c4221202015c4c64decc6d16d1"
+    },
+    {
+      "id": "rfx-m4-003",
+      "case_key": "CStr(0.0001)",
+      "shape": "expression",
+      "helpers": [],
+      "vba_sha256": "af25d663d9cdcdaa09e60a1c75339de8c6ee2241df6502b1e1d15dba70ae5092"
+    },
+    {
+      "id": "rfx-m4-004",
+      "case_key": "CStr(0.00001)",
+      "shape": "expression",
+      "helpers": [],
+      "vba_sha256": "d5bd9bbc5d18c273b1fcb60c06f122f141000209ce9b4fd3b1b9809168e8e4dc"
+    },
+    {
+      "id": "rfx-m4-005",
+      "case_key": "CStr(CSng(1/3))",
+      "shape": "expression",
+      "helpers": [],
+      "vba_sha256": "f7e73d1bf27f8019fa5438414ab99a6c5a2c1cbc997aa2270099a4d94130fe23"
+    },
+    {
+      "id": "rfx-m4-006",
+      "case_key": "CStr(CCur(1.5))",
+      "shape": "expression",
+      "helpers": [],
+      "vba_sha256": "9bd1f34d4d314e9cec5317b9bf99fa188eaeebb199c103cd35eacf467e572f01"
+    },
+    {
+      "id": "rfx-m4-007",
+      "case_key": "CStr(CCur(1/3))",
+      "shape": "expression",
+      "helpers": [],
+      "vba_sha256": "ede9feebc50d1b942f791f44918795b6a14a208e97111eee75e785fcbfbb8cdf"
+    },
+    {
+      "id": "rfx-m4-008",
+      "case_key": "CStr(True)",
+      "shape": "expression",
+      "helpers": [],
+      "vba_sha256": "142f59abb1ff542c6ce91b8daed46debcf976dd2e9df260a09b8693e6de381c4"
+    },
+    {
+      "id": "rfx-m4-009",
+      "case_key": "CStr(Empty)",
+      "shape": "expression",
+      "helpers": [],
+      "vba_sha256": "36aa81701e6f36c4a97922c43c4f218045c8b443a7de09d79cc7b11cf9b6a248"
+    },
+    {
+      "id": "rfx-m4-010",
+      "case_key": "CInt(2.5)",
+      "shape": "expression",
+      "helpers": [],
+      "vba_sha256": "97ccf2f8f369d783c63aae8d0502f58fcb4ddc8d07d9d4c56be96e472d42a704"
+    },
+    {
+      "id": "rfx-m4-011",
+      "case_key": "CInt(3.5)",
+      "shape": "expression",
+      "helpers": [],
+      "vba_sha256": "21737f17204c53b48a0c60c46099050a0b7e1569cefa499d6eecf8b838748ac9"
+    },
+    {
+      "id": "rfx-m4-012",
+      "case_key": "CInt(-2.5)",
+      "shape": "expression",
+      "helpers": [],
+      "vba_sha256": "b6d20e34b8faaa136b9a8778cf0ef95e9566414732e46e16c8cd7644b43d9411"
+    },
+    {
+      "id": "rfx-m4-013",
+      "case_key": "CInt(\"12\")",
+      "shape": "expression",
+      "helpers": [],
+      "vba_sha256": "0232d741aeb129f86886b02e05dcf609c284f383476063b3777fef4ee53f289b"
+    },
+    {
+      "id": "rfx-m4-014",
+      "case_key": "CInt(\" 12 \")",
+      "shape": "expression",
+      "helpers": [],
+      "vba_sha256": "f95ae2aefa06d2b8e201cbf81567dcdfac06d567c3e5001f33a83bc173241786"
+    },
+    {
+      "id": "rfx-m4-015",
+      "case_key": "CInt(\"1e3\")",
+      "shape": "expression",
+      "helpers": [],
+      "vba_sha256": "d1d77f5c1f801665c11e23318e31f8219c25df0ed43ffdfcb8075c2d02ca9ceb"
+    },
+    {
+      "id": "rfx-m4-016",
+      "case_key": "CInt(True)",
+      "shape": "expression",
+      "helpers": [],
+      "vba_sha256": "36455ce46e092f69a3772e773df41fc3b8453479c2ab7f9540c6c6f0e599f1bc"
+    },
+    {
+      "id": "rfx-m4-017",
+      "case_key": "CInt(\"True\")",
+      "shape": "expression",
+      "helpers": [],
+      "vba_sha256": "1cc48dc17e352044a43e349674371cec77010b3bb6e4551bf933ee22b58e9b10"
+    },
+    {
+      "id": "rfx-m4-018",
+      "case_key": "CInt(\"abc\")",
+      "shape": "expression",
+      "helpers": [],
+      "vba_sha256": "a4e7ddd5525583b396031d69c5e726c092d93e031ff8def1d0edeaca7b029c55"
+    },
+    {
+      "id": "rfx-m4-019",
+      "case_key": "CInt(40000)",
+      "shape": "expression",
+      "helpers": [],
+      "vba_sha256": "4c7d438fd2cd0546ad34dd07a40d68e9a12eb02afe33ea15dc9bd21c5cd39fd5"
+    },
+    {
+      "id": "rfx-m4-020",
+      "case_key": "CLng(2147483647.4)",
+      "shape": "expression",
+      "helpers": [],
+      "vba_sha256": "120a571621f885508cec4be91030718e9fcdd4e295bb2e19170b56ec804b88bd"
+    },
+    {
+      "id": "rfx-m4-021",
+      "case_key": "CLng(\"2147483648\")",
+      "shape": "expression",
+      "helpers": [],
+      "vba_sha256": "3b97461a6360a8499b24e1f7a9246bcf2884b4c9f65f135fb3fc9e133d5f38f6"
+    },
+    {
+      "id": "rfx-m4-022",
+      "case_key": "CBool(\"True\")",
+      "shape": "expression",
+      "helpers": [],
+      "vba_sha256": "2f61876d50019923b430eebd40300fb01896975ba8952a84b1d51b3633a7699f"
+    },
+    {
+      "id": "rfx-m4-023",
+      "case_key": "CBool(\"yes\")",
+      "shape": "expression",
+      "helpers": [],
+      "vba_sha256": "4c924980fb31fb6008f8bf1000194b9f32e6d05e950ca05d56405c792c5c1495"
+    },
+    {
+      "id": "rfx-m4-024",
+      "case_key": "CBool(2)",
+      "shape": "expression",
+      "helpers": [],
+      "vba_sha256": "59bc21b12ca65b8f1e1c9fc63c1c6bea72f18f49719123f02c15c10af4447e7c"
+    },
+    {
+      "id": "rfx-m4-025",
+      "case_key": "CBool(\"0\")",
+      "shape": "expression",
+      "helpers": [],
+      "vba_sha256": "cb9b14abfab3dd3d179004b86571b7a0615f6a6ed4eaf41903efb368a4b1385a"
+    },
+    {
+      "id": "rfx-m4-026",
+      "case_key": "CBool(0.0)",
+      "shape": "expression",
+      "helpers": [],
+      "vba_sha256": "4775eb1cd902df843bbf734b278634d7bb7604058bf20eb7444d8b112237127b"
+    },
+    {
+      "id": "rfx-m4-027",
+      "case_key": "CCur(\"0.1\") * 3",
+      "shape": "expression",
+      "helpers": [],
+      "vba_sha256": "eabd87e5a586beb6d0cdffbbb218c03af50d60ad4b1f0a617f142e8f2bbb31c3"
+    },
+    {
+      "id": "rfx-m4-028",
+      "case_key": "CCur(1) + 1.5",
+      "shape": "expression",
+      "helpers": [],
+      "vba_sha256": "d3d9bbee11a0c3c23116570aa7b64cde981d1d6a545753d4540a31f900e55ad3"
+    },
+    {
+      "id": "rfx-m4-029",
+      "case_key": "CCur(10) / 4",
+      "shape": "expression",
+      "helpers": [],
+      "vba_sha256": "5fe5a3c30e65178bd783cf1acf5a933a8f1be9c8db3415b2adea6b97b2f661c6"
+    },
+    {
+      "id": "rfx-m4-030",
+      "case_key": "CByte(255)",
+      "shape": "expression",
+      "helpers": [],
+      "vba_sha256": "0d4f1df1c1f1aea0de28ecf63f6a900fe40c84b249687984f1e8f89b68535c3b"
+    },
+    {
+      "id": "rfx-m4-031",
+      "case_key": "CByte(256)",
+      "shape": "expression",
+      "helpers": [],
+      "vba_sha256": "69c67a634e7e03a2f35a683e694b8960d7b6054faaa73898736233240141e7b1"
+    },
+    {
+      "id": "rfx-m4-032",
+      "case_key": "CByte(-1)",
+      "shape": "expression",
+      "helpers": [],
+      "vba_sha256": "de38df1b71cf7b4aece39542e3788e73c84de1ffff204eae1626e3a1ef7c7428"
+    },
+    {
+      "id": "rfx-m4-033",
+      "case_key": "CSng(\"1.5\")",
+      "shape": "expression",
+      "helpers": [],
+      "vba_sha256": "8f6a48b66fa597617fb888865532b41c771f2c307d85f082ce919d2c7daa498d"
+    },
+    {
+      "id": "rfx-m4-034",
+      "case_key": "CVErr(2042)",
+      "shape": "expression",
+      "helpers": [],
+      "vba_sha256": "f9f969a58e83e69d886298ed1c252aa57fd7bf7e839e61ac60420f7f074677ab"
+    },
+    {
+      "id": "rfx-m4-035",
+      "case_key": "CStr(CVErr(2042))",
+      "shape": "expression",
+      "helpers": [],
+      "vba_sha256": "66e1d33072201930bd705dc5d426ffa9f2cacb1de6760616c9864a9de274e41e"
+    },
+    {
+      "id": "rfx-m4-036",
+      "case_key": "Int(-2.5)",
+      "shape": "expression",
+      "helpers": [],
+      "vba_sha256": "830fb370e833403c5cd3e2dfe6da318e86462805176cc200aed1fcd1cf3fbed6"
+    },
+    {
+      "id": "rfx-m4-037",
+      "case_key": "Fix(-2.5)",
+      "shape": "expression",
+      "helpers": [],
+      "vba_sha256": "967295af29b4ae9d3d76b63f51e3caeaf61d04bb7cc308ab9178e7e443291bdc"
+    },
+    {
+      "id": "rfx-m4-038",
+      "case_key": "Int(2.5)",
+      "shape": "expression",
+      "helpers": [],
+      "vba_sha256": "02a6bfcc1cc49d27272b3e48a90cc3893e35f2fd0539bf8d6ba6f460bf2cdfd2"
+    },
+    {
+      "id": "rfx-m4-039",
+      "case_key": "Round(2.5)",
+      "shape": "expression",
+      "helpers": [],
+      "vba_sha256": "7a6b265084e9585e512cd870ce1e13e9e9de8016a35a4193e61cdab7cb948a44"
+    },
+    {
+      "id": "rfx-m4-040",
+      "case_key": "Round(3.5)",
+      "shape": "expression",
+      "helpers": [],
+      "vba_sha256": "2a8379baf093923c1b8f25dcf3e504e8b262544c10758ed00ae96ad7b23f39bb"
+    },
+    {
+      "id": "rfx-m4-041",
+      "case_key": "Round(2.675, 2)",
+      "shape": "expression",
+      "helpers": [],
+      "vba_sha256": "69641528f1aabca75ca597d1ec96feabb558ccc49abce39dbdb3b7955a83b4a3"
+    },
+    {
+      "id": "rfx-m4-042",
+      "case_key": "Round(0.125, 2)",
+      "shape": "expression",
+      "helpers": [],
+      "vba_sha256": "d703eef32c70a5bc651cd7d9f9424cb135d536d1940b2ddfb94c8256fea3ca14"
+    },
+    {
+      "id": "rfx-m4-043",
+      "case_key": "Round(-2.5)",
+      "shape": "expression",
+      "helpers": [],
+      "vba_sha256": "5f4dff1019ab34c56b0230148018763fb8c4a1a0b7a5c3b712c4a66b1763f8b8"
+    },
+    {
+      "id": "rfx-m4-044",
+      "case_key": "Round(1.005, 2)",
+      "shape": "expression",
+      "helpers": [],
+      "vba_sha256": "e13cb8e1db7b6ea701aec67ccccf4a5a800428d40f213f4358fc6110006a2383"
+    },
+    {
+      "id": "rfx-m4-045",
+      "case_key": "200 * 200",
+      "shape": "expression",
+      "helpers": [],
+      "vba_sha256": "a2ce71e23751de3efa048fbfcd029d39a08c11055c299d0f89d6a76102c6d39b"
+    },
+    {
+      "id": "rfx-m4-046",
+      "case_key": "32767 + 1",
+      "shape": "expression",
+      "helpers": [],
+      "vba_sha256": "07cb9b03868e6808a61a098337280ee266cc64d91fcff30d7528cd0741820d26"
+    },
+    {
+      "id": "rfx-m4-047",
+      "case_key": "CInt(32767) + CLng(1)",
+      "shape": "expression",
+      "helpers": [],
+      "vba_sha256": "3786cca6e6fd1ff8d78444ebc7f1c444b72dd979842dac2f7d6fe0e69f0ae46c"
+    },
+    {
+      "id": "rfx-m4-048",
+      "case_key": "1 + 1",
+      "shape": "expression",
+      "helpers": [],
+      "vba_sha256": "93de32a3b853f0ddf2e344a23cf6679647556610e1491de91e3685f6a839660c"
+    },
+    {
+      "id": "rfx-m4-049",
+      "case_key": "1 + 1.5",
+      "shape": "expression",
+      "helpers": [],
+      "vba_sha256": "e25dff5f1fc6666c6327208e1d7be7b5ddee258916a9bc41dd93fd59db9ba8fb"
+    },
+    {
+      "id": "rfx-m4-050",
+      "case_key": "CByte(1) + CByte(2)",
+      "shape": "expression",
+      "helpers": [],
+      "vba_sha256": "cd582f2f0f91404b0fed2187ef99468fb7e4b7c83ec4ad0217a1c4d0c637694b"
+    },
+    {
+      "id": "rfx-m4-051",
+      "case_key": "CByte(200) + CByte(100)",
+      "shape": "expression",
+      "helpers": [],
+      "vba_sha256": "3ace9a7ba77dbbb15ff77dccf0af63105afefdfb2497d94f7a1afb76fc09aed6"
+    },
+    {
+      "id": "rfx-m4-052",
+      "case_key": "True + True",
+      "shape": "expression",
+      "helpers": [],
+      "vba_sha256": "4a63bc6d8bd01867a6f84c236b2116c70f7aa8f7d5e294a252aa47c313db325a"
+    },
+    {
+      "id": "rfx-m4-053",
+      "case_key": "True * 2",
+      "shape": "expression",
+      "helpers": [],
+      "vba_sha256": "e2220377c83fe7005d50b8f4639b48c3408d0bd4611bcd2a9ea878216c82d759"
+    },
+    {
+      "id": "rfx-m4-054",
+      "case_key": "Empty + Empty",
+      "shape": "expression",
+      "helpers": [],
+      "vba_sha256": "e2037c8c123bff9a8424e406b141bca1a466cefa7cfe8535287fc0134015eb17"
+    },
+    {
+      "id": "rfx-m4-055",
+      "case_key": "Empty + 1",
+      "shape": "expression",
+      "helpers": [],
+      "vba_sha256": "28965d5a55460b17235768b82538c34bd433c8418477bb6b9f33eefb15e97d37"
+    },
+    {
+      "id": "rfx-m4-056",
+      "case_key": "Empty & \"x\"",
+      "shape": "expression",
+      "helpers": [],
+      "vba_sha256": "0c39bb212edbe04cfc0d970183293ce5cde8ac883dd04220fb6effdc5c10cc4a"
+    },
+    {
+      "id": "rfx-m4-057",
+      "case_key": "\"1\" + 2",
+      "shape": "expression",
+      "helpers": [],
+      "vba_sha256": "eac8ae707fd8968cf9e691e0f22279c3fd8da27a114b48806cff7e5eda6ada22"
+    },
+    {
+      "id": "rfx-m4-058",
+      "case_key": "\"1\" + \"2\"",
+      "shape": "expression",
+      "helpers": [],
+      "vba_sha256": "7449011f719cf0a6d751f9598cf186974a6a6ea14dc09d4bede847a1f7a4df32"
+    },
+    {
+      "id": "rfx-m4-059",
+      "case_key": "\"a\" + 1",
+      "shape": "expression",
+      "helpers": [],
+      "vba_sha256": "ca330ddfeffccb69fa770b8a8a1739292c5cd9901ce1da59ba6adbd65b018da0"
+    },
+    {
+      "id": "rfx-m4-060",
+      "case_key": "1 / 0",
+      "shape": "expression",
+      "helpers": [],
+      "vba_sha256": "1be732cffff14716372325346c70730d1dbf8b50dd5144c3d005a8f70e95cb9a"
+    },
+    {
+      "id": "rfx-m4-061",
+      "case_key": "0 / 0",
+      "shape": "expression",
+      "helpers": [],
+      "vba_sha256": "fd450e9aa6ee9b7837f5a024c0006f9ee62e1e37e602a22c0edbb1e7aa403701"
+    },
+    {
+      "id": "rfx-m4-062",
+      "case_key": "5 \\ 2",
+      "shape": "expression",
+      "helpers": [],
+      "vba_sha256": "b2b061f22cdcfa7d579009a0d719ae1b5ecc43097fb918c7a4b93a3eda3a2490"
+    },
+    {
+      "id": "rfx-m4-063",
+      "case_key": "-5 \\ 2",
+      "shape": "expression",
+      "helpers": [],
+      "vba_sha256": "71ce02ca6a7ac5932326db93af7dbb1d4eee0a7e734d4467c13a17c05221fde1"
+    },
+    {
+      "id": "rfx-m4-064",
+      "case_key": "5.5 \\ 2",
+      "shape": "expression",
+      "helpers": [],
+      "vba_sha256": "a89b2d81e0954501de35e4892e82a5efde46190f49c2a2ae49cb96f95e8dcdbd"
+    },
+    {
+      "id": "rfx-m4-065",
+      "case_key": "5 Mod 3",
+      "shape": "expression",
+      "helpers": [],
+      "vba_sha256": "5a08dc87d8289fdc4245edcb4c788b2d23b666d93b4ceee5b9e91414240a4ef1"
+    },
+    {
+      "id": "rfx-m4-066",
+      "case_key": "-5 Mod 3",
+      "shape": "expression",
+      "helpers": [],
+      "vba_sha256": "7debab783912fc7294ca74b89787ef68cfd041e85b5790e095e36152237d4097"
+    },
+    {
+      "id": "rfx-m4-067",
+      "case_key": "5.5 Mod 2",
+      "shape": "expression",
+      "helpers": [],
+      "vba_sha256": "e7f5b8f4365414a63ddc0369911562565e458db4d8d627c0ce9240a119df19f7"
+    },
+    {
+      "id": "rfx-m4-068",
+      "case_key": "6.5 Mod 2",
+      "shape": "expression",
+      "helpers": [],
+      "vba_sha256": "1d8987abfdc06f8de66ab7a373628e90aeba871be1899d69ac81000093803451"
+    },
+    {
+      "id": "rfx-m4-069",
+      "case_key": "0 ^ -1",
+      "shape": "expression",
+      "helpers": [],
+      "vba_sha256": "fb24de42e0ef184facadd51aeeb6adafdaa3f3b017c10e79ad324ae09aef53ee"
+    },
+    {
+      "id": "rfx-m4-070",
+      "case_key": "2 ^ 1024",
+      "shape": "expression",
+      "helpers": [],
+      "vba_sha256": "06e8dbafd64c8d32807661c570654c1235ad1f4a00ebedb9d4c856d136b60ee1"
+    },
+    {
+      "id": "rfx-m4-071",
+      "case_key": "Null + 1",
+      "shape": "expression",
+      "helpers": [],
+      "vba_sha256": "94b78dedb0e9e1d168f3609991965772dbd54928e406af814133a7e8a6ddb62e"
+    },
+    {
+      "id": "rfx-m4-072",
+      "case_key": "Null & \"x\"",
+      "shape": "expression",
+      "helpers": [],
+      "vba_sha256": "9515ef1bd3c7262020febfddb64fa8e160b84984e18bed947ecf94e14a28e81a"
+    },
+    {
+      "id": "rfx-m4-073",
+      "case_key": "Null & Null",
+      "shape": "expression",
+      "helpers": [],
+      "vba_sha256": "96ee71018960840a729992190ca8e7d72bc78d8e853980d6dd46e28f930f9458"
+    },
+    {
+      "id": "rfx-m4-074",
+      "case_key": "Null = Null",
+      "shape": "expression",
+      "helpers": [],
+      "vba_sha256": "452069248c0500ba8b2874b5838da4ce1e8dc9ddbf9f99c1a25ec5a0151b1834"
+    },
+    {
+      "id": "rfx-m4-075",
+      "case_key": "TypeName(Null And False)",
+      "shape": "expression",
+      "helpers": [],
+      "vba_sha256": "517c69d5e380778c7c1eb5170f8e384f93485bae8238238cd87ad8770151df28"
+    },
+    {
+      "id": "rfx-m4-076",
+      "case_key": "Null Or True",
+      "shape": "expression",
+      "helpers": [],
+      "vba_sha256": "3426dda3baad66718646fe0f0b5ba1547daf028297fa620cac134d060402e98b"
+    },
+    {
+      "id": "rfx-m4-077",
+      "case_key": "Not Null",
+      "shape": "expression",
+      "helpers": [],
+      "vba_sha256": "5d9160c0814a0ec827dda89f17fa0600958b1b8dc913e58a8a00eafc8701f353"
+    },
+    {
+      "id": "rfx-m4-078",
+      "case_key": "Not 5",
+      "shape": "expression",
+      "helpers": [],
+      "vba_sha256": "564664072ad58e96e928260280834ec82539c5bd7fcb39328c348e704fdfa2e8"
+    },
+    {
+      "id": "rfx-m4-079",
+      "case_key": "5 And 3",
+      "shape": "expression",
+      "helpers": [],
+      "vba_sha256": "6aa3d6b500f3f0b1f08a24449f3ad9b45c2a7110da65185cc7ba4c7629fe290e"
+    },
+    {
+      "id": "rfx-m4-080",
+      "case_key": "True And 5",
+      "shape": "expression",
+      "helpers": [],
+      "vba_sha256": "c5a68b26c55d53aadefd4503a7a2c114725f96b208d99d43883cbbac5a96b8e2"
+    },
+    {
+      "id": "rfx-m4-081",
+      "case_key": "True Or False",
+      "shape": "expression",
+      "helpers": [],
+      "vba_sha256": "dd501f617ced043d989bfcedf7a15bffb65687b89afa2b426b808fc536e03458"
+    },
+    {
+      "id": "rfx-m4-082",
+      "case_key": "-32768",
+      "shape": "expression",
+      "helpers": [],
+      "vba_sha256": "86d5eb328e3eb7824915e2792c9e396c8dbd537fa84187a5fb6faf613a375506"
+    },
+    {
+      "id": "rfx-m4-083",
+      "case_key": "1E300 * 1E10",
+      "shape": "expression",
+      "helpers": [],
+      "vba_sha256": "c8f947491c7bc4b4f6d63384d43583e875a281870ba0073003c432c23c7e168b"
+    },
+    {
+      "id": "rfx-m4-084",
+      "case_key": "CSng(1) + 1",
+      "shape": "expression",
+      "helpers": [],
+      "vba_sha256": "b7331806259befec22234f6293aa038c4295dc7090bda5ce940d512cd6c878f6"
+    },
+    {
+      "id": "rfx-m4-085",
+      "case_key": "CSng(1) + 100000",
+      "shape": "expression",
+      "helpers": [],
+      "vba_sha256": "e044beed3da09803efed7f7e917e79551a768ee3bb7a67f70e141a136890ec76"
+    },
+    {
+      "id": "rfx-m4-086",
+      "case_key": "CLng(1) / 2",
+      "shape": "expression",
+      "helpers": [],
+      "vba_sha256": "ad8f1c2312b1bedc58f81aafd82819275bc50d82a55782c40b60907e580e1677"
+    },
+    {
+      "id": "rfx-m4-087",
+      "case_key": "10 \\ 4.6",
+      "shape": "expression",
+      "helpers": [],
+      "vba_sha256": "188517b714650d3f810a9bf8ad4fe726aea4eb8028fd563f9375299ed2333670"
+    },
+    {
+      "id": "rfx-m4-088",
+      "case_key": "CCur(5) \\ 2",
+      "shape": "expression",
+      "helpers": [],
+      "vba_sha256": "ac16b1e88326d404245e3d313e02c6b5a183cd82661dc56586a24fadff97a860"
+    },
+    {
+      "id": "rfx-m4-089",
+      "case_key": "\"abc\" < \"abd\"",
+      "shape": "expression",
+      "helpers": [],
+      "vba_sha256": "12671ec51a61a23e3bed8f57fdbccf73511e57b61bdfffbdba8941ec4b8dc154"
+    },
+    {
+      "id": "rfx-m4-090",
+      "case_key": "\"a\" = \"A\"",
+      "shape": "expression",
+      "helpers": [],
+      "vba_sha256": "f4a24fe33b11674346fa240fda8003872ebf0ca6e35881ffa854d77786c4deef"
+    },
+    {
+      "id": "rfx-m4-091",
+      "case_key": "Empty = 0",
+      "shape": "expression",
+      "helpers": [],
+      "vba_sha256": "937167f8e89e20eea9f659438fa1f9ee316e3145304eef3d25fbed13b358c581"
+    },
+    {
+      "id": "rfx-m4-092",
+      "case_key": "Empty = \"\"",
+      "shape": "expression",
+      "helpers": [],
+      "vba_sha256": "f012bfa64601309089169574df55a2e1e201478b5cc64ec4002b8527763e90c9"
+    },
+    {
+      "id": "rfx-m4-093",
+      "case_key": "Null = 1",
+      "shape": "expression",
+      "helpers": [],
+      "vba_sha256": "e954c7eb68656d1a6f29d4f2036fa8957159a443cf08fac5f8b8870c1b4e7c35"
+    },
+    {
+      "id": "rfx-m4-094",
+      "case_key": "Left(\"hello\", 2)",
+      "shape": "expression",
+      "helpers": [],
+      "vba_sha256": "7761dde5accf908a2b4c7fd61805cb9639951812c447f1e6075f476a45f24f4c"
+    },
+    {
+      "id": "rfx-m4-095",
+      "case_key": "Right(\"hello\", 10)",
+      "shape": "expression",
+      "helpers": [],
+      "vba_sha256": "a5e54cf546bf690c502e1ead636d2d18329d2f0c46eb8b6b43ff0c46ba536087"
+    },
+    {
+      "id": "rfx-m4-096",
+      "case_key": "Mid(\"hello\", 2)",
+      "shape": "expression",
+      "helpers": [],
+      "vba_sha256": "f85a1ea65db223083a1d26af8388d50c1654da240a98de64ea297a45a5b5690a"
+    },
+    {
+      "id": "rfx-m4-097",
+      "case_key": "Mid(\"hello\", 10, 2)",
+      "shape": "expression",
+      "helpers": [],
+      "vba_sha256": "2940f9a21bf973f4292c095cb798795c0ffb910c544e4d56c57ea820b8b2c13e"
+    },
+    {
+      "id": "rfx-m4-098",
+      "case_key": "Mid(\"hello\", 0, 1)",
+      "shape": "expression",
+      "helpers": [],
+      "vba_sha256": "dfe011cf82994abd03dcf587f53f8152f1e4916dcdc5e3a82318b6736c685d9f"
+    },
+    {
+      "id": "rfx-m4-099",
+      "case_key": "Len(Null)",
+      "shape": "expression",
+      "helpers": [],
+      "vba_sha256": "5d48b71da16b42b17b63ae493adf986b89102fdbcc4ded17f73218ea6ad78efa"
+    },
+    {
+      "id": "rfx-m4-100",
+      "case_key": "Trim(\"  a b  \")",
+      "shape": "expression",
+      "helpers": [],
+      "vba_sha256": "6df6ebf5a50e51815d16c2327f50fa8209edffbb759745f38f492b3629d51722"
+    },
+    {
+      "id": "rfx-m4-101",
+      "case_key": "InStr(\"hello\", \"l\")",
+      "shape": "expression",
+      "helpers": [],
+      "vba_sha256": "1bb70420b30bc8580908126e365f1c0872b912059cd0ff3a4256e933c373d048"
+    },
+    {
+      "id": "rfx-m4-102",
+      "case_key": "InStr(3, \"hello\", \"l\")",
+      "shape": "expression",
+      "helpers": [],
+      "vba_sha256": "3062c9faef1dd074c9b61d200dce2137b8c3b79fdf3038106c2c3685e5ef954a"
+    },
+    {
+      "id": "rfx-m4-103",
+      "case_key": "InStr(\"hello\", \"\")",
+      "shape": "expression",
+      "helpers": [],
+      "vba_sha256": "f8c1a7fa5c6ca04a0afdffb7a6a39e3c858f94e75ad46c6af58197e696bdd877"
+    },
+    {
+      "id": "rfx-m4-104",
+      "case_key": "InStr(10, \"hello\", \"l\")",
+      "shape": "expression",
+      "helpers": [],
+      "vba_sha256": "0bcdc7365c6cf4219aa9db4fcab21dc382d4375cbc8c14286178c82c08153b46"
+    },
+    {
+      "id": "rfx-m4-105",
+      "case_key": "InStr(Null, \"x\")",
+      "shape": "expression",
+      "helpers": [],
+      "vba_sha256": "f1a072fcbf4f33c56afd9d326f917163577d15f1c49a902aa71d8e65a1896056"
+    },
+    {
+      "id": "rfx-m4-106",
+      "case_key": "Replace(\"abcabc\", \"a\", \"x\", 3)",
+      "shape": "expression",
+      "helpers": [],
+      "vba_sha256": "3a98e23137719328e1e23299437bcb7cc8218008bfcab1915b8beeabf37b0bbd"
+    },
+    {
+      "id": "rfx-m4-107",
+      "case_key": "Replace(\"aaa\", \"a\", \"b\", 1, 2)",
+      "shape": "expression",
+      "helpers": [],
+      "vba_sha256": "f27d57bd43b4dbc2a1b85350c4a62713e3b3077f10afd0d13491220ba70278ee"
+    },
+    {
+      "id": "rfx-m4-108",
+      "case_key": "UBound(Split(\"a,b,,c\", \",\"))",
+      "shape": "expression",
+      "helpers": [],
+      "vba_sha256": "4a760e3bbf588b04aaa0fefaa9bae436a22774614ff47ebd43b6f4bd04472005"
+    },
+    {
+      "id": "rfx-m4-109",
+      "case_key": "UBound(Split(\"\"))",
+      "shape": "expression",
+      "helpers": [],
+      "vba_sha256": "18f51591c74da83f87e34183039495b58f44a9cdc10dd78dda30c75e63d4741d"
+    },
+    {
+      "id": "rfx-m4-110",
+      "case_key": "UBound(Split(\"a b  c\"))",
+      "shape": "expression",
+      "helpers": [],
+      "vba_sha256": "b924b07876fad0bc541f5e0904b29d00e79bbb85b84c37c2e6546c316baa583c"
+    },
+    {
+      "id": "rfx-m4-111",
+      "case_key": "Join(Split(\"a-b-c\", \"-\", 2), \"|\")",
+      "shape": "expression",
+      "helpers": [],
+      "vba_sha256": "1dc717fdaed906f2b73afdba63f08de60475fd09ea54aea180b2f33776a455f6"
+    },
+    {
+      "id": "rfx-m4-112",
+      "case_key": "Chr(65)",
+      "shape": "expression",
+      "helpers": [],
+      "vba_sha256": "eed63207dfd5480b46f334da37e97a66e94bf928e0d5426954651341ec87f3b4"
+    },
+    {
+      "id": "rfx-m4-113",
+      "case_key": "Asc(\"A\")",
+      "shape": "expression",
+      "helpers": [],
+      "vba_sha256": "1086f7614e6a4e3e40ea03ca8ad3863bf1e8bc15b011425f5fa512591e78a820"
+    },
+    {
+      "id": "rfx-m4-114",
+      "case_key": "IsEmpty(Empty)",
+      "shape": "expression",
+      "helpers": [],
+      "vba_sha256": "3c703ddf36899aa7fb0d64a2faf1caa6175da731b14211dc27d001ecc300f49d"
+    },
+    {
+      "id": "rfx-m4-115",
+      "case_key": "IsNull(Null)",
+      "shape": "expression",
+      "helpers": [],
+      "vba_sha256": "ce4989c2131001ae6edfd5849d497fd65e0bb046a5aba1d3cfa1f1745f17f9e5"
+    },
+    {
+      "id": "rfx-m4-116",
+      "case_key": "TypeName(Nothing)",
+      "shape": "expression",
+      "helpers": [],
+      "vba_sha256": "0ba867606bae358da662415dc574eba4571ae7152121065487d44869ae5493d4"
+    },
+    {
+      "id": "rfx-m4-117",
+      "case_key": "LBound(Array(1, 2))",
+      "shape": "expression",
+      "helpers": [],
+      "vba_sha256": "56497b40a4c5903cc56aed829397073dcc54f54f684db94dd20ce62f168c99b6"
+    },
+    {
+      "id": "rfx-m4-118",
+      "case_key": "UBound(Array())",
+      "shape": "expression",
+      "helpers": [],
+      "vba_sha256": "40c1e7009c3b546a90c197cc200d54a55445cf558ac4751a7cc9edfc804045a3"
+    },
+    {
+      "id": "rfx-m4-119",
+      "case_key": "IIf(1 > 2, \"a\", \"b\")",
+      "shape": "expression",
+      "helpers": [],
+      "vba_sha256": "edfa2db486f3667a7e69827a41775d5812b26b6976fe563846c4d36f42197960"
+    },
+    {
+      "id": "rfx-m4-120",
+      "case_key": "Sgn(-3.5)",
+      "shape": "expression",
+      "helpers": [],
+      "vba_sha256": "49ac09e14483614cf0e3c47a9d6268d729276d57e47f06b2983313e1c64af8f5"
+    },
+    {
+      "id": "rfx-m4-121",
+      "case_key": "Abs(CInt(-5))",
+      "shape": "expression",
+      "helpers": [],
+      "vba_sha256": "a610ae49262c33b431d84e1ebe491a3e1b270a3cfdb675f796567e48e45d5e94"
+    },
+    {
+      "id": "rfx-m4-122",
+      "case_key": "TypeName(1 + 1)",
+      "shape": "expression",
+      "helpers": [],
+      "vba_sha256": "3354a65c8ed92a5d0a352614dff8021de0305ea20557026fdd335cec8af9114e"
+    },
+    {
+      "id": "rfx-m4-123",
+      "case_key": "TypeName(1 + 100000)",
+      "shape": "expression",
+      "helpers": [],
+      "vba_sha256": "d78168d1ff78ea76c215dce667dc3eb9c2c386d9f42e62f2cba2c04c4bb8da8b"
+    },
+    {
+      "id": "rfx-m4-124",
+      "case_key": "TypeName(30000 + 30000)",
+      "shape": "expression",
+      "helpers": [],
+      "vba_sha256": "cf0b3cde2c859e2394d6ff446538a1a4484360bebde16f6c5d55a92516e95229"
+    },
+    {
+      "id": "rfx-m4-125",
+      "case_key": "TypeName(CInt(1) * 1.5)",
+      "shape": "expression",
+      "helpers": [],
+      "vba_sha256": "661e2305441ea362887dddf8f31d88443fd5c0366b3feb95f683fce5075f8284"
+    },
+    {
+      "id": "rfx-m4-126",
+      "case_key": "TypeName(1 / 1)",
+      "shape": "expression",
+      "helpers": [],
+      "vba_sha256": "790bd79b6f82fce77c287c75ca8fad6c42518a023ef349fc66de5eb1076f2190"
+    },
+    {
+      "id": "rfx-m4-127",
+      "case_key": "TypeName(CSng(1) / 2)",
+      "shape": "expression",
+      "helpers": [],
+      "vba_sha256": "1ecedebec0f5a7d2cac4307dc4df5b5c4326a90b59f4a95efd91cf1816bc1a73"
+    },
+    {
+      "id": "rfx-m4-128",
+      "case_key": "TypeName(10 \\ 3)",
+      "shape": "expression",
+      "helpers": [],
+      "vba_sha256": "6fe29fc7433dce1a69ece3905341a53362e8ab8fdeddc5c27ede5e0f668dd13c"
+    },
+    {
+      "id": "rfx-m4-129",
+      "case_key": "TypeName(10& \\ 3)",
+      "shape": "expression",
+      "helpers": [],
+      "vba_sha256": "154220cf89c5b12575aa15f0266ffba4ccb02a065f2ff1a11fe713f6e6eb6e65"
+    },
+    {
+      "id": "rfx-m4-130",
+      "case_key": "TypeName(\"1\" + 1)",
+      "shape": "expression",
+      "helpers": [],
+      "vba_sha256": "6a977326bc4a1e157c296bbcccc4a7b0284c118a8228b74ead0f2214654d277c"
+    },
+    {
+      "id": "rfx-m4-131",
+      "case_key": "TypeName(True And True)",
+      "shape": "expression",
+      "helpers": [],
+      "vba_sha256": "5aed6bb9499cae24d8eb85fd8e55df51a9b3a592ae0e3e3bceacf7a8eded14ee"
+    },
+    {
+      "id": "rfx-m4-132",
+      "case_key": "TypeName(5 And 3)",
+      "shape": "expression",
+      "helpers": [],
+      "vba_sha256": "528a0bdde3155dd7107ea1ffc5d38c0b2ec98198ea72b5afc1e45bddb78f7c21"
+    },
+    {
+      "id": "rfx-m4-133",
+      "case_key": "TypeName(CByte(5) And CByte(3))",
+      "shape": "expression",
+      "helpers": [],
+      "vba_sha256": "c9f322242297874132b75d3fe2250282be6d7f162119e9c2b12155a8d0c75fe4"
+    },
+    {
+      "id": "rfx-m4-134",
+      "case_key": "ForLongLimit()",
+      "shape": "function",
+      "helpers": [],
+      "vba_sha256": "e466638cf4ed63aa02c482b4d67d16429935e91bafb7b753f5f0804086df1919"
+    },
+    {
+      "id": "rfx-m4-135",
+      "case_key": "ResumeNextIf()",
+      "shape": "function",
+      "helpers": [],
+      "vba_sha256": "c540da9a6bd9c084c81f40ceb338ff5655ca0c8784f8491989f90eebb2a7d6c2"
+    },
+    {
+      "id": "rfx-m4-136",
+      "case_key": "ErrInHandler()",
+      "shape": "function",
+      "helpers": [],
+      "vba_sha256": "6d88c80010238259925d37b8dd660cf8f756f4bbe3d1c4e6d6e935d1f664e686"
+    },
+    {
+      "id": "rfx-m4-137",
+      "case_key": "ErrClearedAfterResume()",
+      "shape": "function",
+      "helpers": [],
+      "vba_sha256": "ad9b7267ee16e30154de62751bbcebca228eb0040e9e56ad3069369bcd5ab3a8"
+    },
+    {
+      "id": "rfx-m4-138",
+      "case_key": "RaiseDefaultDescription()",
+      "shape": "function",
+      "helpers": [],
+      "vba_sha256": "6b5cc5d7d76de9c8834e975d97c1b3c1f84d333ea4c7264a6f9c61ecfaa69518"
+    },
+    {
+      "id": "rfx-m4-139",
+      "case_key": "ReDimPreserve()",
+      "shape": "function",
+      "helpers": [],
+      "vba_sha256": "1ed261ecaa05b73660499a7694ede3ff7c32bdfb32a6dbaa601158a121e34692"
+    },
+    {
+      "id": "rfx-m4-140",
+      "case_key": "ReDimPreserveBad()",
+      "shape": "function",
+      "helpers": [],
+      "vba_sha256": "a8061fa7ac0d2a79f21da017918e2a8ac801dedca8d14f1fc8db523f7a3288ae"
+    },
+    {
+      "id": "rfx-m4-141",
+      "case_key": "ArrayCopy()",
+      "shape": "function",
+      "helpers": [],
+      "vba_sha256": "4005c223be860a4b2813363500a4f65abee2acb2cd8d9bf7f822c8c3fc80a6ec"
+    },
+    {
+      "id": "rfx-m4-142",
+      "case_key": "ByRefDefault()",
+      "shape": "function",
+      "helpers": [
+        "Bump"
+      ],
+      "vba_sha256": "e76aa9ec4583150a9d14a9a7af96c1be0ae5af638be3b486edd641fe91045def"
+    },
+    {
+      "id": "rfx-m4-143",
+      "case_key": "ByValParen()",
+      "shape": "function",
+      "helpers": [
+        "Bump"
+      ],
+      "vba_sha256": "0dac8a66f6115a2a2e69818bfeaa47338793c9cafb6445d105f7ace585b24327"
+    },
+    {
+      "id": "rfx-m4-144",
+      "case_key": "CallByRef()",
+      "shape": "function",
+      "helpers": [
+        "Bump"
+      ],
+      "vba_sha256": "5eb802dd9bc9942c1355b97fdce72bbe38243ff48524d7e1d1b96623625d32c9"
+    },
+    {
+      "id": "rfx-m4-145",
+      "case_key": "StaticCounter()",
+      "shape": "function",
+      "helpers": [
+        "Counter"
+      ],
+      "vba_sha256": "97d6aed5d6416a13315f6faf5ad23dde157d53f888c98af0f8f94baf4b207eaf"
+    },
+    {
+      "id": "rfx-m4-146",
+      "case_key": "OptionalMissing()",
+      "shape": "function",
+      "helpers": [
+        "HasArg"
+      ],
+      "vba_sha256": "af76ebeb55cb6b3d5105c743e704a750f5964515b5d0488032b30e74719381e3"
+    },
+    {
+      "id": "rfx-m4-147",
+      "case_key": "ParamArrayCount()",
+      "shape": "function",
+      "helpers": [
+        "CountArgs"
+      ],
+      "vba_sha256": "4003b8dcc170b578f9ae0619c29091bd0dca8ca256c1922c26612aeec0ba497d"
+    },
+    {
+      "id": "rfx-m4-148",
+      "case_key": "NullCondition()",
+      "shape": "function",
+      "helpers": [],
+      "vba_sha256": "33f928f1cde93e86cbd5fff3f59ddfe175012fd687b5982c62241aa0f1d8c9ed"
+    },
+    {
+      "id": "rfx-m4-149",
+      "case_key": "EraseFixed()",
+      "shape": "function",
+      "helpers": [],
+      "vba_sha256": "bed7332de52ae5453dcffb277ce8d04a085f7f5b350a924cf5d927f9c065ff3d"
+    },
+    {
+      "id": "rfx-m4-150",
+      "case_key": "EraseDynamic()",
+      "shape": "function",
+      "helpers": [],
+      "vba_sha256": "6ba050a22a0ddc775d234172aeb43d7a8b7cee79f56dd8c4130e5591bc3664cc"
+    },
+    {
+      "id": "rfx-m4-151",
+      "case_key": "NestedFunctionReturnArray()",
+      "shape": "function",
+      "helpers": [
+        "MakeArr"
+      ],
+      "vba_sha256": "73b0ac905c6156e397b0a77b5ce50fd45204466d5a6bdccbade5b9bd18b5eac7"
+    },
+    {
+      "id": "rfx-m4-152",
+      "case_key": "SplitLimit()",
+      "shape": "function",
+      "helpers": [],
+      "vba_sha256": "2d7bd1f81f3e20b86c4d8eaee413ccee1f0ee0179e8896f650a105dfb87e013a"
+    },
+    {
+      "id": "rfx-m4-153",
+      "case_key": "ResumeLabel()",
+      "shape": "function",
+      "helpers": [],
+      "vba_sha256": "3d259875cd25b1e6787278e05a79370c134f4629972378abcb5a21ab6f5a809e"
+    }
+  ],
+  "selected_expected_sha256": "b14fac1a1029172e3acc1c171eaa9dc7e10444a3013b38fc784dd6e23fe27ae8",
+  "oracle": {
+    "excel": "Microsoft Excel for Mac 16.114 (build 26101123)",
+    "os": "macOS 15.3.1",
+    "date": "2026-10-15",
+    "locale": "not-recorded-per-run",
+    "reflexgrid_commit": "3758c56a39f0c8841fa43eedda0e074414fed3e3"
+  }
+}

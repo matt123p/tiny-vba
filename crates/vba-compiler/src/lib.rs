@@ -33,7 +33,7 @@ impl Default for CompileOptions {
         Self {
             entry: "Answer".into(),
             revision: "source-1".into(),
-            capabilities: ir::Capabilities::ir2_structural(),
+            capabilities: ir::Capabilities::ir3_structural(),
             limits: ir::VerifyLimits::default(),
         }
     }
@@ -116,6 +116,10 @@ pub fn compile_modules(
             code_count: 0,
         };
         for (i, local) in procedure.locals.iter().enumerate() {
+            if local.array.is_some() {
+                builder.feature("arrays-v2");
+                builder.feature("array-layout-v3");
+            }
             builder.allocation.charge(256)?;
             let role = if let Some(key) = &local.persistent {
                 let id = if let Some(id) = persistent_ids.get(key) {
@@ -137,6 +141,7 @@ pub fn compile_modules(
             push(
                 &mut builder.locals,
                 ir::Local {
+                    array: local.array,
                     name: local.name.clone(),
                     kind: local.kind,
                     role,
@@ -179,7 +184,9 @@ pub fn compile_modules(
         .get(program.entry)
         .ok_or_else(|| error("entry invariant"))?;
     let mut ir = ir::Program {
-        ir_version: if features.iter().any(|f| f.ends_with("-v2")) {
+        ir_version: if features.iter().any(|f| f.ends_with("-v3")) {
+            ir::IR3_VERSION
+        } else if features.iter().any(|f| f.ends_with("-v2")) {
             ir::IR2_VERSION
         } else {
             ir::IR_VERSION
@@ -393,6 +400,7 @@ impl Builder<'_> {
         push(
             &mut self.locals,
             ir::Local {
+                array: None,
                 name: format!("$scratch{id}"),
                 kind,
                 role: ir::SlotRole::Scratch,
@@ -455,16 +463,24 @@ impl Builder<'_> {
                     kind,
                 } => {
                     if capture {
-                        return Err(Diagnostic::unsupported(
-                            "named/omitted calls with ByRef array elements",
-                        ));
-                    }
-                    // Index evaluation occurs in source order; the canonical reference is retained
-                    // on the operand stack only when arguments need no named reordering.
-                    bound::Argument::Element {
-                        slot: *slot,
-                        indices: indices.clone(),
-                        kind: *kind,
+                        self.element(block, *slot, indices, *kind)?;
+                        let temporary = self.scratch(*kind)?;
+                        self.locals
+                            .get_mut(temporary)
+                            .ok_or_else(|| error("reference capture slot"))?
+                            .role = ir::SlotRole::ScratchReference;
+                        self.feature("argument-captures-v3");
+                        self.emit(
+                            block,
+                            ir::Instruction::SaveReference(ir::LocalSlot(idx(temporary)?)),
+                        )?;
+                        bound::Argument::CapturedReference(temporary)
+                    } else {
+                        bound::Argument::Element {
+                            slot: *slot,
+                            indices: indices.clone(),
+                            kind: *kind,
+                        }
                     }
                 }
                 bound::Argument::Temporary { value, kind } => {
@@ -488,6 +504,13 @@ impl Builder<'_> {
         let mut arguments = Vec::new();
         for (i, (_, arg)) in prepared.iter().enumerate() {
             let mode = match arg {
+                bound::Argument::CapturedReference(slot) => {
+                    self.emit(
+                        block,
+                        ir::Instruction::LoadReference(ir::LocalSlot(idx(*slot)?)),
+                    )?;
+                    ir::ArgumentMode::Reference
+                }
                 bound::Argument::Value(value) => {
                     self.expr(block, value)?;
                     ir::ArgumentMode::Value
@@ -668,6 +691,12 @@ impl Builder<'_> {
                 function,
                 arguments,
             } => {
+                if matches!(
+                    function,
+                    vba_values::Intrinsic::IIf | vba_values::Intrinsic::ArrayBaseOne
+                ) {
+                    self.feature("intrinsics-v3");
+                }
                 self.feature("intrinsics-v2");
                 for argument in arguments {
                     self.expr(block, argument)?;
@@ -1052,6 +1081,9 @@ impl Builder<'_> {
     }
     fn finish(mut self, procedure: &bound::BoundProcedure, entry: usize) -> Result<ir::Procedure> {
         for param in &procedure.signature.parameters {
+            if param.array.is_some() {
+                self.feature("array-parameters-v3");
+            }
             if !param.by_val {
                 self.feature("byref-locals");
             }
@@ -1250,6 +1282,7 @@ impl Builder<'_> {
                 .parameters
                 .iter()
                 .map(|p| ir::Parameter {
+                    array: p.array,
                     name: p.name.clone(),
                     kind: p.kind,
                     mode: if p.by_val {

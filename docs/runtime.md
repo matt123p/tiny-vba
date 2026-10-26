@@ -1,6 +1,6 @@
 # M3/M4 runtime and debugger
 
-Implemented 2026-10-26. The current consumer is `m4-language-v1`, using verified IR 1/2.
+Implemented 2026-10-26. The current consumer is `m4-conformance-v1`, using verified IR 1/2/3.
 The [M4 language contract](m4-language.md) and [ADR 0011](decisions/0011-m4-language-extension.md)
 define scalar coercions, arrays, arguments, persistent state, builtins and VBA handlers. The
 headless debugger and generic host protocol retain their M3 lifecycle contracts. Visual IDE,
@@ -29,7 +29,7 @@ Node 22 for this gate. Node may print its WASI experimental-feature notice.
 
 ## Runtime capability matrix
 
-The compiler defaults to `ir2-structural` for check/compile/disasm. To execute, compile with
+The compiler defaults to `ir3-structural` for check/compile/disasm. To execute, compile with
 `CompileOptions { capabilities: vba_vm::capabilities(), ..Default::default() }` and pass the resulting
 VerifiedProgram to Session. Session rechecks immutable IR against its actual capabilities without
 cloning the source payload. A caller's capability set cannot enable an unimplemented operation.
@@ -168,5 +168,10 @@ reports are escaped per unit. `conformance validate` executes nothing and keeps 
 build artifacts cannot silently redirect tests or select an older WASM executable.
 
 Current M4 execution evidence and boundaries supersede the historical first-slice notes above.
-All 44 authored scenario assertions pass. `Session::output`, `project_state` and `restore_project`
+All 44 authored and 153 inherited oracle scenario assertions pass. See [the M4 acceptance report](m4-oracle-report.md). `Session::output`, `project_state` and `restore_project`
 are described in the M4 contract. Fault snapshots include unavailable_locals for expired array cells.
+
+The current profile includes required typed whole-array ByRef parameters, positional ParamArray,
+Option Base and qualified VBA.Array, and source-order named array-reference capture under IR 3.
+Host writeback checks all scalar representation tags and declared array element kinds before commit.
+Historical matrices below/above do not override [the current contract](m4-language.md).

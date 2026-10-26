@@ -15,6 +15,8 @@ pub struct BoundProgram {
 }
 #[derive(Clone, Debug)]
 pub struct BoundParameter {
+    pub array: Option<ScalarKind>,
+    pub param_array: bool,
     pub name: String,
     pub kind: ScalarKind,
     pub by_val: bool,
@@ -102,6 +104,7 @@ pub enum ExprKind {
 }
 #[derive(Clone, Debug)]
 pub enum Argument {
+    CapturedReference(usize),
     Element {
         slot: usize,
         indices: Vec<Expr>,
@@ -416,9 +419,13 @@ pub fn bind(parsed: &[ast::ParseResult], entry: &str) -> Result<BoundProgram> {
             return Err(unsupported("class module binding", source_span));
         }
         let mut constants = BTreeMap::new();
+        let mut base_seen = false;
         for option in &module.options {
-            if let ast::ModuleOption::Base { value: 1, span } = option {
-                return Err(unsupported("Option Base 1 array defaults", *span));
+            if let ast::ModuleOption::Base { span, .. } = option {
+                if base_seen {
+                    return Err(err("duplicate Option Base", *span));
+                }
+                base_seen = true;
             }
             if let ast::ModuleOption::Compare { text: true, span } = option {
                 return Err(unsupported("Option Compare Text compilation", *span));
@@ -465,8 +472,36 @@ pub fn bind(parsed: &[ast::ParseResult], entry: &str) -> Result<BoundProgram> {
             if procedure.parameters.len() > 256 {
                 return Err(limit(procedure.span));
             }
-            for parameter in &procedure.parameters {
-                let kind = kind(parameter.ty.as_ref(), &parameter.name)?;
+            for (position, parameter) in procedure.parameters.iter().enumerate() {
+                let element = kind(parameter.ty.as_ref(), &parameter.name)?;
+                if parameter.param_array
+                    && (!parameter.array
+                        || element != ScalarKind::Variant
+                        || parameter.optional
+                        || parameter.default.is_some()
+                        || position + 1 != procedure.parameters.len()
+                        || parameter.by_val
+                        || parameter.explicit_by_ref)
+                {
+                    return Err(err(
+                        "ParamArray must be a final Variant array",
+                        parameter.span,
+                    ));
+                }
+                if parameter.array
+                    && !parameter.param_array
+                    && (parameter.by_val || parameter.optional)
+                {
+                    return Err(err(
+                        "array parameters must be required ByRef",
+                        parameter.span,
+                    ));
+                }
+                let kind = if parameter.array {
+                    ScalarKind::Variant
+                } else {
+                    element
+                };
                 if !parameter.optional && parameters.iter().any(|p: &BoundParameter| p.optional) {
                     return Err(err("required parameter after Optional", parameter.span));
                 }
@@ -489,8 +524,10 @@ pub fn bind(parsed: &[ast::ParseResult], entry: &str) -> Result<BoundProgram> {
                     &mut parameters,
                     BoundParameter {
                         name: parameter.name.spelling.clone(),
+                        array: parameter.array.then_some(element),
+                        param_array: parameter.param_array,
                         kind,
-                        by_val: parameter.by_val,
+                        by_val: parameter.by_val || parameter.param_array,
                         optional: parameter.optional,
                         default,
                         span: parameter.span,
@@ -591,6 +628,17 @@ pub fn bind(parsed: &[ast::ParseResult], entry: &str) -> Result<BoundProgram> {
                 .cloned()
                 .ok_or_else(|| err("module symbols missing", sig.span))?,
             explicit,
+            base: module
+                .options
+                .iter()
+                .find_map(|o| {
+                    if let ast::ModuleOption::Base { value, .. } = o {
+                        Some(*value)
+                    } else {
+                        None
+                    }
+                })
+                .unwrap_or(0),
             loop_depth: 0,
         };
         let mut local_names = BTreeSet::new();
@@ -603,6 +651,11 @@ pub fn bind(parsed: &[ast::ParseResult], entry: &str) -> Result<BoundProgram> {
                 false,
                 &mut local_names,
             )?;
+            binder
+                .locals
+                .last_mut()
+                .ok_or_else(|| err("parameter local", param.span))?
+                .array = param.array;
         }
         if let Some(kind) = sig.result {
             binder.local(
@@ -703,6 +756,7 @@ struct Binder<'a> {
     locals: Vec<BoundLocal>,
     symbols: BTreeMap<String, Symbol>,
     explicit: bool,
+    base: u8,
     loop_depth: usize,
 }
 impl Binder<'_> {
@@ -907,7 +961,9 @@ impl Binder<'_> {
             .signatures
             .get(id)
             .ok_or_else(|| err("callee missing", span))?;
-        if args.len() > sig.parameters.len() {
+        if args.len() > sig.parameters.len()
+            && !sig.parameters.last().is_some_and(|p| p.param_array)
+        {
             return Err(err("argument count mismatch", span));
         }
         let params = sig.parameters.clone();
@@ -915,6 +971,46 @@ impl Binder<'_> {
         let mut named = false;
         let mut result = Vec::new();
         for (position, arg) in args.iter().enumerate() {
+            if params.last().is_some_and(|p| p.param_array)
+                && position >= params.len().saturating_sub(1)
+                && arg.name.is_none()
+                && !named
+            {
+                let index = params
+                    .len()
+                    .checked_sub(1)
+                    .ok_or_else(|| err("ParamArray signature", span))?;
+                let mut values = Vec::new();
+                for arg in args.iter().skip(position) {
+                    if arg.name.is_some() || arg.value.is_none() {
+                        return Err(err(
+                            "ParamArray requires present positional values",
+                            arg.span,
+                        ));
+                    }
+                    let value = arg
+                        .value
+                        .as_ref()
+                        .ok_or_else(|| err("ParamArray value", arg.span))?;
+                    push(&mut values, self.expr(value)?, arg.span)?;
+                }
+                used.insert(index);
+                push(
+                    &mut result,
+                    Argument::Mapped {
+                        parameter: index,
+                        argument: Box::new(Argument::Value(Expr {
+                            span,
+                            kind: ExprKind::Intrinsic {
+                                function: vba_values::Intrinsic::Array,
+                                arguments: values,
+                            },
+                        })),
+                    },
+                    span,
+                )?;
+                break;
+            }
             let index = if let Some(name) = &arg.name {
                 named = true;
                 params
@@ -933,12 +1029,17 @@ impl Binder<'_> {
             let param = params
                 .get(index)
                 .ok_or_else(|| err("argument count mismatch", span))?;
+            if param.param_array {
+                return Err(err("ParamArray cannot be named", arg.span));
+            }
             let bound = if let Some(expr) = &arg.value {
                 if param.by_val {
                     Argument::Value(self.expr(expr)?)
                 } else if let ast::ExprKind::Name(name) = &expr.kind {
                     let slot = self.slot(name)?;
-                    if self.locals.get(slot).is_none_or(|l| l.kind != param.kind) {
+                    if self.locals.get(slot).is_none_or(|l| {
+                        l.kind != param.kind || (param.array.is_some() && l.array != param.array)
+                    }) {
                         return Err(err("ByRef declared type mismatch", expr.span));
                     }
                     Argument::Reference(slot)
@@ -994,6 +1095,23 @@ impl Binder<'_> {
         }
         for (index, param) in params.iter().enumerate() {
             if used.contains(&index) {
+                continue;
+            }
+            if param.param_array {
+                push(
+                    &mut result,
+                    Argument::Mapped {
+                        parameter: index,
+                        argument: Box::new(Argument::Value(Expr {
+                            span,
+                            kind: ExprKind::Intrinsic {
+                                function: vba_values::Intrinsic::Array,
+                                arguments: Vec::new(),
+                            },
+                        })),
+                    },
+                    span,
+                )?;
                 continue;
             }
             let value = param
@@ -1141,13 +1259,41 @@ impl Binder<'_> {
                     name,
                 } = &target.kind
                 {
+                    if matches!(&object.kind,ast::ExprKind::Name(n) if n.key()=="vba")
+                        && let Some(function) = vba_values::Intrinsic::from_name(&name.spelling)
+                    {
+                        if !function.accepts(arguments.len()) {
+                            return Err(err("intrinsic argument count", expr.span));
+                        }
+                        let mut values = Vec::new();
+                        for argument in arguments {
+                            if argument.name.is_some() {
+                                return Err(unsupported("named intrinsic argument", argument.span));
+                            }
+                            let value = argument
+                                .value
+                                .as_ref()
+                                .ok_or_else(|| err("missing intrinsic argument", argument.span))?;
+                            push(&mut values, self.expr(value)?, argument.span)?;
+                        }
+                        return Ok(Expr {
+                            span: expr.span,
+                            kind: ExprKind::Intrinsic {
+                                function,
+                                arguments: values,
+                            },
+                        });
+                    }
                     return self.foreign(object, name, arguments, ForeignKind::Call, None);
                 }
                 let ast::ExprKind::Name(name) = &target.kind else {
                     return Err(unsupported("member/default/array application", expr.span));
                 };
                 if let Some(Symbol::Local(slot)) = self.symbols.get(&name.key()).cloned()
-                    && let Some(kind) = self.locals.get(slot).and_then(|l| l.array)
+                    && let Some(kind) = self.locals.get(slot).and_then(|l| {
+                        l.array
+                            .or((l.kind == ScalarKind::Variant).then_some(ScalarKind::Variant))
+                    })
                 {
                     return Ok(Expr {
                         span: expr.span,
@@ -1163,8 +1309,11 @@ impl Binder<'_> {
                     .local
                     .contains_key(&(self.signature.module, name.key()))
                     && !self.lookup.public.contains_key(&name.key())
-                    && let Some(function) = vba_values::Intrinsic::from_name(&name.spelling)
+                    && let Some(mut function) = vba_values::Intrinsic::from_name(&name.spelling)
                 {
+                    if function == vba_values::Intrinsic::Array && self.base == 1 {
+                        function = vba_values::Intrinsic::ArrayBaseOne;
+                    }
                     if !function.accepts(arguments.len()) {
                         return Err(err("intrinsic argument count", expr.span));
                     }
@@ -1253,7 +1402,15 @@ impl Binder<'_> {
                 (
                     Expr {
                         span: lower.span,
-                        kind: ExprKind::Constant(literal(lower)?),
+                        kind: ExprKind::Constant(
+                            if lower.span == upper.span
+                                && matches!(&lower.kind,ast::ExprKind::Number(n) if n=="0")
+                            {
+                                Value::Integer(i16::from(self.base))
+                            } else {
+                                literal(lower)?
+                            },
+                        ),
                     },
                     Expr {
                         span: upper.span,
@@ -1270,7 +1427,19 @@ impl Binder<'_> {
         for (lower, upper) in dimensions {
             push(
                 &mut result,
-                (self.expr(lower)?, self.expr(upper)?),
+                (
+                    if lower.span == upper.span
+                        && matches!(&lower.kind,ast::ExprKind::Number(n) if n=="0")
+                    {
+                        Expr {
+                            span: lower.span,
+                            kind: ExprKind::Constant(Value::Integer(i16::from(self.base))),
+                        }
+                    } else {
+                        self.expr(lower)?
+                    },
+                    self.expr(upper)?,
+                ),
                 lower.span,
             )?;
         }
@@ -1386,7 +1555,10 @@ impl Binder<'_> {
                     let kind = self
                         .locals
                         .get(slot)
-                        .and_then(|l| l.array)
+                        .and_then(|l| {
+                            l.array
+                                .or((l.kind == ScalarKind::Variant).then_some(ScalarKind::Variant))
+                        })
                         .ok_or_else(|| err("array required", target.span))?;
                     return Ok(Statement {
                         site,

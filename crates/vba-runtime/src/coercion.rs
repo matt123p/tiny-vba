@@ -99,8 +99,8 @@ pub(crate) fn text(v: &V) -> Result<VbaString> {
         V::Integer(n) => n.to_string(),
         V::Long(n) => n.to_string(),
         V::LongLong(n) => n.to_string(),
-        V::Single(n) => n.to_string(),
-        V::Double(n) => n.to_string(),
+        V::Single(n) => number_text(f64::from(*n), 7)?,
+        V::Double(n) => number_text(*n, 15)?,
         V::Currency(n) => {
             let n = i128::from(*n);
             let sign = if n < 0 { "-" } else { "" };
@@ -197,6 +197,16 @@ pub fn intrinsic(function: I, args: &[V]) -> Result<V> {
     if !function.accepts(args.len()) {
         return Err(error(450, "Wrong number of arguments"));
     }
+    if function == I::IIf {
+        return args
+            .get(if super::condition(args.first().ok_or_else(mismatch)?)? {
+                1
+            } else {
+                2
+            })
+            .cloned()
+            .ok_or_else(mismatch);
+    }
     if function == I::IsObject {
         return Ok(V::Boolean(matches!(
             args.first(),
@@ -206,11 +216,18 @@ pub fn intrinsic(function: I, args: &[V]) -> Result<V> {
     if matches!(function, I::InStr | I::Replace | I::Split | I::Join) {
         return string_function(function, args);
     }
-    if function == I::Array {
+    if matches!(function, I::Array | I::ArrayBaseOne) {
+        let lower = if function == I::ArrayBaseOne { 1 } else { 0 };
+        if args.is_empty() {
+            return Ok(V::Array(vba_values::VbaArray::empty(K::Variant, lower)));
+        }
         let bounds = if args.is_empty() {
             Vec::new()
         } else {
-            vec![(0, i32::try_from(args.len() - 1).map_err(|_| overflow())?)]
+            vec![(
+                lower,
+                lower + i32::try_from(args.len() - 1).map_err(|_| overflow())?,
+            )]
         };
         let mut array = vba_values::VbaArray::new(K::Variant, bounds, true)
             .map_err(|_| Error::Resource("array budget".into()))?;
@@ -595,6 +612,9 @@ fn string_function(function: I, args: &[V]) -> Result<V> {
                     VbaString::from_units(remaining.to_vec()).map_err(|_| mismatch())?,
                 ));
             }
+            if parts.is_empty() {
+                return Ok(V::Array(vba_values::VbaArray::empty(K::String, 0)));
+            }
             let bounds = if parts.is_empty() {
                 Vec::new()
             } else {
@@ -680,4 +700,50 @@ fn value_error(error: vba_diagnostics::Diagnostic) -> Error {
         "VBA0001" => Error::Unsupported(error.message),
         _ => mismatch(),
     }
+}
+
+fn number_text(number: f64, precision: usize) -> Result<String> {
+    if !number.is_finite() {
+        return Err(overflow());
+    }
+    if number == 0.0 {
+        return Ok(if number.is_sign_negative() { "-0" } else { "0" }.into());
+    }
+    let raw = format!("{:.*e}", precision.saturating_sub(1), number.abs());
+    let (mantissa, exponent) = raw.split_once('e').ok_or_else(mismatch)?;
+    let exponent = exponent.parse::<i32>().map_err(|_| mismatch())?;
+    let sign = if number.is_sign_negative() { "-" } else { "" };
+    if exponent < -4 || exponent >= precision as i32 {
+        let mantissa = mantissa.trim_end_matches('0').trim_end_matches('.');
+        return Ok(format!(
+            "{sign}{mantissa}E{}{:02}",
+            if exponent < 0 { "-" } else { "+" },
+            exponent.abs()
+        ));
+    }
+    let digits = mantissa.replace('.', "");
+    let decimal = exponent + 1;
+    let mut text = if decimal <= 0 {
+        format!("0.{}{digits}", "0".repeat((-decimal) as usize))
+    } else if decimal as usize >= digits.len() {
+        format!(
+            "{digits}{}",
+            "0".repeat((decimal as usize).saturating_sub(digits.len()))
+        )
+    } else {
+        format!(
+            "{}.{}",
+            digits.get(..decimal as usize).ok_or_else(mismatch)?,
+            digits.get(decimal as usize..).ok_or_else(mismatch)?
+        )
+    };
+    if text.contains('.') {
+        while text.ends_with('0') {
+            text.pop();
+        }
+        if text.ends_with('.') {
+            text.pop();
+        }
+    }
+    Ok(format!("{sign}{text}"))
 }

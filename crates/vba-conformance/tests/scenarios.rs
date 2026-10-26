@@ -162,3 +162,42 @@ fn classification_and_exit_policy_cannot_hide_engine_or_budget_failures() {
     }
     assert_eq!(Status::InvalidFixture.exit_code(), 2);
 }
+
+#[test]
+fn inherited_oracle_evidence_is_explicit_and_preserves_raw_results()
+-> Result<(), Box<dyn std::error::Error>> {
+    let text = include_str!("../../../tests/fixtures/m4-oracle/rfx-m4-010.vbas");
+    let scenario = parse(text)?;
+    let evidence = scenario.oracle.ok_or("oracle evidence")?;
+    assert_eq!(evidence.raw_result, "Integer|2");
+    assert_eq!(
+        evidence.excel,
+        "Microsoft Excel for Mac 16.114 (build 26101123)"
+    );
+    assert_eq!(evidence.locale, "not-recorded-per-run");
+    assert_eq!(
+        evidence.source_revision,
+        "03a338b214df243f1bc68e50512936ddc5566c76"
+    );
+    assert!(parse(VALID)?.oracle.is_none());
+    Ok(())
+}
+#[test]
+fn malformed_missing_or_conflicting_oracle_metadata_is_invalid() {
+    let text = include_str!("../../../tests/fixtures/m4-oracle/rfx-m4-010.vbas");
+    for bad in [
+        text.replace("Integer|2", "Integer|3"),
+        text.replace("source-sha256 = ", "source-sha256 = INVALID"),
+        text.replace("source-revision = ", "source-revision = INVALID"),
+        text.replace("oracle-result = Integer|2\n", ""),
+        text.replace("oracle-date = 2026-10-15", "oracle-date = yesterday"),
+        text.replace(
+            "source-path = tests/vba_excel_cases.py",
+            "source-path = ../unsafe.py",
+        ),
+        text.replace("tiny-vba-scenario = 2", "tiny-vba-scenario = 1"),
+        text.replace("reviewed-external", "independently-authored"),
+    ] {
+        assert!(parse(&bad).is_err(), "accepted {bad}");
+    }
+}

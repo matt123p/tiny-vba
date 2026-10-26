@@ -15,9 +15,9 @@
         }
       ],
       "role": "language-oracle-and-office-scenarios",
-      "adoption_status": "pending-specimen-review",
-      "execution_policy": "never-auto-execute",
-      "notes": "Mac oracle profile; fixture rights must be assessed separately; implementation code excluded."
+      "adoption_status": "153-language-oracle-cases-reviewed",
+      "execution_policy": "reviewed-pure-language-allowlist-only",
+      "notes": "MIT case data and upstream-reported Excel Mac results only, under docs/decisions/0012-m4-oracle-acceptance.md. Exact selection/hashes in tests/fixtures/m4-oracle/selection.json. Upstream scripts and implementation code excluded; unselected specimens remain NOT_RUN."
     },
     {
       "id": "vba-json",

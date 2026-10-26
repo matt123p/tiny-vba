@@ -12,7 +12,7 @@ use vba_values::{Location, Locations, ScalarKind, Value};
 type Result<T> = std::result::Result<T, Diagnostic>;
 pub const PROFILE: &str = runtime::PROFILE;
 pub fn capabilities() -> ir::Capabilities {
-    let mut c = ir::Capabilities::ir2_structural();
+    let mut c = ir::Capabilities::ir3_structural();
     c.profile = PROFILE.into();
 
     c
@@ -171,6 +171,7 @@ struct ErrorState {
     erl: i32,
 }
 struct Frame {
+    captured: Vec<Option<Location>>,
     handler: Handler,
     id: u64,
     procedure: ir::ProcedureId,
@@ -194,6 +195,7 @@ pub struct ProjectState {
     values: BTreeMap<u32, Value>,
 }
 pub struct Session {
+    array_types: BTreeMap<Location, ScalarKind>,
     output: Vec<vba_values::VbaString>,
     persistent: BTreeMap<u32, Location>,
     program: ir::VerifiedProgram,
@@ -308,6 +310,7 @@ impl Session {
             raised_source: None,
             output: Vec::new(),
             persistent: BTreeMap::new(),
+            array_types: BTreeMap::new(),
             break_on_error: false,
             allocation_bytes: 0,
             allocated_locations: 0,
@@ -573,12 +576,31 @@ impl Session {
                 match (arg, params.get(i).map(|p| p.mode)) {
                     (Operand::Reference(l), Some(ir::ParameterMode::ByRef)) => {
                         if self.kinds.get(l) != Some(&local.kind) {
-                            return Err(invariant("ByRef kind mismatch"));
+                            return Err(runtime_diagnostic(runtime::Error::Vba {
+                                number: 13,
+                                message: "ByRef argument type mismatch".into(),
+                            }));
                         }
-                        self.store.read(*l)?;
+                        let value = self.store.read(*l)?;
+                        if let Some(element) = params.get(i).and_then(|p| p.array)
+                            && !matches!(value,Value::Array(a) if a.kind()==element)
+                        {
+                            return Err(runtime_diagnostic(runtime::Error::Vba {
+                                number: 13,
+                                message: "Array parameter element type mismatch".into(),
+                            }));
+                        }
                         Operand::Reference(*l)
                     }
                     (Operand::Value(v), Some(ir::ParameterMode::ByVal)) => {
+                        if let Some(element) = params.get(i).and_then(|p| p.array)
+                            && !matches!(v,Value::Array(a) if a.kind()==element)
+                        {
+                            return Err(runtime_diagnostic(runtime::Error::Vba {
+                                number: 13,
+                                message: "Array parameter element type mismatch".into(),
+                            }));
+                        }
                         Operand::Value(runtime::bind(local.kind, v).map_err(runtime_diagnostic)?)
                     }
                     _ => return Err(invariant("call mode mismatch")),
@@ -610,12 +632,24 @@ impl Session {
                     l
                 }
             };
+            if let Some(element) = local.array
+                && self
+                    .array_types
+                    .insert(location, element)
+                    .is_some_and(|old| old != element)
+            {
+                return Err(invariant("array alias metadata"));
+            }
             slots.push(location);
         }
         self.allocated_locations = count;
         self.stack_capacity = stack_capacity;
         self.next_frame = self.next_frame.checked_add(1).ok_or_else(resource)?;
+        let mut captured = Vec::new();
+        reserve(&mut captured, slots.len())?;
+        captured.resize(slots.len(), None);
         self.frames.push(Frame {
+            captured,
             handler: Handler::default(),
             id: self.next_frame,
             procedure: id,
@@ -814,6 +848,13 @@ impl Session {
             .get(&location)
             .ok_or_else(|| invariant("local kind"))?;
         let value = runtime::bind(kind, &value).map_err(runtime_diagnostic)?;
+        if self
+            .array_types
+            .get(&location)
+            .is_some_and(|element| !matches!(&value,Value::Array(array) if array.kind()==*element))
+        {
+            return Err(command("array element type mismatch"));
+        }
         self.charge(value_bytes(&value))?;
         self.store.write(location, value)?;
         let frames = self.snapshots()?;
@@ -831,6 +872,8 @@ impl Session {
         }
         self.frames.clear();
         self.kinds
+            .retain(|location, _| persistent.values().any(|l| l == location));
+        self.array_types
             .retain(|location, _| persistent.values().any(|l| l == location));
         self.visit = None;
         self.pending_fault = None;
@@ -1051,6 +1094,7 @@ impl Session {
         for location in frame.owned {
             self.store.invalidate(location)?;
             self.kinds.remove(&location);
+            self.array_types.remove(&location);
         }
         Ok(())
     }
@@ -1124,6 +1168,28 @@ impl Session {
     }
     fn dispatch(&mut self, host: &mut impl Host, instruction: I) -> Result<()> {
         match instruction {
+            I::SaveReference(slot) => {
+                let location = self.pop_ref()?;
+                self.store.read(location)?;
+                *self
+                    .top_mut()?
+                    .captured
+                    .get_mut(slot.0 as usize)
+                    .ok_or_else(|| invariant("capture slot"))? = Some(location);
+                self.advance()?;
+            }
+            I::LoadReference(slot) => {
+                let location = self
+                    .top()?
+                    .captured
+                    .get(slot.0 as usize)
+                    .copied()
+                    .flatten()
+                    .ok_or_else(|| invariant("reference uninitialized"))?;
+                self.store.read(location)?;
+                self.push(Operand::Reference(location))?;
+                self.advance()?;
+            }
             I::RefElement { rank, kind } => {
                 let mut indices = Vec::new();
                 reserve(&mut indices, usize::from(rank))?;
@@ -1138,7 +1204,7 @@ impl Session {
                         message: "Array required".into(),
                     }));
                 };
-                if array.kind() != kind {
+                if kind != ScalarKind::Variant && array.kind() != kind {
                     return Err(runtime_diagnostic(runtime::Error::Vba {
                         number: 13,
                         message: "Array element type mismatch".into(),
@@ -1148,7 +1214,8 @@ impl Session {
                 if self.kinds.len() >= 65536 {
                     return Err(resource());
                 }
-                self.kinds.insert(location, kind);
+                let actual = array.kind();
+                self.kinds.insert(location, actual);
                 self.push(Operand::Reference(location))?;
                 self.advance()?;
             }
@@ -1312,6 +1379,7 @@ impl Session {
                 self.deliver_failure(failure)?;
             }
             I::Checkpoint(site) => {
+                self.top_mut()?.captured.fill(None);
                 self.top_mut()?.checkpoint = Some(site);
                 self.visit = None;
                 self.advance()?;
@@ -1355,6 +1423,14 @@ impl Session {
                     runtime::assign(kind, &value, mode == ir::AssignmentKind::ObjectReference)
                 }
                 .map_err(runtime_diagnostic)?;
+                if let Some(element) = self.array_types.get(&location)
+                    && !matches!(&value,Value::Array(array) if array.kind()==*element)
+                {
+                    return Err(runtime_diagnostic(runtime::Error::Vba {
+                        number: 13,
+                        message: "Whole-array assignment type mismatch".into(),
+                    }));
+                }
                 self.charge(value_bytes(&value))?;
                 self.store.write(location, value)?;
                 self.advance()?;
@@ -1524,6 +1600,7 @@ impl Session {
                 for location in frame.owned {
                     self.store.invalidate(location)?;
                     self.kinds.remove(&location);
+                    self.array_types.remove(&location);
                 }
                 if self.frames.is_empty() {
                     self.cleanup();
@@ -1592,10 +1669,11 @@ impl Session {
             ir::ForeignKind::Set => foreign::InvokeKind::Set,
         };
         let kinds = &self.kinds;
+        let array_types = &self.array_types;
         let used = &mut self.allocation_bytes;
         let cap = self.limits.payload;
         let mut validate = |l, v: &Value| {
-            validate_write(kinds, l, v)?;
+            validate_write(kinds, array_types, l, v)?;
             let next = used.checked_add(value_bytes(v)).ok_or_else(resource)?;
             if next > cap {
                 return Err(resource());
@@ -1663,10 +1741,11 @@ impl Session {
             return Ok(self.state.clone());
         }
         let kinds = &self.kinds;
+        let array_types = &self.array_types;
         let used = &mut self.allocation_bytes;
         let cap = self.limits.payload;
         let mut validate = |l, v: &Value| {
-            validate_write(kinds, l, v)?;
+            validate_write(kinds, array_types, l, v)?;
             let next = used.checked_add(value_bytes(v)).ok_or_else(resource)?;
             if next > cap {
                 return Err(resource());
@@ -1697,6 +1776,7 @@ impl Session {
 }
 fn validate_write(
     kinds: &BTreeMap<Location, ScalarKind>,
+    array_types: &BTreeMap<Location, ScalarKind>,
     location: Option<Location>,
     value: &Value,
 ) -> Result<()> {
@@ -1706,15 +1786,10 @@ fn validate_write(
     let kind = *kinds
         .get(&location)
         .ok_or_else(|| protocol("stale typed location"))?;
-    let exact = match kind {
-        ScalarKind::Variant => true,
-        ScalarKind::Integer => matches!(value, Value::Integer(_)),
-        ScalarKind::Long => matches!(value, Value::Long(_)),
-        ScalarKind::Boolean => matches!(value, Value::Boolean(_)),
-        ScalarKind::String => matches!(value, Value::String(_)),
-        ScalarKind::Object => matches!(value, Value::Object(_) | Value::Nothing),
-        _ => false,
-    };
+    let exact = kind.accepts(value)
+        && array_types
+            .get(&location)
+            .is_none_or(|element| matches!(value,Value::Array(array) if array.kind()==*element));
     if !exact {
         return Err(protocol("foreign writeback declared type mismatch"));
     }

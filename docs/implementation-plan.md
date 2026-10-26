@@ -3,10 +3,12 @@
 Prepared 2026-10-26. This plan builds the interpreter and editor/debugger UI here; document/Office integration stays external.
 Setup and the documented M0–M3 subsets are complete. The detailed [bytecode/VM specification](bytecode-vm-specification.md)
 and [ADR 0004](decisions/0004-bytecode-vm-contract.md) are written before frontend work continues.
-M2 binding/lowering and M3 execution/debugger are implemented. M4 is complete for the reviewed
-[m4-language-v1 subset](m4-language.md), including IR 2, arrays/arguments, coercions, handlers,
-intrinsics and persistent state. The 20 original and 24 M4 authored scenarios are asserted PASS.
-External corpus/Microsoft oracle observations remain M9 work and are not claimed here.
+M2 binding/lowering and M3 execution/debugger are implemented. M4 now meets its original
+external acceptance gate: 153 reviewed ReflexGrid pure-language cases match their published
+Microsoft Excel Mac oracle expectations, alongside 44 authored scenarios. [The report](m4-oracle-report.md)
+records source hashes, the upstream environment and the distinction from a fresh Office run.
+The current profile is m4-conformance-v1 with [IR 3 extensions](m4-language.md); unselected corpus
+cases and new oracle acquisition remain M9 work.
 
 | Stage | Work in tiny-vba | Acceptance gate |
 |---|---|---|
@@ -15,7 +17,7 @@ External corpus/Microsoft oracle observations remain M9 work and are not claimed
 | M1 — frontend — complete for reviewed subset | Lexer, source-preserving parser, .bas/.cls metadata, procedures/declarations/assignment/If/For/calls; positive/negative fixtures | Exact error spans and same-line statement IDs; bounded recovery; run a reviewed grammar-corpus subset and report unsupported syntax |
 | M2 — binder and bytecode — complete for reviewed subset | Scopes, Option Explicit, locals/procedure binding, argument subset, lowering, verifier/disassembler | Compile/disassemble examples; reject invalid branches/slots/stack effects; deterministic source maps |
 | M3 — executable VM + debugger — complete for reviewed subset | Minimal typed values/arithmetic, explicit frames, loops/calls, budgets; generic foreign protocol; break/step/inspect/edit/resume | Host-free Answer() returns Long 42; generic host call trace correct; pause/edit/resume without replay; infinite loop cancels; native and WASM execution smoke tests |
-| M4 — semantic depth — complete for reviewed profile | Centralized coercions/all scalar widths, special states, Currency/Date, canonical ByRef/temporaries, bounded arrays, optional/named calls, handlers/intrinsics and module/Static state | 44 authored typed scenario assertions; negative IR2 and error-number tests; handler propagation/resume and explicit state restore/reset; native/WASI evidence; [scope](m4-language.md) |
+| M4 — semantic depth — complete | Coercions/numeric widths, special states, Currency/Date, arrays, whole-array/cell ByRef, optional/named/ParamArray arguments, Option Base, handlers, intrinsics and module/Static state | Original growing external-subset gate: 153 reviewed ReflexGrid cases with published Microsoft Excel expectations pass exact typed/error comparisons; 44 authored scenarios; negative IR/version tests and native/WASI execution; [evidence](m4-oracle-report.md) |
 | M5 — fork integration contract | Stabilize public foreign/value/debug APIs and version compatibility table; offer reusable tests | Fork-owned bridge can run FillCells against its own fake Office layer, pause/edit/resume and validate results; core still builds alone |
 | M6 — project source decoding | Read-only MS-OVBA decoder, encoding/attributes/references/codenames; malformed-stream and budget tests | Decode controlled project bytes; preserve module identities; reject unsupported/protected/corrupt inputs; no auto-execution |
 | M7 — callbacks and lifecycle | Bounded callbacks/events, static reset, stale-reference handling, cancellation/disconnect cleanup | Generic-host reentrancy tests pass; fork-owned event order and partial-side-effect tests pass |
@@ -51,7 +53,7 @@ M3 replacement-session isolation correction under ADR 0008.
 
 ## Immediate task sequence
 
-1. M4 language gates are implemented under ADR 0011; preserve explicit profile refusals and authored evidence.
+1. M4 language and external-oracle gates are implemented under ADRs 0011/0012; preserve explicit profile refusals and authored evidence.
 2. M5: stabilize foreign/value/debug API versioning and reusable bridge tests; fork-owned FillCells proof.
 3. Start the reusable graphical editor/debugger slice on proven VM APIs; M8 completes its acceptance gate.
 4. Extend vetted scenario/oracle coverage through M9, retaining NOT_RUN for unexecuted external material.

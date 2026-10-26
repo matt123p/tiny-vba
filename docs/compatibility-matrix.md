@@ -1,6 +1,6 @@
 # Compatibility matrix
 
-Updated 2026-10-26. Stage: M4 reviewed profile complete. **The documented m4-language-v1 consumer, including M3 control and M4 scalar widths, has execution evidence; the 20 self-authored fixtures are asserted 20 PASS / 0 UNSUPPORTED.**
+Updated 2026-10-26. Stage: M4 external acceptance complete. **The documented m4-conformance-v1 consumer, including M3 control and M4 scalar widths, has execution evidence; the 20 self-authored fixtures are asserted 20 PASS / 0 UNSUPPORTED.**
 
 | Dimension | Status | Evidence / next gate |
 |---|---|---|
@@ -35,3 +35,11 @@ Updated 2026-10-26. Stage: M4 reviewed profile complete. **The documented m4-lan
 M3 execution evidence is restricted to its explicit tests/examples and runtime matrix. It does not establish
 workbook/Office compatibility, browser UI behavior or external corpus pass rates; self-authored
 M0 assertions are 20 PASS / 0 UNSUPPORTED and external corpus execution remains NOT_RUN.
+
+## Current M4 external acceptance
+
+[The acceptance report](m4-oracle-report.md) supersedes the earlier authored-only status: 44
+authored scenarios and 153 reviewed ReflexGrid cases PASS. The latter carry upstream-reported
+Microsoft Excel Mac evidence with exact source hashes and raw results, not a new Office run.
+Whole-array/ParamArray/Option Base/named-cell argument tests and IR 3 version/metadata refusal
+checks pass. Unselected external cases retain NOT_RUN; future oracle acquisition stays in M9.

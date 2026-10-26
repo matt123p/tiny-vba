@@ -32,6 +32,7 @@ fn base() -> TestResult<Program> {
         kind: ProcedureKind::Sub,
         parameters: vec![],
         locals: vec![Local {
+            array: None,
             name: "x".into(),
             kind: ScalarKind::Long,
             role: SlotRole::User,
@@ -101,7 +102,9 @@ fn replace(p: &mut Program, pc: usize, instruction: Instruction) -> TestResult {
     Ok(())
 }
 fn check(p: Program) -> Result<VerifiedProgram, vba_diagnostics::Diagnostic> {
-    let caps = if p.ir_version == IR2_VERSION {
+    let caps = if p.ir_version == IR3_VERSION {
+        Capabilities::ir3_structural()
+    } else if p.ir_version == IR2_VERSION {
         Capabilities::ir2_structural()
     } else {
         Capabilities::ir1_structural()
@@ -252,7 +255,7 @@ fn reachable_infinite_cycle_is_valid_and_unreachable_block_is_rejected() -> Test
 #[test]
 fn feature_profile_version_opcode_operator_and_conversion_gates_are_checked() -> TestResult {
     let mut p = base()?;
-    p.ir_version = 3;
+    p.ir_version = 4;
     assert_eq!(check(p).err().ok_or("reject")?.code, "VBA0022");
     let mut p = base()?;
     p.required_features.insert("unknown-feature".into());
@@ -339,12 +342,14 @@ fn direct() -> TestResult<Program> {
         end_statement: statement,
         kind: ProcedureKind::Sub,
         parameters: vec![Parameter {
+            array: None,
             name: "n".into(),
             kind: ScalarKind::Long,
             mode: ParameterMode::ByRef,
             required: true,
         }],
         locals: vec![Local {
+            array: None,
             name: "n".into(),
             kind: ScalarKind::Long,
             role: SlotRole::Parameter(0),
@@ -742,5 +747,86 @@ fn ir2_intrinsic_handler_array_and_persistent_shapes_are_verified() -> TestResul
         .get_mut(1)
         .ok_or("instruction")? = Instruction::ErrClear;
     assert!(check(program).is_err());
+    Ok(())
+}
+
+fn reference_capture_program() -> TestResult<Program> {
+    let mut p = base()?;
+    p.ir_version = IR3_VERSION;
+    p.profile = "ir3-structural".into();
+    p.required_features.insert("argument-captures-v3".into());
+    let proc = proc_mut(&mut p)?;
+    proc.locals.push(Local {
+        array: None,
+        name: "capture".into(),
+        kind: ScalarKind::Long,
+        role: SlotRole::ScratchReference,
+        span: None,
+        visible: false,
+    });
+    proc.code = vec![
+        Instruction::Checkpoint(SiteId(0)),
+        Instruction::RefLocal(LocalSlot(0)),
+        Instruction::SaveReference(LocalSlot(1)),
+        Instruction::LoadReference(LocalSlot(1)),
+        Instruction::Const(ConstantId(0)),
+        Instruction::WriteRef(AssignmentKind::Value),
+        Instruction::Jump(Pc(7)),
+        Instruction::Checkpoint(SiteId(1)),
+        Instruction::Return,
+    ];
+    proc.checkpoints.get_mut(1).ok_or("site")?.enter_pc = Pc(7);
+    proc.max_stack = 2;
+    Ok(p)
+}
+#[test]
+fn reference_captures_require_matching_hidden_slots_and_prior_same_block_assignment() -> TestResult
+{
+    let p = reference_capture_program()?;
+    check(p.clone())?;
+    for instruction in [
+        Instruction::LoadReference(LocalSlot(1)),
+        Instruction::SaveReference(LocalSlot(99)),
+    ] {
+        let mut bad = p.clone();
+        *proc_mut(&mut bad)?.code.get_mut(2).ok_or("instruction")? = instruction;
+        assert!(check(bad).is_err());
+    }
+    let mut bad = p.clone();
+    proc_mut(&mut bad)?.locals.get_mut(1).ok_or("slot")?.kind = ScalarKind::Integer;
+    assert!(check(bad).is_err());
+    let mut bad = p.clone();
+    proc_mut(&mut bad)?.code.extend([
+        Instruction::LoadReference(LocalSlot(1)),
+        Instruction::ReadRef,
+        Instruction::DropValue,
+        Instruction::Return,
+    ]);
+    *proc_mut(&mut bad)?.code.get_mut(8).ok_or("instruction")? =
+        Instruction::LoadReference(LocalSlot(1));
+    assert!(check(bad).is_err());
+    let mut bad = p;
+    bad.ir_version = IR_VERSION;
+    bad.profile = "ir1-structural".into();
+    assert!(check(bad).is_err());
+    Ok(())
+}
+#[test]
+fn array_metadata_requires_variant_storage_and_matching_parameter_layout() -> TestResult {
+    let mut p = base()?;
+    p.ir_version = IR2_VERSION;
+    p.profile = "ir2-structural".into();
+    p.required_features.insert("arrays-v2".into());
+    proc_mut(&mut p)?.locals.first_mut().ok_or("local")?.array = Some(ScalarKind::Long);
+    assert!(check(p).is_err());
+    let legacy = Capabilities::ir1_structural();
+    assert!(!legacy.instructions.contains(&Opcode::SaveReference));
+    assert!(!legacy.ir_versions.contains(&IR2_VERSION));
+    assert!(
+        !Capabilities::ir2_structural()
+            .ir_versions
+            .contains(&IR3_VERSION)
+    );
+    assert!(!legacy.features.contains("array-parameters-v3"));
     Ok(())
 }

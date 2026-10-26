@@ -1,8 +1,14 @@
+Current compiler additions are in [the M4 language contract](m4-language.md) and
+[ADR 0012](decisions/0012-m4-oracle-acceptance.md): ir3-structural is the default target;
+IR 1/2 remain supported. Array parameter/layout metadata, ParamArray packing and named reference
+capture are checked before execution. The historical M2/M4-first-slice restrictions below are
+superseded only by those explicitly documented additions.
+
 # M2 binding and verified bytecode
 
 Updated for [M4 / IR 2](m4-language.md), adopted by [ADR 0011](decisions/0011-m4-language-extension.md).
-The additions there supersede the historical M2 subset/refusals below. Default compilation targets
-ir2-structural, preserving IR 1 instruction shapes and emitting IR 2 for extension features.
+The additions there supersede the historical M2 subset/refusals below. Default compilation now targets
+ir3-structural, preserving IR 1 instruction shapes and emitting IR 2 for extension features.
 
 Implemented 2026-10-26. `vba-semantics` binds the M1 AST; `vba-compiler` lowers it;
 `vba-ir` owns IR 1, structural verification, opaque immutable `VerifiedProgram` and disassembly.

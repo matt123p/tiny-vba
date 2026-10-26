@@ -1,0 +1,43 @@
+tiny-vba-scenario = 2
+id = rfx-m4-023
+module = Module1
+entry = OracleProbe
+provenance = reviewed-external
+license = MIT
+profile = excel-mac-upstream
+requirements = m4-conformance-v1
+capabilities = none
+evidence = upstream-reported-microsoft-oracle
+expected = Error:13
+rationale = Selected MIT pure-language oracle data; exact upstream scalar tag or error number, with no local Office run.
+source-repository = https://github.com/milochen0418/reflex_grid
+source-revision = 03a338b214df243f1bc68e50512936ddc5566c76
+source-path = tests/vba_excel_cases.py
+source-sha256 = e5d03d56c4f06433c5c4198c3ac79a4af3ff8c8def9d265337749705caf1cd0e
+expected-sha256 = 610f3ed1d17922a8d095179c6c6eb5e62936c81d7cef4993f3a7adb62a40427a
+report-sha256 = 4144969beac52097fba9ae19bad0e30a03d6ecf1b3278fd1fe424431bc4b61ec
+case-key = CBool("yes")
+oracle-result = E13
+oracle-excel = Microsoft Excel for Mac 16.114 (build 26101123)
+oracle-os = macOS 15.3.1
+oracle-date = 2026-10-15
+oracle-locale = not-recorded-per-run
+oracle-run-revision = 3758c56a39f0c8841fa43eedda0e074414fed3e3
+---
+Function OracleProbe() As Variant
+On Error Resume Next
+Err.Clear
+Dim v As Variant
+v = CaseValue()
+If Err.Number <> 0 Then
+Dim failure As Long
+failure = Err.Number
+On Error GoTo 0
+Err.Raise failure
+End If
+OracleProbe = v
+End Function
+
+Function CaseValue() As Variant
+CaseValue = CBool("yes")
+End Function

@@ -133,7 +133,24 @@ impl Expected {
     }
 }
 #[derive(Clone, Debug, PartialEq)]
+pub struct OracleEvidence {
+    pub source_repository: String,
+    pub source_revision: String,
+    pub source_path: String,
+    pub source_sha256: String,
+    pub expected_sha256: String,
+    pub report_sha256: String,
+    pub case_key: String,
+    pub raw_result: String,
+    pub excel: String,
+    pub os: String,
+    pub date: String,
+    pub locale: String,
+    pub run_revision: String,
+}
+#[derive(Clone, Debug, PartialEq)]
 pub struct Scenario {
+    pub oracle: Option<OracleEvidence>,
     pub id: String,
     pub module: String,
     pub entry: String,
@@ -167,7 +184,7 @@ impl Scenario {
         if file.text().contains('\0') {
             return Err(fail("NUL in fixture", 0, 0));
         }
-        let allowed = [
+        let common = [
             "tiny-vba-scenario",
             "id",
             "module",
@@ -180,6 +197,21 @@ impl Scenario {
             "evidence",
             "expected",
             "rationale",
+        ];
+        let evidence_fields = [
+            "source-repository",
+            "source-revision",
+            "source-path",
+            "source-sha256",
+            "expected-sha256",
+            "report-sha256",
+            "case-key",
+            "oracle-result",
+            "oracle-excel",
+            "oracle-os",
+            "oracle-date",
+            "oracle-locale",
+            "oracle-run-revision",
         ];
         let mut fields = BTreeMap::new();
         let mut offset = 0;
@@ -196,7 +228,10 @@ impl Scenario {
             let (key, value) = header
                 .split_once(" = ")
                 .ok_or_else(|| fail("expected key = value", offset, header.len()))?;
-            if !allowed.contains(&key) || value.is_empty() || fields.insert(key, value).is_some() {
+            if (!common.contains(&key) && !evidence_fields.contains(&key))
+                || value.is_empty()
+                || fields.insert(key, value).is_some()
+            {
                 return Err(fail(
                     "unknown, duplicate or empty field",
                     offset,
@@ -214,17 +249,100 @@ impl Scenario {
                 .copied()
                 .ok_or_else(|| fail(&format!("missing field {key}"), 0, 0))
         };
-        for key in allowed {
+        for key in common {
             field(key)?;
         }
-        for (key, required) in [
-            ("tiny-vba-scenario", "1"),
-            ("provenance", "independently-authored"),
-            ("license", "MIT"),
-            ("profile", "pure-language-unmeasured"),
-            ("capabilities", "none"),
-            ("evidence", "reasoned-not-oracle"),
-        ] {
+        let version = field("tiny-vba-scenario")?;
+        let oracle = match version {
+            "1" => {
+                if evidence_fields.iter().any(|key| fields.contains_key(key)) {
+                    return Err(fail("oracle fields require schema 2", 0, 0));
+                }
+                for (key, required) in [
+                    ("provenance", "independently-authored"),
+                    ("profile", "pure-language-unmeasured"),
+                    ("evidence", "reasoned-not-oracle"),
+                ] {
+                    if field(key)? != required {
+                        return Err(fail(&format!("unsupported {key}"), 0, 0));
+                    }
+                }
+                None
+            }
+            "2" => {
+                for key in evidence_fields {
+                    field(key)?;
+                }
+                for (key, required) in [
+                    ("provenance", "reviewed-external"),
+                    ("profile", "excel-mac-upstream"),
+                    ("evidence", "upstream-reported-microsoft-oracle"),
+                ] {
+                    if field(key)? != required {
+                        return Err(fail(&format!("unsupported {key}"), 0, 0));
+                    }
+                }
+                for key in ["source-sha256", "expected-sha256", "report-sha256"] {
+                    let hash = field(key)?;
+                    if hash.len() != 64
+                        || !hash
+                            .bytes()
+                            .all(|b| b.is_ascii_hexdigit() && !b.is_ascii_uppercase())
+                    {
+                        return Err(fail("invalid evidence hash", 0, 0));
+                    }
+                }
+                for key in ["source-revision", "oracle-run-revision"] {
+                    let hash = field(key)?;
+                    if hash.len() != 40
+                        || !hash
+                            .bytes()
+                            .all(|b| b.is_ascii_hexdigit() && !b.is_ascii_uppercase())
+                    {
+                        return Err(fail("invalid evidence revision", 0, 0));
+                    }
+                }
+                let path = field("source-path")?;
+                if path.starts_with('/')
+                    || path.contains('\\')
+                    || path.split('/').any(|p| p == ".." || p.is_empty())
+                {
+                    return Err(fail("invalid evidence path", 0, 0));
+                }
+                if !field("source-repository")?.starts_with("https://") {
+                    return Err(fail("invalid evidence repository", 0, 0));
+                }
+                let date = field("oracle-date")?;
+                if date.len() != 10
+                    || date.bytes().enumerate().any(|(i, b)| {
+                        if matches!(i, 4 | 7) {
+                            b != b'-'
+                        } else {
+                            !b.is_ascii_digit()
+                        }
+                    })
+                {
+                    return Err(fail("invalid oracle date", 0, 0));
+                }
+                Some(OracleEvidence {
+                    source_repository: field("source-repository")?.into(),
+                    source_revision: field("source-revision")?.into(),
+                    source_path: path.into(),
+                    source_sha256: field("source-sha256")?.into(),
+                    expected_sha256: field("expected-sha256")?.into(),
+                    report_sha256: field("report-sha256")?.into(),
+                    case_key: field("case-key")?.into(),
+                    raw_result: field("oracle-result")?.into(),
+                    excel: field("oracle-excel")?.into(),
+                    os: field("oracle-os")?.into(),
+                    date: date.into(),
+                    locale: field("oracle-locale")?.into(),
+                    run_revision: field("oracle-run-revision")?.into(),
+                })
+            }
+            _ => return Err(fail("unsupported tiny-vba-scenario", 0, 0)),
+        };
+        for (key, required) in [("license", "MIT"), ("capabilities", "none")] {
             if field(key)? != required {
                 return Err(fail(&format!("unsupported {key}"), 0, 0));
             }
@@ -243,7 +361,13 @@ impl Scenario {
         }
         let expected = parse_expected(field("expected")?)
             .ok_or_else(|| fail("invalid typed expectation", 0, 0))?;
+        if let Some(evidence) = &oracle
+            && oracle_expected(&evidence.raw_result).as_ref() != Some(&expected)
+        {
+            return Err(fail("oracle result disagrees with typed expectation", 0, 0));
+        }
         Ok(Self {
+            oracle,
             id: field("id")?.into(),
             module: field("module")?.into(),
             entry: field("entry")?.into(),
@@ -295,4 +419,47 @@ fn parse_expected(text: &str) -> Option<Expected> {
     };
     value.validate().ok()?;
     Some(Expected::Value(value))
+}
+
+/// Convert the selected oracle's exact scalar text; never introduces float tolerances.
+fn oracle_expected(raw: &str) -> Option<Expected> {
+    if let Some(number) = raw.strip_prefix('E')
+        && !number.contains('|')
+    {
+        return Some(Expected::RuntimeError(number.parse().ok()?));
+    }
+    let (kind, text) = raw.split_once('|')?;
+    let encoded = match kind {
+        "Empty" | "Null" if text.is_empty() => kind.to_owned(),
+        "Error" => format!("CVErr:{}", text.strip_prefix("Error ")?),
+        "Currency" => {
+            let negative = text.starts_with('-');
+            let text = text.strip_prefix('-').unwrap_or(text);
+            let (whole, fraction) = text.split_once('.').unwrap_or((text, ""));
+            if fraction.len() > 4 || !fraction.bytes().all(|b| b.is_ascii_digit()) {
+                return None;
+            }
+            let scale = 10i64.checked_pow(4 - u32::try_from(fraction.len()).ok()?)?;
+            let scaled = whole.parse::<i64>().ok()?.checked_mul(10000)?.checked_add(
+                if fraction.is_empty() {
+                    0
+                } else {
+                    fraction.parse::<i64>().ok()?.checked_mul(scale)?
+                },
+            )?;
+            format!(
+                "Currency:{}",
+                if negative {
+                    scaled.checked_neg()?
+                } else {
+                    scaled
+                }
+            )
+        }
+        "String" | "Integer" | "Long" | "LongLong" | "Byte" | "Single" | "Double" | "Boolean" => {
+            format!("{kind}:{text}")
+        }
+        _ => return None,
+    };
+    parse_expected(&encoded)
 }

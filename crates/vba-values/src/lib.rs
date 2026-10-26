@@ -255,6 +255,8 @@ impl ScalarKind {
 /// Deterministic, host-free language intrinsics. Arity is part of the bytecode contract.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Intrinsic {
+    ArrayBaseOne,
+    IIf,
     DebugPrint,
     InStr,
     Replace,
@@ -302,7 +304,7 @@ impl Intrinsic {
     pub fn from_name(name: &str) -> Option<Self> {
         use Intrinsic::*;
         [
-            DebugPrint, InStr, Replace, Split, Join, IsObject, Array, LBound, UBound, IsArray,
+            IIf, DebugPrint, InStr, Replace, Split, Join, IsObject, Array, LBound, UBound, IsArray,
             CVErr, IsMissing, IsEmpty, IsNull, IsError, VarType, TypeName, CInt, CLng, CLngLng,
             CByte, CSng, CDbl, CCur, CDate, CBool, CStr, CVar, Len, Abs, Int, Fix, Sgn, Round,
             Left, Right, Mid, Trim, LCase, UCase, Asc, Chr,
@@ -312,7 +314,8 @@ impl Intrinsic {
     }
     pub fn accepts(self, count: usize) -> bool {
         match self {
-            Self::Array | Self::DebugPrint => count <= 256,
+            Self::IIf => count == 3,
+            Self::Array | Self::ArrayBaseOne | Self::DebugPrint => count <= 256,
             Self::InStr => (2..=4).contains(&count),
             Self::Replace => (3..=6).contains(&count),
             Self::Split => (1..=4).contains(&count),
@@ -377,6 +380,15 @@ impl VbaArray {
     }
     pub fn allocation_bytes(kind: ScalarKind, bounds: &[(i32, i32)]) -> Result<usize, Diagnostic> {
         Ok(128 + Self::length(bounds)? * (64 + kind.initial_value().payload_bytes()))
+    }
+    pub fn empty(kind: ScalarKind, lower: i32) -> Self {
+        Self {
+            kind,
+            bounds: vec![(lower, lower.saturating_sub(1))],
+            elements: Vec::new(),
+            dynamic: true,
+            payload: 128,
+        }
     }
     pub fn set(&mut self, index: usize, value: Value) -> Result<(), Diagnostic> {
         value.validate()?;

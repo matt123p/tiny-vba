@@ -1,4 +1,4 @@
-//! IR 1/2: immutable programs, bounded structural verification and diagnostic disassembly.
+//! IR 1/2/3: immutable programs, bounded structural verification and diagnostic disassembly.
 #![forbid(unsafe_code)]
 mod disasm;
 mod verify;
@@ -26,7 +26,8 @@ index!(
 );
 pub const IR_VERSION: u32 = 1;
 pub const IR2_VERSION: u32 = 2;
-pub const FEATURES: [&str; 11] = [
+pub const IR3_VERSION: u32 = 3;
+pub const FEATURES: [&str; 15] = [
     "scalar-core",
     "integer-long-ops",
     "direct-calls",
@@ -38,6 +39,10 @@ pub const FEATURES: [&str; 11] = [
     "arrays-v2",
     "persistent-v2",
     "argument-defaults-v2",
+    "array-parameters-v3",
+    "array-layout-v3",
+    "argument-captures-v3",
+    "intrinsics-v3",
 ];
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
@@ -90,6 +95,8 @@ pub const BINARY_OPS: [BinaryOp; 19] = [
 ];
 #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
 pub enum Opcode {
+    SaveReference,
+    LoadReference,
     RefElement,
     ArrayResize,
     ArrayErase,
@@ -117,7 +124,9 @@ pub enum Opcode {
     Stop,
     Return,
 }
-pub const OPCODES: [Opcode; 26] = [
+pub const OPCODES: [Opcode; 28] = [
+    Opcode::SaveReference,
+    Opcode::LoadReference,
     Opcode::Intrinsic,
     Opcode::RefElement,
     Opcode::ArrayResize,
@@ -153,6 +162,8 @@ pub enum AssignmentKind {
 }
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum Instruction {
+    SaveReference(LocalSlot),
+    LoadReference(LocalSlot),
     RefElement {
         rank: u8,
         kind: ScalarKind,
@@ -207,6 +218,8 @@ pub enum Instruction {
 impl Instruction {
     pub fn opcode(&self) -> Opcode {
         match self {
+            Self::SaveReference(_) => Opcode::SaveReference,
+            Self::LoadReference(_) => Opcode::LoadReference,
             Self::RefElement { .. } => Opcode::RefElement,
             Self::ArrayResize { .. } => Opcode::ArrayResize,
             Self::ArrayErase => Opcode::ArrayErase,
@@ -248,6 +261,7 @@ pub enum ParameterMode {
 }
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum SlotRole {
+    ScratchReference,
     Persistent(u32),
     Parameter(u32),
     Result,
@@ -256,6 +270,7 @@ pub enum SlotRole {
 }
 #[derive(Clone, Debug)]
 pub struct Local {
+    pub array: Option<ScalarKind>,
     pub name: String,
     pub kind: ScalarKind,
     pub role: SlotRole,
@@ -264,6 +279,7 @@ pub struct Local {
 }
 #[derive(Clone, Debug)]
 pub struct Parameter {
+    pub array: Option<ScalarKind>,
     pub name: String,
     pub kind: ScalarKind,
     pub mode: ParameterMode,
@@ -365,6 +381,7 @@ pub struct Program {
 /// A structural execution target, not a claim that a VM implements its operations.
 #[derive(Clone, Debug)]
 pub struct Capabilities {
+    pub ir_versions: BTreeSet<u32>,
     pub profile: String,
     pub features: BTreeSet<String>,
     pub instructions: BTreeSet<Opcode>,
@@ -377,11 +394,14 @@ impl Capabilities {
     pub fn ir1_structural() -> Self {
         let mut caps = Self::ir2_structural();
         caps.profile = "ir1-structural".into();
+        caps.ir_versions = BTreeSet::from([IR_VERSION]);
         caps.features.retain(|feature| !feature.ends_with("-v2"));
         caps.instructions.retain(|op| {
             !matches!(
                 op,
-                Opcode::Intrinsic
+                Opcode::SaveReference
+                    | Opcode::LoadReference
+                    | Opcode::Intrinsic
                     | Opcode::OnError
                     | Opcode::Resume
                     | Opcode::ErrGet
@@ -395,8 +415,18 @@ impl Capabilities {
         caps
     }
     pub fn ir2_structural() -> Self {
+        let mut caps = Self::ir3_structural();
+        caps.profile = "ir2-structural".into();
+        caps.ir_versions = BTreeSet::from([IR_VERSION, IR2_VERSION]);
+        caps.features.retain(|feature| !feature.ends_with("-v3"));
+        caps.instructions.remove(&Opcode::SaveReference);
+        caps.instructions.remove(&Opcode::LoadReference);
+        caps
+    }
+    pub fn ir3_structural() -> Self {
         Self {
-            profile: "ir2-structural".into(),
+            profile: "ir3-structural".into(),
+            ir_versions: BTreeSet::from([IR_VERSION, IR2_VERSION, IR3_VERSION]),
             features: FEATURES.iter().map(|s| (*s).into()).collect(),
             instructions: OPCODES.into_iter().collect(),
             unary: [UnaryOp::Negate, UnaryOp::Not].into_iter().collect(),

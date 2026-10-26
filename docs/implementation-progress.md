@@ -1,9 +1,49 @@
 # Implementation progress
 
-Updated 2026-10-26. Current stage: M0–M4 complete for the reviewed
-[m4-language-v1 profile](m4-language.md). M5 integration contracts and the graphical IDE slice are next.
+Updated 2026-10-26. Current stage: **M4 acceptance complete**, including the original external
+oracle gate. Current runtime profile: m4-conformance-v1. M5 and the graphical IDE slice are next.
 
-## M4 semantic depth completion
+## M4 external acceptance completion
+
+The earlier authored-only completion claim did not establish the supplied M4 gate. Corrected it
+by reviewing and adopting **153 MIT ReflexGrid pure-language cases** with published Microsoft
+Excel Mac expectations under [ADR 0012](decisions/0012-m4-oracle-acceptance.md). All 153 now PASS,
+alongside the original **44 authored PASS** scenarios. [The acceptance report](m4-oracle-report.md)
+records every selected case and raw expected result, source/expected/report hashes and provenance.
+
+The upstream report names Excel for Mac 16.114/build 26101123, macOS 15.3.1 and 2026-10-15.
+Fetched its recorded run revision read-only and verified that the case/expected files are
+byte-identical at the pinned source revision. Locale is explicitly not recorded per run.
+This is inherited upstream-reported Microsoft evidence, not a fresh local Office run. Excluded
+Windows-only/locale/non-ASCII/Mac naming cases and all unselected specimens remain NOT_RUN.
+Only fixture literals and selected VBA snippets were consumed; no upstream interpreter or Python
+script ran. The exact upstream Err-state probe is preserved in a small fixture adapter.
+
+Oracle cases corrected Byte widths/overflow, Currency addition, Single division, Boolean arithmetic,
+scalar text precision/exponents, 0/0 and power overflow, Empty/string comparison, eager IIf,
+empty-array bounds and physical-line label parsing. Added required typed whole-array ByRef,
+ParamArray packing (including empty 0..-1), Option Base and qualified VBA.Array, and canonical named
+array-reference capture. Typed whole-array assignments, debugger edits and host patches preserve
+element kinds. Captured references retain source evaluation order and expire after resizing.
+
+IR 3 carries the new array layouts/parameters, reference captures and intrinsic identifiers;
+IR 1/2 structural capabilities and supported-version sets are preserved explicitly. The compiler
+selects the minimum required version. Schema 2 requires complete external metadata and matching
+raw/typed results, while Schema 1 remains authored/unmeasured. CI verifies the immutable selection,
+license notice, source adaptations and identical native/WASI case bundle, with no corpus checkout
+required for ordinary tests.
+
+Final verification: cargo xtask ci (formatting, strict Clippy, **133 integration tests**, 16-crate
+DAG, seven pins/646 hashes and M4 evidence verification); the same 133 tests pass in release.
+All libraries compile for wasm32-unknown-unknown. Native and WASI execute all 153 inherited oracle
+cases and expanded array/argument tests alongside every M3 debugger/host/cancellation/isolation
+proof. No remote cross-platform or separate MSRV run is claimed. Remaining language limitations
+are explicit in [the current contract](m4-language.md); no complete-VBA or full-corpus claim is made.
+
+Next: M5 public API/bridge versioning, with graphical IDE work under M8. M9 grows oracle coverage
+and obtains fresh observations; it no longer defers the original M4 external-subset gate.
+
+## Historical M4 authored-subset completion
 
 Implemented the adopted [IR 2 language extension](decisions/0011-m4-language-extension.md) across
 syntax, semantics, compiler, verifier, values, runtime and explicit-frame VM. The original IR 1

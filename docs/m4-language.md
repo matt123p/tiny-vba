@@ -1,8 +1,9 @@
-# M4 language profile and IR 2
+# M4 language profile and versioned IR
 
-The `m4-language-v1` profile implements the reviewed M4 semantic subset. It builds on the M3
+The `m4-conformance-v1` profile implements the reviewed M4 semantic subset. It builds on the M3
 explicit-frame VM, debugger, budgets and generic host protocol. [ADR 0011](decisions/0011-m4-language-extension.md)
-is the adopted extension. This is an independently tested language profile, not full VBA or an
+records the first extension; [ADR 0012](decisions/0012-m4-oracle-acceptance.md) completes
+external acceptance and adds IR 3 while preserving IR 1/2 targets. This is an independently tested language profile, not full VBA or an
 Office compatibility certification. Original supplied specifications remain design inputs.
 
 ## Values and coercion
@@ -37,6 +38,12 @@ complete positional signature: optionality is elaborated in the compiler. Launch
 require explicit ByVal values. Direct exact-type local/static/module/array-element ByRef aliases
 share canonical locations. Parenthesized and evaluated ByRef expressions use typed private temporaries.
 
+Whole-array ByRef parameters preserve the caller's canonical storage, element kind and bounds,
+including ReDim/Erase effects. Typed whole-array assignments and host/debugger writes check element
+kinds. ParamArray packs present positional values into a private zero-based Variant array; an empty
+pack has bounds 0..-1. Option Base 0/1 controls omitted declaration/ReDim bounds and unqualified
+Array; VBA.Array and ParamArray remain zero-based. Explicit bounds are preserved.
+
 Arrays support Dim with fixed bounds, dynamic Dim(), ReDim, ReDim Preserve, Erase, typed element
 reads/writes and direct ByRef elements. Dimensions retain signed lower bounds and column-major
 order. Preserve may change only the final upper bound. Erase resets fixed cells or unallocates a
@@ -51,17 +58,23 @@ invocation; `restore_project()` imports it before the first instruction, matchin
 exact source identities/text. Starting fresh resets state. Completed writes survive failure;
 restoration does not implement rollback. State is owned by the Session/caller, never a process global.
 
-The profile currently refuses calls combining named/omitted or evaluated-temporary argument
-capture with ByRef array elements, whole-array
-parameters, ParamArray, UDT fields, Static procedure modifiers, implicit ReDim declarations,
-Option Base 1, class/property/default-member dispatch, radix/extra-suffix numeric literals and
-locale-sensitive behavior. These refusals are outside the reviewed M4 profile. Object host
+The profile still explicitly refuses nested arrays, UDT fields, Static procedure modifiers,
+ReDim without an explicitly declared array, additional literal forms and locale-sensitive behavior.
+ParamArray must be final and cannot be Optional, explicitly ByRef/ByVal or named. Whole-array
+source parameters are required ByRef. Named array-cell arguments are supported through canonical
+reference capture; indices evaluate once in source order, and later resizes invalidate the saved
+reference rather than retargeting it. Object host
 dispatch and snapshot aliases retain the M3 restrictions; Office objects remain fork-owned.
 
 ## Intrinsic registry
 
+IIf is eager: all arguments evaluate before its selection, as in VBA. Scalar number text uses
+15 significant digits for Double and seven for Single, with the tested exponent conventions.
+The oracle cases also establish Byte widths/overflow, Single division, Currency addition and
+0/0 overflow 6 separately from nonzero/0 error 11.
+
 The values layer owns closed intrinsic identifiers and arity. Runtime owns implementation and
-shared conversions. Implemented deterministic operations are CVErr, IsMissing, IsEmpty, IsNull,
+shared conversions. Implemented deterministic operations are IIf, CVErr, IsMissing, IsEmpty, IsNull,
 IsError, IsObject, IsArray, VarType, TypeName, CInt, CLng, CLngLng, CByte, CSng, CDbl, CCur, CDate,
 CBool, CStr, CVar, Len, Abs, Int, Fix, Sgn, Round, Left, Right, Mid, Trim, LCase, UCase, Asc, Chr,
 InStr, Replace, Split, Join, Array, LBound and UBound. Binary string comparison is supported;
@@ -87,15 +100,18 @@ before handler delivery; continue applies it once. Fault inspection is read-only
 statements retain separate checkpoints. A retry can intentionally repeat effects inside the faulting
 statement; effects of earlier completed statements are not replayed by ordinary continuation.
 
-## IR 2 extension
+## IR 2 and IR 3 contracts
 
-IR_VERSION stays 1 for old clients; IR2_VERSION is 2. `ir1_structural()` retains old features/opcodes;
-`ir2_structural()` adds the extension. The compiler defaults to the new structural target and emits
-IR 1 for old instructions or IR 2 when an extension feature is required. Existing IR 1 instruction
+IR_VERSION stays 1 for old clients; IR2_VERSION is 2 and IR3_VERSION is 3. `ir1_structural()` retains old features/opcodes;
+`ir2_structural()` retains the first extension. `ir3_structural()` adds array layout/parameter
+metadata, saved canonical references and new intrinsic identifiers. Each target explicitly lists
+its supported IR versions. The compiler defaults to ir3-structural and emits the minimum required
+version for its selected features. Existing IR 1 instruction
 shapes are unchanged. The runtime profile is explicitly new; compile against VM capabilities.
 
 | Instruction | Stack effect / constraints |
 |---|---|
+| SaveReference(slot), LoadReference(slot) (IR 3) | typed reference -> capture / capture -> typed reference; matching hidden role, assignment earlier in the same checkpoint block |
 | Intrinsic {function, arguments} | n values -> value; closed identifier and accepted arity |
 | OnError {target, resume_next} | empty -> empty; target is a checkpoint; target and next are exclusive |
 | Resume {target, next} | empty -> terminator; exclusive optional target/next; dynamic retry otherwise |
@@ -107,7 +123,11 @@ shapes are unchanged. The runtime profile is explicitly new; compile against VM 
 | ArrayErase | owner reference -> empty |
 
 New feature names are intrinsics-v2, error-handlers-v2, arrays-v2, persistent-v2 and
-argument-defaults-v2. SlotRole::Persistent(key) shares a bounded project key across procedures;
+argument-defaults-v2. IR 3 adds array-layout-v3, array-parameters-v3, argument-captures-v3 and
+intrinsics-v3. Local/Parameter.array metadata must agree, requires Variant storage and validates
+element kinds. ScratchReference slots cannot be accessed as ordinary value locals; captures cannot
+cross checkpoint boundaries. The old structural targets refuse new versions/features/instructions.
+SlotRole::Persistent(key) shares a bounded project key across procedures;
 the verifier checks type agreement and disallows parameter/result overlap. Missing constants and WriteRef(ArgumentBinding) are
 allowed only in IR 2. ArgumentBinding uses shared parameter binding rules for captured values,
 including Object/Nothing copies, and requires argument-defaults-v2. Live Object and Array constants remain forbidden.
@@ -120,10 +140,13 @@ stacks are verified. The compiler records logical structured successors before f
 
 ## Evidence
 
-The 20 original fixtures and 24 M4 fixtures run through the CLI with exact typed judgments. M4
-fixtures declare `requirements = m4-language-v1`; their evidence remains reasoned-not-oracle.
-Owning runtime/value/compiler/IR/VM/host tests cover numeric extrema, canonical aliases, stale cells,
-source evaluation order, handler propagation/resumption, budgets and explicit state reset/restore.
-The native/WASI smoke runs arrays, Currency, Date, exact LongLong, optional/named calls, handlers
-and project-state transfer alongside all original M3 debugger/host/cancellation checks.
-External corpus candidates remain NOT_RUN. Microsoft oracle goldens remain an M9 obligation.
+M4's original external gate now passes: 153 reviewed ReflexGrid cases match published Microsoft
+Excel Mac scalar/error expectations. They run natively and under WASI, along with all 44 authored
+scenarios and the prior M3 lifecycle smoke. Schema 2 preserves raw oracle results and source hashes;
+its probe reproduces the upstream Err-state check. [The report](m4-oracle-report.md) documents
+upstream-reported build/OS/date, selection, license, numerical evidence limits and unselected cases.
+
+Owning tests additionally cover whole-array aliases, ParamArray, Option Base and qualified Array,
+source-order reference capture, stale locations, host/debugger type checks, malformed IR and
+legacy capability refusal. No fresh local Office observation is claimed. M9 extends oracle coverage;
+unselected external specimens remain NOT_RUN.
