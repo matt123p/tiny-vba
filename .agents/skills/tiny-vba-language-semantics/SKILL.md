@@ -41,3 +41,20 @@ side effects and unsupported behaviour. Include same-line source mapping and pau
 when lowering or control flow changes. Put integration tests under the owning crate's tests/.
 Use the conformance skill for external fixtures or oracle claims, and debugger skill for stepping
 or inspection changes. Preserve native/WASM execution paths and report the exact supported subset.
+
+## Implemented M1 frontend
+
+Read [frontend](../../../docs/frontend.md) and [ADR 0005](../../../docs/decisions/0005-m1-frontend.md).
+Reuse vba-syntax's owned source/tokens/AST and distinct StatementSites. A recovered tree with diagnostics
+is never valid input to binding. Apply nodes remain unresolved; retain parentheses, call style,
+Let/Set and omitted/named/optional syntax. M1 parsing does not make those IR 1 capabilities.
+M2 implements the documented subset of binding/Option Explicit/types/call legality. No execution results change from parsing.
+
+## Implemented M2 contract
+
+Read [compiler](../../../docs/compiler.md) and [ADR 0006](../../../docs/decisions/0006-m2-binding-and-verification.md).
+Reuse vba-values ScalarKind, vba-semantics bound symbols and vba-compiler lowering. The compiler always
+passes vba-ir verification; only vba-ir constructs VerifiedProgram. Keep IR independent of binding and
+VM independent of compilation/debug/UI. M2 ir1-structural capabilities describe verification shapes,
+not runtime support. Actual execution must check the M3 runtime matrix. Preserve exact constant tags,
+ordered slots/sites, complete nonexecutable statement metadata and explicit unsupported diagnostics.

@@ -9,8 +9,8 @@ checked half-open UTF-8 byte spans and optional diagnostic attachments. Source I
 within a compilation/session; replacing text requires a fresh source identity. Statement identity
 is independent of line number, so colon-separated statements can receive different IDs in M1.
 SourceFile checks text/name budgets and span order, bounds and UTF-8 boundaries. Display positions
-are one-based lines/Unicode scalar columns; CRLF is one newline. Lone CR line handling and
-editor UTF-16 coordinate conversion are future frontend work.
+are one-based lines/Unicode scalar columns; CRLF is one newline. Lone CR line handling was added at M1 under ADR 0005;
+editor UTF-16 coordinate conversion remains future work.
 
 `vba-values` owns distinct Empty/Null/Missing/Nothing/CVErr states, exact scalar widths,
 Currency scaled by 10,000, serial-day Date, UTF-16 strings (including lone surrogate code units),

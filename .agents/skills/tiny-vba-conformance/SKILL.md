@@ -45,3 +45,11 @@ native/WASM runtime evidence when available; UI changes need rendered/interactio
 Run the appropriate checks and repository CI/WASM gates; corpus integrity is a separate check.
 Update compatibility/progress from actual outcomes, including unavailable checks and the next smallest
 task. Never claim full Office compatibility from a narrow generic-host or visual demonstration.
+
+M1's [reviewed grammar allowlist](../../../docs/m1-corpus-report.md) permits syntax-only ingestion
+of five directly authored tree-sitter-vba examples, not execution or third-party subtree adoption.
+All 20 M0 bodies parse, but execution statuses and the corpus inventory remain NOT_RUN.
+
+M2 VERIFIED/diagnostic disassembly is structural compilation evidence only; see
+[compiler tests and boundaries](../../../docs/compiler.md). Do not mark any execution scenario PASS
+from compilation. All M0/external execution statuses remain NOT_RUN until a real VM runs assertions.

@@ -42,3 +42,7 @@ No arbitrary upstream test scripts are invoked by repository checks.
 
 Submodule acquisition is complete for the documented Git-backed corpus sources. Curating executable,
 rights-reviewed scenarios and measured oracle goldens remains M0/M9 work, not an accomplished test result.
+
+M1 exception to the pending syntax selection: five directly authored tree-sitter-vba example files
+are reviewed for bounded parser ingestion only. See [review and results](../../docs/m1-corpus-report.md).
+Their execution remains NOT_RUN; no third-party or realworld subtree selection is included.

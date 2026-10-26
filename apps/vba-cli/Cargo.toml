@@ -13,3 +13,6 @@ workspace = true
 [dependencies]
 vba-diagnostics.workspace = true
 vba-conformance.workspace = true
+vba-syntax.workspace = true
+vba-compiler.workspace = true
+vba-ir.workspace = true

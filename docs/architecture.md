@@ -1,6 +1,6 @@
 # Architecture
 
-Status: M0 complete, 2026-10-26. Source/scenario/scalar/foreign prototype APIs exist; compiler and VM remain scaffolds.
+Status: M0–M2 subset complete, 2026-10-26. Source frontend, binder, compiler and verified IR are implemented; runtime, VM and debugger remain scaffolds.
 
 The current scaffold and future headless engine can compile and test without Office, UI toolkits,
 application forks or corpus downloads. This repository also owns an optional editor/debugger UI
@@ -8,19 +8,21 @@ and standalone IDE; those upper layers may depend on UI toolkits.
 VBA source flows through syntax → semantics → verified IR → explicit-state VM.
 The dependency graph is separate from this data flow: IR does not need a dependency on the binder.
 The adopted [IR 1 specification](bytecode-vm-specification.md) defines instruction/stack contracts,
-verified immutable programs, calling conventions, continuations and budgets. It is not implemented.
-[ADR 0004](decisions/0004-bytecode-vm-contract.md) plans an upper-layer vba-compiler for orchestration
-and lowering, depending on diagnostics/syntax/semantics/IR/values when it lands at M2. This avoids
-putting reusable compilation inside CLI/VM or reversing the IR/binder boundary. No compiler package
-or reserved DAG node is added by this design-only change.
+verified immutable programs, calling conventions, continuations and budgets. M2 implements the structural IR/verifier; VM execution remains M3.
+[ADR 0004](decisions/0004-bytecode-vm-contract.md) and
+[ADR 0006](decisions/0006-m2-binding-and-verification.md) place compilation/lowering in vba-compiler,
+which depends on diagnostics/syntax/semantics/IR/values. IR remains independent of the binder.
+See the [M2 compiler contract](compiler.md) for supported source, API and structural capability target.
+
 
 | Crate | Responsibility | Direct normal dependencies |
 |---|---|---|
 | vba-diagnostics | Source identities, spans, diagnostic codes | none |
 | vba-values | Typed Variant, arrays, references and l-values | diagnostics |
 | vba-syntax | Lexer/parser and source-preserving AST | diagnostics |
-| vba-semantics | Scope/type/call binding | diagnostics, syntax |
+| vba-semantics | Scope/type/call binding | diagnostics, syntax, values |
 | vba-ir | Bytecode, verifier, constants and source maps | diagnostics, values |
+| vba-compiler | Parse/bind coordination and deterministic verified IR lowering | diagnostics, syntax, semantics, ir, values |
 | vba-runtime | Shared coercion/operators/builtins/error rules | diagnostics, values |
 | vba-foreign | Generic host call/result/wait protocol | diagnostics, values |
 | vba-vm | Frames, instruction pointer, budgets, inspection hooks | diagnostics, ir, values, runtime, foreign |
@@ -29,10 +31,12 @@ or reserved DAG node is added by this design-only change.
 | vba-project | Read-only source/project decoder | diagnostics |
 | vba-testkit | Deterministic generic foreign host and trace support | diagnostics, values, foreign |
 | vba-conformance | Scenario validation and typed expectations; comparison/reports later | diagnostics, testkit, values, vm |
-| vba-cli | Standalone command frontend and fixture validation | conformance, diagnostics (compiler/VM wiring later) |
+| vba-cli | Source parsing, compilation/disassembly and fixture validation | conformance, diagnostics, syntax, compiler, ir |
 | xtask | Maintenance commands | none |
 
-Some dependencies still reserve boundaries. Syntax, semantics, IR, runtime, VM, debug/DAP and project remain scaffolds.
+Some dependencies still reserve boundaries. Runtime, VM, debug/DAP and project remain scaffolds. Semantics, compiler and IR implement M2.
+Syntax implements the bounded lexer/parser described in [frontend](frontend.md) and
+[ADR 0005](decisions/0005-m1-frontend.md); its only dependency remains diagnostics.
 Diagnostics, values, foreign, testkit and conformance implement the bounded M0 contracts in
 [ADR 0003](decisions/0003-m0-source-scenarios-foreign.md).
 `tools/architecture.json` is the enforced graph. New external dependencies require explicit graph review.

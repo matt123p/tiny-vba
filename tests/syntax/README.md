@@ -1,7 +1,9 @@
-# syntax
+# Syntax fixtures
 
-Positive and negative lexer/parser fixtures, recovery and source spans.
+`m1/control.bas`, `m1/metadata.cls` and `m1/invalid.bas` are independently authored MIT fixtures
+for M1 control flow, source-only class metadata and exact error/recovery assertions.
+Rust integration tests live in `crates/vba-syntax/tests/frontend.rs` and also parse the two examples
+and all 20 M0 scenario bodies. None executes VBA. Normal tests need no external checkout.
 
-This directory reserves the test-data location; it is not automatically discovered by Cargo.
-Rust integration tests must live under the owning crate’s `tests/` directory and load these fixtures using `CARGO_MANIFEST_DIR`.
-No VBA scenarios execute yet. See [the implementation plan](../../docs/implementation-plan.md).
+See [frontend](../../docs/frontend.md) for the grammar matrix/bounds and
+[the external grammar report](../../docs/m1-corpus-report.md) for the separate opt-in allowlist.

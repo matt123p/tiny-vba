@@ -73,18 +73,34 @@ impl SourceFile {
             .get(span.start as usize..span.end as usize)
             .ok_or_else(|| Diagnostic::new("VBA0004", "invalid source span"))
     }
-    /// One-based line and Unicode scalar column; CRLF counts as one newline.
+    /// One-based line and Unicode scalar column; LF, CRLF and lone CR are newlines.
     pub fn position(&self, span: Span) -> Result<(usize, usize), Diagnostic> {
         self.slice(span)?;
         let prefix = self
             .text
             .get(..span.start as usize)
             .ok_or_else(|| Diagnostic::new("VBA0004", "invalid source span"))?;
-        let line = prefix.bytes().filter(|b| *b == b'\n').count() + 1;
-        let column = prefix
-            .rsplit('\n')
-            .next()
-            .map_or(1, |s| s.chars().count() + 1);
+        let (mut line, mut column, mut was_cr) = (1, 1, false);
+        for c in prefix.chars() {
+            match c {
+                '\r' => {
+                    line += 1;
+                    column = 1;
+                    was_cr = true;
+                }
+                '\n' => {
+                    if !was_cr {
+                        line += 1;
+                    }
+                    column = 1;
+                    was_cr = false;
+                }
+                _ => {
+                    column += 1;
+                    was_cr = false;
+                }
+            }
+        }
         Ok((line, column))
     }
 }

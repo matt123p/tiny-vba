@@ -11,7 +11,7 @@ Read [architecture](../../../docs/architecture.md), the [actual dependency graph
 Inspect the affected Cargo manifests and callers before designing an API.
 Read the adopted [IR 1 contract](../../../docs/bytecode-vm-specification.md) and
 [ADR 0004](../../../docs/decisions/0004-bytecode-vm-contract.md) for bytecode/VM work.
-Compilation/lowering belongs in a planned upper-layer vba-compiler, introduced with real M2 code;
+Compilation/lowering belongs in the implemented upper-layer vba-compiler;
 do not add documentation-only graph nodes or put reusable lowering inside the CLI/VM.
 
 ## Place responsibility before adding code
@@ -45,3 +45,16 @@ packages merely to reserve names. External dependency adoption includes licence 
 
 Run `cargo xtask layers`, then repository CI/WASM gates. Demonstrate headless consumers do not
 pull UI/platform dependencies when UI packages are introduced. Report planned versus working APIs.
+
+M1 implements vba-syntax's lexer/parser/AST and adds CLI -> syntax for source parsing under ADR 0005.
+Its only library dependency is diagnostics. Syntax success, binding validity and execution results
+remain distinct. See [frontend](../../../docs/frontend.md) before consuming recovered trees.
+
+## Implemented M2 contract
+
+Read [compiler](../../../docs/compiler.md) and [ADR 0006](../../../docs/decisions/0006-m2-binding-and-verification.md).
+Reuse vba-values ScalarKind, vba-semantics bound symbols and vba-compiler lowering. The compiler always
+passes vba-ir verification; only vba-ir constructs VerifiedProgram. Keep IR independent of binding and
+VM independent of compilation/debug/UI. M2 ir1-structural capabilities describe verification shapes,
+not runtime support. Actual execution must check the M3 runtime matrix. Preserve exact constant tags,
+ordered slots/sites, complete nonexecutable statement metadata and explicit unsupported diagnostics.

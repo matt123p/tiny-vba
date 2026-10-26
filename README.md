@@ -3,11 +3,13 @@
 A new, standalone VBA interpreter, editor and debugger in Rust, intended to run natively and in WebAssembly.
 Develop, run and test the language engine without Gridcraft, Wordcraft, Microsoft Office or a graphical interface.
 
-**Current status:** M0 complete: source-aware diagnostics, typed scalar/location foundations,
-a versioned fixture validator with 20 self-authored language cases, and a tested generic foreign-call
-ownership prototype. There is no VBA parser, executable VM or editor/debugger UI yet.
-The CLI provides help/version and `conformance validate`; planned execution commands return
-`VBA0001: UNSUPPORTED` with exit code 2. Validated VBA cases remain NOT_RUN. No VBA compatibility is claimed.
+**Current status:** M0–M2 complete for the documented [frontend](docs/frontend.md) and
+[compiler subset](docs/compiler.md): source-preserving parsing, scalar name/signature binding,
+checkpoint-based bytecode lowering, bounded IR 1 verification and deterministic disassembly.
+The CLI implements `parse`, `check`, `compile`, `disasm` and fixture validation. There is no
+executable VM or editor/debugger UI yet. Execution commands return `VBA0001: UNSUPPORTED`
+with exit code 2; all VBA scenario execution results remain NOT_RUN.
+
 
 The Excel/Word compatibility layers, Office metadata and application adapters belong in the
 Gridcraft and Wordcraft forks. This repo owns language semantics, bytecode, execution,
@@ -18,10 +20,13 @@ and design conventions. See the [editor/debugger UI contract](docs/editor-debugg
 ## Start here
 
 Rust is pinned by `rust-toolchain.toml`; Python 3.11+ and Git support repository checks only.
-No third-party Rust crates or Office installations are needed for M0.
+No third-party Rust crates or Office installations are needed for M0–M2.
 
 ```sh
 cargo run -p vba-cli -- --help
+cargo run -p vba-cli -- parse examples/pure-vba/Arithmetic.bas
+cargo run -p vba-cli -- disasm examples/pure-vba/Arithmetic.bas
+cargo run -p vba-cli -- compile examples/pure-vba/M2Control.bas --entry Answer
 cargo run -p vba-cli -- conformance validate tests/fixtures/m0/arithmetic.vbas
 cargo test --workspace --locked
 cargo xtask ci

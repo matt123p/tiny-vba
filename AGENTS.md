@@ -66,7 +66,8 @@ Routine implementation choices within the agreed scope do not require another ap
 
 Run `cargo xtask ci` and `cargo xtask wasm`. Install wasm32-unknown-unknown as needed.
 Local core tests must work without corpus checkouts or application siblings; corpus verification is separate.
-Use `cargo run -p vba-cli -- --help` for the current interface. M0 fixture validation is implemented; VBA execution is not.
+Use `cargo run -p vba-cli -- --help` for the current interface. M0 fixture validation, M1 subset parsing and M2 binding/verified IR compilation are implemented; VBA execution is not.
+See `docs/frontend.md` for syntax and `docs/compiler.md` for the narrower binding/lowering subset, IR verification and budgets.
 Update affected architecture, compatibility, progress and decision documents with changes.
 Report exact tests run, support added, remaining gaps and the next smallest task.
 

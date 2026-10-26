@@ -1,0 +1,20 @@
+IR 1 profile="ir1-structural" revision="source-1" entry=0 launch=[]
+features={"integer-long-ops", "scalar-core"}
+source 0 id=0 module="Arithmetic.bas" file="Arithmetic.bas"
+constant 0 Integer(6)
+constant 1 Integer(7)
+procedure 0 Function "Answer" source=0 declaration=17..81 end=1 entry=0 result=Some(LocalSlot(0)) max_stack=3
+  slot 0 "Answer" Long Result visible=false span=Some(Span { source: SourceId(0), start: 33, end: 39 })
+  statement 0:0 span=54..68
+  statement 0:1 span=69..81
+  site 0 statement=0:0 role=Source visible=true span=54..68 enter=0 resume_next=Some(SiteId(1))
+  site 1 statement=0:1 role=SyntheticExit visible=false span=69..81 enter=7 resume_next=None
+  0000 Checkpoint(SiteId(0))
+  0001 RefLocal(LocalSlot(0))
+  0002 Const(ConstantId(0))
+  0003 Const(ConstantId(1))
+  0004 Binary(Multiply)
+  0005 WriteRef(Value)
+  0006 Jump(Pc(7))
+  0007 Checkpoint(SiteId(1))
+  0008 Return

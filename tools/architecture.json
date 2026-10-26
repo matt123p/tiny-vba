@@ -47,15 +47,26 @@
     ],
     "vba-semantics": [
       "vba-diagnostics",
-      "vba-syntax"
+      "vba-syntax",
+      "vba-values"
     ],
     "vba-syntax": [
       "vba-diagnostics"
     ],
     "vba-cli": [
+      "vba-compiler",
       "vba-conformance",
-      "vba-diagnostics"
+      "vba-diagnostics",
+      "vba-ir",
+      "vba-syntax"
     ],
-    "xtask": []
+    "xtask": [],
+    "vba-compiler": [
+      "vba-diagnostics",
+      "vba-ir",
+      "vba-semantics",
+      "vba-syntax",
+      "vba-values"
+    ]
   }
 }

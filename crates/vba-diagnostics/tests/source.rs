@@ -36,3 +36,13 @@ fn checked_utf8_spans_and_identity() -> Result<(), Diagnostic> {
     );
     Ok(())
 }
+
+#[test]
+fn mixed_newline_coordinates_count_unicode_scalars() -> Result<(), Diagnostic> {
+    let file = SourceFile::new(SourceId(2), "mixed.bas".into(), "é😀\rx\r\ny\nz".into())?;
+    assert_eq!(file.position(file.span(2, 6)?)?, (1, 2));
+    for (offset, position) in [(7, (2, 1)), (10, (3, 1)), (12, (4, 1)), (13, (4, 2))] {
+        assert_eq!(file.position(file.span(offset, offset)?)?, position);
+    }
+    Ok(())
+}

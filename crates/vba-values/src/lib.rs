@@ -123,3 +123,52 @@ impl Locations {
 fn stale() -> Diagnostic {
     Diagnostic::new("VBA0005", "stale or foreign location")
 }
+
+/// Declared scalar slot type shared by binding, IR and runtime; not an execution capability.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
+pub enum ScalarKind {
+    Variant,
+    Boolean,
+    Byte,
+    Integer,
+    Long,
+    LongLong,
+    Single,
+    Double,
+    Currency,
+    Date,
+    String,
+    Object,
+}
+impl ScalarKind {
+    pub const ALL: [Self; 12] = [
+        Self::Variant,
+        Self::Boolean,
+        Self::Byte,
+        Self::Integer,
+        Self::Long,
+        Self::LongLong,
+        Self::Single,
+        Self::Double,
+        Self::Currency,
+        Self::Date,
+        Self::String,
+        Self::Object,
+    ];
+    pub fn initial_value(self) -> Value {
+        match self {
+            Self::Variant => Value::Empty,
+            Self::Boolean => Value::Boolean(false),
+            Self::Byte => Value::Byte(0),
+            Self::Integer => Value::Integer(0),
+            Self::Long => Value::Long(0),
+            Self::LongLong => Value::LongLong(0),
+            Self::Single => Value::Single(0.0),
+            Self::Double => Value::Double(0.0),
+            Self::Currency => Value::Currency(0),
+            Self::Date => Value::Date(0.0),
+            Self::String => Value::String(VbaString(Vec::new())),
+            Self::Object => Value::Nothing,
+        }
+    }
+}

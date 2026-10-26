@@ -6,8 +6,22 @@ version = 4
 name = "vba-cli"
 version = "0.1.0"
 dependencies = [
+ "vba-compiler",
  "vba-conformance",
  "vba-diagnostics",
+ "vba-ir",
+ "vba-syntax",
+]
+
+[[package]]
+name = "vba-compiler"
+version = "0.1.0"
+dependencies = [
+ "vba-diagnostics",
+ "vba-ir",
+ "vba-semantics",
+ "vba-syntax",
+ "vba-values",
 ]
 
 [[package]]
@@ -76,6 +90,7 @@ version = "0.1.0"
 dependencies = [
  "vba-diagnostics",
  "vba-syntax",
+ "vba-values",
 ]
 
 [[package]]

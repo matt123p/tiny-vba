@@ -15,6 +15,7 @@ vba-diagnostics = { path = "crates/vba-diagnostics" }
 vba-values = { path = "crates/vba-values" }
 vba-syntax = { path = "crates/vba-syntax" }
 vba-semantics = { path = "crates/vba-semantics" }
+vba-compiler = { path = "crates/vba-compiler" }
 vba-ir = { path = "crates/vba-ir" }
 vba-runtime = { path = "crates/vba-runtime" }
 vba-foreign = { path = "crates/vba-foreign" }

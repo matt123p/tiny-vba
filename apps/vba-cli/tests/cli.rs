@@ -72,3 +72,138 @@ fn conformance_rejects_bad_input_and_arguments() -> Result<(), Box<dyn std::erro
     }
     Ok(())
 }
+
+#[test]
+fn parse_accepts_examples_and_rejects_recovered_invalid_source()
+-> Result<(), Box<dyn std::error::Error>> {
+    let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../..");
+    for relative in [
+        "examples/pure-vba/Arithmetic.bas",
+        "examples/foreign-host/FillCells.bas",
+        "tests/syntax/m1/metadata.cls",
+    ] {
+        let output = Command::new(env!("CARGO_BIN_EXE_vba-cli"))
+            .arg("parse")
+            .arg(root.join(relative))
+            .output()?;
+        assert!(
+            output.status.success(),
+            "{}",
+            String::from_utf8_lossy(&output.stderr)
+        );
+        let stdout = String::from_utf8(output.stdout)?;
+        assert!(stdout.starts_with("PARSED "));
+        assert!(stdout.contains("binding and execution unavailable"));
+    }
+    let output = Command::new(env!("CARGO_BIN_EXE_vba-cli"))
+        .arg("parse")
+        .arg(root.join("tests/syntax/m1/invalid.bas"))
+        .output()?;
+    assert_eq!(output.status.code(), Some(2));
+    assert!(output.stdout.is_empty());
+    let stderr = String::from_utf8(output.stderr)?;
+    assert!(stderr.contains("invalid.bas:3:19: VBA0101"));
+    for args in [
+        vec!["parse"],
+        vec!["parse", "missing.bas"],
+        vec!["parse", "missing.frm"],
+        vec!["parse", "missing.bas", "extra"],
+    ] {
+        assert_eq!(
+            Command::new(env!("CARGO_BIN_EXE_vba-cli"))
+                .args(args)
+                .output()?
+                .status
+                .code(),
+            Some(2)
+        );
+    }
+    Ok(())
+}
+
+#[test]
+fn parse_bounds_reads_and_rejects_non_utf8() -> Result<(), Box<dyn std::error::Error>> {
+    let temp = std::env::temp_dir().join(format!("tiny-vba-source-{}.bas", std::process::id()));
+    for (bytes, code) in [
+        (vec![255], "VBA0100"),
+        (
+            vec![b' '; vba_diagnostics::SourceFile::MAX_BYTES + 1],
+            "VBA0102",
+        ),
+    ] {
+        std::fs::write(&temp, bytes)?;
+        let output = Command::new(env!("CARGO_BIN_EXE_vba-cli"))
+            .arg("parse")
+            .arg(&temp)
+            .output()?;
+        assert_eq!(output.status.code(), Some(2));
+        assert!(output.stdout.is_empty());
+        assert!(String::from_utf8(output.stderr)?.contains(code));
+    }
+    std::fs::remove_file(temp)?;
+    Ok(())
+}
+
+#[test]
+fn m2_compile_check_disasm_are_usable_and_execution_stays_unavailable()
+-> Result<(), Box<dyn std::error::Error>> {
+    let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../..");
+    for command in ["check", "compile", "disasm"] {
+        let output = Command::new(env!("CARGO_BIN_EXE_vba-cli"))
+            .arg(command)
+            .arg(root.join("examples/pure-vba/Arithmetic.bas"))
+            .output()?;
+        assert!(
+            output.status.success(),
+            "{}",
+            String::from_utf8_lossy(&output.stderr)
+        );
+        let text = String::from_utf8(output.stdout)?;
+        if command == "disasm" {
+            assert!(text.contains("max_stack=3"));
+            assert!(text.contains("Binary(Multiply)"));
+        } else {
+            assert!(text.contains("VERIFIED"));
+            assert!(text.contains("execution unavailable"));
+        }
+    }
+    let output = Command::new(env!("CARGO_BIN_EXE_vba-cli"))
+        .arg("compile")
+        .arg(root.join("examples/pure-vba/M2Control.bas"))
+        .args(["--entry", "Answer"])
+        .output()?;
+    assert!(
+        output.status.success(),
+        "{}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    for args in [
+        vec!["compile"],
+        vec!["compile", "missing.bas"],
+        vec!["compile", "missing.bas", "--entry"],
+        vec!["compile", "missing.bas", "--bogus"],
+        vec!["compile", "missing.bas", "--entry", "Answer", "extra"],
+    ] {
+        assert_eq!(
+            Command::new(env!("CARGO_BIN_EXE_vba-cli"))
+                .args(args)
+                .output()?
+                .status
+                .code(),
+            Some(2)
+        );
+    }
+    for path in [
+        "tests/syntax/m1/invalid.bas",
+        "examples/foreign-host/FillCells.bas",
+        "tests/syntax/m1/metadata.cls",
+    ] {
+        let output = Command::new(env!("CARGO_BIN_EXE_vba-cli"))
+            .arg("compile")
+            .arg(root.join(path))
+            .output()?;
+        assert_eq!(output.status.code(), Some(2));
+        assert!(output.stdout.is_empty());
+    }
+    Ok(())
+}

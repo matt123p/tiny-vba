@@ -1,0 +1,16 @@
+[package]
+name = "vba-compiler"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+publish = false
+[lints]
+workspace = true
+[dependencies]
+vba-diagnostics.workspace = true
+vba-syntax.workspace = true
+vba-semantics.workspace = true
+vba-ir.workspace = true
+vba-values.workspace = true

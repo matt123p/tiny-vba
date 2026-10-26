@@ -12,7 +12,8 @@ and [compatibility matrix](compatibility-matrix.md) describe development contrac
 
 [Bytecode and VM specification](bytecode-vm-specification.md) defines the adopted IR 1 instruction,
 verification and execution contract; [ADR 0004](decisions/0004-bytecode-vm-contract.md) records the choices.
-The IR/VM implementation remains M2/M3 work.
+M2 IR/binding/lowering is implemented; VM execution remains M3 work.
+[M2 compiler contract](compiler.md) and [ADR 0006](decisions/0006-m2-binding-and-verification.md) record the current API, budgets and evidence.
 
 [Agent design skills](agent-skills.md) lists the shared Codex/OpenCode skills and their task routing.
 
@@ -31,3 +32,7 @@ The inputs link `office_automation_architecture.md`, but it was absent from both
 docs folders. Its detailed Office design is an input gap for fork integration, not a
 prerequisite for standalone interpreter development. Other relative links in original
 snapshots may also refer to historical locations; use this index to locate available files.
+
+M1 implementation: [frontend subset and API](frontend.md),
+[adopted frontend contract](decisions/0005-m1-frontend.md), and
+[reviewed external grammar results](m1-corpus-report.md).

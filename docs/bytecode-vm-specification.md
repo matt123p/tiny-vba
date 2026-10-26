@@ -1,12 +1,12 @@
 # Bytecode and explicit-state VM specification
 
 Version: IR 1. Date: 2026-10-26. Status: adopted implementation contract under
-[ADR 0004](decisions/0004-bytecode-vm-contract.md); not implemented.
+[ADR 0004](decisions/0004-bytecode-vm-contract.md). M2 structural IR/verifier/lowering implemented; VM execution remains M3. See [current implementation](compiler.md).
 
 This document defines the M2/M3 instruction representation, verifier, calling convention and execution
 lifecycle. It supplements section 6 of the preserved [implementation specification](vba-interpreter-rust-implementation-spec.md).
-Current code implements only [M0 foundations](decisions/0003-m0-source-scenarios-foreign.md).
-Writing this contract adds no executable VBA support and changes no fixture result.
+Current code implements [M0 foundations](decisions/0003-m0-source-scenarios-foreign.md), the M1 frontend and [M2 compilation](compiler.md).
+This contract and structural verification add no executable VBA support and change no execution result.
 
 ## 1. Scope, versions and owners
 
@@ -29,17 +29,18 @@ Do not encode unimplemented syntax as a no-op or a fabricated constant.
 | vba-values | Existing Value/VbaString/ObjectRef/Location; future declared-slot typing and alias storage |
 | vba-syntax | Source-preserving tokens/AST; distinct same-line statement identities |
 | vba-semantics | Bound symbols, procedure signatures, argument mapping and supported-language checks |
-| planned vba-compiler | Compilation orchestration and lowering from bound program to unverified IR |
+| vba-compiler | Compilation orchestration and lowering from bound program to unverified IR |
 | vba-ir | Program/Instruction/metadata, bounded verifier, opaque VerifiedProgram and disassembler |
 | vba-runtime | Shared operator, conversion, assignment and VBA runtime-error rules |
 | vba-foreign | Existing owned native generic-host protocol and pending-call controller |
 | vba-vm | Frames, dispatch, storage, budgets, pending continuations and inspection events |
 | vba-debug | Breakpoint binding, stepping policy, paused inspection/edit commands |
 
-The compiler is a planned upper-layer crate: it may depend on diagnostics, syntax, semantics, IR
-and values. Add its actual package and reviewed DAG edges when implemented at M2, not as scaffolding
-for this specification. IR never depends on semantics; the VM never depends on compiler, debug,
-DAP or UI. The actual dependency graph is unchanged by this document.
+The compiler is an implemented upper-layer crate depending on diagnostics, syntax, semantics, IR
+and values. Its M2 package and reviewed DAG edges are recorded in ADR 0006. IR never depends on
+semantics; the VM never depends on compiler, debug, DAP or UI. M2's `ir1-structural` target verifies
+all IR 1 shapes without claiming any runtime implementation; M3 must check actual capabilities.
+
 
 ### Delivery capabilities
 
@@ -526,7 +527,7 @@ pause/resume/side-effect counts checked. No browser-dependent host call belongs 
 
 ## 9. Lowering examples and acceptance obligations
 
-These examples are specifications for future tests, not generated output or measured VBA execution.
+The Answer example now has an M2 golden disassembly test; examples here remain normative pseudocode, not measured VBA execution.
 Feature declarations and full metadata headers are abbreviated here; a real disassembler prints them.
 
 ### Answer returning Long 42

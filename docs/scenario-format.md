@@ -52,7 +52,9 @@ Malformed/unsupported fixture structure or arguments and unreadable/non-UTF-8 fi
 Fixture errors use VBA0010 and include source attachments when parsed. Source infrastructure budget
 errors use VBA0003. Filesystem errors are reported by the CLI IO boundary. The validator does not
 check VBA grammar, bind names, execute the entrypoint or compare results. It must not report PASS.
-`run`, `parse`, `compile` and other planned execution/frontend commands still return VBA0001.
+`run` and other planned execution commands still return VBA0001. M1 separately implements
+`parse <source.bas|source.cls>` for its [documented syntax subset](frontend.md); M2 adds
+`check`, `compile` and `disasm` for the [compiler subset](compiler.md). None executes a scenario.
 
 The 20 independently authored [M0 cases](../tests/fixtures/m0/) cover arithmetic/precedence,
 integer division/remainder, Boolean/string results, Empty/Null/Nothing/CVErr, branches/loops,

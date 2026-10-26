@@ -19,3 +19,12 @@ Use explicit PASS/MISMATCH/UNSUPPORTED/BLOCKED_BY_POLICY/INVALID_FIXTURE/CRASH/T
 Do not count absent execution as a pass. Never silently update oracle goldens. Keep ReflexGrid Mac data
 separate from the intended Windows profile until evidence supports portability.
 Keep malformed/deep/huge/budget tests and minimized regressions alongside implemented APIs.
+
+M1 adds a separate syntax layer: all 20 self-authored scenario bodies parse under its documented
+subset, without changing NOT_RUN runtime statuses. Five reviewed external grammar files were read
+by an opt-in Rust allowlist: two unsupported modules and three intentionally malformed inputs. See
+[the review, provenance and exact results](m1-corpus-report.md). No upstream code was executed.
+
+M2 [compiler and IR evidence](compiler.md) adds verified compilation, deterministic disassembly
+and malformed-program rejection. VERIFIED is a structural result; all M0/external execution
+statuses remain NOT_RUN. The ir1-structural capability set supplies no VM or Office runtime.

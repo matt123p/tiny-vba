@@ -13,3 +13,4 @@ workspace = true
 [dependencies]
 vba-diagnostics.workspace = true
 vba-syntax.workspace = true
+vba-values.workspace = true
