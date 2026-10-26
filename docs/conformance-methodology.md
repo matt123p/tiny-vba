@@ -30,5 +30,11 @@ and malformed-program rejection. VERIFIED is a structural result; all M0/externa
 statuses remain NOT_RUN. The ir1-structural capability set supplies no VM or Office runtime.
 
 M3 adds actual native/WASI execution evidence for the explicit runtime examples and tests in
-[runtime](runtime.md). Do not transfer those results to fixture manifests or external specimens: the
-scenario assertion/oracle runner is still pending. The M0/external execution inventory stays NOT_RUN.
+[runtime](runtime.md). Do not transfer those results to fixture manifests or external specimens.
+
+M4 adds the typed scenario assertion runner
+([ADR 0009](decisions/0009-m4-runner-and-numeric-widths.md)): `conformance run` executes each
+self-authored M0 fixture and compares its typed expectation. The asserted inventory is 17 PASS and
+3 UNSUPPORTED (cverr, named, optional-missing); this measures the implemented subset, not Office
+behavior. External/oracle specimens stay NOT_RUN. The same slice enables real division and Double
+widths with exact error numbers 6/11 across widths.

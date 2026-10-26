@@ -14,6 +14,10 @@ Read [methodology](../../../docs/conformance-methodology.md),
 
 M0 validates [schema 1](../../../docs/scenario-format.md) self-authored fixtures only.
 `vba-cli conformance validate` reports VALID_FIXTURE and NOT_RUN; it does not parse/execute VBA.
+`vba-cli conformance run` (M4,
+[ADR 0009](../../../docs/decisions/0009-m4-runner-and-numeric-widths.md)) executes a validated
+fixture and compares its typed expectation, printing RESULT with the shared status vocabulary
+(MISMATCH exits 1). The asserted M0 inventory is 17 PASS / 3 UNSUPPORTED.
 External/oracle metadata needs a reviewed schema extension. Keep the 20 fixture identities unique
 and matching filenames; update owning integration tests when changing that suite.
 

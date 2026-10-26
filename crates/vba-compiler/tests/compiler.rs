@@ -163,7 +163,7 @@ fn unsupported_and_invalid_binding_never_produces_verified_program() -> Result<(
             "persistent module",
         ),
         (
-            "Function Answer() As Long\nAnswer=1.5\nEnd Function",
+            "Function Answer() As Long\nAnswer=&H10\nEnd Function",
             "numeric literal",
         ),
         (

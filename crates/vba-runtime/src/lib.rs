@@ -17,11 +17,20 @@ fn overflow() -> Error {
         message: "Overflow".into(),
     }
 }
-fn integer(v: &Value) -> Result<(i32, bool)> {
+fn integer(v: &Value) -> Result<(i64, bool)> {
     match v {
-        Value::Integer(n) => Ok((i32::from(*n), false)),
-        Value::Long(n) => Ok((*n, true)),
+        Value::Integer(n) => Ok((i64::from(*n), false)),
+        Value::Long(n) => Ok((i64::from(*n), true)),
         _ => Err(unsupported()),
+    }
+}
+/// Exact widening to the Double execution width; narrower Integer/Long inputs are exact.
+fn floating(v: &Value) -> Option<f64> {
+    match v {
+        Value::Integer(n) => Some(f64::from(*n)),
+        Value::Long(n) => Some(i64::from(*n) as f64),
+        Value::Double(n) if n.is_finite() => Some(*n),
+        _ => None,
     }
 }
 fn number(n: i32, long: bool) -> Result<Value> {
@@ -52,9 +61,35 @@ pub fn assign(kind: ScalarKind, value: &Value, object: bool) -> Result<Value> {
         | (ScalarKind::String, Value::String(_)) => Ok(value.clone()),
         (ScalarKind::Long, Value::Integer(n)) => Ok(Value::Long(i32::from(*n))),
         (ScalarKind::Integer, Value::Long(n)) => number(*n, false),
+        (ScalarKind::Double, Value::Integer(n)) => Ok(Value::Double(f64::from(*n))),
+        (ScalarKind::Double, Value::Long(n)) => Ok(Value::Double(i64::from(*n) as f64)),
+        (ScalarKind::Double, Value::Double(n)) if n.is_finite() => Ok(value.clone()),
+        (ScalarKind::Integer, Value::Double(n)) => Ok(Value::Integer(ordinal(*n, false)? as i16)),
+        (ScalarKind::Long, Value::Double(n)) => Ok(Value::Long(ordinal(*n, true)? as i32)),
         _ => Err(unsupported()),
     }
 }
+/// Narrowing a Double into an Integer/Long slot rounds half to even, as VBA's typed
+/// conversions do; a value outside the destination range is overflow error 6.
+fn ordinal(value: f64, long: bool) -> Result<i64> {
+    if !value.is_finite() {
+        return Err(unsupported());
+    }
+    let rounded = value.round_ties_even();
+    if long {
+        let n = rounded as i64;
+        if n as f64 == rounded {
+            return Ok(n);
+        }
+    } else {
+        let n = rounded as i64;
+        if let Ok(n) = i16::try_from(n) {
+            return Ok(i64::from(n));
+        }
+    }
+    Err(overflow())
+}
+
 pub fn bind(kind: ScalarKind, value: &Value) -> Result<Value> {
     assign(
         kind,
@@ -76,7 +111,11 @@ pub fn unary(op: &str, value: &Value) -> Result<Value> {
         ("not", Value::Long(v)) => Ok(Value::Long(!v)),
         ("-", _) => {
             let (v, long) = integer(value)?;
-            number(v.checked_neg().ok_or_else(overflow)?, long)
+            number(
+                i32::try_from(v.checked_neg().ok_or_else(overflow)?)
+                    .map_err(|_| overflow())?,
+                long,
+            )
         }
         _ => Err(unsupported()),
     }
@@ -114,6 +153,51 @@ pub fn binary(op: &str, left: &Value, right: &Value) -> Result<Value> {
         }
         return Err(unsupported());
     }
+    if op == "/" {
+        if let (Some(a), Some(b)) = (floating(left), floating(right)) {
+            // Exact-width real division: the result is always Double, and an inexact
+            // integer quotient keeps its fractional part instead of rounding.
+            let quotient = a / b;
+            if !quotient.is_finite() {
+                return if b == 0.0 {
+                    Err(Error::Vba {
+                        number: 11,
+                        message: "Division by zero".into(),
+                    })
+                } else {
+                    Err(overflow())
+                };
+            }
+            return Ok(Value::Double(if quotient == 0.0 {
+                0.0
+            } else {
+                quotient
+            }));
+        }
+        return Err(unsupported());
+    }
+    mixed_tail(op, left, right)
+}
+/// Add/Subtract/Multiply over Integer/Long/Double: Double when either operand is Double,
+/// otherwise the existing Integer/Long width rules. Other operators stay integer-only.
+fn mixed_tail(op: &str, left: &Value, right: &Value) -> Result<Value> {
+    let double_involved = matches!(left, Value::Double(_)) || matches!(right, Value::Double(_));
+    if double_involved && matches!(op, "+" | "-" | "*") {
+        if let (Some(a), Some(b)) = (floating(left), floating(right)) {
+            let value = match op {
+                "+" => a + b,
+                "-" => a - b,
+                _ => a * b,
+            };
+            if !value.is_finite() {
+                return Err(overflow());
+            }
+            return Ok(Value::Double(if value == 0.0 { 0.0 } else { value }));
+        }
+    }
+    integer_tail(op, left, right)
+}
+fn integer_tail(op: &str, left: &Value, right: &Value) -> Result<Value> {
     let (a, al) = integer(left)?;
     let (b, bl) = integer(right)?;
     let long = al || bl;
@@ -148,5 +232,5 @@ pub fn binary(op: &str, left: &Value, right: &Value) -> Result<Value> {
         _ => return Err(unsupported()),
     }
     .ok_or_else(overflow)?;
-    number(n, long)
+    number(i32::try_from(n).map_err(|_| overflow())?, long)
 }

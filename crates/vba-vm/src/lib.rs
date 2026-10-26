@@ -14,12 +14,12 @@ pub const PROFILE: &str = "m3-core-v1";
 pub fn capabilities() -> ir::Capabilities {
     let mut c = ir::Capabilities::ir1_structural();
     c.profile = PROFILE.into();
-    c.binary.remove(&ir::BinaryOp::Divide);
     c.binary.remove(&ir::BinaryOp::Power);
     c.conversions = [
         ScalarKind::Variant,
         ScalarKind::Integer,
         ScalarKind::Long,
+        ScalarKind::Double,
         ScalarKind::Boolean,
         ScalarKind::String,
     ]
@@ -29,6 +29,7 @@ pub fn capabilities() -> ir::Capabilities {
         ScalarKind::Variant,
         ScalarKind::Integer,
         ScalarKind::Long,
+        ScalarKind::Double,
         ScalarKind::Boolean,
         ScalarKind::String,
         ScalarKind::Object,

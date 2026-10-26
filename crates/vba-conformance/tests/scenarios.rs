@@ -1,5 +1,5 @@
 use std::{collections::BTreeSet, fs, path::Path};
-use vba_conformance::{Expected, MAX_SCENARIO_BYTES, Scenario, Status};
+use vba_conformance::{describe_value, Expected, MAX_SCENARIO_BYTES, Scenario, Status};
 use vba_diagnostics::{Diagnostic, SourceFile, SourceId};
 use vba_values::{Value, VbaString};
 const VALID: &str = include_str!("../../../tests/fixtures/m0/arithmetic.vbas");
@@ -86,5 +86,26 @@ fn typed_expectations_preserve_states_and_widths() -> Result<(), Diagnostic> {
         Expected::RuntimeError(11)
     );
     assert_eq!(parse(&VALID.replace('\n', "\r\n"))?.id, "arithmetic");
+    Ok(())
+}
+#[test]
+fn typed_judgment_passes_only_exact_tag_and_payload() -> Result<(), Diagnostic> {
+    let expected = parse(&VALID.replace("Long:42", "Long:42"))?.expected;
+    assert_eq!(expected.judge_value(&Value::Long(42)), Status::Pass);
+    // A different numeric width is a mismatch, not a pass: tags matter.
+    assert_eq!(expected.judge_value(&Value::Integer(42)), Status::Mismatch);
+    assert_eq!(expected.judge_value(&Value::Double(42.0)), Status::Mismatch);
+    assert_eq!(expected.judge_value(&Value::Long(43)), Status::Mismatch);
+    let error = parse(&VALID.replace("Long:42", "Error:11"))?.expected;
+    assert_eq!(error.judge_error(11), Status::Pass);
+    assert_eq!(error.judge_error(6), Status::Mismatch);
+    // A completed value cannot satisfy an expected runtime error.
+    assert_eq!(error.judge_value(&Value::Long(42)), Status::Mismatch);
+    let empty = parse(&VALID.replace("Long:42", "Empty"))?.expected;
+    assert_eq!(empty.judge_value(&Value::Empty), Status::Pass);
+    assert_eq!(empty.judge_value(&Value::Long(0)), Status::Mismatch);
+    assert_eq!(expected.describe(), "expected Long(42)");
+    assert_eq!(error.describe(), "expected runtime error 11");
+    assert_eq!(describe_value(&Value::Double(3.5)), "Double(3.5)");
     Ok(())
 }

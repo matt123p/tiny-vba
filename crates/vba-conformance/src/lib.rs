@@ -1,4 +1,4 @@
-//! Bounded M0 scenario validation. Valid fixtures remain NOT_RUN; no VBA execution is implied.
+//! Bounded M0 scenario validation and M4 typed outcome comparison.
 #![forbid(unsafe_code)]
 use std::collections::BTreeMap;
 use vba_diagnostics::{Diagnostic, SourceFile};
@@ -32,6 +32,60 @@ impl Status {
             Self::Crash => "CRASH",
             Self::Timeout => "TIMEOUT",
             Self::NotRun => "NOT_RUN",
+        }
+    }
+}
+/// Deterministic value description: exact tag and payload; never host Debug formatting.
+pub fn describe_value(value: &Value) -> String {
+    match value {
+        Value::Empty => "Empty".into(),
+        Value::Null => "Null".into(),
+        Value::Missing => "Missing".into(),
+        Value::Nothing => "Nothing".into(),
+        Value::Boolean(v) => format!("Boolean({v})"),
+        Value::Byte(v) => format!("Byte({v})"),
+        Value::Integer(v) => format!("Integer({v})"),
+        Value::Long(v) => format!("Long({v})"),
+        Value::LongLong(v) => format!("LongLong({v})"),
+        Value::Single(v) => format!("Single({v:?})"),
+        Value::Double(v) => format!("Double({v:?})"),
+        Value::Currency(v) => format!("Currency({v})"),
+        Value::Date(v) => format!("Date({v:?})"),
+        Value::String(s) => format!("String({})", String::from_utf16_lossy(s.units())),
+        Value::CvErr(code) => format!("CVErr({code})"),
+        Value::Object(o) => format!(
+            "Object(host {}, object {}, generation {})",
+            o.host, o.object, o.generation
+        ),
+    }
+}
+impl Expected {
+    /// Compare an executed Function result with the fixture's typed expectation.
+    pub fn judge_value(&self, actual: &Value) -> Status {
+        match self {
+            Self::Value(expected) => {
+                if expected == actual {
+                    Status::Pass
+                } else {
+                    Status::Mismatch
+                }
+            }
+            // A completed value cannot satisfy an expected runtime error.
+            Self::RuntimeError(_) => Status::Mismatch,
+        }
+    }
+    /// Compare a delivered VBA runtime error number with the fixture expectation.
+    pub fn judge_error(&self, number: i32) -> Status {
+        match self {
+            Self::RuntimeError(expected) if *expected == number => Status::Pass,
+            _ => Status::Mismatch,
+        }
+    }
+    /// Deterministic description of the expected outcome for reports.
+    pub fn describe(&self) -> String {
+        match self {
+            Self::Value(value) => format!("expected {}", describe_value(value)),
+            Self::RuntimeError(number) => format!("expected runtime error {number}"),
         }
     }
 }

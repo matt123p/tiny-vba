@@ -124,3 +124,87 @@ fn advertised_integer_long_boolean_matrix_has_operand_order_and_width_evidence()
         Err(Error::Vba { number: 6, .. })
     ));
 }
+#[test]
+fn real_division_and_double_widths_match_the_m4_matrix() -> Result<(), Box<dyn std::error::Error>> {
+    // / is exact-width real division: always Double, keeping fractional parts.
+    assert_eq!(
+        r::binary("/", &Value::Integer(7), &Value::Integer(2)),
+        Ok(Value::Double(3.5))
+    );
+    assert_eq!(
+        r::binary("/", &Value::Long(6), &Value::Integer(2)),
+        Ok(Value::Double(3.0))
+    );
+    assert_eq!(
+        r::binary("/", &Value::Double(1.5), &Value::Double(0.5)),
+        Ok(Value::Double(3.0))
+    );
+    assert_eq!(
+        r::binary("/", &Value::Integer(-6), &Value::Integer(2)),
+        Ok(Value::Double(-3.0))
+    );
+    assert!(matches!(
+        r::binary("/", &Value::Integer(1), &Value::Integer(0)),
+        Err(Error::Vba { number: 11, .. })
+    ));
+    assert!(matches!(
+        r::binary("/", &Value::Double(1.0), &Value::Double(0.0)),
+        Err(Error::Vba { number: 11, .. })
+    ));
+    // Add/Subtract/Multiply promote to Double only with a Double operand.
+    assert_eq!(
+        r::binary("*", &Value::Double(2.5), &Value::Integer(4)),
+        Ok(Value::Double(10.0))
+    );
+    assert_eq!(
+        r::binary("-", &Value::Double(0.5), &Value::Double(0.25)),
+        Ok(Value::Double(0.25))
+    );
+    assert_eq!(
+        r::binary("+", &Value::Integer(6), &Value::Integer(2)),
+        Ok(Value::Integer(8))
+    );
+    assert!(matches!(
+        r::binary("\\", &Value::Double(7.0), &Value::Integer(2)),
+        Err(Error::Unsupported(_))
+    ));
+    assert!(matches!(
+        r::binary(
+            "/",
+            &Value::String(VbaString::from_units(vec![49]).map_err(|e| e.to_string())?),
+            &Value::Integer(2)
+        ),
+        Err(Error::Unsupported(_))
+    ));
+    // Widening Integer/Long/Double into Double slots is exact.
+    assert_eq!(
+        r::assign(ScalarKind::Double, &Value::Integer(3), false),
+        Ok(Value::Double(3.0))
+    );
+    assert_eq!(
+        r::assign(ScalarKind::Double, &Value::Long(2147483647), false),
+        Ok(Value::Double(2147483647.0))
+    );
+    // Narrowing a Double rounds half to even and reports overflow 6 out of range.
+    assert_eq!(
+        r::assign(ScalarKind::Integer, &Value::Double(3.5), false),
+        Ok(Value::Integer(4))
+    );
+    assert_eq!(
+        r::assign(ScalarKind::Integer, &Value::Double(2.5), false),
+        Ok(Value::Integer(2))
+    );
+    assert_eq!(
+        r::assign(ScalarKind::Long, &Value::Double(-0.5), false),
+        Ok(Value::Long(0))
+    );
+    assert!(matches!(
+        r::assign(ScalarKind::Integer, &Value::Double(40000.0), false),
+        Err(Error::Vba { number: 6, .. })
+    ));
+    assert_eq!(
+        r::assign(ScalarKind::Long, &Value::Double(2147483647.0), false),
+        Ok(Value::Long(2147483647))
+    );
+    Ok(())
+}

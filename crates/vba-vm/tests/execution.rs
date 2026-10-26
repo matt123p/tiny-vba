@@ -400,3 +400,36 @@ fn recycled_client_ids_cannot_reuse_old_handles_breakpoints_or_step_targets() ->
     );
     Ok(())
 }
+
+#[test]
+fn real_division_and_double_locals_execute_with_exact_double_tags() -> R {
+    let mut s = session(
+        "Function Answer() As Variant\nDim d As Double\nd = 7 / 2\nDim half As Double\nhalf = 1 / 4\nAnswer = d + half\nEnd Function",
+        Limits::default(),
+    )?;
+    let out = drive(&mut s, &Controller::new())?;
+    assert_eq!(
+        out,
+        Outcome::Completed(ReturnValue::Function(Value::Double(3.75)))
+    );
+    // Narrowing a Double into an Integer slot rounds half to even at runtime.
+    let mut s = session(
+        "Function Answer() As Integer\nDim d As Double\nd = 2.5\nAnswer = d\nEnd Function",
+        Limits::default(),
+    )?;
+    assert_eq!(
+        drive(&mut s, &Controller::new())?,
+        Outcome::Completed(ReturnValue::Function(Value::Integer(2)))
+    );
+    // Division by zero stays runtime error 11 across widths.
+    let mut s = session(
+        "Function Answer() As Double\nAnswer = 1.5 / 0\nEnd Function",
+        Limits::default(),
+    )?;
+    let out = drive(&mut s, &Controller::new())?;
+    let Outcome::Failed(failure) = out else {
+        return Err("expected failure".into());
+    };
+    assert_eq!(failure.number, Some(11));
+    Ok(())
+}

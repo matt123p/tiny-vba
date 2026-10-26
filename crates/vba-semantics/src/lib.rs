@@ -1076,7 +1076,25 @@ fn literal(expr: &ast::Expr) -> Result<Value> {
             } else {
                 (raw.as_str(), None)
             };
-            // Wider, floating, radix and Currency literal rules need their own profiled cases.
+            // Decimal/exponent literals are exact finite Double values; radix, currency
+            // and other suffixed forms need their own profiled cases.
+            let floating = suffix.is_none()
+                && digits.contains(|b: char| {
+                    b.is_ascii_digit()
+                        || matches!(b, '.' | 'e' | 'E' | 'd' | 'D' | '+' | '-')
+                })
+                && digits.chars().any(|b: char| b.is_ascii_digit())
+                && digits.chars().any(|b: char| !b.is_ascii_digit());
+            if floating {
+                let number: f64 = digits
+                    .replace(['d', 'D'], "e")
+                    .parse()
+                    .map_err(|_| err("numeric literal out of supported range", expr.span))?;
+                if !number.is_finite() {
+                    return Err(err("numeric literal out of supported range", expr.span));
+                }
+                return Ok(Value::Double(if number == 0.0 { 0.0 } else { number }));
+            }
             if !digits.bytes().all(|b| b.is_ascii_digit()) {
                 return Err(unsupported(
                     "numeric literal form (M2 decimal Integer/Long only)",

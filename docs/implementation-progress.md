@@ -1,6 +1,39 @@
 # Implementation progress
 
-Updated 2026-10-26. Current stage: M0–M3 reviewed subsets complete; M4 semantic depth is next.
+Updated 2026-10-26. Current stage: M0–M3 reviewed subsets complete; M4 first slice (typed scenario
+assertion runner, real division and Double widths) implemented under
+[ADR 0009](decisions/0009-m4-runner-and-numeric-widths.md).
+
+## M4 first slice: assertion runner and numeric widths
+
+Implemented `conformance run <scenario>`: the CLI parses the manifest, compiles only the embedded
+VBA body with the VM's actual capability set, executes host-free and compares the outcome with the
+manifest's typed expectation through new `vba-conformance` judgment APIs (`judge_value`,
+`judge_error`, `describe_value`). It prints `RESULT <id>: <STATUS> (<detail>)`; MISMATCH exits 1,
+PASS/UNSUPPORTED exit 0, invalid fixtures exit 2. `conformance validate` still reports NOT_RUN and
+never executes.
+
+Enabled real division and Double widths under existing IR 1 instructions through an explicit
+`m3-core-v1` capability update ([ADR 0009](decisions/0009-m4-runner-and-numeric-widths.md)): `/`
+always produces Double (zero divisor 11, non-finite 6), Add/Subtract/Multiply promote to Double
+only with a Double operand, Double declarations/assignments widen exactly, narrowing rounds half to
+even with overflow 6 out of range, and decimal/exponent literals bind as finite Doubles. The
+integer operator matrix and its error numbers are unchanged. The M3 CLI negative case `Answer=1/2`
+became correct behavior (Double 0.5 narrowed to Long 0), so the unsupported-operator case uses `^`.
+
+The 20-fixture inventory moved from 20 NOT_RUN to an asserted 17 PASS plus 3 explicit UNSUPPORTED
+(cverr: builtins; named: named/omitted direct arguments; optional-missing: optional
+parameters/IsMissing). External corpora remain NOT_RUN; no oracle observation is claimed.
+
+Validation: cargo xtask ci (81 integration tests, fmt, strict Clippy, layers, corpus pins),
+cargo test --workspace --release --locked, cargo xtask wasm and cargo xtask wasm-run (native and
+WASI smoke pass with unchanged M3 results). No dependency graph, IR version or scenario-schema
+change. Remaining M4 work: the handler-capable IR contract for On Error/Resume/Err/Erl before
+implementing handlers; arrays; optional/named direct-call binding; builtins; Currency/Date/Byte/
+LongLong/Single arithmetic; persistent/static state.
+
+Next smallest task: specify the versioned handler-capable IR extension (frame handler state,
+exceptional edges, resumption metadata, nested-handler tests) before enabling On Error constructs.
 
 ## M2/M3 acceptance audit and session-isolation correction
 
@@ -57,8 +90,8 @@ The original M0 fixture manifests and external execution inventory remain NOT_RU
 no fixture assertion runner. M3's explicit runtime examples/tests have actual execution evidence.
 The required graphical editor/debugger, DAP and fork-owned Office integration remain later gates.
 
-Next smallest task: M4 typed scenario assertion runner and expanded scalar conversion/error cases;
-then specify the versioned On Error/Resume/Err/Erl VM contract before implementing handlers.
+Next smallest task: superseded — the M4 runner and numeric widths are implemented above; see the
+M4 section for the current next task.
 
 ## Pre-push verification of M0–M2 (historical stage record)
 

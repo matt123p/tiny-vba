@@ -52,7 +52,17 @@ Malformed/unsupported fixture structure or arguments and unreadable/non-UTF-8 fi
 Fixture errors use VBA0010 and include source attachments when parsed. Source infrastructure budget
 errors use VBA0003. Filesystem errors are reported by the CLI IO boundary. The validator does not
 check VBA grammar, bind names, execute the entrypoint or compare results. It must not report PASS.
-`run` executes the [M3 runtime subset](runtime.md); it does not load or compare scenario manifests. M1 separately implements
+
+`vba-cli conformance run <scenario>` executes the validated fixture host-free through the same
+compiler/VM path as `run` and compares the actual outcome with the typed `expected` field
+([ADR 0009](decisions/0009-m4-runner-and-numeric-widths.md)). It prints
+`RESULT <id>: <STATUS> (<detail>)` using the shared status vocabulary: PASS (exact tag, payload and
+error number), MISMATCH (exits 1), UNSUPPORTED (the reviewed subset refuses the construct before or
+during execution), CRASH (infrastructure failure) or TIMEOUT (resource limit). The M0 inventory is
+asserted as 17 PASS and 3 UNSUPPORTED (CVErr/IsMissing builtins and named/omitted direct
+arguments); this is an implemented-subset boundary, not a compatibility result. External corpus
+manifests stay NOT_RUN.
+`run` executes the [M3/M4 runtime subset](runtime.md); `conformance run` compares a scenario outcome against its typed expectation. Neither loads external corpora. M1 separately implements
 `parse <source.bas|source.cls>` for its [documented syntax subset](frontend.md); M2 adds
 `check`, `compile` and `disasm` for the [compiler subset](compiler.md). These validation/compilation commands do not compare a scenario outcome.
 

@@ -32,25 +32,27 @@ The compiler defaults to `ir1-structural` for check/compile/disasm. To execute, 
 VerifiedProgram to Session. Session rechecks immutable IR against its actual capabilities without
 cloning the source payload. A caller's capability set cannot enable an unimplemented operation.
 
-| Operation | M3 combinations |
+| Operation | M3/M4 combinations |
 |---|---|
-| Declarations | Variant, Integer, Long, Boolean, String, generic Object; initialized to exact tagged defaults |
-| Assignment / ByVal | Same-tag Integer/Long/Boolean/String; Integer to Long; range-checked Long to Integer; Variant preserves scalar tags; Object/Nothing copied through explicit Set or parameter binding |
-| Add/Subtract/Multiply | Integer/Long pairs; Long if either operand is Long, otherwise Integer; checked overflow number 6 |
+| Declarations | Variant, Integer, Long, Double, Boolean, String, generic Object; initialized to exact tagged defaults |
+| Assignment / ByVal | Same-tag Integer/Long/Double/Boolean/String; Integer to Long; range-checked narrowing of Long to Integer and of Double to Integer/Long (round half to even; overflow 6 out of range); Integer/Long into Double slots are exact widenings; Variant preserves scalar tags; Object/Nothing copied through explicit Set or parameter binding |
+| Add/Subtract/Multiply | Integer/Long pairs; Long if either operand is Long, otherwise Integer; Double when either operand is Double; checked overflow number 6 |
+| Division `/` | Integer/Long/Double operands; the result is always Double; zero divisor number 11; non-finite quotient overflow number 6; String/Boolean/CVErr operands stay Unsupported |
 | IntegerDivide/Modulo | Integer/Long pairs, checked width, division by zero number 11; signed integer quotient/remainder |
 | Comparisons | Integer/Long pairs for =, <>, <, <=, >, >=; Boolean = and <> |
 | Logical operators | Integer/Long bitwise And/Or/Xor/Eqv/Imp; Boolean equivalents; both source operands evaluated |
 | Unary | Checked Integer/Long negate; Integer/Long bitwise Not and Boolean Not |
 | Concatenation | String with String, exact UTF-16 units; bounded length |
 | Conditions | Boolean only; no implicit numeric/string truthiness |
-| Explicit Convert | Variant/Integer/Long/Boolean/String with the assignment matrix above |
+| Explicit Convert | Variant/Integer/Long/Double/Boolean/String with the assignment matrix above |
 | Calls/control | Required positional ByVal and canonical exact-type local ByRef, Sub/Function, If, positive integral-step Integer/Long For, Exit, Stop |
 | Generic host | Object-local/parameter member Call/Get/Let/Set; names/omitted args retained, per-site permissions, wait/resume/cancel and typed snapshot writebacks |
 
-Division `/`, exponentiation, wider declared numerics, mixed string/numeric/Boolean coercion,
-Null/Empty arithmetic, default members, arrays/classes, builtins, persistent state, optional/named
-**direct VBA** arguments, temporary ByRef, error handlers and arbitrary watch evaluation remain
-unsupported. Passive scalar Variant copies preserve Empty/Null/Missing/Nothing/CVErr and existing
+Power `^`, the remaining declared numerics (Byte/LongLong/Single/Currency/Date), mixed
+string/numeric/Boolean coercion, Null/Empty arithmetic, default members, arrays/classes, builtins,
+persistent state, optional/named **direct VBA** arguments, temporary ByRef, error handlers and
+arbitrary watch evaluation remain unsupported. Decimal/exponent literals (`1.5`, `1e2`) bind as
+exact finite Double constants; radix and suffixed literal forms stay unsupported. Passive scalar Variant copies preserve Empty/Null/Missing/Nothing/CVErr and existing
 scalar payload tags; that is not arithmetic or conversion support for those states. Bad dynamic
 combinations fail Unsupported, not a guessed VBA error. Host-provided VBA error numbers are preserved.
 

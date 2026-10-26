@@ -2,6 +2,37 @@
 use std::process::Command;
 
 #[test]
+fn m4_divide_reports_double_and_zero_divisor_error() -> Result<(), Box<dyn std::error::Error>> {
+    let temp = std::env::temp_dir().join(format!("tiny-vba-m4-divide-{}.bas", std::process::id()));
+    for (body, expected, success) in [
+        (
+            "Dim d As Double\nd = 7 / 2\nAnswer = d * 2",
+            "Double(7.0)",
+            true,
+        ),
+        ("Answer = 1 / 0", "VBA runtime error 11", false),
+    ] {
+        std::fs::write(
+            &temp,
+            format!("Function Answer() As Variant\n{body}\nEnd Function"),
+        )?;
+        let output = Command::new(env!("CARGO_BIN_EXE_vba-cli"))
+            .arg("run")
+            .arg(&temp)
+            .output()?;
+        assert_eq!(output.status.success(), success);
+        let text = format!(
+            "{}{}",
+            String::from_utf8(output.stdout)?,
+            String::from_utf8(output.stderr)?
+        );
+        assert!(text.contains(expected), "{text}");
+    }
+    std::fs::remove_file(temp)?;
+    Ok(())
+}
+
+#[test]
 fn unsupported_legacy_run_arguments_do_not_report_success() -> Result<(), Box<dyn std::error::Error>>
 {
     let output = Command::new(env!("CARGO_BIN_EXE_vba-cli"))
@@ -229,7 +260,11 @@ fn m3_run_reports_typed_results_and_rejects_unsupported_execution()
         assert!(String::from_utf8(output.stdout)?.contains(value));
     }
     let temp = std::env::temp_dir().join(format!("tiny-vba-execution-{}.bas", std::process::id()));
-    for body in ["Answer=1/2", "Answer=1 \\ 0", "Answer=32767+1"] {
+    for body in [
+        "Answer=2^10",
+        "Answer=1 \\ 0",
+        "Dim v As Integer\nv = 30000\nv = v + v + v\nAnswer = v",
+    ] {
         std::fs::write(
             &temp,
             format!("Function Answer() As Long\n{body}\nEnd Function"),
@@ -242,5 +277,64 @@ fn m3_run_reports_typed_results_and_rejects_unsupported_execution()
         assert!(output.stdout.is_empty());
     }
     std::fs::remove_file(temp)?;
+    Ok(())
+}
+
+#[test]
+fn conformance_run_asserts_every_m0_fixture_status() -> Result<(), Box<dyn std::error::Error>> {
+    let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../tests/fixtures/m0");
+    let mut pass = 0;
+    let mut unsupported = 0;
+    for entry in std::fs::read_dir(&root)? {
+        let path = entry?.path();
+        if path.extension().and_then(|s| s.to_str()) != Some("vbas") {
+            continue;
+        }
+        let output = Command::new(env!("CARGO_BIN_EXE_vba-cli"))
+            .args(["conformance", "run"])
+            .arg(&path)
+            .output()?;
+        let text = String::from_utf8(output.stdout)?;
+        assert!(text.starts_with("RESULT "), "{text}");
+        if text.contains(": PASS (") {
+            assert_eq!(output.status.code(), Some(0));
+            pass += 1;
+        } else if text.contains(": UNSUPPORTED (") {
+            assert_eq!(output.status.code(), Some(0));
+            unsupported += 1;
+        } else {
+            return Err(format!("unexpected result for {path:?}: {text}").into());
+        }
+    }
+    // The reviewed subset: cverr, named and optional-missing stay explicit UNSUPPORTED.
+    assert_eq!(pass, 17);
+    assert_eq!(unsupported, 3);
+    Ok(())
+}
+
+#[test]
+fn conformance_run_reports_mismatch_and_exit_status_truthfully()
+-> Result<(), Box<dyn std::error::Error>> {
+    let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../..");
+    let fixture = root.join("tests/fixtures/m0/arithmetic.vbas");
+    let original = std::fs::read_to_string(&fixture)?;
+    let temp = std::env::temp_dir().join(format!("tiny-vba-mismatch-{}.vbas", std::process::id()));
+    std::fs::write(&temp, original.replace("expected = Long:42", "expected = Long:43"))?;
+    let output = Command::new(env!("CARGO_BIN_EXE_vba-cli"))
+        .args(["conformance", "run"])
+        .arg(&temp)
+        .output()?;
+    std::fs::remove_file(&temp)?;
+    assert_eq!(output.status.code(), Some(1));
+    let text = String::from_utf8(output.stdout)?;
+    assert!(text.contains(": MISMATCH ("), "{text}");
+    assert!(text.contains("vs expected Long(43)"));
+    // validate keeps reporting NOT_RUN and never executes the fixture.
+    let output = Command::new(env!("CARGO_BIN_EXE_vba-cli"))
+        .args(["conformance", "validate"])
+        .arg(&fixture)
+        .output()?;
+    assert!(output.status.success());
+    assert!(String::from_utf8(output.stdout)?.contains("NOT_RUN"));
     Ok(())
 }

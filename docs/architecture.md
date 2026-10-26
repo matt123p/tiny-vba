@@ -1,6 +1,9 @@
 # Architecture
 
-Status: M0–M3 subset complete, 2026-10-26. Source frontend, binder, compiler, verified IR, runtime subset, VM and headless debugger are implemented. DAP/UI remain planned.
+Status: M0–M3 subset complete; M4 first slice (typed scenario assertion runner, real division and
+Double widths) implemented 2026-10-26 under [ADR 0009](decisions/0009-m4-runner-and-numeric-widths.md).
+Source frontend, binder, compiler, verified IR, runtime subset, VM and headless debugger are
+implemented. DAP/UI remain planned.
 
 The current scaffold and future headless engine can compile and test without Office, UI toolkits,
 application forks or corpus downloads. This repository also owns an optional editor/debugger UI
@@ -30,7 +33,7 @@ See the [M2 compiler contract](compiler.md) for supported source, API and struct
 | vba-dap | Later DAP adapter | debug |
 | vba-project | Read-only source/project decoder | diagnostics |
 | vba-testkit | Deterministic generic foreign host and trace support | diagnostics, values, foreign |
-| vba-conformance | Scenario validation and typed expectations; comparison/reports later | diagnostics, testkit, values, vm |
+| vba-conformance | Scenario validation, typed expectations and M4 outcome judgment; comparison/reports later | diagnostics, testkit, values, vm |
 | vba-cli | Source parsing, compilation/disassembly/execution and fixture validation | conformance, diagnostics, syntax, compiler, ir, values, vm |
 | xtask | Maintenance commands | none |
 
