@@ -14,3 +14,4 @@ vba-syntax.workspace = true
 vba-semantics.workspace = true
 vba-ir.workspace = true
 vba-values.workspace = true
+vba-foreign.workspace = true

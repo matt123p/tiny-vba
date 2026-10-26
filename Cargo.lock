@@ -22,6 +22,7 @@ name = "vba-compiler"
 version = "0.1.0"
 dependencies = [
  "vba-diagnostics",
+ "vba-foreign",
  "vba-ir",
  "vba-semantics",
  "vba-syntax",
@@ -93,6 +94,7 @@ name = "vba-semantics"
 version = "0.1.0"
 dependencies = [
  "vba-diagnostics",
+ "vba-foreign",
  "vba-runtime",
  "vba-syntax",
  "vba-values",
@@ -109,9 +111,12 @@ dependencies = [
 name = "vba-testkit"
 version = "0.1.0"
 dependencies = [
+ "vba-debug",
  "vba-diagnostics",
  "vba-foreign",
+ "vba-ir",
  "vba-values",
+ "vba-vm",
 ]
 
 [[package]]

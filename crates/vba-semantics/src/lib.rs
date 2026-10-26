@@ -26,6 +26,7 @@ pub struct BoundParameter {
 }
 #[derive(Clone, Debug)]
 pub struct BoundLocal {
+    pub host_root:bool,
     pub persistent: Option<String>,
     pub array: Option<ScalarKind>,
     pub name: String,
@@ -381,7 +382,9 @@ fn preflight(module: &ast::Module, budget: &mut Budget) -> Result<()> {
 }
 /// Bind syntax-validated source snapshots, preserving ordered module/procedure identity.
 /// `entry` is an unqualified unique procedure name; cross-module calls honor visibility.
-pub fn bind(parsed: &[ast::ParseResult], entry: &str) -> Result<BoundProgram> {
+pub fn bind(parsed:&[ast::ParseResult],entry:&str)->Result<BoundProgram> {bind_with_imports(parsed,entry,&[])}
+pub fn bind_with_imports(parsed: &[ast::ParseResult], entry: &str,imports:&[vba_foreign::Import]) -> Result<BoundProgram> {
+    vba_foreign::validate_imports(imports)?;
     if parsed.is_empty() || parsed.len() > 256 {
         return Err(Diagnostic::new("VBA0111", "source count limit"));
     }
@@ -639,6 +642,7 @@ pub fn bind(parsed: &[ast::ParseResult], entry: &str) -> Result<BoundProgram> {
                     }
                 })
                 .unwrap_or(0),
+            imports,root_slots:BTreeMap::new(),
             loop_depth: 0,
         };
         let mut local_names = BTreeSet::new();
@@ -757,6 +761,8 @@ struct Binder<'a> {
     symbols: BTreeMap<String, Symbol>,
     explicit: bool,
     base: u8,
+    imports:&'a [vba_foreign::Import],
+    root_slots:BTreeMap<String,usize>,
     loop_depth: usize,
 }
 impl Binder<'_> {
@@ -781,6 +787,7 @@ impl Binder<'_> {
         push(
             &mut self.locals,
             BoundLocal {
+                host_root:false,
                 persistent: None,
                 array: None,
                 name: name.into(),
@@ -866,6 +873,7 @@ impl Binder<'_> {
             )?;
             return Ok(symbol.clone());
         }
+        if self.imports.iter().any(|i| i.name.eq_ignore_ascii_case(&name.spelling)) {return Err(err("host import is not writable; declare a local to shadow it",name.span));}
         if self.constant_names.contains(&name.key()) {
             return Err(unsupported("cross-module constant lookup", name.span));
         }
@@ -888,6 +896,7 @@ impl Binder<'_> {
         push(
             &mut self.locals,
             BoundLocal {
+                host_root:false,
                 persistent: None,
                 array: None,
                 name: name.spelling.clone(),
@@ -1162,20 +1171,8 @@ impl Binder<'_> {
         kind: ForeignKind,
         extra: Option<&ast::Expr>,
     ) -> Result<Expr> {
-        let ast::ExprKind::Name(name) = &target.kind else {
-            return Err(unsupported("nested/default foreign target", target.span));
-        };
-        let slot = self.slot(name)?;
-        if self
-            .locals
-            .get(slot)
-            .is_none_or(|l| l.kind != ScalarKind::Object)
-        {
-            return Err(unsupported(
-                "foreign target must be declared Object local/parameter",
-                target.span,
-            ));
-        }
+        let bound_target=self.expr(target)?;
+        if let ExprKind::Local(slot)=&bound_target.kind && self.locals.get(*slot).is_some_and(|l| !matches!(l.kind,ScalarKind::Object | ScalarKind::Variant)) {return Err(unsupported("foreign target must be an Object",target.span));}
         let mut args = Vec::new();
         let mut named = false;
         for arg in arguments {
@@ -1206,20 +1203,34 @@ impl Binder<'_> {
         Ok(Expr {
             span: member.span,
             kind: ExprKind::Foreign {
-                target: Box::new(Expr {
-                    span: target.span,
-                    kind: ExprKind::Local(slot),
-                }),
+                target: Box::new(bound_target),
                 kind,
                 member: member.spelling.clone(),
                 arguments: args,
             },
         })
     }
+    fn imported(&mut self,import:&vba_foreign::Import,args:&[ast::Argument],span:Span)->Result<Expr> {
+        let slot=if let Some(slot)=self.root_slots.get(&import.root.to_ascii_lowercase()) {*slot} else {
+            if self.locals.len()>=MAX_SLOTS {return Err(limit(span));}
+            let slot=self.locals.len();
+            push(&mut self.locals,BoundLocal {host_root:true,persistent:None,array:None,name:import.root.clone(),kind:ScalarKind::Object,span,parameter:false,result:false},span)?;
+            self.root_slots.insert(import.root.to_ascii_lowercase(),slot);slot
+        };
+        let target=Expr {span,kind:ExprKind::Local(slot)};
+        let Some(member)=&import.member else {if !args.is_empty() {return Err(err("root object is not callable",span));}return Ok(target);};
+        let mut arguments=Vec::new();let mut named=false;
+        for arg in args {
+            if arg.name.is_some() {named=true;} else if named {return Err(err("positional after named host argument",arg.span));}
+            push(&mut arguments,ForeignArgument {name:arg.name.as_ref().map(|n| n.spelling.clone()),value:arg.value.as_ref().map(|e|self.expr(e)).transpose()?},arg.span)?;
+        }
+        Ok(Expr {span,kind:ExprKind::Foreign {target:Box::new(target),kind:if import.kind==vba_foreign::InvokeKind::Get {ForeignKind::Get} else {ForeignKind::Call},member:member.clone(),arguments}})
+    }
     fn expr(&mut self, expr: &ast::Expr) -> Result<Expr> {
         self.budget.charge(256, expr.span)?;
         let bound = match &expr.kind {
             ast::ExprKind::Name(name) => {
+                if !self.symbols.contains_key(&name.key()) && let Some(import)=self.imports.iter().find(|i|i.name.eq_ignore_ascii_case(&name.spelling)).cloned() {return self.imported(&import,&[],expr.span);}
                 if name.key() == "erl" {
                     return Ok(Expr {
                         span: expr.span,
@@ -1289,6 +1300,7 @@ impl Binder<'_> {
                 let ast::ExprKind::Name(name) = &target.kind else {
                     return Err(unsupported("member/default/array application", expr.span));
                 };
+                if !self.symbols.contains_key(&name.key()) && let Some(import)=self.imports.iter().find(|i|i.name.eq_ignore_ascii_case(&name.spelling)).cloned() {return self.imported(&import,arguments,expr.span);}
                 if let Some(Symbol::Local(slot)) = self.symbols.get(&name.key()).cloned()
                     && let Some(kind) = self.locals.get(slot).and_then(|l| {
                         l.array
@@ -1686,6 +1698,7 @@ impl Binder<'_> {
                 let ast::ExprKind::Name(name) = &target.kind else {
                     return Err(unsupported("foreign member call", target.span));
                 };
+                if !self.symbols.contains_key(&name.key()) && let Some(import)=self.imports.iter().find(|i|i.name.eq_ignore_ascii_case(&name.spelling)).cloned() {return Ok(Statement {site,kind:StatementKind::Foreign(self.imported(&import,arguments,site.span)?)});}
                 let id = self.callee(name)?;
                 StatementKind::Call {
                     procedure: id,

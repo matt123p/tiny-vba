@@ -12,7 +12,7 @@ use vba_values::{Location, Locations, ScalarKind, Value};
 type Result<T> = std::result::Result<T, Diagnostic>;
 pub const PROFILE: &str = runtime::PROFILE;
 pub fn capabilities() -> ir::Capabilities {
-    let mut c = ir::Capabilities::ir3_structural();
+    let mut c = ir::Capabilities::ir4_structural();
     c.profile = PROFILE.into();
 
     c
@@ -44,6 +44,7 @@ impl Default for Limits {
 }
 #[derive(Clone, Debug)]
 pub struct HostBinding {
+    pub roots:BTreeMap<String,vba_values::ObjectRef>,
     pub identity: u64,
     pub permitted: BTreeSet<(ir::ProcedureId, ir::ForeignSiteId)>,
 }
@@ -260,6 +261,16 @@ impl Session {
         if arguments.len() != entry.parameters.len() {
             return Err(command("launch argument count mismatch"));
         }
+        if let Some(binding)=&binding {
+            if binding.roots.len()>64 {return Err(command("host root budget"));}
+            let mut seen=BTreeSet::new();
+            for (name,reference) in &binding.roots {
+                if name.is_empty() || name.len()>128 || reference.host!=binding.identity || !seen.insert(name.to_ascii_lowercase()) {return Err(command("invalid or duplicate host root"));}
+            }
+        }
+        for local in p.procedures.iter().flat_map(|p| &p.locals).filter(|l| l.role==ir::SlotRole::HostRoot) {
+            if binding.as_ref().is_none_or(|b| !b.roots.keys().any(|name| name.eq_ignore_ascii_case(&local.name))) {return Err(command("required host root is not bound"));}
+        }
         if let Some(binding) = &binding {
             if binding.permitted.len() > 1024 {
                 return Err(command("host permission limit"));
@@ -400,6 +411,7 @@ impl Session {
         }
         Ok(())
     }
+    pub fn limits(&self)->&Limits {&self.limits}
     pub fn instance(&self) -> SessionInstance {
         self.instance
     }
@@ -563,7 +575,10 @@ impl Session {
         let mut values = Vec::new();
         reserve(&mut values, locals.len())?;
         for (i, local) in locals.iter().enumerate() {
-            let v = if let ir::SlotRole::Persistent(key) = local.role {
+            let v = if local.role==ir::SlotRole::HostRoot {
+                let reference=self.binding.as_ref().and_then(|b| b.roots.iter().find(|(name,_)|name.eq_ignore_ascii_case(&local.name)).map(|(_,r)|*r)).ok_or_else(|| command("host root unavailable"))?;
+                Operand::Value(Value::Object(reference))
+            } else if let ir::SlotRole::Persistent(key) = local.role {
                 if let Some(location) = self.persistent.get(&key) {
                     if self.kinds.get(location) != Some(&local.kind) {
                         return Err(invariant("persistent kind mismatch"));
@@ -881,6 +896,7 @@ impl Session {
         self.generation = self.generation.saturating_add(1);
     }
     fn check_host(&self, host: &impl Host) -> Result<()> {
+        foreign::check_protocol(host.protocol())?;
         if self
             .binding
             .as_ref()
@@ -1858,4 +1874,15 @@ impl Host for NoHost {
         })
     }
     fn cancel(&mut self, _: u64) {}
+}
+
+impl HostBinding {
+    /// Explicitly authorize this compiled program's foreign sites for the supplied host roots.
+    pub fn for_program(program:&ir::VerifiedProgram,identity:u64,roots:BTreeMap<String,vba_values::ObjectRef>)->Result<Self> {
+        let mut permitted=BTreeSet::new();
+        for (procedure,p) in program.program().procedures.iter().enumerate() {for site in 0..p.foreign.len() {
+            if permitted.len()>=1024 {return Err(command("host permission limit"));}
+            permitted.insert((ir::ProcedureId(u32::try_from(procedure).map_err(|_| resource())?),ir::ForeignSiteId(u32::try_from(site).map_err(|_| resource())?)));
+        }}Ok(Self {identity,roots,permitted})
+    }
 }

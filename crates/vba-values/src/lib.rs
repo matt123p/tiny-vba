@@ -1,5 +1,8 @@
 //! Typed scalar/array values and bounded canonical writable locations.
 #![forbid(unsafe_code)]
+/// Version of this native Rust public contract.
+pub const API_VERSION:u32=1;
+
 use vba_diagnostics::Diagnostic;
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]

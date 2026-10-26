@@ -3,7 +3,7 @@
 mod coercion;
 pub use coercion::intrinsic;
 use vba_values::{ScalarKind, Value, VbaString};
-pub const PROFILE: &str = "m4-conformance-v1";
+pub const PROFILE: &str = "m5-host-v1";
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum Error {
     Vba { number: i32, message: String },

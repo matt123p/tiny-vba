@@ -102,7 +102,7 @@ fn replace(p: &mut Program, pc: usize, instruction: Instruction) -> TestResult {
     Ok(())
 }
 fn check(p: Program) -> Result<VerifiedProgram, vba_diagnostics::Diagnostic> {
-    let caps = if p.ir_version == IR3_VERSION {
+    let caps = if p.ir_version==IR4_VERSION {Capabilities::ir4_structural()} else if p.ir_version == IR3_VERSION {
         Capabilities::ir3_structural()
     } else if p.ir_version == IR2_VERSION {
         Capabilities::ir2_structural()
@@ -255,7 +255,7 @@ fn reachable_infinite_cycle_is_valid_and_unreachable_block_is_rejected() -> Test
 #[test]
 fn feature_profile_version_opcode_operator_and_conversion_gates_are_checked() -> TestResult {
     let mut p = base()?;
-    p.ir_version = 4;
+    p.ir_version = 5;
     assert_eq!(check(p).err().ok_or("reject")?.code, "VBA0022");
     let mut p = base()?;
     p.required_features.insert("unknown-feature".into());

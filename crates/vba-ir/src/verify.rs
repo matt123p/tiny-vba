@@ -120,7 +120,7 @@ fn validate(
     limits: &VerifyLimits,
     maxima: bool,
 ) -> Result<Vec<u32>> {
-    if !matches!(p.ir_version, IR_VERSION | IR2_VERSION | IR3_VERSION)
+    if !matches!(p.ir_version, IR_VERSION | IR2_VERSION | IR3_VERSION | IR4_VERSION)
         || p.profile != caps.profile
         || !caps.ir_versions.contains(&p.ir_version)
     {
@@ -273,10 +273,10 @@ fn validate(
                         return Err(invalid("local declaration outside procedure"));
                     }
                 }
-                None if matches!(local.role, SlotRole::Scratch | SlotRole::ScratchReference) => (),
+                None if matches!(local.role, SlotRole::Scratch | SlotRole::ScratchReference | SlotRole::HostRoot) => (),
                 None => return Err(invalid("missing declared local span")),
             }
-            if matches!(local.role, SlotRole::Scratch | SlotRole::ScratchReference) {
+            if matches!(local.role, SlotRole::Scratch | SlotRole::ScratchReference | SlotRole::HostRoot) {
                 if local.visible {
                     return Err(invalid("visible scratch local"));
                 }
@@ -328,6 +328,11 @@ fn validate(
         }
         for (i, local) in proc.locals.iter().enumerate() {
             let role_valid = match local.role {
+                SlotRole::HostRoot=>{
+                    if p.ir_version<IR4_VERSION || local.kind!=ScalarKind::Object || local.array.is_some() || local.visible {return Err(invalid("host root layout/version"));}
+                    feature(p,caps,"host-roots-v4")?;
+                    i>=proc.parameters.len() && proc.result!=Some(LocalSlot(i as u32))
+                }
                 SlotRole::Parameter(n) => i < proc.parameters.len() && i == n as usize,
                 SlotRole::Result => {
                     proc.result == Some(LocalSlot(i as u32)) && proc.kind == ProcedureKind::Function
@@ -745,9 +750,8 @@ fn procedure(
                     .locals
                     .get(slot.0 as usize)
                     .ok_or_else(|| invalid("bad local index"))?;
-                if local.role == SlotRole::ScratchReference {
-                    return Err(invalid("reference capture used as value slot"));
-                }
+                if local.role == SlotRole::ScratchReference {return Err(invalid("reference capture used as value slot"));}
+                if local.role==SlotRole::HostRoot && matches!(instruction,Instruction::RefLocal(_)) {return Err(invalid("host roots are read-only"));}
                 stack.push(if matches!(instruction, Instruction::ReadLocal(_)) {
                     Stack::Value
                 } else {

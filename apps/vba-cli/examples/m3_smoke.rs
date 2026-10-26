@@ -96,6 +96,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     }
     let text = "Function Answer(ByVal target As Object) As Long\nDim x As Long\nx=1\ntarget.Record x\nx=x+1\nAnswer=x\nEnd Function";
     let binding = HostBinding {
+            roots:Default::default(),
         identity: 77,
         permitted: BTreeSet::from([(vba_ir::ProcedureId(0), vba_ir::ForeignSiteId(0))]),
     };

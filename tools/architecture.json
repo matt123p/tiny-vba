@@ -9,9 +9,12 @@
     ],
     "vba-diagnostics": [],
     "vba-testkit": [
+      "vba-debug",
       "vba-diagnostics",
       "vba-foreign",
-      "vba-values"
+      "vba-ir",
+      "vba-values",
+      "vba-vm"
     ],
     "vba-foreign": [
       "vba-diagnostics",
@@ -47,6 +50,7 @@
     ],
     "vba-semantics": [
       "vba-diagnostics",
+      "vba-foreign",
       "vba-runtime",
       "vba-syntax",
       "vba-values"
@@ -66,6 +70,7 @@
     "xtask": [],
     "vba-compiler": [
       "vba-diagnostics",
+      "vba-foreign",
       "vba-ir",
       "vba-semantics",
       "vba-syntax",

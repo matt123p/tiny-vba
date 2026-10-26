@@ -1,5 +1,8 @@
 //! Source breakpoints and frame-identity stepping over the VM's headless checkpoint hooks.
 #![forbid(unsafe_code)]
+/// Version of this native Rust public contract.
+pub const API_VERSION:u32=1;
+
 use std::collections::BTreeSet;
 use vba_diagnostics::{Diagnostic, Span, StatementId};
 use vba_vm::{CheckpointView, Outcome, PauseReason, Session, SessionInstance};

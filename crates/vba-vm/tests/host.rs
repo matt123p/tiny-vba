@@ -78,6 +78,7 @@ fn session(text: &str, byref: bool, limits: Limits) -> R<Session> {
         101,
         vec![Value::Object(TARGET)],
         Some(HostBinding {
+            roots:Default::default(),
             identity: TARGET.host,
             permitted,
         }),
@@ -203,6 +204,7 @@ fn foreign_aliases_and_unpermitted_sites_fail_before_dispatch() -> R {
         102,
         vec![Value::Object(TARGET)],
         Some(HostBinding {
+            roots:Default::default(),
             identity: TARGET.host,
             permitted: BTreeSet::new(),
         }),

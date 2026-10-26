@@ -15,3 +15,4 @@ vba-diagnostics.workspace = true
 vba-syntax.workspace = true
 vba-values.workspace = true
 vba-runtime.workspace = true
+vba-foreign.workspace = true

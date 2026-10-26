@@ -14,3 +14,6 @@ workspace = true
 vba-diagnostics.workspace = true
 vba-values.workspace = true
 vba-foreign.workspace = true
+vba-vm.workspace = true
+vba-debug.workspace = true
+vba-ir.workspace = true
