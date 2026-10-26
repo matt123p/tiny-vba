@@ -94,6 +94,15 @@ impl Session {
         invocation: Invocation,
         store: &mut Locations,
     ) -> Result<Outcome, Diagnostic> {
+        self.invoke_checked(host, invocation, store, &mut |_, _| Ok(()))
+    }
+    pub fn invoke_checked(
+        &mut self,
+        host: &mut impl Host,
+        invocation: Invocation,
+        store: &mut Locations,
+        validate: &mut impl FnMut(Option<Location>, &Value) -> Result<(), Diagnostic>,
+    ) -> Result<Outcome, Diagnostic> {
         if self.pending.is_some() {
             return Err(protocol("call already suspended"));
         }
@@ -140,12 +149,20 @@ impl Session {
             member: invocation.member,
             arguments,
         });
-        self.accept(reply, locations, store, host.identity(), 0)
+        self.accept(reply, locations, store, host.identity(), 0, validate)
     }
     pub fn resume(
         &mut self,
         host: &mut impl Host,
         store: &mut Locations,
+    ) -> Result<Outcome, Diagnostic> {
+        self.resume_checked(host, store, &mut |_, _| Ok(()))
+    }
+    pub fn resume_checked(
+        &mut self,
+        host: &mut impl Host,
+        store: &mut Locations,
+        validate: &mut impl FnMut(Option<Location>, &Value) -> Result<(), Diagnostic>,
     ) -> Result<Outcome, Diagnostic> {
         self.check_host(host)?;
         let pending = self
@@ -164,7 +181,14 @@ impl Session {
             return Err(protocol("suspension budget exceeded"));
         }
         let reply = host.resume(pending.token);
-        self.accept(reply, pending.locations, store, pending.host, pending.waits)
+        self.accept(
+            reply,
+            pending.locations,
+            store,
+            pending.host,
+            pending.waits,
+            validate,
+        )
     }
     fn check_host(&self, host: &impl Host) -> Result<(), Diagnostic> {
         if self
@@ -192,6 +216,7 @@ impl Session {
         store: &mut Locations,
         host: u64,
         waits: usize,
+        validate: &mut impl FnMut(Option<Location>, &Value) -> Result<(), Diagnostic>,
     ) -> Result<Outcome, Diagnostic> {
         match reply {
             Reply::Wait(token) => {
@@ -211,6 +236,7 @@ impl Session {
             }
             Reply::Complete(completion) => {
                 completion.value.validate()?;
+                validate(None, &completion.value)?;
                 if completion.writes.len() > 256 {
                     return Err(protocol("write budget exceeded"));
                 }
@@ -223,6 +249,7 @@ impl Session {
                         .ok_or_else(|| protocol("write to non-ByRef argument"))?;
                     store.read(location)?;
                     value.validate()?;
+                    validate(Some(location), value)?;
                 }
                 for (index, value) in completion.writes {
                     let location = locations

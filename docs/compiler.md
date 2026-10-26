@@ -2,7 +2,7 @@
 
 Implemented 2026-10-26. `vba-semantics` binds the M1 AST; `vba-compiler` lowers it;
 `vba-ir` owns IR 1, structural verification, opaque immutable `VerifiedProgram` and disassembly.
-No VM or VBA runtime operation is implemented by compilation. The target `ir1-structural`
+Compilation alone executes no VM or VBA runtime operation. M3 now provides the separate [runtime profile](runtime.md). The target `ir1-structural`
 advertises the shapes of IR 1 operations for verification, not an executable compatibility profile.
 
 ```sh
@@ -13,7 +13,7 @@ cargo test -p vba-semantics -p vba-ir -p vba-compiler
 ```
 
 `check` and `compile` both perform the full parse/bind/lower/verify pipeline and print
-`VERIFIED ... (execution unavailable)`. `disasm` prints the same verified program's diagnostic
+`VERIFIED ... (structural target; use run for execution)`. `disasm` prints the same verified program's diagnostic
 text. These commands accept UTF-8 standard `.bas` modules and default to entry `Answer`;
 `--entry <name>` selects another entry. Errors return exit 2, with source coordinates when
 available. There is no bytecode file format, binary loader or persisted compile output.
@@ -33,7 +33,7 @@ Long result slot 0, max_stack 3, and the specified instructions:
 0008 Return
 ```
 
-Returning Long 42 remains the first M3 execution gate. Neither VERIFIED nor the presence
+M3 now executes this example as Long 42. Neither VERIFIED nor the presence
 of an operation in `Capabilities::ir1_structural()` claims runtime support.
 
 ## Binding boundary
@@ -50,7 +50,7 @@ of an operation in `Capabilities::ir1_structural()` claims runtime support.
 | Control | If/ElseIf/Else including inline forms, Exit in a matching context, Stop, numeric For with Integer/Long counter and positive integral literal step (default 1); matching Next name |
 | Constants | Literal untyped module/procedure Const only; exact tags retained; cross-module Const lookup, typed Const and computed constant expressions fail explicitly |
 
-Rejected M2 forms include persistent module variables, classes/properties, foreign/default-member
+Rejected M2 forms include persistent module variables, classes/properties, default-member
 binding, arrays, optional/default/named/omitted direct VBA arguments, parenthesized direct arguments,
 nonlocal ByRef, identifier type suffix binding, unknown types, unary plus, Is/Like, nondecimal/wider/
 floating/Currency literals, Option Compare Text, computed/nonpositive/nonintegral For steps, and
@@ -134,4 +134,13 @@ nested/same-line calls, If/For/ByRef lowering, the full Answer golden, version/f
 all IR 1 stack instruction shapes, malformed indexes/blocks/metadata/calls, all verifier budget
 dimensions, exact UTF-16/float-bit disassembly and bounded constant amplification. Tests are
 independent of corpus checkouts and Office. All 20 M0 scenario execution statuses stay NOT_RUN.
-Native CI and library WASM compilation are required; WASM execution remains M3.
+Native CI, library WASM compilation and the M3 native/WASI execution gate are required.
+
+## M3 source extension
+
+The binder/compiler now support generic member Call/Get/Let/Set on an explicitly declared Object
+local or parameter. Calls and member applications use Call; plain reads use Get; member assignments
+retain Let/Set. Source foreign arguments are ByVal or omitted with names preserved; foreign ByRef
+snapshot descriptors are verified/tested separately. Nested/default/indexed property ambiguity and
+implicit Office globals remain unsupported. These sites need explicit embedding permissions at
+runtime. See [M3 contract](runtime.md); runtime operations never enter the compiler layer.

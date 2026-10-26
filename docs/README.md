@@ -12,8 +12,11 @@ and [compatibility matrix](compatibility-matrix.md) describe development contrac
 
 [Bytecode and VM specification](bytecode-vm-specification.md) defines the adopted IR 1 instruction,
 verification and execution contract; [ADR 0004](decisions/0004-bytecode-vm-contract.md) records the choices.
-M2 IR/binding/lowering is implemented; VM execution remains M3 work.
+M2 IR/binding/lowering is implemented; the documented VM execution subset is implemented at M3.
 [M2 compiler contract](compiler.md) and [ADR 0006](decisions/0006-m2-binding-and-verification.md) record the current API, budgets and evidence.
+
+[M3 runtime/debugger contract](runtime.md) and [ADR 0007](decisions/0007-m3-execution-and-debugger.md)
+record supported execution, generic host continuations and identical native/WASM acceptance.
 
 [Agent design skills](agent-skills.md) lists the shared Codex/OpenCode skills and their task routing.
 

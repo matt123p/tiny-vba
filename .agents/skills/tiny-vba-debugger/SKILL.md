@@ -12,7 +12,7 @@ state before adding controls. Use the editor UI skill as well when changing visu
 Follow [IR 1 checkpoint/continuation semantics](../../../docs/bytecode-vm-specification.md): distinguish
 normal checkpoint pauses, post-Stop pauses, fault snapshots, quota yields and host waits. Continue grants
 one permit only for the paused checkpoint visit; step targets use frame identities and dynamic visits.
-The specification is adopted design, not a working VM/debugger.
+The M3 headless VM/controller subset is now implemented; the runtime contract records its limits.
 
 ## Required invariants
 
@@ -37,3 +37,13 @@ Prove break/inspect/edit/resume with deterministic cases that count host writes,
 loops, runtime errors and cancellation. Exercise stale handles and disconnect/close during pause.
 Keep UI state/actions consistent with the controller; unsupported actions are disabled or return
 explicit diagnostics. A CLI or DAP test does not satisfy the required visual debugger milestone.
+
+## Implemented M3 contract
+
+Read [runtime](../../../docs/runtime.md) and [ADR 0007](../../../docs/decisions/0007-m3-execution-and-debugger.md).
+The m3-core-v1 runtime is intentionally narrower than structural IR. Preserve explicit frame/alias
+storage, one-visit checkpoint permits, saved fault PCs, generation checks and nonreplayed continuations.
+Use vba-runtime for operations/edits. VM host dispatch must use checked precommit return/writeback
+validation and explicit per-site permissions; foreign aliases remain unsupported. Run cargo xtask ci,
+wasm and wasm-run (native plus actual WASI execution). Runtime example results do not mark unrun M0
+or external scenario assertions PASS. Graphical UI, DAP and VBA error-handler semantics remain later work.

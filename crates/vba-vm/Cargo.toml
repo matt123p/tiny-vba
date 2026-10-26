@@ -16,3 +16,8 @@ vba-ir.workspace = true
 vba-values.workspace = true
 vba-runtime.workspace = true
 vba-foreign.workspace = true
+
+[dev-dependencies]
+vba-compiler.workspace = true
+vba-debug.workspace = true
+vba-testkit.workspace = true

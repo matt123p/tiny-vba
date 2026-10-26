@@ -50,8 +50,26 @@ pub struct Expr {
     pub span: Span,
     pub kind: ExprKind,
 }
+#[derive(Clone, Copy, Debug)]
+pub enum ForeignKind {
+    Call,
+    Get,
+    Let,
+    Set,
+}
+#[derive(Clone, Debug)]
+pub struct ForeignArgument {
+    pub name: Option<String>,
+    pub value: Option<Expr>,
+}
 #[derive(Clone, Debug)]
 pub enum ExprKind {
+    Foreign {
+        target: Box<Expr>,
+        kind: ForeignKind,
+        member: String,
+        arguments: Vec<ForeignArgument>,
+    },
     Constant(Value),
     Local(usize),
     Unary {
@@ -86,6 +104,7 @@ pub struct IfArm {
 }
 #[derive(Clone, Debug)]
 pub enum StatementKind {
+    Foreign(Expr),
     Declare,
     Assign {
         slot: usize,
@@ -105,7 +124,7 @@ pub enum StatementKind {
         counter: usize,
         start: Expr,
         limit: Expr,
-        step: Expr,
+        step: Box<Expr>,
         body: Vec<Statement>,
         next: ast::StatementSite,
     },
@@ -723,6 +742,68 @@ impl Binder<'_> {
         }
         Ok(result)
     }
+    fn foreign(
+        &mut self,
+        target: &ast::Expr,
+        member: &ast::Name,
+        arguments: &[ast::Argument],
+        kind: ForeignKind,
+        extra: Option<&ast::Expr>,
+    ) -> Result<Expr> {
+        let ast::ExprKind::Name(name) = &target.kind else {
+            return Err(unsupported("nested/default foreign target", target.span));
+        };
+        let slot = self.slot(name)?;
+        if self
+            .locals
+            .get(slot)
+            .is_none_or(|l| l.kind != ScalarKind::Object)
+        {
+            return Err(unsupported(
+                "foreign target must be declared Object local/parameter",
+                target.span,
+            ));
+        }
+        let mut args = Vec::new();
+        let mut named = false;
+        for arg in arguments {
+            if arg.name.is_some() {
+                named = true;
+            } else if named {
+                return Err(err("positional argument after named", arg.span));
+            }
+            push(
+                &mut args,
+                ForeignArgument {
+                    name: arg.name.as_ref().map(|n| n.spelling.clone()),
+                    value: arg.value.as_ref().map(|e| self.expr(e)).transpose()?,
+                },
+                arg.span,
+            )?;
+        }
+        if let Some(value) = extra {
+            push(
+                &mut args,
+                ForeignArgument {
+                    name: None,
+                    value: Some(self.expr(value)?),
+                },
+                value.span,
+            )?;
+        }
+        Ok(Expr {
+            span: member.span,
+            kind: ExprKind::Foreign {
+                target: Box::new(Expr {
+                    span: target.span,
+                    kind: ExprKind::Local(slot),
+                }),
+                kind,
+                member: member.spelling.clone(),
+                arguments: args,
+            },
+        })
+    }
     fn expr(&mut self, expr: &ast::Expr) -> Result<Expr> {
         self.budget.charge(256, expr.span)?;
         let bound = match &expr.kind {
@@ -755,6 +836,13 @@ impl Binder<'_> {
                 }
             }
             ast::ExprKind::Apply { target, arguments } => {
+                if let ast::ExprKind::Member {
+                    target: object,
+                    name,
+                } = &target.kind
+                {
+                    return self.foreign(object, name, arguments, ForeignKind::Call, None);
+                }
                 let ast::ExprKind::Name(name) = &target.kind else {
                     return Err(unsupported("member/default/array application", expr.span));
                 };
@@ -791,8 +879,8 @@ impl Binder<'_> {
                     right: Box::new(self.expr(right)?),
                 }
             }
-            ast::ExprKind::Member { .. } => {
-                return Err(unsupported("foreign member binding", expr.span));
+            ast::ExprKind::Member { target, name } => {
+                return self.foreign(target, name, &[], ForeignKind::Get, None);
             }
             _ => ExprKind::Constant(literal(expr)?),
         };
@@ -819,6 +907,26 @@ impl Binder<'_> {
                 object,
                 ..
             } => {
+                if let ast::ExprKind::Member {
+                    target: object_target,
+                    name,
+                } = &target.kind
+                {
+                    return Ok(Statement {
+                        site,
+                        kind: StatementKind::Foreign(self.foreign(
+                            object_target,
+                            name,
+                            &[],
+                            if *object {
+                                ForeignKind::Set
+                            } else {
+                                ForeignKind::Let
+                            },
+                            Some(value),
+                        )?),
+                    });
+                }
                 let ast::ExprKind::Name(name) = &target.kind else {
                     return Err(unsupported("nonlocal assignment", target.span));
                 };
@@ -840,6 +948,22 @@ impl Binder<'_> {
             ast::StatementKind::Call {
                 target, arguments, ..
             } => {
+                if let ast::ExprKind::Member {
+                    target: object,
+                    name,
+                } = &target.kind
+                {
+                    return Ok(Statement {
+                        site,
+                        kind: StatementKind::Foreign(self.foreign(
+                            object,
+                            name,
+                            arguments,
+                            ForeignKind::Call,
+                            None,
+                        )?),
+                    });
+                }
                 let ast::ExprKind::Name(name) = &target.kind else {
                     return Err(unsupported("foreign member call", target.span));
                 };
@@ -919,7 +1043,7 @@ impl Binder<'_> {
                     counter,
                     start,
                     limit,
-                    step,
+                    step: Box::new(step),
                     body: body?,
                     next: loop_.next,
                 }

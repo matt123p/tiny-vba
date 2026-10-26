@@ -26,6 +26,12 @@ jobs:
       - uses: actions/checkout@v4
       - run: rustup target add wasm32-unknown-unknown
       - run: cargo xtask wasm
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - run: rustup target add wasm32-wasip1
+      - name: Execute identical native and WASM acceptance programs
+        run: cargo xtask wasm-run
   corpora:
     runs-on: ubuntu-latest
     steps:

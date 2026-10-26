@@ -1,12 +1,12 @@
 # Bytecode and explicit-state VM specification
 
 Version: IR 1. Date: 2026-10-26. Status: adopted implementation contract under
-[ADR 0004](decisions/0004-bytecode-vm-contract.md). M2 structural IR/verifier/lowering implemented; VM execution remains M3. See [current implementation](compiler.md).
+[ADR 0004](decisions/0004-bytecode-vm-contract.md). M2 structural IR/verifier/lowering and M3 execution subset implemented. See [compiler](compiler.md) and [runtime](runtime.md).
 
 This document defines the M2/M3 instruction representation, verifier, calling convention and execution
 lifecycle. It supplements section 6 of the preserved [implementation specification](vba-interpreter-rust-implementation-spec.md).
-Current code implements [M0 foundations](decisions/0003-m0-source-scenarios-foreign.md), the M1 frontend and [M2 compilation](compiler.md).
-This contract and structural verification add no executable VBA support and change no execution result.
+Current code implements [M0 foundations](decisions/0003-m0-source-scenarios-foreign.md), the M1 frontend, [M2 compilation](compiler.md) and [M3 runtime subset](runtime.md).
+Structural verification alone adds no execution result; the M3 runtime contract records actual execution evidence.
 
 ## 1. Scope, versions and owners
 
@@ -39,7 +39,7 @@ Do not encode unimplemented syntax as a no-op or a fabricated constant.
 The compiler is an implemented upper-layer crate depending on diagnostics, syntax, semantics, IR
 and values. Its M2 package and reviewed DAG edges are recorded in ADR 0006. IR never depends on
 semantics; the VM never depends on compiler, debug, DAP or UI. M2's `ir1-structural` target verifies
-all IR 1 shapes without claiming any runtime implementation; M3 must check actual capabilities.
+all IR 1 shapes without claiming any runtime implementation; M3 checks the actual m3-core-v1 capabilities at launch.
 
 
 ### Delivery capabilities

@@ -52,3 +52,13 @@ are host tasks. P-code, protection bypass and VBA binary project writeback remai
 Verify generic invocation and pause/resume locally, including omitted/named/ByRef arguments, errors,
 suspension and stale handles. Real workbook mutation, recalc/undo and package round trips require
 fork integration evidence; do not claim those from a generic double or source decoder alone.
+
+## Implemented M3 contract
+
+Read [runtime](../../../docs/runtime.md) and [ADR 0007](../../../docs/decisions/0007-m3-execution-and-debugger.md).
+The m3-core-v1 runtime is intentionally narrower than structural IR. Preserve explicit frame/alias
+storage, one-visit checkpoint permits, saved fault PCs, generation checks and nonreplayed continuations.
+Use vba-runtime for operations/edits. VM host dispatch must use checked precommit return/writeback
+validation and explicit per-site permissions; foreign aliases remain unsupported. Run cargo xtask ci,
+wasm and wasm-run (native plus actual WASI execution). Runtime example results do not mark unrun M0
+or external scenario assertions PASS. Graphical UI, DAP and VBA error-handler semantics remain later work.

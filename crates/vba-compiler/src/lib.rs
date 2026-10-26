@@ -222,6 +222,7 @@ struct Block {
     visible: bool,
     code: Vec<ir::Instruction>,
     calls: Vec<(usize, ir::CallSite)>,
+    foreign: Vec<(usize, ir::ForeignSite)>,
 }
 struct Builder<'a> {
     program: &'a bound::BoundProgram,
@@ -260,6 +261,7 @@ impl Builder<'_> {
                 visible,
                 code: Vec::new(),
                 calls: Vec::new(),
+                foreign: Vec::new(),
             },
         )?;
         Ok(id)
@@ -447,8 +449,67 @@ impl Builder<'_> {
             .kind
             == ast::ProcedureKind::Function)
     }
+    fn foreign(
+        &mut self,
+        block: usize,
+        target: &bound::Expr,
+        kind: bound::ForeignKind,
+        member: &str,
+        args: &[bound::ForeignArgument],
+    ) -> Result<()> {
+        self.feature("foreign-snapshot-v1");
+        self.expr(block, target)?;
+        let mut arguments = Vec::new();
+        for arg in args {
+            let mode = if let Some(value) = &arg.value {
+                self.expr(block, value)?;
+                ir::ArgumentMode::Value
+            } else {
+                ir::ArgumentMode::Omitted
+            };
+            push(
+                &mut arguments,
+                ir::Argument {
+                    mode,
+                    name: arg.name.clone(),
+                    parameter: None,
+                },
+            )?;
+        }
+        let kind = match kind {
+            bound::ForeignKind::Call => ir::ForeignKind::Call,
+            bound::ForeignKind::Get => ir::ForeignKind::Get,
+            bound::ForeignKind::Let => ir::ForeignKind::Let,
+            bound::ForeignKind::Set => ir::ForeignKind::Set,
+        };
+        let block_ref = self
+            .blocks
+            .get_mut(block)
+            .ok_or_else(|| error("foreign block"))?;
+        let id = ir::ForeignSiteId(idx(block_ref.foreign.len())?);
+        let pc = block_ref.code.len();
+        push(
+            &mut block_ref.foreign,
+            (
+                pc,
+                ir::ForeignSite {
+                    checkpoint: ir::SiteId(0),
+                    kind,
+                    member: member.into(),
+                    arguments,
+                },
+            ),
+        )?;
+        self.emit(block, ir::Instruction::Invoke(id))
+    }
     fn expr(&mut self, block: usize, expr: &bound::Expr) -> Result<()> {
         match &expr.kind {
+            bound::ExprKind::Foreign {
+                target,
+                kind,
+                member,
+                arguments,
+            } => self.foreign(block, target, *kind, member, arguments),
             bound::ExprKind::Constant(value) => self.constant(block, value),
             bound::ExprKind::Local(slot) => self.emit(
                 block,
@@ -637,6 +698,10 @@ impl Builder<'_> {
                     !matches!(statement.kind, bound::StatementKind::Declare),
                 )?;
                 match &statement.kind {
+                    bound::StatementKind::Foreign(expr) => {
+                        self.expr(block, expr)?;
+                        self.emit(block, ir::Instruction::DropValue)?;
+                    }
                     bound::StatementKind::Assign {
                         slot,
                         value,
@@ -733,6 +798,7 @@ impl Builder<'_> {
         code.try_reserve_exact(pc).map_err(|_| resource())?;
         let mut checkpoints = Vec::new();
         let mut calls = Vec::new();
+        let mut foreign = Vec::new();
         for (site_index, id) in order.iter().enumerate() {
             let block = self.blocks.get(*id).ok_or_else(|| error("block"))?;
             let site = ir::SiteId(idx(site_index)?);
@@ -764,6 +830,19 @@ impl Builder<'_> {
                         *if_false = *mapping
                             .get(&(if_false.0 as usize))
                             .ok_or_else(|| error("false mapping"))?;
+                    }
+                    ir::Instruction::Invoke(id) => {
+                        let (call_offset, mut call) = block
+                            .foreign
+                            .get(id.0 as usize)
+                            .cloned()
+                            .ok_or_else(|| error("foreign mapping"))?;
+                        if call_offset != offset {
+                            return Err(error("foreign offset"));
+                        }
+                        call.checkpoint = site;
+                        *id = ir::ForeignSiteId(idx(foreign.len())?);
+                        push(&mut foreign, call)?;
                     }
                     ir::Instruction::Call { site: call_id, .. } => {
                         let (call_offset, mut call) = block
@@ -839,7 +918,7 @@ impl Builder<'_> {
             statements: self.statements,
             checkpoints,
             calls,
-            foreign: Vec::new(),
+            foreign,
         })
     }
 }

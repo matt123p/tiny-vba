@@ -12,9 +12,9 @@ cargo test -p vba-syntax
 ```
 
 The first command prints `PARSED examples/pure-vba/Arithmetic.bas: 1 procedures
-(binding and execution unavailable)` and the procedure's name/range. Invalid input returns
+(syntax only; use check or run)` and the procedure's name/range. Invalid input returns
 exit 2 and reports `invalid.bas:3:19: VBA0101` at the unexpected `)`.
-`check`, `compile` and `disasm` now implement the narrower [M2 compiler subset](compiler.md); `run` remains unsupported.
+`check`, `compile` and `disasm` now implement the narrower [M2 compiler subset](compiler.md); `run` executes the narrower [M3 runtime subset](runtime.md).
 
 ## API and source ownership
 

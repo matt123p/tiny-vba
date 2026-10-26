@@ -64,10 +64,10 @@ Routine implementation choices within the agreed scope do not require another ap
 
 ## Development gates
 
-Run `cargo xtask ci` and `cargo xtask wasm`. Install wasm32-unknown-unknown as needed.
+Run `cargo xtask ci`, `cargo xtask wasm` and `cargo xtask wasm-run`. Install wasm32-unknown-unknown and wasm32-wasip1 as needed; Node 18+ runs the WASI smoke gate.
 Local core tests must work without corpus checkouts or application siblings; corpus verification is separate.
-Use `cargo run -p vba-cli -- --help` for the current interface. M0 fixture validation, M1 subset parsing and M2 binding/verified IR compilation are implemented; VBA execution is not.
-See `docs/frontend.md` for syntax and `docs/compiler.md` for the narrower binding/lowering subset, IR verification and budgets.
+Use `cargo run -p vba-cli -- --help` for the current interface. M0 fixture validation, M1 subset parsing and M2 binding/verified IR compilation and the M3 runtime/debugger subset are implemented.
+See `docs/frontend.md` for syntax and `docs/compiler.md` for the narrower binding/lowering subset, IR verification and budgets; `docs/runtime.md` defines actual execution and host/debugger capabilities.
 Update affected architecture, compatibility, progress and decision documents with changes.
 Report exact tests run, support added, remaining gaps and the next smallest task.
 

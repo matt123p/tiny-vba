@@ -63,7 +63,7 @@ fn parse_source(path: &str) -> Result<(), Box<dyn std::error::Error>> {
         .into());
     }
     println!(
-        "PARSED {}: {} procedures (binding and execution unavailable)",
+        "PARSED {}: {} procedures (syntax only; use check or run)",
         file.name(),
         parsed.module.procedures.len()
     );
@@ -88,9 +88,7 @@ fn compile_source(
         .and_then(|s| s.to_str())
         .is_some_and(|s| s.eq_ignore_ascii_case("bas"))
     {
-        return Err(
-            Diagnostic::unsupported("M2 compilation requires a standard .bas module").into(),
-        );
+        return Err(Diagnostic::unsupported("compilation requires a standard .bas module").into());
     }
     let mut bytes = Vec::new();
     File::open(path)?
@@ -101,6 +99,11 @@ fn compile_source(
     let source = SourceFile::new(SourceId(0), path.into(), text)?;
     let options = vba_compiler::CompileOptions {
         entry: entry.into(),
+        capabilities: if command == "run" {
+            vba_vm::capabilities()
+        } else {
+            vba_ir::Capabilities::ir1_structural()
+        },
         ..Default::default()
     };
     let program = match vba_compiler::compile(&source, &options) {
@@ -113,11 +116,55 @@ fn compile_source(
             return Err(diagnostic.into());
         }
     };
-    if command == "disasm" {
+    if command == "run" {
+        let mut session =
+            vba_vm::Session::new(program, 1, vec![], None, vba_vm::Limits::default())?;
+        loop {
+            match session.run_slice(&mut vba_vm::NoHost, 4096, &mut |_| Ok(false))? {
+                vba_vm::Outcome::Yielded => (),
+                vba_vm::Outcome::Completed(value) => {
+                    println!("COMPLETED {value:?}");
+                    break;
+                }
+                vba_vm::Outcome::Failed(failure) => {
+                    if let Some(span) = failure.frames.first().and_then(|f| f.span) {
+                        let (line, column) = source.position(span)?;
+                        eprintln!("{}:{line}:{column}", source.name());
+                    }
+                    if let Some(number) = failure.number {
+                        return Err(std::io::Error::other(format!(
+                            "VBA runtime error {number}: {}",
+                            failure.message
+                        ))
+                        .into());
+                    }
+                    let code = match failure.kind {
+                        vba_vm::FailureKind::Unsupported => "VBA0001",
+                        vba_vm::FailureKind::ResourceLimit => "VBA0031",
+                        vba_vm::FailureKind::HostProtocol => "VBA0033",
+                        vba_vm::FailureKind::HostDisconnected => "VBA0032",
+                        _ => "VBA0030",
+                    };
+                    return Err(Diagnostic::new(code, failure.message).into());
+                }
+                vba_vm::Outcome::Paused(_) => {
+                    return Err(Diagnostic::unsupported(
+                        "Stop requires debugger control; use the M3 smoke example",
+                    )
+                    .into());
+                }
+                _ => {
+                    return Err(
+                        Diagnostic::unsupported("host-free CLI cannot resume a host call").into(),
+                    );
+                }
+            }
+        }
+    } else if command == "disasm" {
         print!("{}", vba_ir::disassemble(&program)?);
     } else {
         println!(
-            "VERIFIED {}: {} procedures, IR 1 (execution unavailable)",
+            "VERIFIED {}: {} procedures, IR 1 (structural target; use run for execution)",
             source.name(),
             program.program().procedures.len()
         );
@@ -129,12 +176,12 @@ fn main() -> ExitCode {
     match args.next().as_deref() {
         None | Some("--help" | "-h" | "help") => {
             println!(
-                "tiny-vba: standalone VBA interpreter scaffold\n\nUsage: vba-cli <command> [options]\n\nImplemented: --help, --version, conformance validate <scenario>, parse <source.bas|source.cls>\nM2: check|compile|disasm <source.bas> [--entry <name>]\nPlanned commands: run, debug, dap, inspect-project\nVBA execution remains unsupported (VBA0001, exit 2). Validated fixtures remain NOT_RUN."
+                "tiny-vba: standalone VBA interpreter scaffold\n\nUsage: vba-cli <command> [options]\n\nImplemented: --help, --version, conformance validate <scenario>, parse <source.bas|source.cls>\nM2: check|compile|disasm <source.bas> [--entry <name>]\nM3: run <source.bas> [--entry <name>]\nPlanned commands: debug, dap, inspect-project\nrun executes the m3-core-v1 subset. Unsupported forms and targets fail with exit 2. Fixture validation does not execute scenarios."
             );
             ExitCode::SUCCESS
         }
         Some("--version" | "-V") => {
-            println!("vba-cli {} (M2)", env!("CARGO_PKG_VERSION"));
+            println!("vba-cli {} (M3)", env!("CARGO_PKG_VERSION"));
             ExitCode::SUCCESS
         }
         Some("parse") => {
@@ -168,7 +215,7 @@ fn main() -> ExitCode {
                 None => ExitCode::from(2),
             }
         }
-        Some(command @ ("check" | "compile" | "disasm")) => {
+        Some(command @ ("check" | "compile" | "disasm" | "run")) => {
             let path = args.next();
             let mut entry = "Answer".to_owned();
             if let Some(flag) = args.next() {
@@ -198,7 +245,7 @@ fn main() -> ExitCode {
                 None => ExitCode::from(2),
             }
         }
-        Some(command @ ("run" | "debug" | "dap" | "inspect-project")) => {
+        Some(command @ ("debug" | "dap" | "inspect-project")) => {
             eprintln!("{}", Diagnostic::unsupported(command));
             ExitCode::from(2)
         }

@@ -1,9 +1,9 @@
 # Plan of action
 
 Prepared 2026-10-26. This plan builds the interpreter and editor/debugger UI here; document/Office integration stays external.
-Setup and the documented M0–M2 subsets are complete. The detailed [bytecode/VM specification](bytecode-vm-specification.md)
+Setup and the documented M0–M3 subsets are complete. The detailed [bytecode/VM specification](bytecode-vm-specification.md)
 and [ADR 0004](decisions/0004-bytecode-vm-contract.md) are written before frontend work continues.
-M2 binding, lowering and verified IR are implemented under [the compiler contract](compiler.md). M3 execution/debugger is next; all VBA execution outcomes remain NOT_RUN.
+M2 binding, lowering and verified IR are implemented under [the compiler contract](compiler.md). M3 execution/debugger is implemented under [the runtime contract](runtime.md). M4 semantic depth is next; scenario manifests still require an assertion runner.
 
 | Stage | Work in tiny-vba | Acceptance gate |
 |---|---|---|
@@ -11,7 +11,7 @@ M2 binding, lowering and verified IR are implemented under [the compiler contrac
 | M0 — contract and test harness — complete | Source IDs/spans/diagnostics; versioned scenario parser/validator; at least 20 independently authored pure-language cases; foreign-call ownership prototype and deterministic double | CLI validates valid fixtures and rejects malformed ones; missing/empty/null distinctions; fake call/error/wait round trip; no silent execution stub |
 | M1 — frontend — complete for reviewed subset | Lexer, source-preserving parser, .bas/.cls metadata, procedures/declarations/assignment/If/For/calls; positive/negative fixtures | Exact error spans and same-line statement IDs; bounded recovery; run a reviewed grammar-corpus subset and report unsupported syntax |
 | M2 — binder and bytecode — complete for reviewed subset | Scopes, Option Explicit, locals/procedure binding, argument subset, lowering, verifier/disassembler | Compile/disassemble examples; reject invalid branches/slots/stack effects; deterministic source maps |
-| M3 — executable VM + debugger | Minimal typed values/arithmetic, explicit frames, loops/calls, budgets; generic foreign protocol; break/step/inspect/edit/resume | Host-free Answer() returns Long 42; generic host call trace correct; pause/edit/resume without replay; infinite loop cancels; native and WASM execution smoke tests |
+| M3 — executable VM + debugger — complete for reviewed subset | Minimal typed values/arithmetic, explicit frames, loops/calls, budgets; generic foreign protocol; break/step/inspect/edit/resume | Host-free Answer() returns Long 42; generic host call trace correct; pause/edit/resume without replay; infinite loop cancels; native and WASM execution smoke tests |
 | M4 — semantic depth | Centralized coercion and numeric widths, Empty/Null/Missing/Nothing/CVErr, Currency/Date, ByRef, arrays, optional/named args, error handlers and builtins | Type/value/error-number comparisons against vetted profile-tagged fixtures; no generic error swallowing; static/project state tested |
 | M5 — fork integration contract | Stabilize public foreign/value/debug APIs and version compatibility table; offer reusable tests | Fork-owned bridge can run FillCells against its own fake Office layer, pause/edit/resume and validate results; core still builds alone |
 | M6 — project source decoding | Read-only MS-OVBA decoder, encoding/attributes/references/codenames; malformed-stream and budget tests | Decode controlled project bytes; preserve module identities; reject unsupported/protected/corrupt inputs; no auto-execution |
@@ -48,12 +48,13 @@ Do not duplicate those implementations in tiny-vba to make a local demonstration
 M0 is implemented; see [ADR 0003](decisions/0003-m0-source-scenarios-foreign.md) and
 [scenario schema 1](scenario-format.md). All 20 VBA scenarios remain NOT_RUN.
 
-1. Start M3 with explicit VM frames/local storage, checked Integer/Long multiply and assignment,
-   checkpoint dispatch and instruction quotas; execute Arithmetic.Answer as exact Long 42.
-2. Advertise/recheck an actual runtime capability matrix instead of M2's structural target.
-3. Wire same-line/loop checkpoints, direct ByVal/canonical ByRef, Stop, pause/step/inspect/edit/resume,
-   cancellation and typed generic foreign continuation/writebacks; test native and WASM execution.
-4. Coordinate the fork-owned FillCells bridge proof and expand semantics from classified corpus failures.
+1. Start M4 with a separately tested scalar conversion/error matrix and a scenario assertion runner;
+   preserve NOT_RUN until each manifest's typed expected outcome is actually compared.
+2. Specify a handler-capable IR extension for On Error/Resume/Err/Erl, including frame handler state,
+   exceptional edges, resumption metadata and nested-handler tests, before enabling those constructs.
+3. Expand numeric/string/array/argument semantics from classified cases, and coordinate the fork-owned
+   FillCells bridge proof without implementing Office objects here.
+4. Begin the reusable graphical editor/debugger slice on the proven M3 APIs under the M8 UI contract.
 
 M1's [frontend contract](frontend.md), [ADR 0005](decisions/0005-m1-frontend.md) and
 [external syntax evaluation](m1-corpus-report.md) record support and limits. All 20 M0 bodies parse;
@@ -61,7 +62,7 @@ that does not change their execution status.
 IR 1 deliberately restricts the first executable language subset; optional/named direct calls,
 arrays, error handlers and full foreign ByRef behavior need later features/IR contracts. M2/M3
 acceptance cases and version/feature refusal rules are listed in the bytecode/VM specification.
-M2 implementation evidence is in [compiler](compiler.md) and [ADR 0006](decisions/0006-m2-binding-and-verification.md). VM/debugger execution remains M3.
+M2 implementation evidence is in [compiler](compiler.md) and [ADR 0006](decisions/0006-m2-binding-and-verification.md). M3 execution evidence and limitations are in [runtime](runtime.md) and [ADR 0007](decisions/0007-m3-execution-and-debugger.md).
 
 ## Measurement and decisions
 

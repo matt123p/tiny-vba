@@ -1,6 +1,6 @@
 # Debugger design contract
 
-Status: planned, 2026-10-26. vba-debug, vba-dap and the editor/debugger UI have no implementation yet.
+Status: M3 headless VM/controller implemented, 2026-10-26. See [runtime APIs, tests and limitations](runtime.md). DAP and the graphical editor/debugger remain planned.
 
 The reusable graphical editor/debugger and standalone IDE belong in tiny-vba. They are required
 product work under [ADR 0002](decisions/0002-editor-debugger-ui.md) and the
@@ -9,7 +9,7 @@ The egui UI calls native debugger/IDE APIs directly. DAP is optional and does no
 
 [IR 1](bytecode-vm-specification.md) now specifies checkpoint visits/one-visit continuation permits,
 frame-local stacks, exactly-once host continuations, Stop/fault/quota/wait distinctions, step targets,
-inspection generations and cancellation. Follow this detailed contract when implementing M3;
+inspection generations and cancellation. The M3 subset follows this detailed contract;
 On Error handler execution is reserved for a later IR version, not implemented by IR 1.
 
 The VM owns explicit frames, instruction pointer, per-frame error-handler state, execution budgets,

@@ -53,3 +53,13 @@ All 20 M0 bodies parse, but execution statuses and the corpus inventory remain N
 M2 VERIFIED/diagnostic disassembly is structural compilation evidence only; see
 [compiler tests and boundaries](../../../docs/compiler.md). Do not mark any execution scenario PASS
 from compilation. All M0/external execution statuses remain NOT_RUN until a real VM runs assertions.
+
+## Implemented M3 contract
+
+Read [runtime](../../../docs/runtime.md) and [ADR 0007](../../../docs/decisions/0007-m3-execution-and-debugger.md).
+The m3-core-v1 runtime is intentionally narrower than structural IR. Preserve explicit frame/alias
+storage, one-visit checkpoint permits, saved fault PCs, generation checks and nonreplayed continuations.
+Use vba-runtime for operations/edits. VM host dispatch must use checked precommit return/writeback
+validation and explicit per-site permissions; foreign aliases remain unsupported. Run cargo xtask ci,
+wasm and wasm-run (native plus actual WASI execution). Runtime example results do not mark unrun M0
+or external scenario assertions PASS. Graphical UI, DAP and VBA error-handler semantics remain later work.

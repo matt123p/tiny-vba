@@ -6,7 +6,7 @@ pub use disasm::disassemble;
 use std::collections::BTreeSet;
 use vba_diagnostics::{SourceFile, Span, StatementId};
 use vba_values::{ScalarKind, Value};
-pub use verify::{VerifyLimits, measure_stack, verify};
+pub use verify::{VerifyLimits, measure_stack, recheck, verify};
 
 macro_rules! index {
     ($($name:ident),*) => {$ (

@@ -39,6 +39,32 @@ fn run() -> Result<(), Box<dyn Error>> {
             command("cargo", &["test", "--workspace", "--locked"])?;
             command("python3", &["tools/check_repository.py"])?;
         }
+        Some("wasm-run") => {
+            command(
+                "cargo",
+                &["run", "-p", "vba-cli", "--example", "m3_smoke", "--locked"],
+            )?;
+            command(
+                "cargo",
+                &[
+                    "build",
+                    "-p",
+                    "vba-cli",
+                    "--example",
+                    "m3_smoke",
+                    "--locked",
+                    "--target",
+                    "wasm32-wasip1",
+                ],
+            )?;
+            command(
+                "node",
+                &[
+                    "tools/run_wasi.cjs",
+                    "target/wasm32-wasip1/debug/examples/m3_smoke.wasm",
+                ],
+            )?;
+        }
         Some("layers") => command("python3", &["tools/check_repository.py", "layers"])?,
         Some("corpora") => command("python3", &["tools/check_repository.py", "corpora"])?,
         Some("wasm") => command(
@@ -52,7 +78,11 @@ fn run() -> Result<(), Box<dyn Error>> {
                 "wasm32-unknown-unknown",
             ],
         )?,
-        _ => return Err(io::Error::other("usage: cargo xtask <ci|layers|corpora|wasm>").into()),
+        _ => {
+            return Err(
+                io::Error::other("usage: cargo xtask <ci|layers|corpora|wasm|wasm-run>").into(),
+            );
+        }
     }
     Ok(())
 }

@@ -1,8 +1,46 @@
 # Implementation progress
 
-Updated 2026-10-26. Current stage: M0–M2 reviewed subsets complete; M3 VM/debugger execution is next.
+Updated 2026-10-26. Current stage: M0–M3 reviewed subsets complete; M4 semantic depth is next.
 
-## Pre-push verification of M0–M2
+## M3 completion
+
+Implemented vba-runtime's documented Integer/Long/Boolean/String/Variant/Object assignment and
+operator subset with exact scalar tags, overflow/division errors and explicit Unsupported results.
+The new m3-core-v1 capability profile is rechecked at VM launch using borrowed immutable IR; the
+structural M2 profile cannot silently enable runtime operations. Added CLI run and generic Object-
+local member Call/Get/Let/Set binding/lowering without Office globals or default-member inference.
+
+Implemented explicit frames, typed owned locations and canonical direct ByRef aliases, frame-local
+operand stacks, quotas/hard work and copy budgets, saved call/Invoke fault PCs, fresh checkpoint
+visits and single-use continue permits. Added source breakpoints, into/over/out stepping, generation-
+checked read-only inspection, validated active-frame edits and source staleness checks. Stop and
+optional read-only fault pauses continue without replay. Bounded snapshots explicitly report local
+truncation. Cancellation, host disconnect/loss, recursion/storage/stack/payload limits are explicit.
+
+Connected generic native host dispatch with per-site permissions, exactly-once wait/resume continuations
+and cancellation. vba-foreign's checked APIs validate return payload and all typed patches before
+its sole commit loop. Foreign alias snapshots are refused; direct ByRef remains canonical. Tests
+preserve successful direct alias/host effects after errors and distinguish VBA numbers from engine
+failures. The VM still has no compiler/debug/UI dependency and no ambient IO.
+
+Validation: cargo xtask ci, cargo xtask wasm, cargo xtask wasm-run and release workspace tests.
+The workspace has 74 integration tests: prior 54 plus 3 runtime, 10 VM execution, 6 VM host and
+1 additional CLI execution case. Native and actual wasm32-wasip1 execution run the same Rust
+m3_smoke acceptance under Node 18.19.1/Rust 1.99.1: Long(42), If/For/calls/ByRef Long(18), host
+pause/edit/resume Long(41), one invoke/two polls, stale handles, host-token and infinite-loop
+cancellation. Core libraries also compile for wasm32-unknown-unknown; CI now runs the shared
+native/WASI smoke gate using Node 22. Corpus integrity remains seven pins/646 hashes. No Office
+oracle, browser UI, remote cross-platform run or separate MSRV test is claimed by these local checks.
+
+See [runtime contract](runtime.md) and [ADR 0007](decisions/0007-m3-execution-and-debugger.md).
+The original M0 fixture manifests and external execution inventory remain NOT_RUN; there is still
+no fixture assertion runner. M3's explicit runtime examples/tests have actual execution evidence.
+The required graphical editor/debugger, DAP and fork-owned Office integration remain later gates.
+
+Next smallest task: M4 typed scenario assertion runner and expanded scalar conversion/error cases;
+then specify the versioned On Error/Resume/Err/Erl VM contract before implementing handlers.
+
+## Pre-push verification of M0–M2 (historical stage record)
 
 On 2026-10-26, reran `cargo xtask ci` (formatting, warning-free all-target Clippy, all 54
 workspace integration tests, layer checks and available corpus integrity), `cargo xtask wasm`
@@ -23,7 +61,7 @@ inputs stay covered by authored tests. A fresh `core.autocrlf=true` checkout pre
 bytes and passed `cargo xtask ci`, including all 54 tests, without corpus downloads. Cross-platform
 CI is rerun after this fix; source-map tests stay exact rather than normalizing parser input.
 
-## M2 completion
+## M2 completion (historical stage record)
 
 Implemented ordered module/procedure scopes and case-insensitive lookup, Option Explicit, scalar
 parameters/locals/Function result slots, implicit Variant locals, literal constants, positional ByVal

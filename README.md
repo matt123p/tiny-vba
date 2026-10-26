@@ -3,12 +3,13 @@
 A new, standalone VBA interpreter, editor and debugger in Rust, intended to run natively and in WebAssembly.
 Develop, run and test the language engine without Gridcraft, Wordcraft, Microsoft Office or a graphical interface.
 
-**Current status:** M0–M2 complete for the documented [frontend](docs/frontend.md) and
+**Current status:** M0–M3 complete for the documented [frontend](docs/frontend.md) and
 [compiler subset](docs/compiler.md): source-preserving parsing, scalar name/signature binding,
-checkpoint-based bytecode lowering, bounded IR 1 verification and deterministic disassembly.
-The CLI implements `parse`, `check`, `compile`, `disasm` and fixture validation. There is no
-executable VM or editor/debugger UI yet. Execution commands return `VBA0001: UNSUPPORTED`
-with exit code 2; all VBA scenario execution results remain NOT_RUN.
+checkpoint-based bytecode lowering, bounded IR 1 verification, explicit-frame execution and a headless debugger.
+The CLI implements `parse`, `check`, `compile`, `disasm`, `run` and fixture validation.
+See the [M3 runtime matrix](docs/runtime.md) for supported execution and debugger/host APIs.
+The graphical editor/debugger and DAP remain planned. Fixture validation still reports NOT_RUN;
+there is no automatic scenario assertion runner.
 
 
 The Excel/Word compatibility layers, Office metadata and application adapters belong in the
@@ -20,11 +21,13 @@ and design conventions. See the [editor/debugger UI contract](docs/editor-debugg
 ## Start here
 
 Rust is pinned by `rust-toolchain.toml`; Python 3.11+ and Git support repository checks only.
-No third-party Rust crates or Office installations are needed for M0–M2.
+No third-party Rust crates or Office installations are needed for M0–M3. Node 18+ runs the WASI smoke test.
 
 ```sh
 cargo run -p vba-cli -- --help
 cargo run -p vba-cli -- parse examples/pure-vba/Arithmetic.bas
+cargo run -p vba-cli -- run examples/pure-vba/Arithmetic.bas
+cargo run -p vba-cli --example m3_smoke
 cargo run -p vba-cli -- disasm examples/pure-vba/Arithmetic.bas
 cargo run -p vba-cli -- compile examples/pure-vba/M2Control.bas --entry Answer
 cargo run -p vba-cli -- conformance validate tests/fixtures/m0/arithmetic.vbas
@@ -32,11 +35,13 @@ cargo test --workspace --locked
 cargo xtask ci
 rustup target add wasm32-unknown-unknown
 cargo xtask wasm
+rustup target add wasm32-wasip1
+cargo xtask wasm-run
 ```
 
 `cargo xtask ci` checks formatting, Clippy, Rust tests, dependency boundaries and source pins.
 It verifies corpus hashes when checkouts are present; it never runs downloaded VBA.
-WASM is a separate compilation gate; execution smoke tests arrive with the VM.
+WASM library compilation and identical native/WASI execution are separate gates.
 
 ## Optional external test material
 

@@ -1,14 +1,15 @@
-//! These tests guard against reporting successful execution before a VM exists.
+//! CLI availability, bounded input and explicit execution result tests.
 use std::process::Command;
 
 #[test]
-fn execution_does_not_report_success() -> Result<(), Box<dyn std::error::Error>> {
+fn unsupported_legacy_run_arguments_do_not_report_success() -> Result<(), Box<dyn std::error::Error>>
+{
     let output = Command::new(env!("CARGO_BIN_EXE_vba-cli"))
         .args(["run", "--source", "missing.bas", "--host", "fake"])
         .output()?;
     assert_eq!(output.status.code(), Some(2));
     assert!(output.stdout.is_empty());
-    assert!(String::from_utf8(output.stderr)?.contains("VBA0001: UNSUPPORTED"));
+    assert!(String::from_utf8(output.stderr)?.contains("expected --entry"));
     Ok(())
 }
 
@@ -93,7 +94,7 @@ fn parse_accepts_examples_and_rejects_recovered_invalid_source()
         );
         let stdout = String::from_utf8(output.stdout)?;
         assert!(stdout.starts_with("PARSED "));
-        assert!(stdout.contains("binding and execution unavailable"));
+        assert!(stdout.contains("syntax only; use check or run"));
     }
     let output = Command::new(env!("CARGO_BIN_EXE_vba-cli"))
         .arg("parse")
@@ -164,7 +165,7 @@ fn m2_compile_check_disasm_are_usable_and_execution_stays_unavailable()
             assert!(text.contains("Binary(Multiply)"));
         } else {
             assert!(text.contains("VERIFIED"));
-            assert!(text.contains("execution unavailable"));
+            assert!(text.contains("structural target"));
         }
     }
     let output = Command::new(env!("CARGO_BIN_EXE_vba-cli"))
@@ -205,5 +206,41 @@ fn m2_compile_check_disasm_are_usable_and_execution_stays_unavailable()
         assert_eq!(output.status.code(), Some(2));
         assert!(output.stdout.is_empty());
     }
+    Ok(())
+}
+
+#[test]
+fn m3_run_reports_typed_results_and_rejects_unsupported_execution()
+-> Result<(), Box<dyn std::error::Error>> {
+    let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../..");
+    for (path, value) in [
+        ("examples/pure-vba/Arithmetic.bas", "Long(42)"),
+        ("examples/pure-vba/M2Control.bas", "Long(18)"),
+    ] {
+        let output = Command::new(env!("CARGO_BIN_EXE_vba-cli"))
+            .arg("run")
+            .arg(root.join(path))
+            .output()?;
+        assert!(
+            output.status.success(),
+            "{}",
+            String::from_utf8_lossy(&output.stderr)
+        );
+        assert!(String::from_utf8(output.stdout)?.contains(value));
+    }
+    let temp = std::env::temp_dir().join(format!("tiny-vba-execution-{}.bas", std::process::id()));
+    for body in ["Answer=1/2", "Answer=1 \\ 0", "Answer=32767+1"] {
+        std::fs::write(
+            &temp,
+            format!("Function Answer() As Long\n{body}\nEnd Function"),
+        )?;
+        let output = Command::new(env!("CARGO_BIN_EXE_vba-cli"))
+            .arg("run")
+            .arg(&temp)
+            .output()?;
+        assert_eq!(output.status.code(), Some(2));
+        assert!(output.stdout.is_empty());
+    }
+    std::fs::remove_file(temp)?;
     Ok(())
 }

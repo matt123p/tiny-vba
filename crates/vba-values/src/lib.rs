@@ -68,7 +68,7 @@ impl Value {
 }
 
 /// Opaque location: slots are never reused within an owner. Owners must be unique per VM session.
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+#[derive(Clone, Copy, Debug, Eq, PartialEq, Ord, PartialOrd)]
 pub struct Location {
     owner: u64,
     slot: usize,

@@ -5,7 +5,8 @@ Use the commands in [README](../README.md). Product code is Rust; maintenance ch
 current verification uses the pinned toolchain, not a separate MSRV CI run.
 
 `cargo xtask ci` is the native gate. `cargo xtask wasm` checks all libraries for wasm32-unknown-unknown;
-it requires `rustup target add wasm32-unknown-unknown`. No runtime WASM tests exist until M3.
+it requires `rustup target add wasm32-unknown-unknown`. Run `cargo xtask wasm-run` for identical native/WASI acceptance; it additionally needs
+Node 18+ and `rustup target add wasm32-wasip1`.
 `cargo xtask layers` reads Cargo metadata and compares normal dependencies to the reviewed acyclic graph.
 `cargo xtask corpora` validates Git/source pins and available hashes. The strict Python form in README also
 requires all submodules to be initialized. CI tests native Linux/macOS/Windows, library WASM, and strict corpus integrity separately.
@@ -21,8 +22,9 @@ pending-host cancellation obligations. M1 implements a bounded source-aware lexe
 the subset, diagnostics, AST and [syntax-only corpus report](m1-corpus-report.md).
 Before compiler/VM work, read the adopted
 [bytecode/VM specification](bytecode-vm-specification.md) and [ADR 0004](decisions/0004-bytecode-vm-contract.md).
-They define the IR 1 layout/verifier/continuation contracts and M2/M3 acceptance cases; no bytecode
-execution exists yet. M2 now implements vba-compiler, binding, IR verification and disassembly; see [the compiler contract](compiler.md).
+They define the IR 1 layout/verifier/continuation contracts and M2/M3 acceptance cases.
+M3 now executes the [runtime subset](runtime.md) via `vba-cli run`; use the Rust m3_smoke example
+for host wait/debugger/cancel acceptance. M2 now implements vba-compiler, binding, IR verification and disassembly; see [the compiler contract](compiler.md).
 
 To update a source pin, fetch/checkout an explicitly chosen commit in that submodule, inspect upstream notices
 and specimen changes without running it, then update the source lock and affected inventory hashes together.

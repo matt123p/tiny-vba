@@ -58,7 +58,9 @@
       "vba-conformance",
       "vba-diagnostics",
       "vba-ir",
-      "vba-syntax"
+      "vba-syntax",
+      "vba-values",
+      "vba-vm"
     ],
     "xtask": [],
     "vba-compiler": [

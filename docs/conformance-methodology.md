@@ -28,3 +28,7 @@ by an opt-in Rust allowlist: two unsupported modules and three intentionally mal
 M2 [compiler and IR evidence](compiler.md) adds verified compilation, deterministic disassembly
 and malformed-program rejection. VERIFIED is a structural result; all M0/external execution
 statuses remain NOT_RUN. The ir1-structural capability set supplies no VM or Office runtime.
+
+M3 adds actual native/WASI execution evidence for the explicit runtime examples and tests in
+[runtime](runtime.md). Do not transfer those results to fixture manifests or external specimens: the
+scenario assertion/oracle runner is still pending. The M0/external execution inventory stays NOT_RUN.

@@ -1,0 +1,155 @@
+# M3 runtime and debugger
+
+Implemented 2026-10-26. M3 executes the `m3-core-v1` profile through an explicit-frame IR 1 VM.
+It provides a headless debugger controller and generic native host continuations. The visual IDE,
+DAP, Office objects and broad VBA coercion/error-handler semantics are later milestones.
+
+```sh
+cargo run -p vba-cli -- run examples/pure-vba/Arithmetic.bas
+# COMPLETED Function(Long(42))
+cargo run -p vba-cli -- run examples/pure-vba/M2Control.bas
+# COMPLETED Function(Long(18))
+cargo run -p vba-cli --example m3_smoke
+rustup target add wasm32-unknown-unknown wasm32-wasip1
+cargo xtask ci
+cargo xtask wasm
+cargo xtask wasm-run
+cargo test --workspace --release --locked
+```
+
+`wasm-run` runs the same Rust acceptance example natively and under Node WASI, asserting Long(42),
+If/For/direct calls/ByRef Long(18), a host wait/pause/edit/resume result of Long(41), exactly one
+invocation and two polls, stale handles, pending-token cancellation and infinite-loop cancellation.
+The Node runner has no preopened directories or inherited environment; the interpreter/host double
+are Rust. WASI is the smoke executable transport, not a core VM filesystem API. Core libraries
+still compile for wasm32-unknown-unknown. Node 18.19.1 and Rust 1.99.1 were used locally; CI uses
+Node 22 for this gate. Node may print its WASI experimental-feature notice.
+
+## Runtime capability matrix
+
+The compiler defaults to `ir1-structural` for check/compile/disasm. To execute, compile with
+`CompileOptions { capabilities: vba_vm::capabilities(), ..Default::default() }` and pass the resulting
+VerifiedProgram to Session. Session rechecks immutable IR against its actual capabilities without
+cloning the source payload. A caller's capability set cannot enable an unimplemented operation.
+
+| Operation | M3 combinations |
+|---|---|
+| Declarations | Variant, Integer, Long, Boolean, String, generic Object; initialized to exact tagged defaults |
+| Assignment / ByVal | Same-tag Integer/Long/Boolean/String; Integer to Long; range-checked Long to Integer; Variant preserves scalar tags; Object/Nothing copied through explicit Set or parameter binding |
+| Add/Subtract/Multiply | Integer/Long pairs; Long if either operand is Long, otherwise Integer; checked overflow number 6 |
+| IntegerDivide/Modulo | Integer/Long pairs, checked width, division by zero number 11; signed integer quotient/remainder |
+| Comparisons | Integer/Long pairs for =, <>, <, <=, >, >=; Boolean = and <> |
+| Logical operators | Integer/Long bitwise And/Or/Xor/Eqv/Imp; Boolean equivalents; both source operands evaluated |
+| Unary | Checked Integer/Long negate; Integer/Long bitwise Not and Boolean Not |
+| Concatenation | String with String, exact UTF-16 units; bounded length |
+| Conditions | Boolean only; no implicit numeric/string truthiness |
+| Explicit Convert | Variant/Integer/Long/Boolean/String with the assignment matrix above |
+| Calls/control | Required positional ByVal and canonical exact-type local ByRef, Sub/Function, If, positive integral-step Integer/Long For, Exit, Stop |
+| Generic host | Object-local/parameter member Call/Get/Let/Set; names/omitted args retained, per-site permissions, wait/resume/cancel and typed snapshot writebacks |
+
+Division `/`, exponentiation, wider declared numerics, mixed string/numeric/Boolean coercion,
+Null/Empty arithmetic, default members, arrays/classes, builtins, persistent state, optional/named
+**direct VBA** arguments, temporary ByRef, error handlers and arbitrary watch evaluation remain
+unsupported. Passive scalar Variant copies preserve Empty/Null/Missing/Nothing/CVErr and existing
+scalar payload tags; that is not arithmetic or conversion support for those states. Bad dynamic
+combinations fail Unsupported, not a guessed VBA error. Host-provided VBA error numbers are preserved.
+
+The shared vba-runtime owns these rules; VM, debugger edits and typed parameter binding do not
+implement independent conversion paths. Tests are independently authored; no Microsoft oracle or
+broad Office compatibility observation is claimed.
+
+## Session and source control
+
+`Session::new` takes VerifiedProgram, a caller-assigned identity unique among live sessions, ordered
+launch Values, optional HostBinding and Limits. IR 1 launch parameters must be ByVal. Locals and
+result storage are frame-owned locations; direct ByRef slots are aliases of the caller's canonical
+location. Returning invalidates owned storage while retaining caller aliases. No Rust recursion
+implements VBA calls. Caller operand prefixes survive nested calls and pauses without evaluation replay.
+
+`run_slice(host, quota, predicate)` reports Yielded, Paused, Waiting, Completed, Failed or Cancelled.
+The initial Yielded state is ready/runnable. Invalid/zero/oversized quotas are command errors.
+Hard instruction limits precede yields and breakpoint offers. Terminal queries never rerun code.
+The synchronous API is cooperatively controlled between bounded slices; callbacks/reentrant execution
+and forcible interruption of a blocked synchronous host are not provided.
+
+At each Checkpoint the VM records a fresh dynamic visit with session/frame/site identity. A breakpoint
+pause leaves that visit unpassed. Continue permits exactly that visit once; the same loop checkpoint
+can break on a later iteration. Predicate errors retain the unpassed visit and PC. Hidden checkpoints
+still consume budget. Stop advances past itself and pauses before its mandatory Jump. A user pause
+request is served at the next visible checkpoint. `mark_source_changed` blocks edits/continuation until
+cancel/recompile/restart; it never replaces the immutable source underneath paused execution.
+
+`vba-debug::Controller` binds breakpoints to the session, compiled revision and StatementId. Multiple
+statements on a line are separate stops. Step Into targets the next visible visit; Over stays in the
+starting frame or surviving ancestors; Out targets surviving ancestors. Descendant calls finish their
+remaining expression work before an editable caller stop. Explicit breakpoints remain active during steps.
+
+Paused snapshots expose ordered frames, exact PCs/source spans and visible parameters/user locals.
+Handles carry session/frame/pause generation. Continue, host resume, terminal cleanup and new pauses
+invalidate old handles. Read-only inspection can read stored locals in paused frames. Editing is restricted
+to visible active-frame locals at ordinary checkpoint/Stop pauses; assignment validates before the write.
+Scratch/result slots, other-frame edits, fault-pause edits and execution of watch expressions are rejected.
+Editing a ByRef local writes its canonical caller location. Snapshot local payload is capped at 1 MiB
+(or a smaller session payload cap); frames explicitly set `locals_truncated` when values are omitted.
+This prevents repeated aliases of a large string from multiplying snapshot memory without bound.
+
+Runtime failures retain bounded source/frame snapshots and error numbers. Infrastructure failures are
+separate Unsupported/ResourceLimit/HostProtocol/HostDisconnected/InternalInvariant kinds. Optional
+break-on-error pauses a saved runtime failure read-only; continue delivers it once and never retries.
+Saved fault PCs identify Call/Invoke even after the caller PC advances to its continuation. Successful
+host effects and direct ByRef writes remain observable after failure. `On Error`/Resume/Err/Erl remain M4.
+
+## Generic host lifecycle
+
+HostBinding records the expected host identity and an allowlist of `(ProcedureId, ForeignSiteId)`
+(cap 1,024 entries). Validate both before dispatch; compiled source cannot grant permissions. Compiler
+member binding is restricted to an explicitly declared Object local/parameter. Call statements and
+member applications use Call, plain member reads use Get, assignments use Let/Set. Indexed/default
+property ambiguity and implicit Office globals are rejected. Source foreign arguments are owned ByVal
+snapshots or omitted; foreign Reference descriptors are exercised separately through verified IR.
+
+A host Invoke is dispatched once. The VM removes its argument suffix, retains the caller prefix,
+saves its fault PC, and advances to the continuation. Waiting run_slice calls never poll. Only an
+explicit resume_host on the correct host polls; repeated Wait replies replace the pending token.
+Success consumes the continuation and pushes one result without repeating Invoke. Wrong-host and
+duplicate resumes are command errors. Invocations, polls, waits and typed location lifetimes are bounded.
+
+vba-foreign remains the sole writeback committer. Its new checked APIs validate the return Value and
+**all** patches before the existing commit loop. The VM validates declared kinds and payload budget
+in that precommit hook. Typed locations require exact tags; Variant accepts validated scalar values.
+Aliased foreign ByRef locations are refused before host dispatch. This is the restricted snapshot ABI,
+not direct VBA's live alias model. No writebacks accompany a host error; live/partial-error foreign
+alias semantics remain M4. Existing M0 unchecked-hook entry points remain available to their original
+untyped prototype callers; the VM always uses the checked entry points.
+
+Cancel/disconnect cancels the current pending token before releasing VM frames/owned locations.
+Wrong-host cancellation leaves state intact. If the host is already gone, host_lost reports that external
+token cleanup was unavailable; dropping VM memory does not claim host resource release. Hosts own
+object validity/generations and lifecycle; ObjectRef remains a non-owning opaque token. No document
+borrow, Office registry, filesystem, network or COM object is retained by the VM.
+
+## Resource accounting and evidence
+
+Defaults: 1,000,000 instructions, slices up to 4,096, 128 explicit frames, 4,096 cumulative owned
+locations, 65,536 live reserved stack entries, 1,024 host invocations and 4,096 host polls. The foreign
+controller separately caps 1,024 Wait replies. Hard counters survive soft yields. String lengths retain
+the 32,768 UTF-16-unit ceiling. Locations are never reused within the session. Frames reserve their
+verified operand-stack maxima before executing calls; function-result copy space is charged before
+callee effects. Generic results/patches validate payload before writeback or result commitment.
+
+The 64 MiB session payload budget uses conservative cumulative copy charges (64 bytes per scalar
+copy plus UTF-16 buffers, 256 per local descriptor/binding and 64 per reserved stack entry). It also
+reserves 64 KiB per host dispatch/poll and maximum declared result-copy space before direct calls.
+Transient copying can exhaust this conservative budget before the instruction ceiling. Snapshots have
+an independent bounded local-copy budget; returned immutable snapshots are caller-owned. Rust tree/
+source/value clones may use the standard allocator; fallible reservations guard operand/frame vectors.
+This is logical accounting, not an RSS or process-OOM guarantee. Cancellation is available between
+synchronous slices/host calls; M3 makes no background-thread or Send/Sync promise.
+
+Tests: `vba-runtime/tests/scalars.rs`, `vba-vm/tests/execution.rs`, `vba-vm/tests/host.rs`, CLI tests
+and the native/WASM m3_smoke example. They cover the advertised operator matrix, exact types/errors,
+If/For/calls, stepping, alias writes/edits, source/handle staleness, quotas/recursion/storage/payload/
+stack limits, infinite-loop cancellation, bounded alias snapshots, all host kinds, named/omitted args,
+wrong host, repeated waits, duplicate resume, atomic typed patches, permission/alias refusal and
+cancel/disconnect/lost-host cleanup. Existing M0 fixture manifests and external corpus execution
+statuses remain NOT_RUN: their assertion runner has not been implemented merely by adding `run`.

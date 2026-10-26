@@ -1,6 +1,6 @@
 # Architecture
 
-Status: M0–M2 subset complete, 2026-10-26. Source frontend, binder, compiler and verified IR are implemented; runtime, VM and debugger remain scaffolds.
+Status: M0–M3 subset complete, 2026-10-26. Source frontend, binder, compiler, verified IR, runtime subset, VM and headless debugger are implemented. DAP/UI remain planned.
 
 The current scaffold and future headless engine can compile and test without Office, UI toolkits,
 application forks or corpus downloads. This repository also owns an optional editor/debugger UI
@@ -8,7 +8,7 @@ and standalone IDE; those upper layers may depend on UI toolkits.
 VBA source flows through syntax → semantics → verified IR → explicit-state VM.
 The dependency graph is separate from this data flow: IR does not need a dependency on the binder.
 The adopted [IR 1 specification](bytecode-vm-specification.md) defines instruction/stack contracts,
-verified immutable programs, calling conventions, continuations and budgets. M2 implements the structural IR/verifier; VM execution remains M3.
+verified immutable programs, calling conventions, continuations and budgets. M2 implements the structural IR/verifier; the runtime subset is implemented at M3; deeper semantics remain M4.
 [ADR 0004](decisions/0004-bytecode-vm-contract.md) and
 [ADR 0006](decisions/0006-m2-binding-and-verification.md) place compilation/lowering in vba-compiler,
 which depends on diagnostics/syntax/semantics/IR/values. IR remains independent of the binder.
@@ -31,10 +31,10 @@ See the [M2 compiler contract](compiler.md) for supported source, API and struct
 | vba-project | Read-only source/project decoder | diagnostics |
 | vba-testkit | Deterministic generic foreign host and trace support | diagnostics, values, foreign |
 | vba-conformance | Scenario validation and typed expectations; comparison/reports later | diagnostics, testkit, values, vm |
-| vba-cli | Source parsing, compilation/disassembly and fixture validation | conformance, diagnostics, syntax, compiler, ir |
+| vba-cli | Source parsing, compilation/disassembly/execution and fixture validation | conformance, diagnostics, syntax, compiler, ir, values, vm |
 | xtask | Maintenance commands | none |
 
-Some dependencies still reserve boundaries. Runtime, VM, debug/DAP and project remain scaffolds. Semantics, compiler and IR implement M2.
+Some dependencies still reserve boundaries. DAP and project remain scaffolds. Runtime, VM and debug implement the [M3 contract](runtime.md); semantics/compiler/IR implement M2 with generic member lowering added at M3.
 Syntax implements the bounded lexer/parser described in [frontend](frontend.md) and
 [ADR 0005](decisions/0005-m1-frontend.md); its only dependency remains diagnostics.
 Diagnostics, values, foreign, testkit and conformance implement the bounded M0 contracts in

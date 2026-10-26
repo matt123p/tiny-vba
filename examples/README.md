@@ -23,3 +23,14 @@ cargo run -p vba-cli -- compile examples/pure-vba/M2Control.bas --entry Answer
 M2Control is independently authored and covers scalar If/For/direct calls and exact local ByRef.
 These commands compile and verify; they do not run VBA. FillCells remains syntax-only here;
 its foreign/global binding needs later host integration. See [compiler support](../docs/compiler.md).
+
+M3 executes the supported subset and exposes a runnable headless debugger/host acceptance example:
+
+```sh
+cargo run -p vba-cli -- run examples/pure-vba/Arithmetic.bas
+cargo run -p vba-cli -- run examples/pure-vba/M2Control.bas
+cargo run -p vba-cli --example m3_smoke
+cargo xtask wasm-run
+```
+
+These assert Long 42/18 and host pause/edit/resume Long 41 without replay. See [runtime limits](../docs/runtime.md).

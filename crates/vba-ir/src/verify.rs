@@ -89,6 +89,14 @@ fn span(source: &SourceFile, s: Span) -> Result<()> {
         .map_err(|_| invalid("metadata span/source mismatch"))
 }
 
+/// Recheck an immutable verified program against an actual consumer without cloning its payload.
+pub fn recheck(
+    program: &VerifiedProgram,
+    capabilities: &Capabilities,
+    limits: &VerifyLimits,
+) -> Result<()> {
+    validate(program.program(), capabilities, limits, true).map(|_| ())
+}
 pub fn verify(
     program: Program,
     capabilities: &Capabilities,
