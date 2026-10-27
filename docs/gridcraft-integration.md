@@ -39,6 +39,25 @@ Both working trees were clean before branch creation. Starting tiny-vba revision
 
 ## Evidence and current checkpoint
 
+- Shared compiler fix `16f2a492f68bd361bc2c4e06fa9df1c3a1d47d5e` is committed
+  and pushed to the tiny-vba feature branch with explicit user approval.
+- A fresh Cargo Git fetch also fetched unrelated reference/corpus submodules.
+  Set their `.gitmodules` update strategy to `none`; corpus CI/docs explicitly
+  opt in with `git submodule update --init --checkout --depth 1`. This keeps
+  host dependency builds independent of corpus downloads, as required by scope.
+  Cargo behavior is documented at https://doc.rust-lang.org/cargo/reference/specifying-dependencies.html#git-submodules.
+- GridCraft's complete Windows `cargo +1.99.1 xtask ci` passes all ten steps,
+  2,534 tests at that checkpoint, with the existing pinned craft-fonts input
+  `b076417b5880bd4154bd22f00695b1d28c6bea83` in ignored `target/craft-fonts`.
+  Without it, two existing multilingual UI tests fail on missing fallback glyphs.
+- All seven optional editor/control/source save-discard/accessibility tests pass;
+  strict all-target optional-feature Clippy passes. Original paused-state light,
+  dark and narrow/scaled PNGs in GridCraft `target/vba-ui` were rendered and inspected.
+- GridCraft's actual `gridcraft-web/vba` browser application and toolkit-free
+  adapter compile for wasm32-unknown-unknown. An additional WASI adapter run is
+  not a pass: GridCraft's formula clock uses browser JS imports (chrono/js-sys),
+  unavailable in WASI. JavaScript-hosted WASM acceptance is being added instead.
+
 - Read both AGENTS.md files and tiny-vba development, host, architecture and editor
   skills, M5/M8 contracts, and actual GridCraft command/undo/trust APIs.
 - Matching egui fork revisions confirmed in both workspace roots.

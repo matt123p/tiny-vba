@@ -36,8 +36,8 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-        with:
-          submodules: true
+      - name: Explicitly fetch pinned corpus and reference inputs
+        run: git submodule update --init --checkout --depth 1
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
