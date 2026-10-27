@@ -1,5 +1,40 @@
 # GridCraft integration work log
 
+## Spreadsheet entry points continuation (in progress, 2026-10-27)
+
+User scope: editor launch, toolbar/menu commands, assigned worksheet buttons and
+worksheet-callable VBA Functions. tiny-vba main was pulled and merged locally at
+`f46cf23`, retaining upstream editor assistance and both progress records.
+
+Stages: (1) generic native calculation provider and existing hidden-name source
+storage; (2) fork-owned bounded pure UDF driver, entry discovery and persistence;
+(3) Developer/toolbar/menu/keyboard and worksheet shape assignment UI;
+(4) authored native/WASM/control/UI/package tests, full gates and visual inspection.
+These stages are not complete until acceptance evidence is recorded.
+
+Public behavior sources consulted 2026-10-27 (facts paraphrased; no source code,
+text, artwork, screenshots, binaries or downloaded fixtures copied):
+
+- https://support.microsoft.com/en-us/excel/run-a-macro-in-excel — Developer Macros,
+  procedure picker, edit/step/run and toolbar/custom ribbon invocation.
+- https://support.microsoft.com/en-us/excel/assign-a-macro-to-a-form-or-a-control-button
+  — worksheet placement, Assign Macro, right-click reassignment, click invocation.
+- https://support.microsoft.com/en-us/excel/create-custom-functions-in-excel
+  — Function return assignment, formula arguments, User Defined discovery and
+  restriction against workbook mutation from worksheet functions.
+
+These public behavior references are not redistributed or treated as licensed
+source code. All code, examples and test workbooks are independently authored.
+No private material or Office implementation files are used. Excel feature names
+use GridCraft's own UI components and original code-drawn icons.
+
+Checkpoint: merged tiny-vba `cargo xtask ci`, `wasm` and `wasm-run` pass
+(`target/merged-integration-*.log`). GridCraft's six authored worksheet bridge
+tests pass; optional UI tests are in progress. UDF calls use independently generated
+VBA wrappers so ordinary ByRef parameters and omitted typed defaults flow through
+the existing compiler's call rules, preserving the shared ByVal launch contract.
+The generic calc hook has no VBA dependency; GridCraft's fork owns its provider.
+
 Started 2026-10-27. This is the interruption/resumption record for the user-requested
 integration. Interpreter and shared IDE remain in tiny-vba; Excel objects and the
 adapter belong in GridCraft. WordCraft can consume the same tiny-vba revision.
