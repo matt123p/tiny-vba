@@ -13,6 +13,7 @@ dependencies = [
  "vba-foreign",
  "vba-ir",
  "vba-syntax",
+ "vba-testkit",
  "vba-values",
  "vba-vm",
 ]

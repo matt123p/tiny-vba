@@ -22,3 +22,4 @@ vba-values.workspace = true
 [dev-dependencies]
 vba-debug.workspace = true
 vba-foreign.workspace = true
+vba-testkit.workspace = true

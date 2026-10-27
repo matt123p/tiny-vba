@@ -52,3 +52,8 @@ records the extension and shared default/constant conversion dependency.
 
 [M4 oracle acceptance report](m4-oracle-report.md) and [ADR 0012](decisions/0012-m4-oracle-acceptance.md)
 record the completed external gate, schema 2 provenance and IR 3 extension.
+
+[M5 native host contract](decisions/0013-m5-host-contract.md) records the versioned
+foreign/value/debug APIs, hidden IR 4 host-root imports and the reusable bridge driver;
+[runtime](runtime.md) and [the compatibility matrix](compatibility-matrix.md) carry the
+implemented surface.

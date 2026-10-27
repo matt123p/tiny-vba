@@ -1,6 +1,6 @@
 # Compatibility matrix
 
-Updated 2026-10-26. Stage: M4 external acceptance complete. **The documented m4-conformance-v1 consumer, including M3 control and M4 scalar widths, has execution evidence; the 20 self-authored fixtures are asserted 20 PASS / 0 UNSUPPORTED.**
+Updated 2026-10-26. Stage: M4 external acceptance complete; M5 native host contract implemented. **The documented m5-host-v1 consumer, including M3 control, M4 scalar widths and IR 4 host roots, has execution evidence; the 44 authored and 153 reviewed fixtures remain asserted 197 PASS / 0 UNSUPPORTED.**
 
 | Dimension | Status | Evidence / next gate |
 |---|---|---|
@@ -23,6 +23,8 @@ Updated 2026-10-26. Stage: M4 external acceptance complete. **The documented m4-
 | Coercion/arrays/builtins/On Error/state | Implemented M4 reviewed profile | [M4 exact scope and IR2](m4-language.md), 24 additional PASS fixtures, numeric/handler/array/state regressions; no oracle claim |
 | Bytecode/VM implementation specification | IR and VM subset implemented | IR 1, ADR 0004/0006/0007 and M2/M3 tests |
 | Bytecode execution / generic host continuations | Implemented M3 subset | vba-vm/tests/execution.rs and host.rs; permissions, typed patches, wait/cancel, no replay |
+| Versioned native host protocol and source imports (M5) | Implemented M5 contract | `vba_foreign::check_protocol` refuses foreign protocol versions before dispatch (crates/vba-foreign/tests/protocol.rs); `Import`/`validate_imports` bound names to hidden IR 4 host-root slots (crates/vba-compiler/tests/compiler.rs); missing/mismatched/stale roots refuse launch or surface host error 91 without a second write (crates/vba-vm/tests/host.rs, tests/embedding.rs); [ADR 0013](decisions/0013-m5-host-contract.md) |
+| Reusable bridge driver for forks (M5) | Implemented generic proof | vba-testkit `run_to_boundary`/`statement`; vba-vm/tests/embedding.rs proves break/edit/resume over an imported root with exactly one dispatch. Real workbook FillCells, undo/recalc and permissions stay fork-owned |
 | Breakpoints, stepping, local inspect/edit/resume | Implemented M3 headless API | vba-vm execution tests with vba-debug controller; no graphical UI/DAP |
 | Native / WASM execution | Implemented M3 smoke | cargo xtask wasm-run; identical typed results, pause/edit/host counts and cancellation |
 | Replacement-session isolation | Implemented M3 correction | recycled-client-ID regression in VM tests and native/WASI smoke; [ADR 0008](decisions/0008-vm-instance-isolation.md) |

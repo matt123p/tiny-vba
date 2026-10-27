@@ -1,10 +1,11 @@
 # M3/M4 runtime and debugger
 
-Implemented 2026-10-26. The current consumer is `m4-conformance-v1`, using verified IR 1/2/3.
+Implemented 2026-10-26. The current consumer is `m5-host-v1`, using verified IR 1/2/3/4.
 The [M4 language contract](m4-language.md) and [ADR 0011](decisions/0011-m4-language-extension.md)
-define scalar coercions, arrays, arguments, persistent state, builtins and VBA handlers. The
-headless debugger and generic host protocol retain their M3 lifecycle contracts. Visual IDE,
-DAP and Office objects remain later milestones.
+define scalar coercions, arrays, arguments, persistent state, builtins and VBA handlers.
+[ADR 0013](decisions/0013-m5-host-contract.md) adds the versioned native host protocol and hidden
+host-root imports. The headless debugger and generic host protocol retain their M3 lifecycle
+contracts. Visual IDE, DAP and Office objects remain later milestones.
 
 ```sh
 cargo run -p vba-cli -- run examples/pure-vba/Arithmetic.bas
@@ -42,6 +43,7 @@ cloning the source payload. A caller's capability set cannot enable an unimpleme
 | Calls | Positional/named/optional/omitted source arguments, exact canonical ByRef and typed temporaries |
 | Arrays/storage | Fixed/dynamic bounded arrays, lower bounds, Preserve/Erase, ByRef cells; module/Static locals and explicit project state |
 | Errors/builtins | On Error, Resume, Err/Erl and deterministic intrinsic registry; see M4 contract for exact boundaries |
+| Host roots/protocol | IR 4 hidden `HostRoot` slots bound by `HostBinding.roots`; `vba_foreign::check_protocol` refuses other protocol majors/minors before any dispatch |
 | Generic host/debugger | Existing permitted calls, waits, typed patches, checkpoint stops, stepping, inspection and edits |
 
 The M4 contract lists explicit unsupported forms and profile limits. Source literals retain the
@@ -99,8 +101,21 @@ host effects and direct ByRef writes remain observable after failure. VBA handle
 
 ## Generic host lifecycle
 
-HostBinding records the expected host identity and an allowlist of `(ProcedureId, ForeignSiteId)`
-(cap 1,024 entries). Validate both before dispatch; compiled source cannot grant permissions. Compiler
+HostBinding records the expected host identity, an allowlist of `(ProcedureId, ForeignSiteId)`
+(cap 1,024 entries) and named host roots (cap 64). Roots are `ObjectRef` values whose `host` must
+equal the binding identity; names are case-insensitive and unique. Compiled source cannot grant
+permissions or roots. Every procedure local with an IR 4 `HostRoot` role must be bound at launch or
+`Session::new` refuses; each root local initializes to its bound reference and stays hidden from
+snapshots, edits and reference capture. `HostBinding::for_program` derives the full site allowlist
+from a verified program. The compiler binds import names through `CompileOptions::imports`
+(vba-foreign `Import`, ≤64, validated shape/kind); an import resolves to a hidden root local plus a
+fixed member call/get, and cannot be written. At every run/resume/cancel/disconnect the VM checks
+`vba_foreign::check_protocol(host.protocol())` before dispatch, so a future protocol major/minor
+fails with `VBA0006` without touching host state. The VM validates each root's identity at launch;
+object lifetime/generation remains the host's own validation, and a stale root surfaces the host's
+reference error (91) instead of a successful write.
+
+Validate member binding before dispatch; compiled source cannot grant permissions. Compiler
 member binding is restricted to an explicitly declared Object local/parameter. Call statements and
 member applications use Call, plain member reads use Get, assignments use Let/Set. Indexed/default
 property ambiguity and implicit Office globals are rejected. Source foreign arguments are owned ByVal

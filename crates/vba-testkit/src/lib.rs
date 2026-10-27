@@ -68,18 +68,50 @@ fn failure(message: &str) -> Reply {
 }
 
 /// Bounded reusable embedding driver: returns at pause/wait/terminal without polling/replay.
-pub fn run_to_boundary(session:&mut vba_vm::Session,host:&mut impl Host,controller:&vba_debug::Controller,max_slices:u32)->Result<vba_vm::Outcome,vba_diagnostics::Diagnostic> {
-    if max_slices==0 || max_slices>65536 {return Err(vba_diagnostics::Diagnostic::new("VBA0034","invalid test driver allowance"));}
+pub fn run_to_boundary(
+    session: &mut vba_vm::Session,
+    host: &mut impl Host,
+    controller: &vba_debug::Controller,
+    max_slices: u32,
+) -> Result<vba_vm::Outcome, vba_diagnostics::Diagnostic> {
+    if max_slices == 0 || max_slices > 65536 {
+        return Err(vba_diagnostics::Diagnostic::new(
+            "VBA0034",
+            "invalid test driver allowance",
+        ));
+    }
     for _ in 0..max_slices {
-        let quota=session.limits().slice.min(256);
-        let outcome=session.run_slice(host,quota,&mut |view| controller.should_pause(view))?;
-        if outcome!=vba_vm::Outcome::Yielded {return Ok(outcome);}
-    }Err(vba_diagnostics::Diagnostic::new("VBA0031","embedding driver slice allowance exceeded"))
+        let quota = session.limits().slice.min(256);
+        let outcome = session.run_slice(host, quota, &mut |view| controller.should_pause(view))?;
+        if outcome != vba_vm::Outcome::Yielded {
+            return Ok(outcome);
+        }
+    }
+    Err(vba_diagnostics::Diagnostic::new(
+        "VBA0031",
+        "embedding driver slice allowance exceeded",
+    ))
 }
 /// Find a visible source statement by its verbatim text, avoiding hard-coded bytecode PCs.
-pub fn statement(program:&vba_ir::VerifiedProgram,text:&str)->Result<vba_diagnostics::StatementId,vba_diagnostics::Diagnostic> {
+pub fn statement(
+    program: &vba_ir::VerifiedProgram,
+    text: &str,
+) -> Result<vba_diagnostics::StatementId, vba_diagnostics::Diagnostic> {
     for procedure in &program.program().procedures {
-        let source=&program.program().sources.get(procedure.source.0 as usize).ok_or_else(|| vba_diagnostics::Diagnostic::new("VBA0034","source missing"))?.file;
-        for checkpoint in &procedure.checkpoints {if checkpoint.visible && source.slice(checkpoint.span)?==text {return Ok(checkpoint.statement);}}
-    }Err(vba_diagnostics::Diagnostic::new("VBA0034","visible statement not found"))
+        let source = &program
+            .program()
+            .sources
+            .get(procedure.source.0 as usize)
+            .ok_or_else(|| vba_diagnostics::Diagnostic::new("VBA0034", "source missing"))?
+            .file;
+        for checkpoint in &procedure.checkpoints {
+            if checkpoint.visible && source.slice(checkpoint.span)? == text {
+                return Ok(checkpoint.statement);
+            }
+        }
+    }
+    Err(vba_diagnostics::Diagnostic::new(
+        "VBA0034",
+        "visible statement not found",
+    ))
 }

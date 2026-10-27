@@ -27,9 +27,10 @@ index!(
 pub const IR_VERSION: u32 = 1;
 pub const IR2_VERSION: u32 = 2;
 pub const IR3_VERSION: u32 = 3;
-pub const IR4_VERSION:u32=4;
+pub const IR4_VERSION: u32 = 4;
 pub const FEATURES: [&str; 16] = [
-    "scalar-core", "host-roots-v4",
+    "scalar-core",
+    "host-roots-v4",
     "integer-long-ops",
     "direct-calls",
     "byref-locals",
@@ -425,13 +426,17 @@ impl Capabilities {
         caps.instructions.remove(&Opcode::LoadReference);
         caps
     }
-    pub fn ir3_structural()->Self {
-        let mut caps=Self::ir4_structural();caps.profile="ir3-structural".into();caps.ir_versions.remove(&IR4_VERSION);caps.features.retain(|f| !f.ends_with("-v4"));caps
+    pub fn ir3_structural() -> Self {
+        let mut caps = Self::ir4_structural();
+        caps.profile = "ir3-structural".into();
+        caps.ir_versions.remove(&IR4_VERSION);
+        caps.features.retain(|f| !f.ends_with("-v4"));
+        caps
     }
     pub fn ir4_structural() -> Self {
         Self {
             profile: "ir4-structural".into(),
-            ir_versions: BTreeSet::from([IR_VERSION, IR2_VERSION, IR3_VERSION,IR4_VERSION]),
+            ir_versions: BTreeSet::from([IR_VERSION, IR2_VERSION, IR3_VERSION, IR4_VERSION]),
             features: FEATURES.iter().map(|s| (*s).into()).collect(),
             instructions: OPCODES.into_iter().collect(),
             unary: [UnaryOp::Negate, UnaryOp::Not].into_iter().collect(),

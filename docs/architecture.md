@@ -1,7 +1,9 @@
 # Architecture
 
 Status: M0–M4 complete for the documented [M4 language profile](m4-language.md), with
-verified IR 1/2/3 and explicit-frame execution. Graphical IDE, importer and fork integration remain later gates.
+verified IR 1/2/3/4 and explicit-frame execution; the M5 native host contract is implemented
+([ADR 0013](decisions/0013-m5-host-contract.md)). Graphical IDE, importer and fork-owned workbook
+integration remain later gates.
 
 The current scaffold and future headless engine can compile and test without Office, UI toolkits,
 application forks or corpus downloads. This repository also owns an optional editor/debugger UI
@@ -25,12 +27,12 @@ See the [M2 compiler contract](compiler.md) for supported source, API and struct
 | vba-ir | Bytecode, verifier, constants and source maps | diagnostics, values |
 | vba-compiler | Parse/bind coordination and deterministic verified IR lowering | diagnostics, syntax, semantics, ir, values |
 | vba-runtime | Shared coercion/operators/builtins/error rules | diagnostics, values |
-| vba-foreign | Generic host call/result/wait protocol | diagnostics, values |
-| vba-vm | Frames, instruction pointer, budgets, inspection hooks | diagnostics, ir, values, runtime, foreign |
+| vba-foreign | Generic host call/result/wait protocol; protocol version 1 and validated source imports | diagnostics, values |
+| vba-vm | Frames, instruction pointer, budgets, inspection hooks; host-root binding and protocol checks | diagnostics, ir, values, runtime, foreign |
 | vba-debug | Breakpoint/step/inspection controller | diagnostics, vm |
 | vba-dap | Later DAP adapter | debug |
 | vba-project | Read-only source/project decoder | diagnostics |
-| vba-testkit | Deterministic generic foreign host and trace support | diagnostics, values, foreign |
+| vba-testkit | Deterministic generic foreign host, trace support and bounded embedding driver | debug, diagnostics, foreign, ir, values, vm |
 | vba-conformance | Scenario validation, typed expectations and M4 outcome judgment; comparison/reports later | diagnostics, testkit, values, vm |
 | vba-cli | Source parsing, compilation/disassembly/execution and fixture validation | conformance, diagnostics, syntax, compiler, ir, values, vm |
 | xtask | Maintenance commands | none |
@@ -95,7 +97,8 @@ Keep tools/architecture.json as the graph of actual Cargo packages. Add these no
 external dependencies when their implementation lands; do not add placeholder APIs or manifests.
 Headless and UI checks must be separate so engine consumers do not pull GUI dependencies.
 
-M4's current execution profile is m4-conformance-v1 (ADR 0012), distinct from the historical M3 matrix.
+M4's execution profile was m4-conformance-v1 (ADR 0012), distinct from the historical M3 matrix;
+the current consumer is m5-host-v1 (ADR 0013), which preserves the M4 scalar/array/handler matrix.
 Typed scenario judgment and diagnostic/result classification stay in vba-conformance; CLI owns
 compile/run orchestration. Runtime owns narrowing bounds and scalar comparison rules. Infrastructure
 xtask resolves its checkout at runtime and prints that identity before gates. No dependency edge or
@@ -110,3 +113,11 @@ element locations; the VM owns per-frame handlers and explicit project-state tra
 cases under [ADR 0012](decisions/0012-m4-oracle-acceptance.md). IR 3 owns array-layout/parameter
 metadata and same-block canonical reference captures; IR 1/2 targets remain closed. No Cargo DAG
 edge changed. Schema 2 provenance and evidence checks remain above shipping engine layers.
+
+M5 ([ADR 0013](decisions/0013-m5-host-contract.md)) adds IR 4 with hidden `HostRoot` slots and the
+`host-roots-v4` feature; `Capabilities::ir4_structural()` is the compiler's structural default while
+IR 1/2/3 stay selectable and verified. Semantics and compiler gained reviewed foreign edges for
+import validation/binding, and the testkit gained debug/ir/vm edges for its reusable embedding
+driver (`run_to_boundary`, `statement`). `vba-foreign` owns the native protocol version; the VM
+checks `Host::protocol` before dispatch and binds named roots through `HostBinding`. No Office
+names or catalogue enter the engine; workbook-level FillCells evidence stays fork-owned.

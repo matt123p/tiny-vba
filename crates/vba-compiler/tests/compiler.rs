@@ -239,3 +239,93 @@ fn first_emitted_constant_order_preserves_exact_tags_and_deduplicates() -> Resul
     assert_eq!(q.program().constants.len(), 1);
     Ok(())
 }
+
+#[test]
+fn imports_lower_to_ir4_hidden_roots_and_refuse_writes() -> Result<(), Box<dyn Error>> {
+    let imports = vec![vba_foreign::Import {
+        name: "sheet".into(),
+        root: "Sheet1".into(),
+        member: Some("FillCells".into()),
+        kind: vba_foreign::InvokeKind::Call,
+    }];
+    let options = CompileOptions {
+        imports,
+        ..Default::default()
+    };
+    let p = compile(
+        &source("Function Answer() As Long\nsheet.FillCells 1\nAnswer=7\nEnd Function")?,
+        &options,
+    )?;
+    let program = p.program();
+    assert_eq!(program.ir_version, ir::IR4_VERSION);
+    assert!(program.required_features.contains("host-roots-v4"));
+    let roots: Vec<_> = program
+        .procedures
+        .iter()
+        .flat_map(|p| p.locals.iter())
+        .filter(|l| l.role == ir::SlotRole::HostRoot)
+        .collect();
+    let [root] = roots.as_slice() else {
+        return Err("expected exactly one hidden root".into());
+    };
+    assert_eq!(root.name, "Sheet1");
+    assert!(!root.visible);
+    assert!(root.span.is_none());
+    assert_eq!(root.kind, ScalarKind::Object);
+    // A second import on the same root shares one hidden slot; another root gets its own.
+    let options = CompileOptions {
+        imports: vec![
+            vba_foreign::Import {
+                name: "sheet".into(),
+                root: "Sheet1".into(),
+                member: Some("FillCells".into()),
+                kind: vba_foreign::InvokeKind::Call,
+            },
+            vba_foreign::Import {
+                name: "book".into(),
+                root: "Book1".into(),
+                member: None,
+                kind: vba_foreign::InvokeKind::Get,
+            },
+        ],
+        ..Default::default()
+    };
+    let q = compile(
+        &source(
+            "Function Answer() As Long\nsheet.FillCells 1\nDim w As Long\nw = book\nsheet.FillCells w\nAnswer=w\nEnd Function",
+        )?,
+        &options,
+    )?;
+    let roots: Vec<_> = q
+        .program()
+        .procedures
+        .iter()
+        .flat_map(|p| p.locals.iter())
+        .filter(|l| l.role == ir::SlotRole::HostRoot)
+        .collect();
+    assert_eq!(roots.len(), 2);
+    // Member writes through an import are refused; the root itself is read-only.
+    let options = CompileOptions {
+        imports: vec![vba_foreign::Import {
+            name: "sheet".into(),
+            root: "Sheet1".into(),
+            member: Some("FillCells".into()),
+            kind: vba_foreign::InvokeKind::Call,
+        }],
+        ..Default::default()
+    };
+    let refused = compile(
+        &source("Function Answer() As Long\nsheet.FillCells = 4\nAnswer=7\nEnd Function")?,
+        &options,
+    );
+    assert!(refused.is_err());
+    // Import names shadow nothing: a declared local takes precedence and stays writable.
+    let shadowed = compile(
+        &source(
+            "Function Answer() As Long\nDim sheet As Long\nsheet = 4\nAnswer=sheet\nEnd Function",
+        )?,
+        &CompileOptions::default(),
+    )?;
+    assert_eq!(shadowed.program().ir_version, 1);
+    Ok(())
+}

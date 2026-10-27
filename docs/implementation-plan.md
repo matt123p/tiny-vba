@@ -7,8 +7,9 @@ M2 binding/lowering and M3 execution/debugger are implemented. M4 now meets its 
 external acceptance gate: 153 reviewed ReflexGrid pure-language cases match their published
 Microsoft Excel Mac oracle expectations, alongside 44 authored scenarios. [The report](m4-oracle-report.md)
 records source hashes, the upstream environment and the distinction from a fresh Office run.
-The current profile is m4-conformance-v1 with [IR 3 extensions](m4-language.md); unselected corpus
-cases and new oracle acquisition remain M9 work.
+The current profile is m5-host-v1 with [IR 4 host roots](decisions/0013-m5-host-contract.md) on top
+of the [IR 3 language extensions](m4-language.md); unselected corpus cases and new oracle acquisition
+remain M9 work.
 
 | Stage | Work in tiny-vba | Acceptance gate |
 |---|---|---|
@@ -18,7 +19,7 @@ cases and new oracle acquisition remain M9 work.
 | M2 — binder and bytecode — complete for reviewed subset | Scopes, Option Explicit, locals/procedure binding, argument subset, lowering, verifier/disassembler | Compile/disassemble examples; reject invalid branches/slots/stack effects; deterministic source maps |
 | M3 — executable VM + debugger — complete for reviewed subset | Minimal typed values/arithmetic, explicit frames, loops/calls, budgets; generic foreign protocol; break/step/inspect/edit/resume | Host-free Answer() returns Long 42; generic host call trace correct; pause/edit/resume without replay; infinite loop cancels; native and WASM execution smoke tests |
 | M4 — semantic depth — complete | Coercions/numeric widths, special states, Currency/Date, arrays, whole-array/cell ByRef, optional/named/ParamArray arguments, Option Base, handlers, intrinsics and module/Static state | Original growing external-subset gate: 153 reviewed ReflexGrid cases with published Microsoft Excel expectations pass exact typed/error comparisons; 44 authored scenarios; negative IR/version tests and native/WASI execution; [evidence](m4-oracle-report.md) |
-| M5 — fork integration contract | Stabilize public foreign/value/debug APIs and version compatibility table; offer reusable tests | Fork-owned bridge can run FillCells against its own fake Office layer, pause/edit/resume and validate results; core still builds alone |
+| M5 — fork integration contract — in-repo contract complete | Versioned foreign/value/debug APIs (`API_VERSION`/`ProtocolVersion`/`check_protocol`), hidden IR 4 host-root imports through `CompileOptions::imports`, `HostBinding::for_program`, testkit bridge driver (`run_to_boundary`/`statement`) and a fake-host break/edit/resume proof with exactly one dispatch; workbook FillCells, undo/recalc and permissions stay fork-owned | crates/vba-foreign/tests/protocol.rs, crates/vba-compiler/tests/compiler.rs, crates/vba-vm/tests/host.rs and tests/embedding.rs; [ADR 0013](decisions/0013-m5-host-contract.md) |
 | M6 — project source decoding | Read-only MS-OVBA decoder, encoding/attributes/references/codenames; malformed-stream and budget tests | Decode controlled project bytes; preserve module identities; reject unsupported/protected/corrupt inputs; no auto-execution |
 | M7 — callbacks and lifecycle | Bounded callbacks/events, static reset, stale-reference handling, cancellation/disconnect cleanup | Generic-host reentrancy tests pass; fork-owned event order and partial-side-effect tests pass |
 | M8 — editor/debugger UI and developer tools (required) | Implement toolkit-independent IDE state, reusable egui panels and standalone native/web shell; wire CLI debugger; optional DAP | Edit and run a self-authored module; use gutter breakpoints, execution highlight, continue/pause/stop and step into/over/out; inspect/edit locals, stack, safe watches and output; pause/resume without replay; embedded and standalone UI checks plus native/WASM gates |
@@ -54,7 +55,7 @@ M3 replacement-session isolation correction under ADR 0008.
 ## Immediate task sequence
 
 1. M4 language and external-oracle gates are implemented under ADRs 0011/0012; preserve explicit profile refusals and authored evidence.
-2. M5: stabilize foreign/value/debug API versioning and reusable bridge tests; fork-owned FillCells proof.
+2. M5: stabilize foreign/value/debug API versioning and reusable bridge tests; fork-owned FillCells proof. The in-repo M5 contract is implemented under [ADR 0013](decisions/0013-m5-host-contract.md); the workbook-level FillCells gate remains fork-owned.
 3. Start the reusable graphical editor/debugger slice on proven VM APIs; M8 completes its acceptance gate.
 4. Extend vetted scenario/oracle coverage through M9, retaining NOT_RUN for unexecuted external material.
 

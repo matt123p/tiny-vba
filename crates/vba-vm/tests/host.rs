@@ -1,8 +1,11 @@
-use std::{collections::BTreeSet, error::Error};
+use std::{
+    collections::{BTreeMap, BTreeSet},
+    error::Error,
+};
 use vba_compiler::{CompileOptions, compile};
 use vba_debug::Controller;
 use vba_diagnostics::{SourceFile, SourceId};
-use vba_foreign::{Completion, ForeignError, Reply};
+use vba_foreign::{Completion, ForeignError, Import, InvokeKind, Reply};
 use vba_ir as ir;
 use vba_testkit::{Event, ScriptedHost};
 use vba_values::{ObjectRef, Value};
@@ -78,7 +81,7 @@ fn session(text: &str, byref: bool, limits: Limits) -> R<Session> {
         101,
         vec![Value::Object(TARGET)],
         Some(HostBinding {
-            roots:Default::default(),
+            roots: Default::default(),
             identity: TARGET.host,
             permitted,
         }),
@@ -204,7 +207,7 @@ fn foreign_aliases_and_unpermitted_sites_fail_before_dispatch() -> R {
         102,
         vec![Value::Object(TARGET)],
         Some(HostBinding {
-            roots:Default::default(),
+            roots: Default::default(),
             identity: TARGET.host,
             permitted: BTreeSet::new(),
         }),
@@ -424,5 +427,197 @@ fn host_writeback_preserves_new_scalar_widths_and_rejects_wrong_array_elements()
         return Err("wrong array patch accepted".into());
     };
     assert_eq!(f.kind, vm::FailureKind::HostProtocol);
+    Ok(())
+}
+fn imported_session(text: &str, roots: BTreeMap<String, ObjectRef>) -> R<Session> {
+    let source = SourceFile::new(SourceId(6), "imports.bas".into(), text.into())?;
+    let options = CompileOptions {
+        capabilities: vm::capabilities(),
+        imports: vec![Import {
+            name: "sheet".into(),
+            root: "Sheet1".into(),
+            member: Some("FillCells".into()),
+            kind: InvokeKind::Call,
+        }],
+        ..Default::default()
+    };
+    let p = compile(&source, &options)?;
+    let binding = HostBinding::for_program(&p, TARGET.host, roots)?;
+    Ok(Session::new(
+        p,
+        103,
+        vec![],
+        Some(binding),
+        Limits::default(),
+    )?)
+}
+#[test]
+fn imported_host_roots_dispatch_against_the_bound_reference_exactly_once() -> R {
+    let text = "Function Answer() As Long\nsheet.FillCells 1, 2\nAnswer=7\nEnd Function";
+    let mut s = imported_session(text, BTreeMap::from([("Sheet1".into(), TARGET)]))?;
+    let mut host = ScriptedHost::new(TARGET, vec![done()]);
+    assert_eq!(
+        drive(&mut s, &mut host, &Controller::new())?,
+        Outcome::Completed(ReturnValue::Function(Value::Long(7)))
+    );
+    let calls: Vec<_> = host
+        .trace
+        .iter()
+        .filter_map(|e| match e {
+            Event::Invoke(call) => Some(call.clone()),
+            _ => None,
+        })
+        .collect();
+    let [call] = calls.as_slice() else {
+        return Err("expected exactly one dispatch".into());
+    };
+    assert_eq!(call.member, "FillCells");
+    assert_eq!(call.target, TARGET);
+    let values: Vec<_> = call.arguments.iter().map(|a| a.value.clone()).collect();
+    assert_eq!(values, vec![Value::Integer(1), Value::Integer(2)]);
+    // The root slot is hidden: no visible local may leak the bound reference.
+    assert!(s.program().program().procedures.iter().all(|p| {
+        p.locals.iter().all(|l| {
+            l.role != ir::SlotRole::HostRoot
+                || (!l.visible && l.span.is_none() && l.kind == vba_values::ScalarKind::Object)
+        })
+    }));
+    Ok(())
+}
+#[test]
+fn missing_mismatched_and_stale_roots_are_refused() -> R {
+    let text = "Function Answer() As Long\nsheet.FillCells 1\nAnswer=7\nEnd Function";
+    // A program that needs a root cannot launch without it.
+    let source = SourceFile::new(SourceId(6), "imports.bas".into(), text.into())?;
+    let options = CompileOptions {
+        capabilities: vm::capabilities(),
+        imports: vec![Import {
+            name: "sheet".into(),
+            root: "Sheet1".into(),
+            member: Some("FillCells".into()),
+            kind: InvokeKind::Call,
+        }],
+        ..Default::default()
+    };
+    let p = compile(&source, &options)?;
+    let permitted = p
+        .program()
+        .procedures
+        .iter()
+        .enumerate()
+        .flat_map(|(pi, p)| {
+            p.foreign
+                .iter()
+                .enumerate()
+                .map(move |(si, _)| (ir::ProcedureId(pi as u32), ir::ForeignSiteId(si as u32)))
+        })
+        .collect();
+    let unbound = Session::new(
+        p.clone(),
+        104,
+        vec![],
+        Some(HostBinding {
+            roots: BTreeMap::new(),
+            identity: TARGET.host,
+            permitted,
+        }),
+        Limits::default(),
+    );
+    assert!(unbound.is_err());
+    // A root owned by another host identity cannot pass as this binding's root.
+    let foreign = ObjectRef {
+        host: 999,
+        ..TARGET
+    };
+    let wrong = Session::new(
+        p,
+        105,
+        vec![],
+        Some(HostBinding {
+            roots: BTreeMap::from([("Sheet1".into(), foreign)]),
+            identity: TARGET.host,
+            permitted: BTreeSet::new(),
+        }),
+        Limits::default(),
+    );
+    assert!(wrong.is_err());
+    // A root reference the host no longer recognizes fails at dispatch without repeating effects.
+    // The host's own stale-reference error (91) enters the VBA-visible failure surface.
+    let stale = ObjectRef {
+        generation: TARGET.generation + 1,
+        ..TARGET
+    };
+    let mut s = imported_session(text, BTreeMap::from([("Sheet1".into(), stale)]))?;
+    let mut host = ScriptedHost::new(TARGET, vec![done()]);
+    let Outcome::Failed(f) = drive(&mut s, &mut host, &Controller::new())? else {
+        return Err("stale root must fail".into());
+    };
+    assert_eq!(f.kind, vm::FailureKind::Runtime);
+    assert_eq!(f.number, Some(91));
+    // The scripted host rejected the reference before recording any accepted dispatch.
+    assert!(host.trace.is_empty());
+    Ok(())
+}
+#[test]
+fn incompatible_protocol_fails_before_any_host_dispatch() -> R {
+    struct Refusing;
+    impl vba_foreign::Host for Refusing {
+        fn protocol(&self) -> vba_foreign::ProtocolVersion {
+            vba_foreign::ProtocolVersion {
+                major: 99,
+                minor: 0,
+            }
+        }
+        fn identity(&self) -> u64 {
+            TARGET.host
+        }
+        fn invoke(&mut self, _: vba_foreign::HostCall) -> Reply {
+            done()
+        }
+        fn resume(&mut self, _: u64) -> Reply {
+            done()
+        }
+        fn cancel(&mut self, _: u64) {}
+    }
+    let text = "Function Answer() As Long\nsheet.FillCells 1\nAnswer=7\nEnd Function";
+    let mut s = imported_session(text, BTreeMap::from([("Sheet1".into(), TARGET)]))?;
+    let mut host = Refusing;
+    let refusal = s
+        .run_slice(&mut host, 64, &mut |_| Ok(false))
+        .err()
+        .ok_or("protocol refusal missing")?;
+    assert_eq!(refusal.code, "VBA0006");
+    Ok(())
+}
+#[test]
+fn for_program_matches_explicit_permission_sets_and_respects_the_cap() -> R {
+    let text = "Function Answer() As Long\nsheet.FillCells 1\nAnswer=7\nEnd Function";
+    let source = SourceFile::new(SourceId(6), "imports.bas".into(), text.into())?;
+    let options = CompileOptions {
+        capabilities: vm::capabilities(),
+        imports: vec![Import {
+            name: "sheet".into(),
+            root: "Sheet1".into(),
+            member: Some("FillCells".into()),
+            kind: InvokeKind::Call,
+        }],
+        ..Default::default()
+    };
+    let p = compile(&source, &options)?;
+    let explicit = p
+        .program()
+        .procedures
+        .iter()
+        .enumerate()
+        .flat_map(|(pi, p)| {
+            p.foreign
+                .iter()
+                .enumerate()
+                .map(move |(si, _)| (ir::ProcedureId(pi as u32), ir::ForeignSiteId(si as u32)))
+        })
+        .collect::<BTreeSet<_>>();
+    let built = HostBinding::for_program(&p, TARGET.host, BTreeMap::new())?;
+    assert_eq!(built.permitted, explicit);
+    assert_eq!(built.identity, TARGET.host);
     Ok(())
 }

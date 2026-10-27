@@ -102,7 +102,9 @@ fn replace(p: &mut Program, pc: usize, instruction: Instruction) -> TestResult {
     Ok(())
 }
 fn check(p: Program) -> Result<VerifiedProgram, vba_diagnostics::Diagnostic> {
-    let caps = if p.ir_version==IR4_VERSION {Capabilities::ir4_structural()} else if p.ir_version == IR3_VERSION {
+    let caps = if p.ir_version == IR4_VERSION {
+        Capabilities::ir4_structural()
+    } else if p.ir_version == IR3_VERSION {
         Capabilities::ir3_structural()
     } else if p.ir_version == IR2_VERSION {
         Capabilities::ir2_structural()
@@ -828,5 +830,110 @@ fn array_metadata_requires_variant_storage_and_matching_parameter_layout() -> Te
             .contains(&IR3_VERSION)
     );
     assert!(!legacy.features.contains("array-parameters-v3"));
+    Ok(())
+}
+#[test]
+fn host_root_slots_require_ir4_object_layout_and_read_only_use() -> TestResult {
+    // IR 3 refuses the role even with the feature name present.
+    let mut p = base()?;
+    p.ir_version = IR3_VERSION;
+    p.profile = "ir3-structural".into();
+    p.required_features.insert("host-roots-v4".into());
+    proc_mut(&mut p)?.locals.push(Local {
+        array: None,
+        name: "root".into(),
+        kind: ScalarKind::Object,
+        role: SlotRole::HostRoot,
+        span: None,
+        visible: false,
+    });
+    assert!(check(p).is_err());
+    let caps = Capabilities::ir4_structural();
+    assert!(caps.ir_versions.contains(&IR4_VERSION));
+    assert!(caps.features.contains("host-roots-v4"));
+    let legacy = Capabilities::ir3_structural();
+    assert!(!legacy.ir_versions.contains(&IR4_VERSION));
+    assert!(!legacy.features.contains("host-roots-v4"));
+    // Hidden, non-array, Object, result-free layout is required at IR 4.
+    let mut hidden = base()?;
+    hidden.ir_version = IR4_VERSION;
+    hidden.profile = "ir4-structural".into();
+    hidden.required_features.insert("host-roots-v4".into());
+    let mut visible = hidden.clone();
+    proc_mut(&mut visible)?.locals.push(Local {
+        array: None,
+        name: "root".into(),
+        kind: ScalarKind::Object,
+        role: SlotRole::HostRoot,
+        span: None,
+        visible: true,
+    });
+    assert!(check(visible).is_err());
+    let mut typed = hidden.clone();
+    proc_mut(&mut typed)?.locals.push(Local {
+        array: None,
+        name: "root".into(),
+        kind: ScalarKind::Long,
+        role: SlotRole::HostRoot,
+        span: None,
+        visible: false,
+    });
+    assert!(check(typed).is_err());
+    let mut arrayed = hidden.clone();
+    proc_mut(&mut arrayed)?.locals.push(Local {
+        array: Some(ScalarKind::Object),
+        name: "root".into(),
+        kind: ScalarKind::Object,
+        role: SlotRole::HostRoot,
+        span: None,
+        visible: false,
+    });
+    assert!(check(arrayed).is_err());
+    // The matching layout verifies cleanly.
+    let mut ok = hidden;
+    proc_mut(&mut ok)?.locals.push(Local {
+        array: None,
+        name: "root".into(),
+        kind: ScalarKind::Object,
+        role: SlotRole::HostRoot,
+        span: None,
+        visible: false,
+    });
+    check(ok)?;
+    Ok(())
+}
+#[test]
+fn host_root_references_cannot_be_captured_or_written() -> TestResult {
+    fn host_root_program() -> TestResult<Program> {
+        let mut p = base()?;
+        p.ir_version = IR4_VERSION;
+        p.profile = "ir4-structural".into();
+        p.required_features.insert("host-roots-v4".into());
+        let proc = proc_mut(&mut p)?;
+        proc.max_stack = 4;
+        proc.locals.push(Local {
+            array: None,
+            name: "root".into(),
+            kind: ScalarKind::Object,
+            role: SlotRole::HostRoot,
+            span: None,
+            visible: false,
+        });
+        Ok(p)
+    }
+    // WriteRef against a host root: RefLocal pushes a reference that WriteRef would consume.
+    let mut write = host_root_program()?;
+    let proc = proc_mut(&mut write)?;
+    proc.code = vec![
+        Instruction::Checkpoint(SiteId(0)),
+        Instruction::RefLocal(LocalSlot(1)),
+        Instruction::Const(ConstantId(0)),
+        Instruction::WriteRef(AssignmentKind::ObjectReference),
+        Instruction::Jump(Pc(5)),
+        Instruction::Checkpoint(SiteId(1)),
+        Instruction::Return,
+    ];
+    proc.checkpoints.get_mut(1).ok_or("site")?.enter_pc = Pc(5);
+    assert!(check(write).is_err());
     Ok(())
 }

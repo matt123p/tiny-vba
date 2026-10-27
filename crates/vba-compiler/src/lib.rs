@@ -23,7 +23,7 @@ fn push<T>(v: &mut Vec<T>, item: T) -> Result<()> {
 }
 #[derive(Clone, Debug)]
 pub struct CompileOptions {
-    pub imports:Vec<vba_foreign::Import>,
+    pub imports: Vec<vba_foreign::Import>,
     pub entry: String,
     pub revision: String,
     pub capabilities: ir::Capabilities,
@@ -32,7 +32,7 @@ pub struct CompileOptions {
 impl Default for CompileOptions {
     fn default() -> Self {
         Self {
-            imports:Vec::new(),
+            imports: Vec::new(),
             entry: "Answer".into(),
             revision: "source-1".into(),
             capabilities: ir::Capabilities::ir4_structural(),
@@ -59,7 +59,7 @@ pub fn compile_modules(
     {
         return Err(error("invalid entry/revision/profile identifier"));
     }
-    let program = bound::bind_with_imports(modules, &options.entry,&options.imports)?;
+    let program = bound::bind_with_imports(modules, &options.entry, &options.imports)?;
     let mut sources = Vec::new();
     for module in &program.modules {
         let module_name = module
@@ -123,7 +123,10 @@ pub fn compile_modules(
                 builder.feature("array-layout-v3");
             }
             builder.allocation.charge(256)?;
-            let role = if local.host_root {builder.feature("host-roots-v4");ir::SlotRole::HostRoot} else if let Some(key) = &local.persistent {
+            let role = if local.host_root {
+                builder.feature("host-roots-v4");
+                ir::SlotRole::HostRoot
+            } else if let Some(key) = &local.persistent {
                 let id = if let Some(id) = persistent_ids.get(key) {
                     *id
                 } else {
@@ -147,7 +150,11 @@ pub fn compile_modules(
                     name: local.name.clone(),
                     kind: local.kind,
                     role,
-                    span:if local.host_root {None} else {Some(local.span)},
+                    span: if local.host_root {
+                        None
+                    } else {
+                        Some(local.span)
+                    },
                     visible: !local.result && !local.host_root,
                 },
             )?;
@@ -186,7 +193,9 @@ pub fn compile_modules(
         .get(program.entry)
         .ok_or_else(|| error("entry invariant"))?;
     let mut ir = ir::Program {
-        ir_version: if features.iter().any(|f|f.ends_with("-v4")) {ir::IR4_VERSION} else if features.iter().any(|f| f.ends_with("-v3")) {
+        ir_version: if features.iter().any(|f| f.ends_with("-v4")) {
+            ir::IR4_VERSION
+        } else if features.iter().any(|f| f.ends_with("-v3")) {
             ir::IR3_VERSION
         } else if features.iter().any(|f| f.ends_with("-v2")) {
             ir::IR2_VERSION

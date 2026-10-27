@@ -3,10 +3,11 @@
 A new, standalone VBA interpreter, editor and debugger in Rust, intended to run natively and in WebAssembly.
 Develop, run and test the language engine without Gridcraft, Wordcraft, Microsoft Office or a graphical interface.
 
-**Current status:** M4 acceptance is complete. The Rust engine includes verified IR 1/2/3,
-explicit-frame execution, a headless debugger, scalar conversions, Currency/Date, arrays,
-optional/named calls, whole-array ByRef, ParamArray, Option Base, static/module state and VBA handlers.
-The current execution profile is `m4-conformance-v1`.
+**Current status:** M4 acceptance is complete and the M5 host contract is implemented. The Rust
+engine includes verified IR 1/2/3/4, explicit-frame execution, a headless debugger, scalar
+conversions, Currency/Date, arrays, optional/named calls, whole-array ByRef, ParamArray,
+Option Base, static/module state, VBA handlers and host-root imports with a versioned native host
+protocol. The current execution profile is `m5-host-v1` ([ADR 0013](docs/decisions/0013-m5-host-contract.md)).
 
 All **44 authored scenarios and 153 reviewed ReflexGrid cases pass**. The latter match published
 Microsoft Excel Mac oracle expectations; this is inherited evidence, not a new local Excel run.

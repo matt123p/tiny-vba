@@ -1,7 +1,41 @@
 # Implementation progress
 
-Updated 2026-10-26. Current stage: **M4 acceptance complete**, including the original external
-oracle gate. Current runtime profile: m4-conformance-v1. M5 and the graphical IDE slice are next.
+Updated 2026-10-26. Current stage: **M5 native host contract implemented** on top of the completed
+M4 external acceptance. Current runtime profile: m5-host-v1 with verified IR 1/2/3/4. The graphical
+IDE slice (implementation-plan step 3) is next; real workbook FillCells evidence stays fork-owned.
+
+## M5 native host integration contract
+
+Implemented [ADR 0013](decisions/0013-m5-host-contract.md). `vba-foreign` owns protocol version 1
+(`API_VERSION`, `ProtocolVersion`, `check_protocol`); the foreign session and the VM both refuse an
+incompatible host protocol before any dispatch, with a double-check regression removed from the
+invoke path. `Import`/`validate_imports` bound generic source imports: ≤64 entries, ASCII identifier
+names, case-insensitive uniqueness, Call/Get only. The compiler accepts them through
+`CompileOptions::imports` and lowers each to a hidden IR 4 `HostRoot` slot plus a fixed member
+call/get; imports resolve only as call targets and cannot be written or captured.
+
+`vba-ir` gained `IR4_VERSION`, the `host-roots-v4` feature and `SlotRole::HostRoot` with structural
+rules (IR 4 only, Object, non-array, hidden, result-free, read-only under `RefLocal`); older IR 1/2/3
+targets and `Capabilities::ir3_structural()` stay closed. The VM's `HostBinding` gained case-folded
+named roots (cap 64, host-identity matching); missing roots refuse `Session::new`, mismatched-host
+roots refuse launch, and a stale root surfaces the host's own reference error (91) with no repeated
+dispatch. `HostBinding::for_program` derives the whole site allowlist from a verified program, and
+`Session::limits()` exposes budgets to embedding drivers.
+
+The runtime profile is now `m5-host-v1`; the compiler's structural default is `ir4-structural` while
+IR 1/2/3 remain selectable and verified. `vba-values`/`vba-debug` publish `API_VERSION` consts.
+`vba-testkit` supplies the reusable bounded bridge driver (`run_to_boundary`, `statement`), and
+vba-vm/tests/embedding.rs proves the fork integration shape in-repo: an import-driven FillCells-style
+call against a scripted fake host, breakpoint/inspect/edit/resume with exactly one dispatch, and
+hidden-root refusal cases. Architecture DAG edges (semantics→foreign, compiler→foreign, testkit
+debug/ir/vm) are reviewed in tools/architecture.json.
+
+Verification from this checkout: cargo xtask ci passes formatting, strict all-target Clippy,
+**146 integration tests**, the 16-crate acyclic DAG and seven pins/646 hashes. All 197 authored and
+reviewed fixtures still assert PASS under the renamed profile, and the same tests pass in release.
+cargo xtask wasm builds every library and cargo xtask wasm-run passes the identical native/WASI
+acceptance. Not claimed: the fork-owned FillCells proof with a real Office layer remains Gridcraft's
+gate, as ADR 0013 requires.
 
 ## M4 external acceptance completion
 

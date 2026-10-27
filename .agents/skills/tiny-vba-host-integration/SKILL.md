@@ -62,3 +62,19 @@ Use vba-runtime for operations/edits. VM host dispatch must use checked precommi
 validation and explicit per-site permissions; foreign aliases remain unsupported. Run cargo xtask ci,
 wasm and wasm-run (native plus actual WASI execution). Runtime example results do not mark unrun M0
 or external scenario assertions PASS. Graphical UI, DAP and VBA error-handler semantics remain later work.
+
+## Implemented M5 contract
+
+Read [ADR 0013](../../../docs/decisions/0013-m5-host-contract.md). The current consumer profile is
+`m5-host-v1` over verified IR 1/2/3/4. `vba-foreign` owns protocol version 1 (`API_VERSION`,
+`ProtocolVersion`, `check_protocol`); hosts report their version through `Host::protocol` and the
+foreign session and VM refuse incompatible majors/minors before any dispatch. Embeddings supply
+generic source imports (`vba_foreign::Import`, Call/Get only, validated by `validate_imports`) through
+`CompileOptions::imports`; each import lowers to a hidden IR 4 `HostRoot` slot plus a fixed member
+call/get and can never be written or captured. `HostBinding` carries case-insensitive named roots
+(host identity must match, cap 64); missing or mismatched roots refuse launch, and
+`HostBinding::for_program` derives the full site allowlist from a verified program. Reuse
+`vba_testkit::run_to_boundary` and `vba_testkit::statement` for bounded bridge drivers;
+vba-vm/tests/embedding.rs is the break/edit/resume proof with exactly one dispatch. Office-shaped
+names, catalogues, workbook FillCells evidence, undo/recalc and permission gates remain fork-owned
+(Gridcraft); do not add them here.

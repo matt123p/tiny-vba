@@ -81,5 +81,5 @@ The authored inventory is 20 M0 plus 24 M4 PASS fixtures; no Microsoft oracle ob
 M4 external acceptance is now implemented under [ADR 0012](../../../docs/decisions/0012-m4-oracle-acceptance.md).
 Read [the report](../../../docs/m4-oracle-report.md) and current language contract: 44 authored
 plus 153 inherited upstream-reported Excel Mac scenarios PASS. Schema 2 and the reviewed allowlist
-preserve raw results/environment/hashes; no fresh Office run is claimed. Use m4-conformance-v1
-and explicit IR 3 capabilities, retaining IR 1/2 refusal rules. Unselected external cases remain NOT_RUN.
+preserve raw results/environment/hashes; no fresh Office run is claimed. Use m5-host-v1
+and explicit IR 3/4 capabilities, retaining IR 1/2 refusal rules. Unselected external cases remain NOT_RUN.

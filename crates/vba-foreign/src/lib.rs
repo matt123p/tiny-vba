@@ -60,7 +60,9 @@ pub enum Reply {
     Wait(u64),
 }
 pub trait Host {
-    fn protocol(&self)->ProtocolVersion {PROTOCOL_VERSION}
+    fn protocol(&self) -> ProtocolVersion {
+        PROTOCOL_VERSION
+    }
     /// Stable identity, unique per host instance during the embedding session.
     fn identity(&self) -> u64;
     fn invoke(&mut self, call: HostCall) -> Reply;
@@ -104,7 +106,6 @@ impl Session {
         store: &mut Locations,
         validate: &mut impl FnMut(Option<Location>, &Value) -> Result<(), Diagnostic>,
     ) -> Result<Outcome, Diagnostic> {
-        check_protocol(host.protocol())?;
         check_protocol(host.protocol())?;
         if self.pending.is_some() {
             return Err(protocol("call already suspended"));
@@ -273,23 +274,53 @@ fn protocol(message: &str) -> Diagnostic {
 }
 
 /// Native Rust host contract; not a C ABI or a serialized representation.
-pub const API_VERSION:u32=1;
-#[derive(Clone,Copy,Debug,PartialEq,Eq)]
-pub struct ProtocolVersion {pub major:u16,pub minor:u16}
-pub const PROTOCOL_VERSION:ProtocolVersion=ProtocolVersion {major:1,minor:0};
-pub fn check_protocol(version:ProtocolVersion)->Result<(),Diagnostic> {
-    if version.major!=PROTOCOL_VERSION.major || version.minor>PROTOCOL_VERSION.minor {return Err(protocol("incompatible native host protocol"));}Ok(())
+pub const API_VERSION: u32 = 1;
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct ProtocolVersion {
+    pub major: u16,
+    pub minor: u16,
+}
+pub const PROTOCOL_VERSION: ProtocolVersion = ProtocolVersion { major: 1, minor: 0 };
+pub fn check_protocol(version: ProtocolVersion) -> Result<(), Diagnostic> {
+    if version.major != PROTOCOL_VERSION.major || version.minor > PROTOCOL_VERSION.minor {
+        return Err(protocol("incompatible native host protocol"));
+    }
+    Ok(())
 }
 /// An embedding-supplied source name; None exposes the root object itself.
-#[derive(Clone,Debug,PartialEq,Eq)]
-pub struct Import {pub name:String,pub root:String,pub member:Option<String>,pub kind:InvokeKind}
-pub fn validate_imports(imports:&[Import])->Result<(),Diagnostic> {
-    if imports.len()>64 {return Err(protocol("host import budget exceeded"));}
-    let mut seen=std::collections::BTreeSet::new();
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct Import {
+    pub name: String,
+    pub root: String,
+    pub member: Option<String>,
+    pub kind: InvokeKind,
+}
+pub fn validate_imports(imports: &[Import]) -> Result<(), Diagnostic> {
+    if imports.len() > 64 {
+        return Err(protocol("host import budget exceeded"));
+    }
+    let mut seen = std::collections::BTreeSet::new();
     for import in imports {
-        for name in [&import.name,&import.root].into_iter().chain(import.member.as_ref()) {
-            if name.is_empty() || name.len()>128 || !name.bytes().all(|b| b.is_ascii_alphanumeric() || b==b'_') || !name.as_bytes().first().is_some_and(|b| b.is_ascii_alphabetic()) {return Err(protocol("invalid host import name"));}
+        for name in [&import.name, &import.root]
+            .into_iter()
+            .chain(import.member.as_ref())
+        {
+            if name.is_empty()
+                || name.len() > 128
+                || !name.bytes().all(|b| b.is_ascii_alphanumeric() || b == b'_')
+                || !name
+                    .as_bytes()
+                    .first()
+                    .is_some_and(|b| b.is_ascii_alphabetic())
+            {
+                return Err(protocol("invalid host import name"));
+            }
         }
-        if !seen.insert(import.name.to_ascii_lowercase()) || !matches!(import.kind,InvokeKind::Call|InvokeKind::Get) {return Err(protocol("duplicate or invalid host import"));}
-    }Ok(())
+        if !seen.insert(import.name.to_ascii_lowercase())
+            || !matches!(import.kind, InvokeKind::Call | InvokeKind::Get)
+        {
+            return Err(protocol("duplicate or invalid host import"));
+        }
+    }
+    Ok(())
 }
