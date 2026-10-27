@@ -39,7 +39,16 @@ corpus, WASM, Linux and macOS jobs pass; the audit report records the failing as
 log provenance. Resolve that CI gate as well. The earlier completion record below is historical;
 the correction record above supersedes this historical failure state.
 
-## GridCraft integration — baseline implemented
+## GridCraft integration — selected spreadsheet profile complete
+
+GridCraft commit `b496325b` adds the requested editor/toolbar/menu/keyboard launch,
+assigned worksheet shapes and worksheet-callable Functions. Its full gate passes
+2,553 tests; the full optional UI suite passes 1,143 (18 VBA cases), and all 25
+adapter cases pass natively and in JavaScript-WASM. Public behavior references,
+source/assignment persistence, read-only UDF policy, exact logs, launch instructions
+and compatibility limits are in [the final acceptance record](gridcraft-integration.md).
+tiny-vba remains a separate dependency pinned to merged product revision `ea38c3f`.
+Broader M14/WordCraft/events/classes remain separate planned work.
 
 Work is on `feat/gridcraft-integration` here and `feat/tiny-vba-integration` in the
 GridCraft fork. The staged plan, decisions, exact validation and resumption notes

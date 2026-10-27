@@ -1,6 +1,6 @@
 # GridCraft integration work log
 
-## Spreadsheet entry points continuation (in progress, 2026-10-27)
+## Spreadsheet entry points continuation — complete for the selected profile
 
 User scope: editor launch, toolbar/menu commands, assigned worksheet buttons and
 worksheet-callable VBA Functions. tiny-vba main was pulled and merged locally at
@@ -10,7 +10,8 @@ Stages: (1) generic native calculation provider and existing hidden-name source
 storage; (2) fork-owned bounded pure UDF driver, entry discovery and persistence;
 (3) Developer/toolbar/menu/keyboard and worksheet shape assignment UI;
 (4) authored native/WASM/control/UI/package tests, full gates and visual inspection.
-These stages are not complete until acceptance evidence is recorded.
+All four stages are complete for the selected GridCraft profile; final acceptance
+below supersedes intermediate checkpoint counts and designs.
 
 Public behavior sources consulted 2026-10-27 (facts paraphrased; no source code,
 text, artwork, screenshots, binaries or downloaded fixtures copied):
@@ -34,6 +35,103 @@ tests pass; optional UI tests are in progress. UDF calls use independently gener
 VBA wrappers so ordinary ByRef parameters and omitted typed defaults flow through
 the existing compiler's call rules, preserving the shared ByVal launch contract.
 The generic calc hook has no VBA dependency; GridCraft's fork owns its provider.
+
+Second checkpoint: 23 native and JavaScript-WASM adapter tests and 17 optional
+editor/worksheet interaction tests pass. The first complete GridCraft gate and
+full optional UI suite passed. Final review replaced a proposed numeric-ID button
+assignment table with inert `Shape.on_action`, set by native `shape.setMacro` and
+stored as DrawingML's `macro` attribute. Shape IDs can be reused after deletion;
+ownership on the shape avoids accidentally assigning a replacement object and
+preserves assignments when package writers renumber drawings or sheets rename.
+The regression exercises deletion, reused IDs and undo. Final full gates are being
+rerun after this correction; only the final acceptance record is authoritative.
+
+Additional public behavior/schema references, paraphrased without source reuse:
+
+- https://support.microsoft.com/en-us/accessibility/excel/keyboard-shortcuts-in-excel
+  — Alt+F11 editor and Alt+F8 procedure picker.
+- https://support.microsoft.com/en-us/office/add-ins/show-the-developer-tab
+  — initially hidden, persisted Developer preference.
+- https://learn.microsoft.com/en-us/office/vba/api/excel.shape.onaction
+  — shape-owned assigned macro name.
+- https://learn.microsoft.com/en-us/dotnet/api/documentformat.openxml.drawing.spreadsheet.shape.macro
+  — the public DrawingML `macro` attribute.
+
+### Final acceptance (2026-10-27)
+
+GridCraft commit `b496325b8e4d2fd471ae747f4036d504aee5c9df` on
+`feat/tiny-vba-integration` contains the completed spreadsheet-facing scope.
+It pins shared tiny-vba revision `ea38c3f346b4010d6017b3a6d27e645ebad7ef79`,
+which includes the pulled editor improvements and imported-root fix. Subsequent
+tiny-vba commits only update this interruption/acceptance record; the dependency
+stays pinned to its tested product code. No WordCraft or application dependency
+is introduced into tiny-vba.
+
+Implemented: VB toolbar and Alt+F11 editor toggle; Alt+F8/View/Developer macro picker;
+initially hidden, persisted Developer tab; original ribbon buttons and Insert menu;
+public no-argument Sub run/edit/assign/toolbar controls; sheet buttons/right-click
+reassignment/Design Mode; inert shape-owned OnAction metadata with DrawingML/JSON
+round trips and deletion/ID-reuse/undo safety; source/toolbar persistence through
+existing hidden-name storage; public Functions in formulas and User Defined discovery.
+UDFs use bounded fresh VMs, compiler-owned default/ByRef semantics, normal dependencies
+and rectangular spills, with no mutable workbook or asynchronous host access.
+Consent, stale source/document guards and imported project decoding remain explicit.
+
+Final local evidence in GridCraft's ignored target directory:
+
+- `worksheet-final-ci.log`: all ten gates PASS, **2,553 tests**, including the
+  newly authored shape metadata and ink preservation cases; fmt, strict Clippy,
+  assets, layers, browser compilation, parity and keytips all pass.
+- `worksheet-final-ui-all.log`: **1,143 tests PASS**, including **18** VBA
+  editor/control/keyboard/worksheet cases; `worksheet-final-ui-tests.log` reruns
+  the 18 cases. Includes real pointer clicks, Design Mode, right-click reassign,
+  toolbar/picker use, permission revocation, dirty source, atomic failed saves,
+  stale-document refusal, and avoiding demo execution for absent/corrupt source.
+- **25 native and JavaScript-WASM adapter cases PASS**: 2 project, 13 workbook,
+  10 worksheet. Final worksheet-only logs `worksheet-final-native-udf.log` and
+  `worksheet-final-wasm-udf.log` include implicit ByRef input isolation and
+  repeated shared strings exceeding 32-bit logical byte totals. Saturating counts
+  and preallocation checks refuse oversized payloads before UTF-16 array creation.
+- `worksheet-final-clippy.log`: optional all-target strict Clippy PASS.
+  `worksheet-final-desktop.log` / `worksheet-final-web.log`: real desktop/browser
+  applications compile with the feature enabled. WASM execution uses Node and
+  wasm-bindgen-test-runner 0.2.129, not unsupported GridCraft WASI.
+- Nine original PNGs in `target/worksheet-ui` render the real paused debugger,
+  Developer/worksheet/function result, and macro picker in light/dark/narrow/scaled
+  modes. Visually inspected; no vendor/reference art or screenshots are committed.
+
+The complete optional UI suite and its pinned craft-fonts input are now included
+in GridCraft's optional CI job. These are local results; no hosted workflow run or
+fresh Office oracle observation is claimed. Merged tiny-vba passes its own CI,
+browser WASM compilation and actual WASI execution (`target/merged-integration-*`).
+All examples, fixtures and code are independently authored from public behavior
+references; no downloaded implementation, private material or vendor assets enter
+either repository.
+
+Launch from GridCraft: `cargo +1.99.1 run -p gridcraft --features vba`.
+Click **VB** or press **Alt+F11**. View → **Developer tab** reveals the ribbon;
+**Macros** / **Alt+F8** opens assignments. Save Source to Workbook applies code;
+save the workbook normally to retain it. File-derived code requires session
+permission. Exact control parameters and a working authored Function example are
+in GridCraft `docs/vba.md`.
+
+Remaining compatibility limits are deliberate: the optional feature is disabled
+in default builds; no Office binary project writeback, ActiveX/UserForm or actual
+Form Control serialization, cross-workbook/add-in UDFs, Range/Caller/Volatile host
+objects inside UDFs, persistent UDF state, events, classes or complete Excel object
+coverage. Reference arguments are bounded value arrays, not Excel Range objects.
+Source and permission replacement invalidate compiled functions; apply desired
+source again after source undo. Sheet topology changes require reopening the editor.
+Next independent stage: stable worksheet host identities and event/caller policy,
+or WordCraft's own adapter acceptance; neither is required for this requested slice.
+
+Publication checkpoint: GridCraft's feature commit remains local for review.
+tiny-vba's tested changes and acceptance record are merged into local `main` and
+published on `feat/gridcraft-integration`. Publishing remote `main` is pending
+explicit user approval: automatic approval review rejected the combined push
+because the earlier push authorization covered only the feature branch. No
+default-branch push or history rewrite was performed. After approval, verify
+upstream has not advanced and push local `main` normally.
 
 Started 2026-10-27. This is the interruption/resumption record for the user-requested
 integration. Interpreter and shared IDE remain in tiny-vba; Excel objects and the
