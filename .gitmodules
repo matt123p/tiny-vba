@@ -1,21 +1,28 @@
 [submodule "tests/corpora/reflex-grid"]
 	path = tests/corpora/reflex-grid
 	url = https://github.com/milochen0418/reflex_grid.git
+	update = none
 [submodule "tests/corpora/vba-json"]
 	path = tests/corpora/vba-json
 	url = https://github.com/VBA-tools/VBA-JSON.git
+	update = none
 [submodule "tests/corpora/vba-project-starter"]
 	path = tests/corpora/vba-project-starter
 	url = https://github.com/jlandgre/VBA_Project_Starter.git
+	update = none
 [submodule "tests/corpora/vba-samples"]
 	path = tests/corpora/vba-samples
 	url = https://github.com/chapmjs/vba-samples.git
+	update = none
 [submodule "tests/corpora/excel-vba-projects"]
 	path = tests/corpora/excel-vba-projects
 	url = https://github.com/dtripathi18/Excel-VBA-Projects.git
+	update = none
 [submodule "tests/corpora/tree-sitter-vba"]
 	path = tests/corpora/tree-sitter-vba
 	url = https://github.com/harumiWeb/tree-sitter-vba.git
+	update = none
 [submodule "references/VBA-Docs"]
 	path = references/VBA-Docs
 	url = https://github.com/MicrosoftDocs/VBA-Docs.git
+	update = none

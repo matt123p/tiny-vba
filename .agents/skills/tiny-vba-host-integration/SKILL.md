@@ -81,6 +81,15 @@ names, catalogues, workbook FillCells evidence, undo/recalc and permission gates
 
 ## Implemented M7 contract
 
+Root-object imports (`member: None`) preserve actual property/method dispatch under
+[ADR 0017](../../../docs/decisions/0017-imported-root-members.md). Only fixed-member
+aliases consume the whole member application. Preserve the exact dispatch regression
+in vba-vm/tests/embedding.rs; do not silently discard an imported root's member call.
+
+GridCraft baseline integration is tracked in
+[the staged work log](../../../docs/gridcraft-integration.md); fork-owned tests supply
+workbook/undo/recalc evidence. Neither fork becomes a tiny-vba dependency.
+
 Read [ADR 0015](../../../docs/decisions/0015-m7-callbacks-and-lifecycle.md). The VM stays
 non-reentrant: schedule VBA callbacks with `Session::schedule_callback` (FIFO, `Limits.callbacks`
 budget, name/arity validated) and deliver each with `Session::run_next_callback` once the current

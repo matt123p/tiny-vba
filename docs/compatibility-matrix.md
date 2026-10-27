@@ -3,6 +3,7 @@
 Updated 2026-10-27. Stage: M4 external acceptance complete; M5–M7 in-repo contracts and M8 standalone/embeddable UI gate implemented. **The documented m5-host-v1 consumer, including M3 control, M4 scalar widths and IR 4 host roots, has execution evidence; the 44 authored and 153 reviewed fixtures remain asserted 197 PASS / 0 UNSUPPORTED.**
 
 | Dimension | Status | Evidence / next gate |
+| Imported object member dispatch | Implemented binder correction | ADR 0017; vba-vm/tests/embedding.rs preserves actual Get/Call/Let/Set, named arguments and returned object targets |
 |---|---|---|
 | Workspace and crate boundaries | Implemented setup | cargo xtask layers |
 | CLI parse/check/compile/disasm/run, help/version and explicit unsupported errors | Implemented M3 | apps/vba-cli/tests/cli.rs |
@@ -34,6 +35,7 @@ Updated 2026-10-27. Stage: M4 external acceptance complete; M5–M7 in-repo cont
 | Oracle comparison / executable scenario runner | M4 runner implemented for self-authored fixtures; oracle comparison not implemented | `conformance run` (20 PASS / 0 UNSUPPORTED); M9 owns oracle goldens |
 | Fuzzing | Not implemented | APIs required before targets |
 | Excel/Word APIs and OOXML round-trip | External ownership | Gridcraft/Wordcraft forks |
+| GridCraft Excel.v1 baseline | Fork-owned implementation | Native and JavaScript/WASM workbook tests, shared editor/control/source IO tests, inspected native snapshots; [scope/evidence](gridcraft-integration.md). Broader events, WordCraft, signatures/forms remain planned |
 | Classes and UserForms | Planned M11; currently unsupported | [Form/class milestone and gate](ui/post-m8-roadmap.md#m11--classdocument-support-and-userform-editor) |
 | COM, DLLs, P-code and binary source writing | Outside current scope | Separate reviewed design required; native Craft extensions in M12 do not imply binary VBE compatibility |
 

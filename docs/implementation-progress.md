@@ -39,6 +39,29 @@ corpus, WASM, Linux and macOS jobs pass; the audit report records the failing as
 log provenance. Resolve that CI gate as well. The earlier completion record below is historical;
 the correction record above supersedes this historical failure state.
 
+## GridCraft integration — baseline implemented
+
+Work is on `feat/gridcraft-integration` here and `feat/tiny-vba-integration` in the
+GridCraft fork. The staged plan, decisions, exact validation and resumption notes
+are in [the integration work log](gridcraft-integration.md). Office objects remain
+fork-owned; no application dependency is added here. Workbook tests exposed the
+root-import member-dispatch defect fixed under [ADR 0017](decisions/0017-imported-root-members.md).
+The native VM regression covers exact Get/Call/Let/Set dispatch and named arguments.
+Windows xtask selects `python` rather than assuming a `python3` executable.
+GridCraft consumes shared revision `4d80a9584b3daeb75d589c629eff272ecd5881fe`
+as a pinned Git dependency, with corpus/reference downloads explicitly opt-in.
+Fourteen real-workbook tests pass natively and as JavaScript-hosted WASM; eight
+shared-editor/control/source-save-discard tests pass. Light/dark/narrow/scaled
+actual-paused-state snapshots were rendered and inspected. The fork's full gate,
+exact commands, remaining profile limits and resumption state are recorded in
+the work log. Broader M14/WordCraft/events/forms/signatures are still planned.
+
+Continuation stage completed in GridCraft commit `8168bda4`: native typed cell
+contents share the engine command/edit lifecycle, replacing JSON mutation dispatch
+and removing the Text-format (`@`) write restriction. All 2,540 GridCraft gate
+tests, five targeted engine cases, 15 native/JavaScript-WASM adapter cases and
+eight editor/control cases pass. Shared tiny-vba code and its Git pin are unchanged.
+
 ## Post-M8 milestone allocation
 
 On 2026-10-27, assigned the remaining UI specification work to explicit **planned** milestones

@@ -107,7 +107,7 @@ def corpora(require_checkouts):
             raise ValueError(f'Git submodule pin disagrees with source lock: {path}')
         if not (checkout / '.git').exists():
             if require_checkouts:
-                raise ValueError(f'missing submodule: {path}; run git submodule update --init --depth 1')
+                raise ValueError(f'missing submodule: {path}; run git submodule update --init --checkout --depth 1')
             print(f'corpora: checkout absent, pin checked only: {path}')
             continue
         if git('-C', str(checkout), 'rev-parse', 'HEAD') != revision:

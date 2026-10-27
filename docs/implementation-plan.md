@@ -1,6 +1,8 @@
 # Plan of action
 
 Updated 2026-10-27. This plan builds the interpreter and editor/debugger UI here; document/Office integration stays external.
+The user-requested GridCraft M14 baseline is now underway in the fork; follow the
+[staged integration work log](gridcraft-integration.md) to resume or verify it.
 Setup and the documented M0–M3 subsets are complete. The detailed [bytecode/VM specification](bytecode-vm-specification.md)
 and [ADR 0004](decisions/0004-bytecode-vm-contract.md) are written before frontend work continues.
 M2 binding/lowering and M3 execution/debugger are implemented. M4 now meets its original
@@ -28,7 +30,7 @@ remain M9 work.
 | M11 — classes and UserForm editor — planned | Prerequisite class/document semantics, shared form model, Toolbox/designer/Properties/Format and real control events | Authored form design/save/reopen/event debugging and runtime/cleanup tests; [scope](ui/post-m8-roadmap.md#m11--classdocument-support-and-userform-editor) |
 | M12 — native Craft extensions and enhancements — planned | Versioned extension API/manager, opt-in non-Microsoft editor features and Python translation preview | Capability/unload/isolation, preview/undo and supported-subset conversion tests; Classic mode works with extensions disabled; [scope](ui/post-m8-roadmap.md#m12--native-craft-extensions-and-non-microsoft-enhancements) |
 | M13 — optional Copilot-style assistance — planned | Opt-in inline/chat assistance, provider/privacy policy, source-aware previews and approved retrieval | Permission/offline/injection/cancellation/undo/shortcut tests; no implicit execution; [scope](ui/post-m8-roadmap.md#m13--optional-copilot-style-assistance) |
-| M14 — host integration acceptance — planned, cross-repository | Shared UI in Gridcraft/Wordcraft; real document/events, trust, storage, signatures and host lifecycle | Executable evidence in each owning fork; baseline may proceed from M5/M7/M8 without waiting for AI; [scope](ui/post-m8-roadmap.md#m14--gridcraft-and-wordcraft-integration-acceptance) |
+| M14 — host integration acceptance — GridCraft baseline implemented; broader cross-repository scope planned | Shared GridCraft UI and bounded workbook adapter implemented; WordCraft, broader events/forms/signatures remain planned | [GridCraft baseline evidence and limits](gridcraft-integration.md); [broader scope](ui/post-m8-roadmap.md#m14--gridcraft-and-wordcraft-integration-acceptance) |
 
 ## Post-M8 scope allocation
 

@@ -18,11 +18,14 @@ No downloaded code or macro is automatically executed, linked or copied into int
 | ../../references/VBA-Docs | VBA language and Excel/Word API reference/examples | CC BY 4.0 docs / MIT samples; not the local Office member catalogue |
 
 ```sh
-git submodule update --init --depth 1
+git submodule update --init --checkout --depth 1
 python3 tools/check_repository.py corpora --require-checkouts
 ```
 
 Normal `cargo test --workspace` works without any checkout. The corpus CI job checks pins/hashes only.
+Submodules default to `update = none` so Git dependency builds in host applications
+do not fetch corpora or reference docs. The explicit `--checkout` above overrides
+that default for reviewed corpus verification; pins/notices and execution policy stay unchanged.
 Before adopting a specimen, establish redistribution rights, classify filesystem/network/shell/COM/forms/
 external-workbook needs, select a target profile, and author expected observations. A future allowlisted
 scenario harness may execute selected cases in the bounded interpreter, never automatically in Office.

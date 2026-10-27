@@ -46,6 +46,81 @@ fn done() -> Reply {
     })
 }
 #[test]
+fn imported_object_members_preserve_name_kind_arguments_and_assignments() -> R {
+    let source = SourceFile::new(SourceId(1),"root.bas".into(),"Function Answer() As Long\nDim item As Object\nSet item = root.Child(Index:=2)\nroot.Value = 7\nSet root.Link = item\nAnswer = root.Count\nEnd Function".into())?;
+    let program = compile(
+        &source,
+        &CompileOptions {
+            imports: vec![Import {
+                name: "root".into(),
+                root: "Document".into(),
+                member: None,
+                kind: InvokeKind::Get,
+            }],
+            capabilities: vba_vm::capabilities(),
+            ..Default::default()
+        },
+    )?;
+    let binding = HostBinding::for_program(
+        &program,
+        TARGET.host,
+        BTreeMap::from([("Document".into(), TARGET)]),
+    )?;
+    let mut session = Session::new(program, 1, vec![], Some(binding), Limits::default())?;
+    let result = |value| {
+        Reply::Complete(Completion {
+            value,
+            writes: vec![],
+        })
+    };
+    let mut host = ScriptedHost::new(
+        TARGET,
+        vec![
+            result(Value::Object(TARGET)),
+            done(),
+            done(),
+            result(Value::Long(42)),
+        ],
+    );
+    assert_eq!(
+        run_to_boundary(&mut session, &mut host, &Controller::new(), 1024)?,
+        Outcome::Completed(ReturnValue::Function(Value::Long(42)))
+    );
+    let calls: Vec<_> = host
+        .trace
+        .iter()
+        .filter_map(|e| {
+            if let Event::Invoke(c) = e {
+                Some(c)
+            } else {
+                None
+            }
+        })
+        .collect();
+    assert_eq!(
+        calls
+            .iter()
+            .map(|c| (c.member.as_str(), c.kind))
+            .collect::<Vec<_>>(),
+        vec![
+            ("Child", InvokeKind::Call),
+            ("Value", InvokeKind::Let),
+            ("Link", InvokeKind::Set),
+            ("Count", InvokeKind::Get)
+        ]
+    );
+    let first = calls.first().ok_or("missing call")?;
+    assert_eq!(
+        first.arguments.first().and_then(|a| a.name.as_deref()),
+        Some("Index")
+    );
+    assert_eq!(
+        first.arguments.first().map(|a| &a.value),
+        Some(&Value::Integer(2))
+    );
+    Ok(())
+}
+#[test]
 fn bridge_driver_breaks_edits_and_resumes_with_one_write() -> R {
     let mut s = imported_session(BTreeMap::from([("Sheet1".into(), TARGET)]))?;
     let program = s.program();

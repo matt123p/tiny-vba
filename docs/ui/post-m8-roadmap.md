@@ -108,7 +108,9 @@ normal CI independent of paid services, credentials and network access. Validate
 Owner: the application forks for Office objects, document UI/storage/trust/events/undo/recalc;
 tiny-vba owns the shared embedding APIs. Baseline integration depends on M5/M7/M8 and can run in
 parallel with later UI milestones. Form-specific workflows additionally depend on M11; AI is optional.
-This milestone records cross-repository gates, not permission to modify sibling projects now.
+The user authorized the GridCraft baseline on 2026-10-27; its implementation and
+fork-owned evidence are recorded in [the integration work log](../gridcraft-integration.md).
+Broader event, form, signature and WordCraft acceptance below remains planned.
 
 - Embed the same UI in both applications with real document projects, themes, fonts, shortcuts,
   source save/return routing, catalogue metadata and host event signatures.

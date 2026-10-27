@@ -55,13 +55,15 @@ WASM library compilation and identical native/WASI execution are separate gates.
 ## Optional external test material
 
 ```sh
-git submodule update --init --depth 1
+git submodule update --init --checkout --depth 1
 cargo xtask corpora
 python3 tools/check_repository.py corpora --require-checkouts
 ```
 
 Submodules are pinned by Git gitlinks and [the source lock](references/sources.lock.json).
 Fast builds/tests work with no submodules checked out. Do not use `--remote` in reproducible builds.
+Corpus/reference submodules use `update = none` so Cargo Git consumers do not
+download unrelated test data. `--checkout` explicitly opts in when verifying corpora.
 See [corpus policy and inventory](tests/corpora/README.md) before selecting any fixture.
 Two workbook sources have unresolved licensing; every specimen still requires classification.
 
