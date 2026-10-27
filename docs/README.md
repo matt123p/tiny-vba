@@ -62,3 +62,14 @@ generic callback queue, static reset and cleanup ownership; [runtime](runtime.md
 [M6 read-only project import](project-import.md) and [ADR 0014](decisions/0014-m6-project-decoding.md)
 record the bounded decoder, reviewed external dependencies, source identities, protection refusals
 and controlled native/WASI acceptance.
+
+## M8 UI implementation
+
+- [User-supplied public-source UI specification](ui/craft_vba_editor_debugger_ui_spec.md)
+- [Implementation plan](ui/m8-implementation-plan.md), [ADR 0016](decisions/0016-m8-embeddable-editor.md)
+- [Run, embed and reproduce visual evidence](ui/embedding.md)
+- [Acceptance and broader-spec feature status](ui/m8-acceptance.md)
+- [Public source manifest](provenance/vbe_sources.yaml), [dependency/font provenance](provenance/ui-dependencies.json)
+
+Downloaded reference evidence is ignored under `.cache/evidence/`; original rendered PNGs are
+ignored under `reports/ui/`. Neither is required for the ordinary offline test suite.

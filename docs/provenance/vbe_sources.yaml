@@ -1,0 +1,68 @@
+{
+  "schema_version": 1,
+  "date": "2026-10-27",
+  "policy": "Independent implementation from public functional documentation. Downloaded evidence is ignored and not distributed. No proprietary code/resources, clone implementation or live Office observation was used.",
+  "cache_root": ".cache/evidence/vbe/",
+  "sources": [
+    {
+      "id": "code-window",
+      "url": "https://learn.microsoft.com/en-us/office/vba/language/reference/user-interface-help/code-window",
+      "publisher": "Microsoft Learn",
+      "retrieved": "2026-10-27",
+      "sha256": "14895e9c847ef56919a1ac01ce3ab7570d66f840c29074d461bcf39bc15f5e9c",
+      "cache": ".cache/evidence/vbe/code-window.html",
+      "observation": "Object/procedure selectors, indicator margin and module navigation.",
+      "rights": "Public reference for facts and observable behavior; no HTML, images, artwork or text incorporated in product assets. Microsoft terms apply to cached source."
+    },
+    {
+      "id": "debug-menu",
+      "url": "https://learn.microsoft.com/en-us/office/vba/language/reference/user-interface-help/debug-menu",
+      "publisher": "Microsoft Learn",
+      "retrieved": "2026-10-27",
+      "sha256": "11a7680f105083b6b0e3ba1ba6ad8a3190b8c5af394da881bbea60c233487ae1",
+      "cache": ".cache/evidence/vbe/debug-menu.html",
+      "observation": "Documented stepping, breakpoint validity and classic shortcut conventions.",
+      "rights": "Public reference for facts and observable behavior; no HTML, images, artwork or text incorporated in product assets. Microsoft terms apply to cached source."
+    },
+    {
+      "id": "locals-window",
+      "url": "https://learn.microsoft.com/en-us/office/vba/language/reference/user-interface-help/locals-window",
+      "publisher": "Microsoft Learn",
+      "retrieved": "2026-10-27",
+      "sha256": "219808dc41bafd05fa60f755baf59e6c440a42d8de794aa8ed4ced4c1c2e3143",
+      "cache": ".cache/evidence/vbe/locals-window.html",
+      "observation": "Typed paused-frame inspection and writable-value semantics.",
+      "rights": "Public reference for facts and observable behavior; no HTML, images, artwork or text incorporated in product assets. Microsoft terms apply to cached source."
+    },
+    {
+      "id": "watch-window",
+      "url": "https://learn.microsoft.com/en-us/office/vba/language/reference/user-interface-help/watch-window",
+      "publisher": "Microsoft Learn",
+      "retrieved": "2026-10-27",
+      "sha256": "b7ccec92138cafb50a1b4b7677b1e35fb9b9a8ea9be8fc3ef6a9f6941d7217a0",
+      "cache": ".cache/evidence/vbe/watch-window.html",
+      "observation": "Expression/context display with explicit out-of-scope states.",
+      "rights": "Public reference for facts and observable behavior; no HTML, images, artwork or text incorporated in product assets. Microsoft terms apply to cached source."
+    },
+    {
+      "id": "immediate-window",
+      "url": "https://learn.microsoft.com/en-us/office/vba/language/reference/user-interface-help/immediate-window",
+      "publisher": "Microsoft Learn",
+      "retrieved": "2026-10-27",
+      "sha256": "b618ad86270750549f3cb3359148cdae64801835f8591d17f390cb6b6a4098ea",
+      "cache": ".cache/evidence/vbe/immediate-window.html",
+      "observation": "Paused-scope inspection and assignment; unsafe operations must be refused.",
+      "rights": "Public reference for facts and observable behavior; no HTML, images, artwork or text incorporated in product assets. Microsoft terms apply to cached source."
+    },
+    {
+      "id": "menus-commands",
+      "url": "https://learn.microsoft.com/en-us/office/vba/language/reference/menus-commands",
+      "publisher": "Microsoft Learn",
+      "retrieved": "2026-10-27",
+      "sha256": "c8d52b13cf94c784521f7b5b42046ba9da7bd3675996681eda0129fdb1740890",
+      "cache": ".cache/evidence/vbe/menus-commands.html",
+      "observation": "Classic menu taxonomy and functional command names.",
+      "rights": "Public reference for facts and observable behavior; no HTML, images, artwork or text incorporated in product assets. Microsoft terms apply to cached source."
+    }
+  ]
+}

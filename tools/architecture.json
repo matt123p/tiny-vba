@@ -64,6 +64,7 @@
       "vba-compiler",
       "vba-conformance",
       "vba-diagnostics",
+      "vba-ide",
       "vba-ir",
       "vba-syntax",
       "vba-values",
@@ -77,10 +78,41 @@
       "vba-semantics",
       "vba-syntax",
       "vba-values"
+    ],
+    "vba-ide": [
+      "vba-compiler",
+      "vba-debug",
+      "vba-diagnostics",
+      "vba-foreign",
+      "vba-ir",
+      "vba-runtime",
+      "vba-syntax",
+      "vba-values",
+      "vba-vm"
+    ],
+    "vba-ui-egui": [
+      "egui",
+      "vba-ide"
+    ],
+    "vba-ide-app": [
+      "eframe",
+      "image",
+      "vba-ide",
+      "vba-ui-egui",
+      "wasm-bindgen",
+      "wasm-bindgen-futures",
+      "web-sys"
     ]
   },
   "allowed_external_dependencies": {
     "cfb": "=0.14.0",
-    "encoding_rs": "=0.8.42"
+    "encoding_rs": "=0.8.42",
+    "egui": "=0.37.0",
+    "eframe": "=0.37.0",
+    "egui_kittest": "=0.37.0",
+    "image": "=0.25.10",
+    "wasm-bindgen": "=0.2.126",
+    "wasm-bindgen-futures": "=0.4.76",
+    "web-sys": "=0.3.103"
   }
 }

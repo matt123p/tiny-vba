@@ -1,0 +1,28 @@
+{
+  "schema_version": 1,
+  "egui_revision": "6d518fc799681571963842f95b55a6b68431b15a",
+  "winit_revision": "a517b3846ee8457d84ee4975110bfda6797c44dc",
+  "implementation": "Original tiny-vba code and geometry; public egui/eframe framework APIs, no application UI code copied.",
+  "dependencies": {
+    "egui/eframe/egui_kittest": "0.37.0, MIT OR Apache-2.0; reviewed public fork",
+    "winit": "0.30.13, Apache-2.0; matching reviewed public fork",
+    "image": "0.25.10, MIT OR Apache-2.0; native screenshot encoding only",
+    "wasm-bindgen / wasm-bindgen-futures / web-sys": "0.2.126 / 0.4.76 / 0.3.103, MIT OR Apache-2.0; browser glue",
+    "playwright": "1.64.1, Apache-2.0; optional maintenance-only browser harness"
+  },
+  "fonts": "egui bundled Hack, Ubuntu Light and framework icon font; unmodified licensed dependencies. No Office/VBE fonts or artwork extracted. Fonts remain in upstream dependency packages; only required redistributable notices are copied here.",
+  "notices": [
+    {
+      "path": "licenses/fonts/Hack-Regular.txt",
+      "sha256": "47c0cccbeec7e8614548cc485588b28149e7874188df5f41b36efebcee285c87"
+    },
+    {
+      "path": "licenses/fonts/UFL.txt",
+      "sha256": "2f0015108d68627bd788d313f529c21ff4da2c2c42a5e1f3883acc83480f9002"
+    },
+    {
+      "path": "licenses/fonts/emoji-icon-font-mit-license.txt",
+      "sha256": "b9d2c1d909aa149996fd4c91dcb92b2362a04431640c1d200959da94caf8cde1"
+    }
+  ]
+}

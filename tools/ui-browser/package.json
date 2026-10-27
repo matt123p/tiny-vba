@@ -1,0 +1,1 @@
+{"name":"tiny-vba-browser-harness","private":true,"version":"0.1.0","description":"Maintenance-only local browser UI smoke harness","engines":{"node":">=20"},"devDependencies":{"playwright":"1.64.1"},"scripts":{"test":"node smoke.cjs"}}

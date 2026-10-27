@@ -46,3 +46,13 @@ Validation must run from the intended checkout: xtask now discovers its runtime 
 to a different clone in a shared build cache. The cross-checkout integration test covers this case;
 wasm-run also honors CARGO_TARGET_DIR when finding the built artifact. Current execution uses
 m4-scalars-v1; recompile legacy M3 programs instead of relabeling their verification target.
+
+## Editor/debugger development
+
+Use [the M8 embedding/harness guide](ui/embedding.md). `cargo xtask ui` runs toolkit-independent,
+interaction, embedding and source-IO tests and generates original paused-session snapshots.
+`cargo xtask ui-native` needs a native display (or Xvfb on Linux); `cargo xtask web` needs
+wasm-bindgen-cli 0.2.126. The browser smoke uses the separately locked maintenance-only Playwright
+tool. Engine/IDE-model builds have no GUI dependencies. See the acceptance report for exact tested
+surfaces and broader product/fork gates. Keep downloaded references only in `.cache/evidence/`;
+track provenance observations/hashes and licensed redistribution notices, not reference copies.

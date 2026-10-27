@@ -11,6 +11,7 @@ publish = false
 workspace = true
 
 [dependencies]
+vba-ide.workspace = true
 vba-diagnostics.workspace = true
 vba-conformance.workspace = true
 vba-syntax.workspace = true

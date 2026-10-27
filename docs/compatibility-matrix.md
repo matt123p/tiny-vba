@@ -1,6 +1,6 @@
 # Compatibility matrix
 
-Updated 2026-10-27. Stage: M4 external acceptance complete; M5 native host contract and M6 source decoding implemented. **The documented m5-host-v1 consumer, including M3 control, M4 scalar widths and IR 4 host roots, has execution evidence; the 44 authored and 153 reviewed fixtures remain asserted 197 PASS / 0 UNSUPPORTED.**
+Updated 2026-10-27. Stage: M4 external acceptance complete; M5–M7 in-repo contracts and M8 standalone/embeddable UI gate implemented. **The documented m5-host-v1 consumer, including M3 control, M4 scalar widths and IR 4 host roots, has execution evidence; the 44 authored and 153 reviewed fixtures remain asserted 197 PASS / 0 UNSUPPORTED.**
 
 | Dimension | Status | Evidence / next gate |
 |---|---|---|
@@ -26,7 +26,8 @@ Updated 2026-10-27. Stage: M4 external acceptance complete; M5 native host contr
 | Versioned native host protocol and source imports (M5) | Implemented M5 contract | `vba_foreign::check_protocol` refuses foreign protocol versions before dispatch (crates/vba-foreign/tests/protocol.rs); `Import`/`validate_imports` bound names to hidden IR 4 host-root slots (crates/vba-compiler/tests/compiler.rs); missing/mismatched/stale roots refuse launch or surface host error 91 without a second write (crates/vba-vm/tests/host.rs, tests/embedding.rs); [ADR 0013](decisions/0013-m5-host-contract.md) |
 | Reusable bridge driver for forks (M5) | Implemented generic proof | vba-testkit `run_to_boundary`/`statement`; vba-vm/tests/embedding.rs proves break/edit/resume over an imported root with exactly one dispatch. Real workbook FillCells, undo/recalc and permissions stay fork-owned |
 | Bounded generic callbacks, static reset, lifecycle cleanup (M7) | Implemented M7 contract | `schedule_callback`/`run_next_callback`/`reset_state`/`rebind_roots` with native/WASI drain, budget, non-reentrancy, permanent closure and entry-restart tests in crates/vba-vm/tests/callbacks.rs; [ADR 0015](decisions/0015-m7-callbacks-and-lifecycle.md); fork-owned event order stays in the forks |
-| Breakpoints, stepping, local inspect/edit/resume | Implemented M3 headless API | vba-vm execution tests with vba-debug controller; no graphical UI/DAP |
+| Breakpoints, stepping, local inspect/edit/resume | Headless API plus M8 native/web UI and CLI | VM/controller tests plus model, keyboard/pointer, embedding and native/browser capture evidence; DAP remains unavailable |
+| Classic editor/debugger panels | Implemented M8 repository gate | [Surface matrix and explicit broader-spec limitations](ui/m8-acceptance.md); independent host themes, source/inspection lifetimes and bounded execution |
 | Native / WASM execution | Implemented M3 smoke | cargo xtask wasm-run; identical typed results, pause/edit/host counts and cancellation |
 | Replacement-session isolation | Implemented M3 correction | recycled-client-ID regression in VM tests and native/WASI smoke; [ADR 0008](decisions/0008-vm-instance-isolation.md) |
 | MS-OVBA source decoding | Implemented M6 bounded profile | [Import contract](project-import.md), [ADR 0014](decisions/0014-m6-project-decoding.md), 14 native/WASI tests; controlled authored projects only; package/trust/preservation gates stay fork-owned |
@@ -36,7 +37,7 @@ Updated 2026-10-27. Stage: M4 external acceptance complete; M5 native host contr
 | COM, DLLs, UserForms, P-code and binary source writing | Deferred / outside MVP | Separate design required |
 
 M3 execution evidence is restricted to its explicit tests/examples and runtime matrix. It does not establish
-workbook/Office compatibility, browser UI behavior or external corpus pass rates; self-authored
+workbook/Office compatibility, physical-device fidelity or unselected external corpus pass rates; self-authored
 M0 assertions are 20 PASS / 0 UNSUPPORTED and external corpus execution remains NOT_RUN.
 
 ## Current M4 external acceptance

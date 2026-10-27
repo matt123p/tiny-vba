@@ -1,6 +1,6 @@
 # Debugger design contract
 
-Status: M3 headless VM/controller implemented, 2026-10-26. See [runtime APIs, tests and limitations](runtime.md). DAP and the graphical editor/debugger remain planned.
+Status: M3 headless VM/controller implemented, 2026-10-26. See [runtime APIs, tests and limitations](runtime.md). M8 now supplies [the reusable graphical editor/debugger and CLI](ui/embedding.md); DAP remains optional/unimplemented.
 
 The reusable graphical editor/debugger and standalone IDE belong in tiny-vba. They are required
 product work under [ADR 0002](decisions/0002-editor-debugger-ui.md) and the

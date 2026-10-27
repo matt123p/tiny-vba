@@ -67,3 +67,15 @@ Read [the report](../../../docs/m4-oracle-report.md) and current language contra
 plus 153 inherited upstream-reported Excel Mac scenarios PASS. Schema 2 and the reviewed allowlist
 preserve raw results/environment/hashes; no fresh Office run is claimed. Use m5-host-v1
 and explicit IR 3/4 capabilities, retaining IR 1/2 refusal rules. Unselected external cases remain NOT_RUN.
+
+## Implemented M8 editor/debugger
+
+Read [ADR 0016](../../../docs/decisions/0016-m8-embeddable-editor.md), the
+[embedding/harness guide](../../../docs/ui/embedding.md) and
+[acceptance matrix](../../../docs/ui/m8-acceptance.md). vba-ide is toolkit/IO-free; vba-ui-egui
+mounts in caller Ui with injected tokens, independent per-view IDs and explicit commands;
+vba-ide-app owns native/web IO and preferences. Run cargo xtask ui, ui-native and web plus ordinary
+CI/WASM gates for affected UI changes. Keep accessibility checks enabled; render/inspect original
+light/dark/narrow/scaled/host-theme/focus output. No downloaded reference evidence enters Git:
+.cache/evidence/ is ignored and provenance/notices/pins are verified. Do not claim full C0/C1,
+Office event/workbook, Set Next Statement or unsafe evaluation support from standalone UI evidence.

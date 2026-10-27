@@ -446,3 +446,39 @@ fn inherited_microsoft_oracle_allowlist_passes_without_submodules_or_office()
     assert_eq!(count, 153);
     Ok(())
 }
+
+#[test]
+fn m8_scripted_debugger_breaks_edits_steps_and_resumes() -> Result<(), Box<dyn std::error::Error>> {
+    let root = std::env::temp_dir();
+    let id = std::process::id();
+    let source = root.join(format!("vba-cli-debug-{id}.bas"));
+    let script = root.join(format!("vba-cli-debug-{id}.txt"));
+    std::fs::write(
+        &source,
+        "Sub Main()\nDim counter As Long\ncounter = 4\nDebug.Print counter\nEnd Sub\n",
+    )?;
+    std::fs::write(
+        &script,
+        "break 4\nrun\nlocals\nprint counter\nset counter = 8\ncontinue\nquit\n",
+    )?;
+    let output = Command::new(env!("CARGO_BIN_EXE_vba-cli"))
+        .arg("debug")
+        .arg(&source)
+        .arg("--entry")
+        .arg("Main")
+        .arg("--script")
+        .arg(&script)
+        .output()?;
+    std::fs::remove_file(source)?;
+    std::fs::remove_file(script)?;
+    assert!(
+        output.status.success(),
+        "{}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    let text = String::from_utf8(output.stdout)?;
+    assert!(text.contains("STATE Break"));
+    assert!(text.contains("VALUE 4"));
+    assert!(text.contains("OUTPUT 8"));
+    Ok(())
+}

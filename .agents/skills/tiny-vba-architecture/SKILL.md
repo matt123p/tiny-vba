@@ -96,3 +96,15 @@ UTF-8 attribute spans and code names distinct from stream/display names. Preserv
 corrupt/unsupported/protected/limit refusals and container/decompression work caps. cfb/encoding_rs
 are reviewed pinned external dependencies; package preservation and trust UX remain fork-owned.
 The 14 controlled importer tests run natively and under WASI through cargo xtask wasm-run.
+
+## Implemented M8 editor/debugger
+
+Read [ADR 0016](../../../docs/decisions/0016-m8-embeddable-editor.md), the
+[embedding/harness guide](../../../docs/ui/embedding.md) and
+[acceptance matrix](../../../docs/ui/m8-acceptance.md). vba-ide is toolkit/IO-free; vba-ui-egui
+mounts in caller Ui with injected tokens, independent per-view IDs and explicit commands;
+vba-ide-app owns native/web IO and preferences. Run cargo xtask ui, ui-native and web plus ordinary
+CI/WASM gates for affected UI changes. Keep accessibility checks enabled; render/inspect original
+light/dark/narrow/scaled/host-theme/focus output. No downloaded reference evidence enters Git:
+.cache/evidence/ is ignored and provenance/notices/pins are verified. Do not claim full C0/C1,
+Office event/workbook, Set Next Statement or unsafe evaluation support from standalone UI evidence.

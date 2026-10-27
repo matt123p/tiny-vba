@@ -1,5 +1,6 @@
 //! Standalone frontend: help/version, parsing, fixture validation and typed scenario runs.
 #![forbid(unsafe_code)]
+mod debugger;
 use std::{fs::File, io::Read, process::ExitCode};
 use vba_conformance::{MAX_SCENARIO_BYTES, Scenario, Status, describe_value};
 use vba_diagnostics::{Diagnostic, SourceFile, SourceId};
@@ -306,12 +307,12 @@ fn main() -> ExitCode {
     match args.next().as_deref() {
         None | Some("--help" | "-h" | "help") => {
             println!(
-                "tiny-vba: standalone VBA interpreter scaffold\n\nUsage: vba-cli <command> [options]\n\nImplemented: --help, --version, conformance validate|run <scenario>, parse <source.bas|source.cls>\nM2: check|compile|disasm <source.bas> [--entry <name>]\nM3: run <source.bas> [--entry <name>]\nPlanned commands: debug, dap, inspect-project\nrun executes the m4-scalars-v1 subset. conformance run executes a validated fixture and compares its typed expectation (MISMATCH/CRASH/TIMEOUT exit 1; INVALID_FIXTURE exits 2; PASS/UNSUPPORTED exit 0). Unsupported forms and targets fail with exit 2. Fixture validation does not execute scenarios."
+                "tiny-vba: VBA interpreter and debugger\n\nUsage: vba-cli <command> [options]\n\nImplemented: --help, --version, conformance validate|run <scenario>, parse <source.bas|source.cls>\nM2: check|compile|disasm <source.bas> [--entry <name>]\nM3: run <source.bas> [--entry <name>]\nM8: debug <source.bas> [--entry <name>] [--script <commands.txt>]\nPlanned commands: dap, inspect-project\nrun executes the m5-host-v1 profile. conformance run executes a validated fixture and compares its typed expectation (MISMATCH/CRASH/TIMEOUT exit 1; INVALID_FIXTURE exits 2; PASS/UNSUPPORTED exit 0). Unsupported forms and targets fail with exit 2. Fixture validation does not execute scenarios."
             );
             ExitCode::SUCCESS
         }
         Some("--version" | "-V") => {
-            println!("vba-cli {} (M4)", env!("CARGO_PKG_VERSION"));
+            println!("vba-cli {} (M8)", env!("CARGO_PKG_VERSION"));
             ExitCode::SUCCESS
         }
         Some("parse") => {
@@ -392,7 +393,14 @@ fn main() -> ExitCode {
                 None => ExitCode::from(2),
             }
         }
-        Some(command @ ("debug" | "dap" | "inspect-project")) => {
+        Some("debug") => match debugger::run(args.collect()) {
+            Ok(()) => ExitCode::SUCCESS,
+            Err(error) => {
+                eprintln!("{error}");
+                ExitCode::from(2)
+            }
+        },
+        Some(command @ ("dap" | "inspect-project")) => {
             eprintln!("{}", Diagnostic::unsupported(command));
             ExitCode::from(2)
         }

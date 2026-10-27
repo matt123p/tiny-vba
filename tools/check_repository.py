@@ -67,7 +67,20 @@ def layers():
 
     for name in actual:
         visit(name)
-    print(f'layers: {len(actual)} crates, acyclic, no Office/application/UI dependencies')
+    # UI/platform dependencies may occur only above the toolkit-independent model.
+    for root in ['vba-vm', 'vba-debug', 'vba-compiler', 'vba-ide', 'vba-project']:
+        pending, seen = [root], set()
+        while pending:
+            name = pending.pop()
+            if name in seen:
+                continue
+            seen.add(name)
+            if name in {'egui', 'eframe', 'vba-ui-egui', 'vba-ide-app', 'image', 'web-sys'}:
+                raise ValueError(f'{root}: UI/platform dependency crossed the headless boundary')
+            pending.extend(actual.get(name, []))
+    from check_ui_provenance import check
+    check()
+    print(f'layers: {len(actual)} crates, acyclic; engine/IDE model remain headless; UI above model')
 
 
 def corpora(require_checkouts):

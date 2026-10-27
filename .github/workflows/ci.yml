@@ -43,3 +43,34 @@ jobs:
           python-version: "3.12"
       - name: Verify pins, notices and fixture hashes; never execute macros
         run: python3 tools/check_repository.py corpora --require-checkouts
+  ui:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - name: Native and software-renderer dependencies
+        run: sudo apt-get update && sudo apt-get install -y xvfb xauth libxkbcommon-dev libxkbcommon-x11-0 libwayland-dev libegl1-mesa-dev mesa-vulkan-drivers
+      - name: Model, keyboard, accessibility, layout and original snapshots
+        run: cargo xtask ui
+      - name: Run and capture the native standalone UI
+        run: xvfb-run -a cargo xtask ui-native
+      - name: Build browser harness
+        run: |
+          rustup target add wasm32-unknown-unknown
+          cargo install wasm-bindgen-cli --version 0.2.126 --locked
+          cargo xtask web
+          npm ci --prefix tools/ui-browser
+          cd tools/ui-browser
+          npx playwright install --with-deps chromium
+      - name: Browser debugger interaction
+        run: npm test --prefix tools/ui-browser
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: original-vba-ui-snapshots
+          path: reports/ui/

@@ -3,9 +3,10 @@
 Status: M0–M4 complete for the documented [M4 language profile](m4-language.md), with
 verified IR 1/2/3/4 and explicit-frame execution; the M5 native host contract is implemented
 ([ADR 0013](decisions/0013-m5-host-contract.md)). M6 read-only project decoding is implemented
-([ADR 0014](decisions/0014-m6-project-decoding.md)); graphical IDE and fork-owned workbook integration remain later gates.
+([ADR 0014](decisions/0014-m6-project-decoding.md)); M8's reusable graphical IDE and native/web shells are implemented under
+[ADR 0016](decisions/0016-m8-embeddable-editor.md). Fork-owned workbook integration remains a separate gate.
 
-The current scaffold and future headless engine can compile and test without Office, UI toolkits,
+The engine and toolkit-independent IDE model compile and test without Office, UI toolkits,
 application forks or corpus downloads. This repository also owns an optional editor/debugger UI
 and standalone IDE; those upper layers may depend on UI toolkits.
 VBA source flows through syntax → semantics → verified IR → explicit-state VM.
@@ -35,7 +36,10 @@ See the [M2 compiler contract](compiler.md) for supported source, API and struct
 | vba-testkit | Deterministic generic foreign host, trace support and bounded embedding driver | debug, diagnostics, foreign, ir, values, vm |
 | vba-conformance | Scenario validation, typed expectations and M4 outcome judgment; comparison/reports later | diagnostics, testkit, values, vm |
 | vba-cli | Source parsing, compilation/disassembly/execution and fixture validation | conformance, diagnostics, syntax, compiler, ir, values, vm |
-| xtask | Maintenance commands | none |
+| vba-ide | Toolkit-independent source buffers, commands, compiler/debug-session orchestration and safe watches | compiler, debug, diagnostics, foreign, ir, runtime, syntax, values, vm |
+| vba-ui-egui | Reusable Classic editor/debugger rendering; explicit commands and scoped theme/IDs | ide, egui |
+| vba-ide-app | Native/browser shell, source IO, preferences and capture harness | ide, ui-egui, eframe; image native-only, wasm-bindgen/futures/web-sys browser-only |
+| xtask | Maintenance/build/render commands | none |
 
 Some dependencies still reserve boundaries. DAP remains a scaffold; project implements [M6 source decoding](project-import.md). Runtime, VM and debug implement the [M3 contract](runtime.md); semantics/compiler/IR implement M2 with generic member lowering added at M3.
 Syntax implements the bounded lexer/parser described in [frontend](frontend.md) and
@@ -74,17 +78,18 @@ Inspection hooks and statement safe points belong to VM; debug controls them, DA
 
 `vba-project` consumes project bytes/source and returns module metadata. It does not own OOXML import/export,
 project trust or macro attachment. P-code, protected-project bypass and binary source writeback are excluded.
-The scaffold has no platform-specific library dependencies. `cargo xtask wasm` compiles all libraries for
-wasm32-unknown-unknown; runtime WASM tests will be added when execution exists.
+Platform facilities stay in vba-ide-app/eframe. `cargo xtask wasm` compiles every library for
+wasm32-unknown-unknown; `wasm-run` executes language, import, callback and headless IDE acceptance
+under WASI. `web` packages the actual browser UI; Chromium exercises its debugger keyboard path.
 
-## Planned editor/debugger UI layers
+## Implemented M8 editor/debugger layers
 
 Adopted scope: [ADR 0002](decisions/0002-editor-debugger-ui.md). Product contract:
-[editor/debugger UI](editor-debugger-ui.md). These packages are planned, not implemented:
+[editor/debugger UI](editor-debugger-ui.md). Implemented under [ADR 0016](decisions/0016-m8-embeddable-editor.md):
 
 | Package | Responsibility | Allowed direction |
 |---|---|---|
-| vba-ide | Toolkit-independent editor/project/session state and actions | diagnostics, syntax/semantics, debug, project; no UI toolkit or Office types |
+| vba-ide | Toolkit-independent editor/project/session state and actions | compiler, debug, diagnostics, foreign, IR, runtime, syntax, values, VM; no toolkit/IO |
 | vba-ui-egui | Embeddable editor/debugger panels | ide, egui and compatible UI support; no Gridcraft/Wordcraft dependency |
 | vba-ide-app | Standalone native/web application shell | ui-egui, ide; eframe/platform facilities at this layer |
 
@@ -93,9 +98,11 @@ The core, VM and debugger controller never depend on these packages. The embedde
 a caller-owned egui context and style; it must not replace global fonts, theme or window settings.
 Native debugging uses in-process Rust APIs; DAP remains an optional adapter for external editors.
 
-Keep tools/architecture.json as the graph of actual Cargo packages. Add these nodes and reviewed
-external dependencies when their implementation lands; do not add placeholder APIs or manifests.
-Headless and UI checks must be separate so engine consumers do not pull GUI dependencies.
+The 19-node graph includes these real packages and reviewed external dependencies. Layers checks
+reject upward GUI/platform edges from engine/IDE model. An EditorUi owns an independent widget
+namespace so multiple documents can share a context. Headless and rendered/browser checks remain
+separate. [Embedding instructions](ui/embedding.md) and [acceptance status](ui/m8-acceptance.md)
+record actual support, commands and remaining broader-spec/fork-owned gates.
 
 M4's execution profile was m4-conformance-v1 (ADR 0012), distinct from the historical M3 matrix;
 the current consumer is m5-host-v1 (ADR 0013), which preserves the M4 scalar/array/handler matrix.

@@ -6,7 +6,7 @@ description: Build or review the tiny-vba VBA editor and graphical debugger, inc
 # Editor and debugger UI design
 
 Read [UI contract](../../../docs/editor-debugger-ui.md),
-[UI ownership ADR](../../../docs/decisions/0002-editor-debugger-ui.md) and the planned UI layers in
+[UI ownership ADR](../../../docs/decisions/0002-editor-debugger-ui.md) and the implemented UI layers in
 [architecture](../../../docs/architecture.md). This repository owns both reusable panels and a
 standalone native/web IDE; do not delegate the editor/debugger implementation to application forks.
 
@@ -43,3 +43,15 @@ an injected host theme as well as standalone defaults. Exercise keyboard actions
 labels. Test the real edit/run/break/step/inspect/resume workflow when implemented, native and browser
 behaviour, and headless builds without GUI dependencies. Report visual evidence and any untested host
 embedding; screenshots of placeholder state are not debugger execution evidence.
+
+## Implemented M8 editor/debugger
+
+Read [ADR 0016](../../../docs/decisions/0016-m8-embeddable-editor.md), the
+[embedding/harness guide](../../../docs/ui/embedding.md) and
+[acceptance matrix](../../../docs/ui/m8-acceptance.md). vba-ide is toolkit/IO-free; vba-ui-egui
+mounts in caller Ui with injected tokens, independent per-view IDs and explicit commands;
+vba-ide-app owns native/web IO and preferences. Run cargo xtask ui, ui-native and web plus ordinary
+CI/WASM gates for affected UI changes. Keep accessibility checks enabled; render/inspect original
+light/dark/narrow/scaled/host-theme/focus output. No downloaded reference evidence enters Git:
+.cache/evidence/ is ignored and provenance/notices/pins are verified. Do not claim full C0/C1,
+Office event/workbook, Set Next Statement or unsafe evaluation support from standalone UI evidence.

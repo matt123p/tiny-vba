@@ -1,0 +1,18 @@
+[package]
+name = "vba-ui-egui"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+publish = false
+
+[lints]
+workspace = true
+
+[dependencies]
+egui.workspace = true
+vba-ide.workspace = true
+
+[dev-dependencies]
+egui_kittest.workspace = true

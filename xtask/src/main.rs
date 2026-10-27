@@ -112,6 +112,93 @@ fn run() -> Result<(), Box<dyn Error>> {
                     &import_runner,
                 ],
             )?;
+            command(
+                "cargo",
+                &[
+                    "test",
+                    "-p",
+                    "vba-ide",
+                    "--locked",
+                    "--target",
+                    "wasm32-wasip1",
+                    "--config",
+                    &import_runner,
+                ],
+            )?;
+        }
+        Some("ui") => {
+            command(
+                "cargo",
+                &[
+                    "test",
+                    "-p",
+                    "vba-ide",
+                    "-p",
+                    "vba-ui-egui",
+                    "-p",
+                    "vba-ide-app",
+                    "--locked",
+                ],
+            )?;
+            command(
+                "cargo",
+                &[
+                    "run",
+                    "-p",
+                    "vba-ui-egui",
+                    "--example",
+                    "snapshots",
+                    "--locked",
+                ],
+            )?;
+        }
+        Some("ui-native") => {
+            command(
+                "cargo",
+                &[
+                    "run",
+                    "-p",
+                    "vba-ide-app",
+                    "--locked",
+                    "--",
+                    "--capture",
+                    "reports/ui/native-paused.png",
+                ],
+            )?;
+        }
+        Some("web") => {
+            command(
+                "cargo",
+                &[
+                    "build",
+                    "-p",
+                    "vba-ide-app",
+                    "--lib",
+                    "--locked",
+                    "--target",
+                    "wasm32-unknown-unknown",
+                ],
+            )?;
+            let target = std::env::var_os("CARGO_TARGET_DIR")
+                .map(PathBuf::from)
+                .unwrap_or_else(|| root.join("target"));
+            let artifact = target.join("wasm32-unknown-unknown/debug/vba_ide_app.wasm");
+            let artifact = artifact
+                .to_str()
+                .ok_or_else(|| io::Error::other("non-UTF-8 WASM artifact path"))?;
+            std::fs::create_dir_all("dist/ui")?;
+            std::fs::copy("apps/vba-ide-app/web/index.html", "dist/ui/index.html")?;
+            command(
+                "wasm-bindgen",
+                &[
+                    "--target",
+                    "web",
+                    "--out-dir",
+                    "dist/ui/pkg",
+                    "--no-typescript",
+                    artifact,
+                ],
+            )?;
         }
         Some("layers") => command("python3", &["tools/check_repository.py", "layers"])?,
         Some("corpora") => command("python3", &["tools/check_repository.py", "corpora"])?,
@@ -127,9 +214,10 @@ fn run() -> Result<(), Box<dyn Error>> {
             ],
         )?,
         _ => {
-            return Err(
-                io::Error::other("usage: cargo xtask <ci|layers|corpora|wasm|wasm-run>").into(),
-            );
+            return Err(io::Error::other(
+                "usage: cargo xtask <ci|layers|corpora|wasm|wasm-run|ui|ui-native|web>",
+            )
+            .into());
         }
     }
     Ok(())

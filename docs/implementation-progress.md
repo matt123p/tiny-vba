@@ -1,9 +1,51 @@
 # Implementation progress
 
-Updated 2026-10-27. Current stage: **M7 bounded generic callbacks and lifecycle complete** on top
-of M6 read-only project decoding. The runtime profile remains m5-host-v1 with verified IR 1/2/3/4.
-The required M8 graphical IDE remains next; real workbook integration, event order and
-package/trust/preservation evidence stay fork-owned.
+Updated 2026-10-27. Current stage: **M8 repository editor/debugger gate complete**. The runtime
+profile remains m5-host-v1 with verified IR 1/2/3/4. M9 conformance/release work is next. Real
+workbook integration, event order and package/trust/preservation evidence remain fork-owned.
+
+## M8 reusable editor/debugger and standalone harnesses
+
+Implemented [ADR 0016](decisions/0016-m8-embeddable-editor.md) following the user-supplied
+[public-source UI specification](ui/craft_vba_editor_debugger_ui_spec.md) and the
+[implementation plan written before code](ui/m8-implementation-plan.md). `vba-ide` owns toolkit/IO-free
+source state, compilation, command metadata and real debugger sessions; `vba-ui-egui` mounts the
+Classic shell/panes in a caller-owned Ui; `vba-ide-app` owns native/browser source transfer,
+preferences and window lifecycle. `vba-cli debug` uses the same model and accepts command scripts.
+No application sibling is a dependency. The 19-node DAG enforces GUI/platform boundaries.
+
+Delivered source editing/navigation, lexer colours, undo, bounded find/replace, actual statement
+breakpoints/highlighting, bounded run/pause/continue/reset, nested into/over/out stepping, selected
+stack/local inspection, validated active-frame edits, safe expression watches/Immediate and output.
+Generic-host embedding tests prove one native write through break/edit/resume, exactly-once waits
+and cancellation without rollback. Edited compiled source requires reset/recompile; invalid,
+stale/out-of-scope and unsafe evaluation states remain explicit. Multiple views have independent
+widget namespaces; injected themes never replace global context visuals/fonts/scaling.
+
+Validation from this checkout: `cargo xtask ci` passes **219 workspace tests**, formatting, strict
+all-target Clippy, the reviewed 19-node DAG, seven source pins/646 candidate hashes, M4 evidence and
+UI cache/provenance/pin/font-notice checks. The 42 added tests comprise **25 IDE/embedding**, **12 UI
+interaction/accessibility/layout**, **4 shell source-IO** and **1 scripted CLI debugger** regressions.
+All 197 authored/reviewed language fixtures retain PASS. `cargo xtask wasm` compiles every library;
+`cargo xtask wasm-run` passes native/WASI language/host/debugger smoke plus the 14 importer,
+17 callback and 25 headless IDE/embedding tests. `cargo xtask ui` passes product tests and renders
+seven original actual-paused-state PNG variants. The native eframe app runs/captures under Xvfb;
+the Chromium harness verifies F8 Break, F5 Completed, output 10 and no page errors. Browser packaging
+uses `cargo xtask web` and matching wasm-bindgen-cli 0.2.126. `git diff --check` passes.
+
+Visual review covered light/dark, narrow, scaled, injected host theme, focused Immediate and dark
+Object Browser output and corrected glyph availability, selector naming, header clipping,
+per-document IDs and debugger presentation. Generated product images remain ignored in `reports/ui/`.
+Downloaded public reference pages remain ignored in `.cache/evidence/vbe/`; only public URL/date/hash
+observations and licensed redistribution notices are tracked. No proprietary/VBE clone code,
+resource extraction, reference screenshots or Office installation was used. This does not establish
+pixel identity, full C0/C1 feature coverage, another operating system or real workbook integration.
+See [the explicit feature/acceptance matrix](ui/m8-acceptance.md) and [embedding guide](ui/embedding.md).
+
+Next smallest task: M9 conformance/release work; separately wire these reusable panels into a fork's
+real document lifecycle and verify workbook effects/undo/recalc/events without duplicating the UI.
+Broader product-spec features (UserForms, Set Next Statement, conditional watches, split/procedure
+views and full metadata-backed IntelliSense) remain recorded rather than simulated.
 
 ## M7 bounded generic callbacks and lifecycle
 

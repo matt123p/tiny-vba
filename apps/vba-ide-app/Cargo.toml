@@ -1,0 +1,27 @@
+[package]
+name = "vba-ide-app"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+publish = false
+
+[lints]
+workspace = true
+
+[dependencies]
+eframe.workspace = true
+vba-ide.workspace = true
+vba-ui-egui.workspace = true
+
+[target.'cfg(target_arch = "wasm32")'.dependencies]
+wasm-bindgen.workspace = true
+wasm-bindgen-futures.workspace = true
+web-sys.workspace = true
+
+[target.'cfg(not(target_arch = "wasm32"))'.dependencies]
+image.workspace = true
+
+[lib]
+crate-type = ["cdylib", "rlib"]

@@ -1,6 +1,9 @@
 # Editor and debugger UI contract
 
-Status: required and planned, 2026-10-26. No UI implementation exists yet.
+Status: M8 repository editor/debugger implemented, 2026-10-27. See
+[ADR 0016](decisions/0016-m8-embeddable-editor.md), [embedding/running](ui/embedding.md),
+[acceptance and remaining broader-spec features](ui/m8-acceptance.md) and the supplied
+[public-source specification](ui/craft_vba_editor_debugger_ui_spec.md).
 Ownership: [ADR 0002](decisions/0002-editor-debugger-ui.md).
 
 ## Product and ownership
@@ -82,5 +85,7 @@ expressions obey the execution capability policy. No mutable host borrow survive
    Verify theme/shortcut integration, recalc, undo policy and cleanup without duplicate writes.
 
 Steps 1–4 belong to tiny-vba; step 5 belongs to the Gridcraft integration. A CLI or DAP demonstration
-alone does not satisfy the visual UI acceptance gate. Current packages and tools/architecture.json
-remain the scaffold until implementation lands; planned package names are recorded in architecture.md.
+alone does not satisfy the visual UI acceptance gate. The implemented packages and reviewed DAG
+now cover native/web panels, explicit command routing and real VM-backed test harnesses. The
+acceptance report records verified local results and limitations; fork workbook integration and
+full C0/C1 coverage of the newer product specification remain separate.

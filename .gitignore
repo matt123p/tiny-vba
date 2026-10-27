@@ -33,3 +33,7 @@ Desktop.ini
 __pycache__/
 *.py[cod]
 .venv/
+
+# Downloaded UI reference evidence: provenance is tracked, source copies are not.
+/.cache/
+/tools/ui-browser/node_modules/

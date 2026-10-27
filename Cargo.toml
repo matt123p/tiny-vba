@@ -25,6 +25,30 @@ vba-dap = { path = "crates/vba-dap" }
 vba-project = { path = "crates/vba-project" }
 vba-testkit = { path = "crates/vba-testkit" }
 vba-conformance = { path = "crates/vba-conformance" }
+vba-ide = { path = "crates/vba-ide" }
+vba-ui-egui = { path = "crates/vba-ui-egui" }
+egui = { version = "=0.37.0", features = ["default_fonts"] }
+eframe = { version = "=0.37.0", default-features = false, features = ["default_fonts", "glow", "x11", "wayland", "accesskit", "clipboard", "persistence"] }
+egui_kittest = { version = "=0.37.0", features = ["wgpu", "snapshot"] }
+image = { version = "=0.25.10", default-features = false, features = ["png"] }
+wasm-bindgen = "=0.2.126"
+wasm-bindgen-futures = "=0.4.76"
+web-sys = { version = "=0.3.103", features = ["Document", "Window", "HtmlCanvasElement", "Element"] }
+
+# Same egui API family and reviewed fork as the embedding applications (ADR 0016).
+[patch.crates-io]
+ecolor = { git = "https://github.com/storytold/egui.git", rev = "6d518fc799681571963842f95b55a6b68431b15a" }
+emath = { git = "https://github.com/storytold/egui.git", rev = "6d518fc799681571963842f95b55a6b68431b15a" }
+epaint = { git = "https://github.com/storytold/egui.git", rev = "6d518fc799681571963842f95b55a6b68431b15a" }
+epaint_default_fonts = { git = "https://github.com/storytold/egui.git", rev = "6d518fc799681571963842f95b55a6b68431b15a" }
+egui = { git = "https://github.com/storytold/egui.git", rev = "6d518fc799681571963842f95b55a6b68431b15a" }
+egui-winit = { git = "https://github.com/storytold/egui.git", rev = "6d518fc799681571963842f95b55a6b68431b15a" }
+egui-wgpu = { git = "https://github.com/storytold/egui.git", rev = "6d518fc799681571963842f95b55a6b68431b15a" }
+egui_glow = { git = "https://github.com/storytold/egui.git", rev = "6d518fc799681571963842f95b55a6b68431b15a" }
+egui_kittest = { git = "https://github.com/storytold/egui.git", rev = "6d518fc799681571963842f95b55a6b68431b15a" }
+eframe = { git = "https://github.com/storytold/egui.git", rev = "6d518fc799681571963842f95b55a6b68431b15a" }
+
+winit = { git = "https://github.com/storytold/winit.git", rev = "a517b3846ee8457d84ee4975110bfda6797c44dc" }
 
 [workspace.lints.rust]
 unsafe_code = "forbid"
