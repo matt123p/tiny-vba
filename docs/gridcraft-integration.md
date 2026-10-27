@@ -4,6 +4,47 @@ Started 2026-10-27. This is the interruption/resumption record for the user-requ
 integration. Interpreter and shared IDE remain in tiny-vba; Excel objects and the
 adapter belong in GridCraft. WordCraft can consume the same tiny-vba revision.
 
+## Continuation stage — native typed writes complete
+
+User requested continuation after the committed baseline. Continue on the same
+feature branches; starting GridCraft revision is `421a6a4c` and both trees were clean.
+
+Committed in GridCraft as `8168bda4c7aa7422d96e01fcf88950233f0b1736`.
+The native `CellContent`/`Session::set_range_contents` API and equivalent
+`range.setContents` command share the original engine command/edit lifecycle.
+VBA now supports Text-format (`@`) literal/formula/CVErr writes, preserving formats;
+serde_json is a test-only direct dependency of the adapter. The shared interpreter
+and pinned dependency revision are unchanged.
+
+Validation: full GridCraft CI passes all ten gates and 2,540 tests; five new engine
+tests pass; all 15 adapter tests pass natively and in JavaScript-hosted WASM; all
+eight editor/control cases, strict optional-feature Clippy and browser compilation
+pass. tiny-vba CI, WASM and WASI gates pass. Logs are in the owning repositories'
+ignored `target/typed-contents-*` files. Native/wire replay, atomic refusal,
+protection, undo/recalc, invalid coordinates/types, Unicode/formula/payload limits
+and Text-format storage are covered. GridCraft `docs/native-cell-contents.md`
+specifies the API. Remaining object lifecycle/events/form work is unchanged.
+
+Plan recorded before implementation:
+
+1. Add a generic engine-owned `range.setContents` command and native
+   `Session::set_range_contents` API accepting bounded row-major scalar values or
+   explicit formulas. Preserve destination formats, literal strings, Empty and
+   cell errors; explicit formulas must work in Text-formatted cells.
+2. Reuse the existing command execution lifecycle for native calls: shared
+   enabled/panic recovery/history/groups/recording/journal behavior. Serialize only
+   the recorded command envelope; the native mutation path must not decode JSON.
+   Keep the existing `range.setValues` typed-input behavior unchanged.
+3. Route the VBA adapter's conversion through that API and remove the `@` refusal.
+   Keep VBA tags until the worksheet-storage conversion boundary. No new tiny-vba
+   dependency or shared-protocol revision is needed.
+4. Prove native/JSON-command equivalence, recording replay, exact literal/error
+   contents, format preservation, formula recalculation, atomic error/protection
+   refusal, budgets, undo/redo and VBA break/edit/resume, natively and JavaScript/WASM.
+5. Run affected and complete gates, update scope/evidence and commit the stage.
+
+Remaining broader object-model/events/WordCraft stages are unchanged.
+
 ## Final baseline checkpoint — 2026-10-27
 
 The requested GridCraft baseline is implemented and committed. This section is

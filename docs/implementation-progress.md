@@ -21,6 +21,12 @@ actual-paused-state snapshots were rendered and inspected. The fork's full gate,
 exact commands, remaining profile limits and resumption state are recorded in
 the work log. Broader M14/WordCraft/events/forms/signatures are still planned.
 
+Continuation stage completed in GridCraft commit `8168bda4`: native typed cell
+contents share the engine command/edit lifecycle, replacing JSON mutation dispatch
+and removing the Text-format (`@`) write restriction. All 2,540 GridCraft gate
+tests, five targeted engine cases, 15 native/JavaScript-WASM adapter cases and
+eight editor/control cases pass. Shared tiny-vba code and its Git pin are unchanged.
+
 ## Post-M8 milestone allocation
 
 On 2026-10-27, assigned the remaining UI specification work to explicit **planned** milestones
