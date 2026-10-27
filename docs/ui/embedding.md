@@ -123,7 +123,7 @@ Reset clears the invocation/project state. Host identity changes prevent state t
 execution (`8`), then syntax error/correction, and captures `browser-completion`/`browser-syntax-error`.
 The standalone page's hidden source mirror and live feedback status are harness observations; they
 do not introduce web APIs into the embeddable model/panels. All images stay ignored under `reports/ui/`.
-See specification section 14 and the provenance manifest for public reference examples/cache hashes.
+See specification section 16 and the provenance manifest for public reference examples/cache hashes.
 
 ## Ordinary editor commands
 

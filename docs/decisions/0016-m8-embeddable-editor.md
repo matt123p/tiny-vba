@@ -82,7 +82,7 @@ simple receiver types only against supplied supported metadata. The renderer own
 completion list and keyboard/pointer focus. Parser messages/red underlines update without Compile,
 without navigating away from the typing caret; compiler/runtime diagnostics remain explicit actions.
 Basic project signature help is source metadata, never an evaluator/host call. Advanced class/library
-resolution, constants and richer Quick Info remain M10. Specification section 14 defines examples.
+resolution, constants and richer Quick Info remain M10. Specification section 16 defines examples.
 
 The editor uses an LF display projection with checked byte mappings and a bounded source diff to
 retain untouched mixed CR/CRLF/LF bytes. Compiler/debugger coordinates always refer to original source.

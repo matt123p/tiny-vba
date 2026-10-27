@@ -95,15 +95,14 @@ baseline; they do not mark these later features complete. M9 conformance/release
 
 ## Completion re-audit
 
-The [subsequent completion audit](m8-completion-audit.md) supersedes the earlier completed-gate
-label. Required baseline checks still pass, but full M8 completion needs these corrections:
+The [completion audit](m8-completion-audit.md) found the defects below. Corrections and local/remote verification now pass:
 
 - [x] M8-A1: preserve Static/project state across normal reruns until explicit Reset.
 - [x] M8-A2: advance Find Next beyond the current match.
 - [x] M8-A3: align lone-CR source coordinates with compiler/debugger positions.
-- [ ] Resolve the Windows checkout-location CI failure and verify its remote job.
+- [x] Resolve the Windows checkout-location CI failure and verify its remote job.
 - [x] Add permanent regression coverage and rerun local gates.
-- [ ] Push corrections and confirm all remote CI jobs.
+- [x] Push corrections and confirm all remote CI jobs.
 
 These are defects in the delivered M8 scope, independent of planned M10–M14 features.
 

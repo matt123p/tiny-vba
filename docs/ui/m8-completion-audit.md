@@ -126,7 +126,7 @@ keyboard route; the standalone web menu explains that boundary.
 
 `tools/audit_m8_completion.py` now runs the permanent `m8_` regressions directly; temporary failing
 probes have been removed. Public examples/references and intentional nonmodal/live-check policy are
-in UI specification section 14. All ten reference-page downloads and the prior Windows log remain
+in UI specification section 16. All ten reference-page downloads and the prior Windows log remain
 ignored cache evidence; only provenance/observations are committed.
 
 Local gates: `cargo xtask ci` (236 workspace tests, format, strict Clippy and repository checks),
@@ -135,6 +135,10 @@ Local gates: `cargo xtask ci` (236 workspace tests, format, strict Clippy and re
 `cargo xtask web` and Chromium keyboard/clipboard/debugger/syntax correction smoke. Generated product
 images remain in ignored `reports/ui/`; reference-cache content is never checked in.
 
-Remote CI: pending the pushed correction. Confirm Windows plus Linux/macOS, WASM, UI and corpus jobs
-before changing the milestone's final verification label. No fresh Office or real-fork integration
+Remote CI: all six jobs passed on [run 40552813785](https://github.com/matt123p/tiny-vba/actions/runs/40552813785) for pushed implementation commit `e24d07a3b86fb2550455957e51c67d99ca17a716`: Windows, Linux, macOS, WASM, UI and corpus verification. The Windows invoking-checkout regression now passes. M8 is complete for the defined baseline. This documentation closure changes no product/test code. No fresh Office or real-fork integration
 result is inferred from these checks; M10–M14 boundaries remain explicit in the roadmap.
+
+Windows confirmation: job [122360798367](https://github.com/matt123p/tiny-vba/actions/runs/40552813785/job/122360798367)
+passed, including `cached_binary_uses_the_invoking_checkout_instead_of_its_build_path`.
+Its raw log is retained only as ignored `.cache/evidence/m8-audit/windows-ci-corrected-job.log`
+(SHA-256 `028dd93d9bfbf48d55ce290bca28b244bdfed78d6289c254eb4abc8ecc2ad371`).

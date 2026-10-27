@@ -77,6 +77,6 @@ M13 optional Copilot-style assistance, and M14 fork integration acceptance. Keep
 capabilities separate from completed M8 evidence; do not silently expand M8 or duplicate fork code.
 
 The 2026-10-27 user correction includes working scoped word/member completion, source signature help
-and live red/underlined parser diagnostics in M8 (UI specification section 14). Keep advanced
+and live red/underlined parser diagnostics in M8 (UI specification section 16). Keep advanced
 reference/class-library resolution and List Constants in M10. Preserve original CR/CRLF source
 bytes through the editor view mapping and Static state across compatible same-host reruns until Reset.

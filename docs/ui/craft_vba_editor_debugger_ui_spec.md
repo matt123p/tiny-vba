@@ -31,6 +31,7 @@
 13. [Development roadmap and acceptance tests](#13-development-roadmap-and-acceptance-tests)
 14. [Public sources and traceability](#14-public-sources-and-traceability)
 15. [Open verification items and release gate](#15-open-verification-items-and-release-gate)
+16. [M8 code assistance and syntax feedback examples](#16-m8-code-assistance-and-syntax-feedback-acceptance-examples)
 
 ---
 
@@ -922,7 +923,7 @@ Craft* may claim **“familiar VBA editor UI”** after the C0 flows pass. It ma
 
 **Product recommendation:** Make the **Classic VBE shell the unchanging compatibility surface**, reuse one host-agnostic editor/debugger implementation across GridCraft and WordCraft, and put AI/Python-translation features in optional extensions. This preserves the value of Excel users' muscle memory while allowing significant modernisation without contaminating the clean public-source implementation.
 
-## 14. M8 code-assistance and syntax-feedback acceptance examples
+## 16. M8 code-assistance and syntax-feedback acceptance examples
 
 Added 2026-10-27 following the reported broken IntelliSense and syntax-error highlighting.
 This section makes functional word/member completion and live syntax feedback part of M8.
@@ -1011,3 +1012,9 @@ acceptance and correction without Compile. `cargo xtask ui` renders original com
 feedback snapshots in light/dark themes as well as the existing paused/narrow/scaled/host variants.
 The standalone native and Chromium harnesses exercise the same reusable Rust panels. Screenshots
 remain ignored local reports; exact Office geometry and fork integration require later evidence.
+
+Ordinary editor commands and their exact boundaries are recorded in the
+[embedding guide's editor matrix](embedding.md#ordinary-editor-commands): M8 verifies keyboard/menu
+Undo/Redo, selection-aware Cut/Copy/Paste and deletion. Browser Paste uses the browser keyboard
+route. Automatic indentation, whole-block indentation/comments and richer editing workflows remain
+M10. This avoids treating every conventional editor feature as implicitly implemented.

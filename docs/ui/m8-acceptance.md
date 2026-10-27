@@ -1,6 +1,6 @@
 # M8 acceptance and compatibility status
 
-**Audit status: product corrections and local acceptance pass; remote CI verification pending.** See
+**Audit status: M8 complete for the defined standalone/embeddable scope; product corrections and local/remote acceptance pass.** See
 [the completion audit](m8-completion-audit.md) for historical failures and their permanent regressions.
 
 Date: 2026-10-27. Scope: the repository's reusable editor/debugger gate under ADRs 0002/0016.
@@ -61,8 +61,7 @@ typing workflow accepts Debug.Print and executes output `8`, then introduces/cor
 without Compile. Both paths require no page errors.
 
 Final gate results and exact counts are recorded in [implementation progress](../implementation-progress.md).
-No Office installation, other operating system, hardware accessibility device, fresh Microsoft
-oracle run or external-workbook integration is claimed by these local checks.
+[Remote CI](https://github.com/matt123p/tiny-vba/actions/runs/40552813785) also passes Windows, Linux and macOS native checks, WASM, UI and corpus verification for implementation commit `e24d07a`. No Office installation, hardware accessibility device, fresh Microsoft oracle run or external-workbook integration is claimed.
 
 ## Public-source process
 

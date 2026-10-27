@@ -1,13 +1,13 @@
 # Implementation progress
 
-Updated 2026-10-27. Current stage: **M8 product corrections locally verified; final remote CI pending**. The runtime
-profile remains m5-host-v1 with verified IR 1/2/3/4. M8-A1–A3 and the reported code-assistance defects are corrected; verify remote CI before closing M8. Real
+Updated 2026-10-27. Current stage: **M8 complete for the defined standalone/embeddable scope**. The runtime
+profile remains m5-host-v1 with verified IR 1/2/3/4. M8-A1–A3 and the reported code-assistance defects are corrected and verified. M9 is next. Real
 workbook integration, event order and package/trust/preservation evidence remain fork-owned.
 
 ## M8 completion corrections
 
 The latest user request makes working IntelliSense and syntax feedback part of M8. Added public
-Microsoft VBA behavior references and independently authored examples to specification section 14;
+Microsoft VBA behavior references and independently authored examples to specification section 16;
 four additional reference pages are cached only under ignored `.cache/evidence/vbe/`, with hashes
 and factual observations tracked. No downloaded implementation, artwork or reference screenshot is used.
 
@@ -22,7 +22,7 @@ Local validation: **236 workspace tests** (17 new regressions), strict Clippy/fo
 corpus checks, UI tests and eleven original rendered variants, native Xvfb capture, headless WASM
 compile/execution and the extended Chromium typing workflow. The 33 IDE/embedding tests run headless;
 21 egui interaction tests verify actual typing, completion, error underlines/recovery and CR editing.
-Remote results for the pushed correction are recorded in the audit before the final completion label.
+All six [remote CI jobs](https://github.com/matt123p/tiny-vba/actions/runs/40552813785) passed for implementation commit `e24d07a`: Windows, Linux, macOS, WASM, UI and corpus verification. The documentation closure changes no product/test code.
 Advanced completion/reference/class resolution remains M10; forms/extensions/AI/fork acceptance
 remain M11–M14. Earlier 219-test counts below describe the initial implementation.
 
@@ -33,7 +33,7 @@ probes. Locally, the 219 existing tests and UI/WASM gates pass, but all three ex
 relaunch discards Static state; Find Next stays on the current match; lone-CR source cannot set
 statement breakpoints with the correct line coordinates. These are M8 defects, not M10–M14 features.
 [The audit report](ui/m8-completion-audit.md) records expected/actual behaviour, source locations and
-`python3 tools/audit_m8_completion.py` for reproduction. Full M8 completion is not confirmed.
+`python3 tools/audit_m8_completion.py` for reproduction. At that point full M8 completion was not confirmed.
 The pushed GitHub workflow additionally fails its Windows checkout-location regression while UI,
 corpus, WASM, Linux and macOS jobs pass; the audit report records the failing assertion and cached
 log provenance. Resolve that CI gate as well. The earlier completion record below is historical;
