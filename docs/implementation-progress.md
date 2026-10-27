@@ -1,8 +1,21 @@
 # Implementation progress
 
-Updated 2026-10-27. Current stage: **M8 repository editor/debugger gate complete**. The runtime
-profile remains m5-host-v1 with verified IR 1/2/3/4. M9 conformance/release work is next. Real
+Updated 2026-10-27. Current stage: **M8 implemented; completion audit has three open defects**. The runtime
+profile remains m5-host-v1 with verified IR 1/2/3/4. Correct M8-A1–A3 before M9 conformance/release work. Real
 workbook integration, event order and package/trust/preservation evidence remain fork-owned.
+
+## M8 completion re-audit
+
+After pushing `f462959` on 2026-10-27, reran the required baseline gates and added targeted audit
+probes. Locally, the 219 existing tests and UI/WASM gates pass, but all three extra probes fail: normal Run
+relaunch discards Static state; Find Next stays on the current match; lone-CR source cannot set
+statement breakpoints with the correct line coordinates. These are M8 defects, not M10–M14 features.
+[The audit report](ui/m8-completion-audit.md) records expected/actual behaviour, source locations and
+`python3 tools/audit_m8_completion.py` for reproduction. Full M8 completion is not confirmed.
+The pushed GitHub workflow additionally fails its Windows checkout-location regression while UI,
+corpus, WASM, Linux and macOS jobs pass; the audit report records the failing assertion and cached
+log provenance. Resolve that CI gate as well. The earlier completion record below is historical;
+this re-audit supersedes its completion label.
 
 ## Post-M8 milestone allocation
 
@@ -53,7 +66,7 @@ resource extraction, reference screenshots or Office installation was used. This
 pixel identity, full C0/C1 feature coverage, another operating system or real workbook integration.
 See [the explicit feature/acceptance matrix](ui/m8-acceptance.md) and [embedding guide](ui/embedding.md).
 
-Next smallest task: M9 conformance/release work; separately wire these reusable panels into a fork's
+Next smallest task: fix M8-A1–A3 and add permanent regression tests, then M9 conformance/release work; separately wire these reusable panels into a fork's
 real document lifecycle and verify workbook effects/undo/recalc/events without duplicating the UI.
 Remaining classic features now belong to M10, forms/class support to M11, native enhancements
 and translation to M12, optional AI to M13, and fork integration acceptance to M14. See the

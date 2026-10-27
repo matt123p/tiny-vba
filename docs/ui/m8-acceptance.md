@@ -1,5 +1,8 @@
 # M8 acceptance and compatibility status
 
+**Audit status: three open M8 defects; full completion is not confirmed.** See
+[the completion audit](m8-completion-audit.md) and its reproducible failing probes.
+
 Date: 2026-10-27. Scope: the repository's reusable editor/debugger gate under ADRs 0002/0016.
 The [new UI specification](craft_vba_editor_debugger_ui_spec.md) supplies the public-source Classic
 layout/command direction and also describes a broader product roadmap. This implementation does

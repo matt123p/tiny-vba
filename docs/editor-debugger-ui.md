@@ -1,6 +1,6 @@
 # Editor and debugger UI contract
 
-Status: M8 repository editor/debugger implemented, 2026-10-27. See
+Status: M8 implemented, with [three open completion-audit defects](ui/m8-completion-audit.md), 2026-10-27. See
 [ADR 0016](decisions/0016-m8-embeddable-editor.md), [embedding/running](ui/embedding.md),
 [acceptance and remaining broader-spec features](ui/m8-acceptance.md) and the supplied
 [public-source specification](ui/craft_vba_editor_debugger_ui_spec.md).

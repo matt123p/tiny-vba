@@ -92,3 +92,16 @@ completion, M11 forms/class runtime, M12 native extensions/non-Microsoft enhance
 M13 optional Copilot-style assistance, and M14 cross-repository host acceptance. These are planned
 milestones with their own gates. The completed checkboxes above apply only to the delivered M8
 baseline; they do not mark these later features complete. M9 conformance/release remains next.
+
+## Completion re-audit
+
+The [subsequent completion audit](m8-completion-audit.md) supersedes the earlier completed-gate
+label. Required baseline checks still pass, but full M8 completion needs these corrections:
+
+- [ ] M8-A1: preserve Static/project state across normal reruns until explicit Reset.
+- [ ] M8-A2: advance Find Next beyond the current match.
+- [ ] M8-A3: align lone-CR source coordinates with compiler/debugger positions.
+- [ ] Resolve the Windows checkout-location CI failure and verify its remote job.
+- [ ] Add permanent regression coverage, rerun gates and push the corrections.
+
+These are defects in the delivered M8 scope, independent of planned M10–M14 features.
