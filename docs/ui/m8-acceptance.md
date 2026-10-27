@@ -22,18 +22,20 @@ reference build. No such reference build was supplied or observed.
 | Shell/lifecycle | Host-free authored demo; CLI debugger; native and browser shells; dirty-close confirmation; native cleanup and font/pane preference persistence |
 | Visual/accessibility | Named widgets with accessibility checking enabled; original markers plus colour; contrast assertions; actual paused-state light/dark/narrow/1.5x/host-theme/focused-pane snapshots |
 
-## Explicit boundaries of the broader UI specification
+## Work assigned to later milestones
 
-| Specification area | Current status |
+Remaining work is assigned to the [M10–M14 roadmap](post-m8-roadmap.md), with explicit owners,
+dependencies and acceptance gates. These milestones are planned; current unsupported states remain.
+
+| Specification area | Planned milestone / current boundary |
 |---|---|
-| `.xlsm` / `.docm` source attachment, trust, package/signature preservation, host save/return | Supplied by embedding host. Native standalone saves `.bas` only. No binary writeback or macro auto-run on import. |
-| Worksheet/workbook events, Excel/Word object models, real workbook edits and undo/recalc | Fork-owned integration acceptance; not proven by standalone snapshots or generic doubles. |
-| Class/document execution, UserForms/designer/Toolbox/Format, ActiveX and binary add-ins | Not implemented by this runtime/UI profile; relevant commands are disabled with explanations. |
-| Set Next Statement; conditional/value-change watches; arbitrary Immediate calls/getters; class error-trapping mode | Unavailable without additional verified VM/evaluation contracts; not simulated. |
-| Split code windows, procedure-only view, full docking/custom toolbar designer, module renaming/removal | Deferred broader-spec features. Current panels are resizable; current editor is Full Module View. Metadata is read-only. |
-| Full classic IntelliSense, parameter info, host event stub generation, references loading | Partial: real project procedure/host catalogue browsing and prefix completion only. No fabricated libraries/members. |
-| Exact Windows VBE pixels, accelerator ordering, all platform shortcuts, physical-device/Office parity | Unverified. Layout is an original functional interpretation of public docs, with named classic commands and tested core shortcuts. |
-| AI assistance and Python translation | Not included; the editor/debugger operates offline without either. |
+| Split/procedure views, docking/toolbars, rename/remove, full classic code aids and options | **M10** — classic editor completion; current Full Module View and limited metadata-backed completion remain delivered M8 scope. |
+| Set Next Statement, conditional/value-change watches, expanded evaluation policies and DAP | **M10** — verified debugger contracts required before enabling commands; default safe evaluation remains. |
+| Class/document execution, class trapping and UserForms/designer/Toolbox/Format | **M11** — real class/event runtime is a prerequisite for running forms. Unsupported controls need safe preservation/loss handling; no implied arbitrary ActiveX support. |
+| Native Craft add-ins, non-Microsoft enhanced-editor features and Python translation preview | **M12** — opt-in extension API/manager with capability and cleanup tests; binary VBIDE/COM add-in compatibility is not promised. |
+| Copilot-style inline/chat assistance and AI provider/privacy/retrieval controls | **M13** — optional, off by default, with preview/undo and explicit permissions; M8 stays usable offline without AI. |
+| Actual Excel/Word objects/events, host save/return, trust, package/signature preservation and undo/recalc | **M14**, owned by the forks — shared UI is reused; standalone `.bas` editing/generic doubles do not establish real-host acceptance. |
+| Exact-reference shortcuts, ordering, geometry and physical/Office parity checks | **M10** for editor fidelity; **M14** for real-host/reference-build evidence. Unverified claims remain marked V. |
 
 ## Reproducible checks and visual review
 

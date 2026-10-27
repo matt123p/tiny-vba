@@ -31,7 +31,7 @@ See the [M2 compiler contract](compiler.md) for supported source, API and struct
 | vba-foreign | Generic host call/result/wait protocol; protocol version 1 and validated source imports | diagnostics, values |
 | vba-vm | Frames, instruction pointer, budgets, inspection hooks; host-root binding and protocol checks | diagnostics, ir, values, runtime, foreign |
 | vba-debug | Breakpoint/step/inspection controller | diagnostics, vm |
-| vba-dap | Later DAP adapter | debug |
+| vba-dap | Planned M10 DAP adapter; current scaffold | debug |
 | vba-project | Bounded read-only MS-OVBA source/project decoder | diagnostics, cfb (=0.14.0), encoding_rs (=0.8.42) |
 | vba-testkit | Deterministic generic foreign host, trace support and bounded embedding driver | debug, diagnostics, foreign, ir, values, vm |
 | vba-conformance | Scenario validation, typed expectations and M4 outcome judgment; comparison/reports later | diagnostics, testkit, values, vm |
@@ -142,3 +142,11 @@ returns source/module/reference metadata and explicit corrupt/unsupported/protec
 no compiler, VM or host edge exists. [ADR 0014](decisions/0014-m6-project-decoding.md) records
 licences, portability, source identity semantics and work limits. External requirements are
 pinned in tools/architecture.json separately from the unchanged 16-node workspace DAG.
+
+## Post-M8 scope ownership
+
+[Planned M10–M14](ui/post-m8-roadmap.md) allocate remaining classic editor/debugger work (M10),
+form/class support (M11), native extensions and translation (M12), optional AI (M13), and host
+integration acceptance (M14). Extension/provider facilities stay above toolkit-independent engine
+layers; Office models, trust and document persistence remain fork-owned. This allocation adds no
+packages, dependencies or runtime capabilities to the implemented DAG.

@@ -241,6 +241,9 @@ Populate using the **VBA symbol database**, built-in language/library metadata, 
 
 ### 3.8 UserForm designer and Toolbox — C1
 
+**Planned allocation: M11.** Form/class runtime and designer work belong to tiny-vba; Office-host
+form persistence and integration acceptance are coordinated under M14. See [the roadmap](post-m8-roadmap.md).
+
 The UserForm window is a visual design canvas with a grid, drag/resize handles, selection, form properties and event handling [S19]. `View → Toolbox` (or Standard toolbar Toolbox) displays the control palette when a form is active; controls are placed by drawing on the form [S20].
 
 Documented standard control inventory [S20]: **Select Objects**, **Label**, **TextBox**, **ComboBox**, **ListBox**, **CheckBox**, **OptionButton**, **ToggleButton**, **Frame**, **CommandButton**, **TabStrip**, **MultiPage**, **ScrollBar**, **SpinButton**, **Image**.
@@ -611,6 +614,10 @@ Each executable IR statement needs: `project_id`, `module_id`, stable `source_sp
 
 ## 9. Optional Copilot-style improvements — X, not historic VBE
 
+**Planned allocation:** AI assistance is **M13**, built on the **M12** native extension/capability
+boundary. Non-AI enhancement and Python translation preview are M12. These features are outside
+the delivered M8 baseline; see [the post-M8 roadmap](post-m8-roadmap.md).
+
 **Key distinction:** Traditional VBE documented **IntelliSense** is deterministic local completion/parameter help [S10, S23, S33]. Copilot-style *multi-token prediction, natural-language code authoring and chat* are **new Craft* features**; they should not be portrayed as controls that exist in the legacy VBA editor. The Microsoft Learn UI inventory does not establish a built-in Copilot interface for classic VBE.
 
 ### 9.1 Operating modes
@@ -776,6 +783,16 @@ Per user/host: pane placement/visibility, window split, editor colours/font, tab
 ---
 
 ## 13. Development roadmap and acceptance tests
+
+### Repository milestone allocation (2026-10-27)
+
+The completed M8 repository gate covers the baseline in [its acceptance record](m8-acceptance.md).
+Remaining requirements below are assigned to [the post-M8 roadmap](post-m8-roadmap.md): **M10**
+classic editor/debugger completion, **M11** class/form runtime and UserForm designer, **M12** native
+Craft extensions/non-Microsoft enhancements and translation preview, **M13** optional Copilot-style
+assistance, and **M14** fork-owned Gridcraft/Wordcraft integration acceptance. All are planned;
+the P0–P8 phases below are product-requirement groupings, not additional M8 commitments. The roadmap
+maps these phases and acceptance scenarios to owners, dependencies and completion evidence.
 
 ### 13.1 Ordered delivery plan
 

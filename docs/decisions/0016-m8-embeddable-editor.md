@@ -65,3 +65,11 @@ committed; no proprietary screenshot baseline or downloaded reference artifact e
 The ordinary CI gate also compiles/lints every UI target, while WASI executes the headless IDE tests
 alongside the earlier language/import/callback suites. No Office/workbook or physical-device parity
 claim follows from these standalone tests.
+
+## Subsequent milestone allocation
+
+On explicit user direction, the remaining UI specification work is assigned to
+[planned M10–M14 milestones](../ui/post-m8-roadmap.md): classic completion, forms/class runtime,
+native extensions/non-Microsoft enhancements and translation, optional AI, and fork integration
+acceptance respectively. This scheduling amendment preserves the M8 baseline and layer/ownership
+contracts above; planned scope is not an implemented capability.

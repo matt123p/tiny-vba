@@ -67,6 +67,7 @@ and controlled native/WASI acceptance.
 
 - [User-supplied public-source UI specification](ui/craft_vba_editor_debugger_ui_spec.md)
 - [Implementation plan](ui/m8-implementation-plan.md), [ADR 0016](decisions/0016-m8-embeddable-editor.md)
+- [Planned M10–M14 milestones: classic completion, forms, native extensions, AI and host acceptance](ui/post-m8-roadmap.md)
 - [Run, embed and reproduce visual evidence](ui/embedding.md)
 - [Acceptance and broader-spec feature status](ui/m8-acceptance.md)
 - [Public source manifest](provenance/vbe_sources.yaml), [dependency/font provenance](provenance/ui-dependencies.json)

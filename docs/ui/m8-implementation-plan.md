@@ -84,3 +84,11 @@ broader C0/C1 programme and fork-owned workflows. [Progress](../implementation-p
 exact test counts and executed native/browser/WASM checks. Original PNGs were rendered and visually
 inspected; downloaded references remain in the ignored cache, with only provenance summaries and
 required licensed font notices tracked.
+
+## Scope after M8
+
+The [post-M8 roadmap](post-m8-roadmap.md) now owns the remaining work: M10 classic editor/debugger
+completion, M11 forms/class runtime, M12 native extensions/non-Microsoft enhancements and translation,
+M13 optional Copilot-style assistance, and M14 cross-repository host acceptance. These are planned
+milestones with their own gates. The completed checkboxes above apply only to the delivered M8
+baseline; they do not mark these later features complete. M9 conformance/release remains next.

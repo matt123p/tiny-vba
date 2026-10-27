@@ -4,6 +4,17 @@ Updated 2026-10-27. Current stage: **M8 repository editor/debugger gate complete
 profile remains m5-host-v1 with verified IR 1/2/3/4. M9 conformance/release work is next. Real
 workbook integration, event order and package/trust/preservation evidence remain fork-owned.
 
+## Post-M8 milestone allocation
+
+On 2026-10-27, assigned the remaining UI specification work to explicit **planned** milestones
+in [the post-M8 roadmap](ui/post-m8-roadmap.md): **M10** classic editing/code aids/advanced debugger
+and DAP; **M11** class/document runtime and UserForm editor; **M12** native Craft extensions,
+non-Microsoft enhancements and Python translation preview; **M13** optional Copilot-style assistance;
+**M14** cross-repository Gridcraft/Wordcraft integration acceptance. Each has owners, dependencies,
+acceptance gates and a mapping to the specification's phases/scenarios. M8's delivered baseline
+and M9's next conformance/release work are unchanged. No deferred feature becomes implemented
+through this planning update; no sibling repository work is started by it.
+
 ## M8 reusable editor/debugger and standalone harnesses
 
 Implemented [ADR 0016](decisions/0016-m8-embeddable-editor.md) following the user-supplied
@@ -44,8 +55,9 @@ See [the explicit feature/acceptance matrix](ui/m8-acceptance.md) and [embedding
 
 Next smallest task: M9 conformance/release work; separately wire these reusable panels into a fork's
 real document lifecycle and verify workbook effects/undo/recalc/events without duplicating the UI.
-Broader product-spec features (UserForms, Set Next Statement, conditional watches, split/procedure
-views and full metadata-backed IntelliSense) remain recorded rather than simulated.
+Remaining classic features now belong to M10, forms/class support to M11, native enhancements
+and translation to M12, optional AI to M13, and fork integration acceptance to M14. See the
+[post-M8 roadmap](ui/post-m8-roadmap.md); all remain planned.
 
 ## M7 bounded generic callbacks and lifecycle
 

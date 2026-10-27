@@ -13,8 +13,9 @@ All **44 authored scenarios and 153 reviewed ReflexGrid cases pass**. The latter
 Microsoft Excel Mac oracle expectations; this is inherited evidence, not a new local Excel run.
 See [the acceptance report](docs/m4-oracle-report.md) and [language scope](docs/m4-language.md).
 [M6 project import](docs/project-import.md) extracts bounded source/metadata without execution.
-The [native/web graphical editor and CLI debugger](docs/ui/embedding.md) are implemented. DAP,
-full C0/C1 coverage of the broader UI specification and Office integration remain separate work.
+The [native/web graphical editor and CLI debugger](docs/ui/embedding.md) are implemented. DAP and
+remaining classic features, forms, native extensions/translation, optional AI and Office integration
+are assigned to [planned M10–M14 milestones](docs/ui/post-m8-roadmap.md).
 
 
 The Excel/Word compatibility layers, Office metadata and application adapters belong in the

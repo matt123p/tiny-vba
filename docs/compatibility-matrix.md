@@ -34,7 +34,8 @@ Updated 2026-10-27. Stage: M4 external acceptance complete; M5–M7 in-repo cont
 | Oracle comparison / executable scenario runner | M4 runner implemented for self-authored fixtures; oracle comparison not implemented | `conformance run` (20 PASS / 0 UNSUPPORTED); M9 owns oracle goldens |
 | Fuzzing | Not implemented | APIs required before targets |
 | Excel/Word APIs and OOXML round-trip | External ownership | Gridcraft/Wordcraft forks |
-| COM, DLLs, UserForms, P-code and binary source writing | Deferred / outside MVP | Separate design required |
+| Classes and UserForms | Planned M11; currently unsupported | [Form/class milestone and gate](ui/post-m8-roadmap.md#m11--classdocument-support-and-userform-editor) |
+| COM, DLLs, P-code and binary source writing | Outside current scope | Separate reviewed design required; native Craft extensions in M12 do not imply binary VBE compatibility |
 
 M3 execution evidence is restricted to its explicit tests/examples and runtime matrix. It does not establish
 workbook/Office compatibility, physical-device fidelity or unselected external corpus pass rates; self-authored
@@ -47,3 +48,12 @@ authored scenarios and 153 reviewed ReflexGrid cases PASS. The latter carry upst
 Microsoft Excel Mac evidence with exact source hashes and raw results, not a new Office run.
 Whole-array/ParamArray/Option Base/named-cell argument tests and IR 3 version/metadata refusal
 checks pass. Unselected external cases retain NOT_RUN; future oracle acquisition stays in M9.
+
+## Planned UI and extension milestones
+
+Deferred UI work is allocated in [the post-M8 roadmap](ui/post-m8-roadmap.md): M10 classic editor,
+code aids, advanced debugger and DAP; M11 class/document runtime and forms; M12 native Craft
+extensions, non-Microsoft enhancements and Python translation preview; M13 optional Copilot-style
+assistance; M14 fork-owned host integration acceptance. These entries are planned scope, not new
+compatibility passes. Existing unavailable/unsupported statuses remain until their milestone gates
+have execution evidence. Binary VBE add-ins and arbitrary ActiveX/COM are not implicitly supported.
