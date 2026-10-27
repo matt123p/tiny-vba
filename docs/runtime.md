@@ -77,6 +77,18 @@ still consume budget. Stop advances past itself and pauses before its mandatory 
 request is served at the next visible checkpoint. `mark_source_changed` blocks edits/continuation until
 cancel/recompile/restart; it never replaces the immutable source underneath paused execution.
 
+M7 callbacks (ADR 0015): hosts schedule by name with `Session::schedule_callback` (FIFO, bounded
+by `Limits.callbacks`, name/arity/payload validated, refused on a closed lifecycle) and deliver
+each with `Session::run_next_callback` after the current program is terminal. Delivery runs as a
+fresh top-level invocation on the same instance — sharing static state, bindings and output —
+drives to a boundary in one call, applies breakpoints and the predicate, counts
+`counters().callbacks_run`, and waits through the existing exactly-once `resume_host` path. A
+stale host root at delivery surfaces the host's reference error 91 without a repeated dispatch.
+`cancel`/`disconnect`/`host_lost` drain the queue without executing. `Session::reset_state()`
+(static/output reset, terminal-only) and `Session::rebind_roots()` (host-owned lifetime under
+launch validation) complete the lifecycle. Nested/reentrant dispatch and mid-run injection stay
+rejected; event ordering and Office-shaped event policy remain fork-owned.
+
 `vba-debug::Controller` binds breakpoints to the VM instance, compiled revision and StatementId. Multiple
 statements on a line are separate stops. Step Into targets the next visible visit; Over stays in the
 starting frame or surviving ancestors; Out targets surviving ancestors. Descendant calls finish their

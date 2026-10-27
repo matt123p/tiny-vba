@@ -380,7 +380,8 @@ individual dispatch operations. Frame IDs are never recycled within a live inspe
 | Completed/Failed/Cancelled | run_slice | Return same bounded terminal outcome, without re-execution |
 
 Running is not an externally reentrant session state: nested mutable dispatch/callback is rejected.
-Callbacks/event queues are M7 work; a synchronous host cannot recursively drive this session. A
+Callback/event queues are specified and implemented for M7 (ADR 0015, `schedule_callback`/
+`run_next_callback`); a synchronous host still cannot recursively drive this session. A
 `run_slice(0)` is a command error and changes nothing. For a valid runnable slice, check cancellation/
 disconnect first, then hard limits, then remaining slice quota, then the checkpoint predicate, then
 dispatch. An expired hard limit is not hidden behind a soft yield or breakpoint. Validate command

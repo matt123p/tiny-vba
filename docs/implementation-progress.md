@@ -1,9 +1,38 @@
 # Implementation progress
 
-Updated 2026-10-27. Current stage: **M6 read-only project source decoding complete**.
-The runtime profile remains m5-host-v1 with verified IR 1/2/3/4; decoding is independent of execution.
-M7 callbacks/lifecycle and the required M8 graphical IDE remain next; real workbook integration
-and package/trust/preservation evidence stay fork-owned.
+Updated 2026-10-27. Current stage: **M7 bounded generic callbacks and lifecycle complete** on top
+of M6 read-only project decoding. The runtime profile remains m5-host-v1 with verified IR 1/2/3/4.
+The required M8 graphical IDE remains next; real workbook integration, event order and
+package/trust/preservation evidence stay fork-owned.
+
+## M7 bounded generic callbacks and lifecycle
+
+Implemented [ADR 0015](decisions/0015-m7-callbacks-and-lifecycle.md). The VM stays single-ownership
+and non-reentrant: hosts schedule callbacks by name (`Session::schedule_callback`, FIFO, bounded by
+`Limits.callbacks` default 256, name/arity/payload validated) and the VM delivers each as a fresh
+top-level invocation through `run_next_callback` only after the current program is terminal. A
+delivery drives to a boundary in one call (soft quota yields continue internally), shares
+module/static state, bindings, output and the session instance, applies breakpoints and the
+checkpoint predicate exactly like `run_slice`, and reports `counters().callbacks_run`. Host waits
+inside a callback use the existing exactly-once resume path. `cancel`, `disconnect` and `host_lost`
+drain the queue without executing pending callbacks; scheduling is refused once the lifecycle is
+closed (cancelled/disconnected), not merely after normal completion.
+
+Lifecycle additions: `Session::reset_state()` clears persistent/static storage and captured output
+and bumps the generation, refused unless terminal; `Session::rebind_roots()` lets the host replace
+root references (its own lifetime/generation model) under the same launch validation. A stale root
+at delivery surfaces the host's reference error 91 with no repeated dispatch. Generic-host
+reentrancy, drain, budget, failure-recovery, debugger-pause-in-callback and stale-reference tests
+live in crates/vba-vm/tests/callbacks.rs. Event ordering, `Application.EnableEvents`, document
+events, UDF evaluation and any Office-shaped catalogue remain fork-owned over this generic queue.
+
+Verification from this checkout: cargo xtask ci passes formatting, strict all-target Clippy,
+**170 integration tests**, the 16-node workspace DAG, seven source pins/646 candidate hashes and
+M4 evidence checks. All 197 authored/reviewed language fixtures retain PASS. cargo xtask wasm
+compiles all libraries; cargo xtask wasm-run passes native/WASI acceptance. git diff --check passes.
+
+Next: the required reusable graphical editor/debugger slice on these VM APIs; M8 completes its
+acceptance gate.
 
 ## M6 project source decoding
 
@@ -40,8 +69,8 @@ native/WASI language/host/debugger acceptance and now executes the same **14 imp
 WASI**, with no preopened directories. git diff --check passes. No separate MSRV, macOS/Windows,
 external-workbook import, browser runtime or Office observation is claimed.
 
-Next smallest task: specify bounded generic callback/reentrancy and disconnect/reset ownership
-for M7 before adding callback entry points; continue the reusable graphical IDE slice under M8.
+M7 delivered the bounded generic callback queue, reset ownership and lifecycle cleanup under
+[ADR 0015](decisions/0015-m7-callbacks-and-lifecycle.md).
 
 ## M5 native host integration contract
 

@@ -3,8 +3,8 @@
 A new, standalone VBA interpreter, editor and debugger in Rust, intended to run natively and in WebAssembly.
 Develop, run and test the language engine without Gridcraft, Wordcraft, Microsoft Office or a graphical interface.
 
-**Current status:** M4 acceptance is complete; the M5 host contract and M6 read-only project
-decoder are implemented. The Rust engine includes verified IR 1/2/3/4, explicit-frame execution, a headless debugger, scalar
+**Current status:** M4 acceptance is complete; the M5 host contract, M6 read-only project
+decoder and M7 bounded callback/lifecycle contract are implemented. The Rust engine includes verified IR 1/2/3/4, explicit-frame execution, a headless debugger, scalar
 conversions, Currency/Date, arrays, optional/named calls, whole-array ByRef, ParamArray,
 Option Base, static/module state, VBA handlers and host-root imports with a versioned native host
 protocol. The current execution profile is `m5-host-v1` ([ADR 0013](docs/decisions/0013-m5-host-contract.md)).

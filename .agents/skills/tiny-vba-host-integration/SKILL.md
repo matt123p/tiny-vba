@@ -79,6 +79,18 @@ vba-vm/tests/embedding.rs is the break/edit/resume proof with exactly one dispat
 names, catalogues, workbook FillCells evidence, undo/recalc and permission gates remain fork-owned
 (Gridcraft); do not add them here.
 
+## Implemented M7 contract
+
+Read [ADR 0015](../../../docs/decisions/0015-m7-callbacks-and-lifecycle.md). The VM stays
+non-reentrant: schedule VBA callbacks with `Session::schedule_callback` (FIFO, `Limits.callbacks`
+budget, name/arity validated) and deliver each with `Session::run_next_callback` once the current
+program is terminal; a delivery runs to a boundary, shares static state and bindings, applies
+breakpoints, and waits through `resume_host` exactly-once. `reset_state` (terminal-only) and
+`rebind_roots` cover static reset and the host's own object-lifetime model; a stale root at
+delivery surfaces the host's reference error 91. Cancel/disconnect/host loss drain queued
+callbacks without executing them. Event ordering, `EnableEvents`, document events and UDF policy
+remain fork-owned over this queue.
+
 M6 is implemented under [ADR 0014](../../../docs/decisions/0014-m6-project-decoding.md).
 Read [the import contract](../../../docs/project-import.md) before changing vba-project.
 Keep extraction read-only/inert, project-local ModuleId separate from caller-owned SourceId,

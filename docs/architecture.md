@@ -114,6 +114,11 @@ cases under [ADR 0012](decisions/0012-m4-oracle-acceptance.md). IR 3 owns array-
 metadata and same-block canonical reference captures; IR 1/2 targets remain closed. No Cargo DAG
 edge changed. Schema 2 provenance and evidence checks remain above shipping engine layers.
 
+M7 ([ADR 0015](decisions/0015-m7-callbacks-and-lifecycle.md)) keeps the VM non-reentrant and adds
+the bounded generic callback queue, terminal-only delivery, static reset and host root rebinding
+inside vba-vm; no new crate or DAG edge. Forks implement event sinks over this queue and own event
+ordering and `Application.EnableEvents` policy above it.
+
 M5 ([ADR 0013](decisions/0013-m5-host-contract.md)) adds IR 4 with hidden `HostRoot` slots and the
 `host-roots-v4` feature; `Capabilities::ir4_structural()` is the compiler's structural default while
 IR 1/2/3 stay selectable and verified. Semantics and compiler gained reviewed foreign edges for

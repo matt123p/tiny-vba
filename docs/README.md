@@ -55,8 +55,9 @@ record the completed external gate, schema 2 provenance and IR 3 extension.
 
 [M5 native host contract](decisions/0013-m5-host-contract.md) records the versioned
 foreign/value/debug APIs, hidden IR 4 host-root imports and the reusable bridge driver;
-[runtime](runtime.md) and [the compatibility matrix](compatibility-matrix.md) carry the
-implemented surface.
+[M7 bounded callbacks and lifecycle](decisions/0015-m7-callbacks-and-lifecycle.md) records the
+generic callback queue, static reset and cleanup ownership; [runtime](runtime.md) and
+[the compatibility matrix](compatibility-matrix.md) carry the implemented surface.
 
 [M6 read-only project import](project-import.md) and [ADR 0014](decisions/0014-m6-project-decoding.md)
 record the bounded decoder, reviewed external dependencies, source identities, protection refusals

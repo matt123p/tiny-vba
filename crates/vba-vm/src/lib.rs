@@ -1,7 +1,7 @@
 //! M3 explicit-frame execution, single-use continuations and generation-checked inspection.
 #![forbid(unsafe_code)]
 use std::{
-    collections::{BTreeMap, BTreeSet},
+    collections::{BTreeMap, BTreeSet, VecDeque},
     sync::atomic::{AtomicU32, Ordering},
 };
 use vba_diagnostics::{Diagnostic, Span, StatementId};
@@ -27,6 +27,7 @@ pub struct Limits {
     pub host_calls: u64,
     pub host_polls: u64,
     pub payload: usize,
+    pub callbacks: usize,
 }
 impl Default for Limits {
     fn default() -> Self {
@@ -39,6 +40,7 @@ impl Default for Limits {
             host_calls: 1024,
             host_polls: 4096,
             payload: 64 * 1024 * 1024,
+            callbacks: 256,
         }
     }
 }
@@ -152,6 +154,7 @@ pub struct Counters {
     pub instructions: u64,
     pub host_calls: u64,
     pub host_polls: u64,
+    pub callbacks_run: u64,
 }
 #[derive(Clone, Debug)]
 enum Operand {
@@ -186,6 +189,12 @@ struct Frame {
 struct Visit {
     view: CheckpointView,
     permit: bool,
+}
+/// A host-requested callback into this project, delivered as a fresh top-level invocation
+/// after the current program reaches a terminal state (ADR 0015).
+struct ScheduledCallback {
+    procedure: ir::ProcedureId,
+    arguments: Vec<Value>,
 }
 /// The caller's identity labels a session; an engine-generated instance isolates handles/storage.
 /// Explicit state transfer between invocations of the same compiled revision.
@@ -223,6 +232,7 @@ pub struct Session {
     allocation_bytes: usize,
     allocated_locations: usize,
     stack_capacity: usize,
+    callbacks: VecDeque<ScheduledCallback>,
 }
 fn command(message: &str) -> Diagnostic {
     Diagnostic::new("VBA0034", message)
@@ -345,6 +355,7 @@ impl Session {
             allocation_bytes: 0,
             allocated_locations: 0,
             stack_capacity: 0,
+            callbacks: VecDeque::new(),
         };
         session.push_frame(entry_id, prepared.into_iter().map(Operand::Value).collect())?;
         Ok(session)
@@ -428,6 +439,176 @@ impl Session {
                 self.kinds.insert(location, kind);
             }
         }
+        Ok(())
+    }
+    /// Queue a host-requested callback into this project (ADR 0015). The callback runs as a
+    /// fresh top-level invocation through `run_next_callback` once the current program is
+    /// terminal; it shares static state, bindings and this session instance.
+    pub fn schedule_callback(&mut self, procedure: &str, arguments: Vec<Value>) -> Result<usize> {
+        // A completed or failed program still accepts callbacks (delivery happens after it);
+        // a cancelled/disconnected session is closed and refuses instead.
+        if self.lifecycle_closed() {
+            return Err(command(
+                "session lifecycle is closed; callbacks are refused",
+            ));
+        }
+        if self.callbacks.len() >= self.limits.callbacks {
+            return Err(command("callback queue limit"));
+        }
+        let id = self
+            .program
+            .program()
+            .procedures
+            .iter()
+            .position(|p| p.name.eq_ignore_ascii_case(procedure))
+            .ok_or_else(|| command("unknown callback procedure"))?;
+        let id = ir::ProcedureId(u32::try_from(id).map_err(|_| resource())?);
+        let parameters = self
+            .program
+            .program()
+            .procedures
+            .get(id.0 as usize)
+            .ok_or_else(|| invariant("callback procedure"))?
+            .parameters
+            .len();
+        if arguments.len() != parameters {
+            return Err(command("callback argument count mismatch"));
+        }
+        let launch_bytes = arguments.iter().try_fold(0usize, |n, v| {
+            n.checked_add(value_bytes(v)).ok_or_else(resource)
+        })?;
+        if launch_bytes > self.limits.payload {
+            return Err(resource());
+        }
+        for value in &arguments {
+            value.validate()?;
+        }
+        self.callbacks
+            .try_reserve(1)
+            .map_err(|_| command("callback queue limit"))?;
+        self.callbacks.push_back(ScheduledCallback {
+            procedure: id,
+            arguments,
+        });
+        Ok(self.callbacks.len())
+    }
+    /// Number of callbacks waiting for delivery.
+    pub fn pending_callbacks(&self) -> usize {
+        self.callbacks.len()
+    }
+    /// Replace the host-root references (ADR 0015: the host owns object lifetime). The same
+    /// validation as launch applies: identity match, cap 64, unique case-insensitive names and
+    /// every declared host root must remain bound. Refused on a closed lifecycle.
+    pub fn rebind_roots(&mut self, roots: BTreeMap<String, vba_values::ObjectRef>) -> Result<()> {
+        if self.lifecycle_closed() {
+            return Err(command(
+                "session lifecycle is closed; roots cannot be rebound",
+            ));
+        }
+        if roots.len() > 64 {
+            return Err(command("host root budget"));
+        }
+        if let Some(binding) = &mut self.binding {
+            let mut seen = BTreeSet::new();
+            for (name, reference) in &roots {
+                if name.is_empty()
+                    || name.len() > 128
+                    || reference.host != binding.identity
+                    || !seen.insert(name.to_ascii_lowercase())
+                {
+                    return Err(command("invalid or duplicate host root"));
+                }
+            }
+            for local in self
+                .program
+                .program()
+                .procedures
+                .iter()
+                .flat_map(|p| &p.locals)
+                .filter(|l| l.role == ir::SlotRole::HostRoot)
+            {
+                if !roots
+                    .keys()
+                    .any(|name| name.eq_ignore_ascii_case(&local.name))
+                {
+                    return Err(command("required host root is not bound"));
+                }
+            }
+            binding.roots = roots;
+        }
+        Ok(())
+    }
+    /// Deliver one queued callback as a fresh top-level invocation (ADR 0015). Refuses while
+    /// the main program is still runnable/paused/waiting; terminal states (including a prior
+    /// callback's completion) are the delivery window.
+    pub fn run_next_callback(
+        &mut self,
+        host: &mut impl Host,
+        quota: u32,
+        predicate: &mut impl FnMut(&CheckpointView) -> Result<bool>,
+    ) -> Result<Outcome> {
+        self.check_host(host)?;
+        if !self.terminal() {
+            return Err(command(
+                "callbacks deliver only after the program is terminal",
+            ));
+        }
+        let Some(callback) = self.callbacks.pop_front() else {
+            return Err(command("no callback is queued"));
+        };
+        let prepared = callback
+            .arguments
+            .iter()
+            .zip(
+                self.program
+                    .program()
+                    .procedures
+                    .get(callback.procedure.0 as usize)
+                    .ok_or_else(|| invariant("callback procedure"))?
+                    .parameters
+                    .iter(),
+            )
+            .map(|(value, parameter)| {
+                runtime::bind(parameter.kind, value).map_err(runtime_diagnostic)
+            })
+            .collect::<Result<Vec<_>>>()?;
+        if !self.frames.is_empty() || self.visit.is_some() {
+            return Err(invariant("callback delivery requires clean frames"));
+        }
+        self.push_frame(
+            callback.procedure,
+            prepared.into_iter().map(Operand::Value).collect(),
+        )?;
+        self.counters.callbacks_run = self
+            .counters
+            .callbacks_run
+            .checked_add(1)
+            .ok_or_else(resource)?;
+        self.state = Outcome::Yielded;
+        // One call delivers one callback to a boundary: soft quota yields continue inside this
+        // delivery so a partially-run callback is never left in a non-terminal state.
+        let mut outcome = self.run_slice(host, quota, predicate)?;
+        while outcome == Outcome::Yielded {
+            outcome = self.run_slice(host, quota, predicate)?;
+        }
+        Ok(outcome)
+    }
+    /// Clear persistent/static storage and captured output; refused unless the session is
+    /// terminal. The compiled program, identity and instance are unchanged.
+    pub fn reset_state(&mut self) -> Result<()> {
+        if !self.terminal() {
+            return Err(command("reset requires a terminal invocation"));
+        }
+        let persistent = self.persistent.values().copied().collect::<Vec<_>>();
+        for location in &persistent {
+            self.store.invalidate(*location)?;
+            self.kinds.remove(location);
+            self.array_types.remove(location);
+            self.allocated_locations = self.allocated_locations.saturating_sub(1);
+        }
+        self.persistent.clear();
+        self.output.clear();
+        self.generation = self.generation.saturating_add(1);
         Ok(())
     }
     pub fn limits(&self) -> &Limits {
@@ -938,6 +1119,7 @@ impl Session {
     }
     pub fn cancel(&mut self, host: &mut impl Host) -> Result<()> {
         self.check_host(host)?;
+        self.callbacks.clear();
         if self.terminal() {
             return Ok(());
         }
@@ -948,6 +1130,7 @@ impl Session {
     }
     pub fn disconnect(&mut self, host: &mut impl Host) -> Result<()> {
         self.check_host(host)?;
+        self.callbacks.clear();
         if self.terminal() {
             return Ok(());
         }
@@ -963,6 +1146,7 @@ impl Session {
     }
     /// Use only when the host is already gone; it cannot claim external token cleanup.
     pub fn host_lost(&mut self) -> Result<()> {
+        self.callbacks.clear();
         if self.terminal() {
             return Ok(());
         }
@@ -975,6 +1159,14 @@ impl Session {
         self.cleanup();
         self.state = Outcome::Failed(failure);
         Ok(())
+    }
+    /// Cancelled or host-disconnected: the embedding closed this session.
+    fn lifecycle_closed(&self) -> bool {
+        match &self.state {
+            Outcome::Cancelled => true,
+            Outcome::Failed(failure) => failure.kind == FailureKind::HostDisconnected,
+            _ => false,
+        }
     }
     fn terminal(&self) -> bool {
         matches!(
