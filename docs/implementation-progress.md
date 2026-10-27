@@ -1,10 +1,32 @@
 # Implementation progress
 
-Updated 2026-10-27. Current stage: **M8 implemented; completion audit has three open defects**. The runtime
-profile remains m5-host-v1 with verified IR 1/2/3/4. Correct M8-A1–A3 before M9 conformance/release work. Real
+Updated 2026-10-27. Current stage: **M8 product corrections locally verified; final remote CI pending**. The runtime
+profile remains m5-host-v1 with verified IR 1/2/3/4. M8-A1–A3 and the reported code-assistance defects are corrected; verify remote CI before closing M8. Real
 workbook integration, event order and package/trust/preservation evidence remain fork-owned.
 
-## M8 completion re-audit
+## M8 completion corrections
+
+The latest user request makes working IntelliSense and syntax feedback part of M8. Added public
+Microsoft VBA behavior references and independently authored examples to specification section 14;
+four additional reference pages are cached only under ignored `.cache/evidence/vbe/`, with hashes
+and factual observations tracked. No downloaded implementation, artwork or reference screenshot is used.
+
+Implemented scoped design-time symbol/typed-receiver completion, an editor-anchored list with real
+keyboard/pointer acceptance and cancellation, project signature help, and live red/underlined parser
+feedback that clears on correction without moving the typing caret. Compatible same-host runs
+transfer VM project state; Reset/source or host identity changes isolate it. Find Next advances and
+wraps. CR/CRLF/LF display mapping retains untouched source bytes and compiler/debugger coordinates.
+The Windows checkout regression now compares filesystem identity rather than short/long path spelling.
+
+Local validation: **236 workspace tests** (17 new regressions), strict Clippy/format, layer/provenance/
+corpus checks, UI tests and eleven original rendered variants, native Xvfb capture, headless WASM
+compile/execution and the extended Chromium typing workflow. The 33 IDE/embedding tests run headless;
+21 egui interaction tests verify actual typing, completion, error underlines/recovery and CR editing.
+Remote results for the pushed correction are recorded in the audit before the final completion label.
+Advanced completion/reference/class resolution remains M10; forms/extensions/AI/fork acceptance
+remain M11–M14. Earlier 219-test counts below describe the initial implementation.
+
+## Earlier M8 completion re-audit (historical failures)
 
 After pushing `f462959` on 2026-10-27, reran the required baseline gates and added targeted audit
 probes. Locally, the 219 existing tests and UI/WASM gates pass, but all three extra probes fail: normal Run
@@ -15,7 +37,7 @@ statement breakpoints with the correct line coordinates. These are M8 defects, n
 The pushed GitHub workflow additionally fails its Windows checkout-location regression while UI,
 corpus, WASM, Linux and macOS jobs pass; the audit report records the failing assertion and cached
 log provenance. Resolve that CI gate as well. The earlier completion record below is historical;
-this re-audit supersedes its completion label.
+the correction record above supersedes this historical failure state.
 
 ## Post-M8 milestone allocation
 

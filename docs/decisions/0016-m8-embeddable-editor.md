@@ -73,3 +73,26 @@ On explicit user direction, the remaining UI specification work is assigned to
 native extensions/non-Microsoft enhancements and translation, optional AI, and fork integration
 acceptance respectively. This scheduling amendment preserves the M8 baseline and layer/ownership
 contracts above; planned scope is not an implemented capability.
+
+## M8 correction request — 2026-10-27
+
+The user explicitly includes working IntelliSense and syntax-error feedback in M8. The toolkit-free
+model caches parser diagnostics and scoped declarations with each source revision; it resolves
+simple receiver types only against supplied supported metadata. The renderer owns the anchored
+completion list and keyboard/pointer focus. Parser messages/red underlines update without Compile,
+without navigating away from the typing caret; compiler/runtime diagnostics remain explicit actions.
+Basic project signature help is source metadata, never an evaluator/host call. Advanced class/library
+resolution, constants and richer Quick Info remain M10. Specification section 14 defines examples.
+
+The editor uses an LF display projection with checked byte mappings and a bounded source diff to
+retain untouched mixed CR/CRLF/LF bytes. Compiler/debugger coordinates always refer to original source.
+Compatible terminal invocations transfer VM ProjectState within the same host identity; explicit
+Reset/source revision/host replacement prevents reuse. No GUI or new dependency is added below
+vba-ide. The standalone browser exposes source/feedback mirrors only for its accessible test harness;
+embedded hosts still consume Rust model state/commands directly.
+
+The follow-up ordinary-editor audit verifies keyboard and menu Undo/Redo, selection-aware clipboard
+commands and deletion. Native menu Paste uses the shell's viewport clipboard request; browser Paste
+uses browser keyboard/user-gesture policy with an explicit menu explanation. Renderer-local selection
+and a menu-opening undo snapshot preserve editor history through temporary menu/IME focus changes.
+This does not add IO to the model or claim automatic/whole-block indentation (M10).

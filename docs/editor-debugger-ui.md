@@ -1,6 +1,6 @@
 # Editor and debugger UI contract
 
-Status: M8 implemented, with [three open completion-audit defects](ui/m8-completion-audit.md), 2026-10-27. See
+Status: M8 implemented, with [completion corrections and verification](ui/m8-completion-audit.md), 2026-10-27. See
 [ADR 0016](decisions/0016-m8-embeddable-editor.md), [embedding/running](ui/embedding.md),
 [acceptance and remaining broader-spec features](ui/m8-acceptance.md) and the supplied
 [public-source specification](ui/craft_vba_editor_debugger_ui_spec.md).
@@ -89,6 +89,6 @@ alone does not satisfy the visual UI acceptance gate. The implemented packages a
 now cover native/web panels, explicit command routing and real VM-backed test harnesses. The
 acceptance report records verified local results and limitations; fork workbook integration and
 full C0/C1 coverage of the newer product specification are assigned to
-[planned M10–M14 milestones](ui/post-m8-roadmap.md). Classic completion is M10, forms/class support
+[planned M10–M14 milestones](ui/post-m8-roadmap.md). Advanced classic completion is M10; working word/member completion, project signature help and live parser feedback are M8, forms/class support
 M11, native extensions and translation M12, optional Copilot-style assistance M13, and fork
 integration acceptance M14. M8 remains the delivered baseline.

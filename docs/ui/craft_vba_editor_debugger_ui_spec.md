@@ -921,3 +921,93 @@ The following should be resolved against a declared licensed **reference build**
 Craft* may claim **“familiar VBA editor UI”** after the C0 flows pass. It may claim **“VBE-compatible editor and debugger workflows”** once P1–P5 scenarios pass on real `.xlsm` workbooks with no fabricated runtime actions. It should **not claim pixel-perfect Microsoft VBE replication**, full Excel VBA compatibility, or native binary add-in compatibility until those claims have separately been established and tested. Any incomplete feature must be visibly recorded in a compatibility matrix.
 
 **Product recommendation:** Make the **Classic VBE shell the unchanging compatibility surface**, reuse one host-agnostic editor/debugger implementation across GridCraft and WordCraft, and put AI/Python-translation features in optional extensions. This preserves the value of Excel users' muscle memory while allowing significant modernisation without contaminating the clean public-source implementation.
+
+## 14. M8 code-assistance and syntax-feedback acceptance examples
+
+Added 2026-10-27 following the reported broken IntelliSense and syntax-error highlighting.
+This section makes functional word/member completion and live syntax feedback part of M8.
+M10 retains advanced reference-library/class resolution, List Constants and navigation refinements;
+forms, non-Microsoft extensions and optional AI remain M11–M14 as allocated in
+[the roadmap](post-m8-roadmap.md). These examples are independently authored tests of public behavior,
+not copied Microsoft sample programs or observations from an installed Office build.
+
+### Public behavior references
+
+Microsoft documents insertion-point member suggestions, function argument information and checking
+syntax after entering a line under [VBA environment options](https://learn.microsoft.com/en-us/office/vba/language/how-to/set-visual-basic-environment-options).
+The [Editor toolbar](https://learn.microsoft.com/en-us/office/vba/language/reference/user-interface-help/editor-toolbar)
+describes member lists following a period and parameter information inside the Code window.
+[Code window keys](https://learn.microsoft.com/en-us/office/vba/language/reference/user-interface-help/code-window-general-use-keys)
+documents Ctrl+J and Ctrl+Space. [Expected End Sub](https://learn.microsoft.com/en-us/office/vba/language/reference/user-interface-help/expected-end-sub)
+identifies a mismatched procedure terminator. These are behavior references; no wording, artwork,
+HTML, fonts or implementation code from those pages is incorporated into the product.
+Cached reference HTML is ignored under `.cache/evidence/vbe/`; URL, retrieval date, SHA-256 and
+observations are recorded in [provenance](../provenance/vbe_sources.yaml). Never commit that cache.
+
+### IntelliSense scenarios (authored fixtures)
+
+```vb
+Sub Main(ByVal limit As Long)
+    Dim counter As Long
+    counter = limit
+    Debug.Print counter
+End Sub
+```
+
+At a statement position in Main, `cou` plus Ctrl+Space offers `counter`; `li` offers `limit`.
+Names are matched without case sensitivity. A variable declared only inside another procedure
+must not appear here. Private procedures in another module must not be suggested. Suggestions
+work in design mode and use source declarations, without requiring an earlier debugger pause.
+Typing `Debug.` automatically opens a list containing `Print`; accepting it keeps the receiver
+and inserts exactly `Debug.Print`. Typing `Debug.pr` filters the same list. Up/Down selects,
+Enter/Tab accepts, Escape cancels, and pointer selection also works. Completion stays attached to
+the source caret and typing continues there after acceptance. Comments and strings do not trigger
+suggestions. Unknown receivers display no invented API members.
+
+For a generic injected catalogue with supported `Document.Title` metadata, an independently authored
+`Dim document As Document` declaration followed by `document.` offers `Title`. Unsupported catalogue
+entries stay absent. This is metadata assistance, not a claim that tiny-vba owns Word's object model
+or executes arbitrary object types. The host still owns capabilities and library metadata.
+A project call such as `total = SumTo(` shows the parsed procedure signature while entering arguments;
+assistance never calls VBA, getters or the host to discover values.
+
+### Syntax feedback scenarios (authored fixtures)
+
+```vb
+Sub Main()
+    Dim counter As Long
+    counter =
+End Sub
+```
+
+The incomplete assignment must produce an accessible parser message and mark the affected physical
+line in red with an underline before Compile/Run. Replacing it with `counter = 3` clears that feedback
+without compiling and leaves the insertion point where the user is typing. Multiple parser failures
+are represented, including lexical failures, and empty/EOF spans have a visible line marker.
+
+```vb
+Sub Main()
+    Debug.Print 3
+End Function
+```
+
+The mismatched terminator must be rejected and identified in the source. Changing it to `End Sub`
+clears the syntax failure. Compile/binding/runtime failures remain distinguishable from live parser
+feedback: a valid expression with an unknown name is a binding failure, not necessarily a syntax
+error. Yellow execution highlighting remains tied to the current compiled statement and must not
+be confused with red syntax feedback. Editing paused source makes that execution stale.
+
+The M8 implementation checks on each source revision (earlier than the documented line-commit
+check) and uses nonmodal messages plus red/underlined lines instead of interrupting typing with a
+modal dialog. This is an intentional, testable UI policy, not an assertion of exact VBE appearance.
+LF, CRLF, lone CR and UTF-8 text must share compiler/debugger coordinates. Display normalization
+must preserve untouched source bytes and map editor offsets back to the original source.
+EOF errors may mark the preceding nonempty line so an omitted terminator remains visible.
+
+### Verification evidence
+
+Owning-crate model and egui interaction tests exercise these scenarios, including keyboard/pointer
+acceptance and correction without Compile. `cargo xtask ui` renders original completion and syntax
+feedback snapshots in light/dark themes as well as the existing paused/narrow/scaled/host variants.
+The standalone native and Chromium harnesses exercise the same reusable Rust panels. Screenshots
+remain ignored local reports; exact Office geometry and fork integration require later evidence.

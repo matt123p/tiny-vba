@@ -13,7 +13,7 @@ fn cached_binary_uses_the_invoking_checkout_instead_of_its_build_path() -> Resul
     fs::write(root.join("tools/architecture.json"), "{}\n")?;
     fs::write(
         root.join("tools/check_repository.py"),
-        "from pathlib import Path\nassert Path.cwd() == Path(__file__).resolve().parent.parent\nprint('INVOKING_CHECKOUT_VERIFIED')\n",
+        "from pathlib import Path\nassert Path.cwd().samefile(Path(__file__).resolve().parent.parent)\nprint('INVOKING_CHECKOUT_VERIFIED')\n",
     )?;
     let output = Command::new(env!("CARGO_BIN_EXE_xtask"))
         .arg("layers")

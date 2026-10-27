@@ -7,7 +7,8 @@ baseline; its release gate does not imply completion of later UI features.
 
 The [public-source UI specification](craft_vba_editor_debugger_ui_spec.md) is the requirements
 reference. Its P0–P8 phases and C0/C1/X labels describe feature families, not additional M8 scope.
-This document assigns the remaining work to repository milestones and defines completion evidence.
+The 2026-10-27 correction request explicitly includes working scoped word/member completion and
+live syntax feedback in M8 (specification section 14). This document assigns the remaining work to repository milestones and defines completion evidence.
 Numbering identifies scope; dependencies below determine sequencing. Host integration can proceed
 without waiting for optional extensions or AI.
 
@@ -18,8 +19,8 @@ Owner: tiny-vba editor/model/compiler/debugger layers. Depends on M8 and the app
 - Complete remaining classic editing/project workflows: split and procedure-only code views,
   docking and toolbar customisation, validated module renaming, export-before-remove, bookmarks,
   navigation history, richer editor options/preferences and browser source-file transfer.
-- Complete deterministic, scope/type-aware IntelliSense: List Members/Constants, Complete Word,
-  Quick/Parameter Info, definition/help navigation, reference metadata and richer Object Browser.
+- Extend M8 scoped word/member completion and project signature help with List Constants, richer
+  Quick/Parameter Info, definition/help navigation, external reference metadata and Object Browser.
   Use actual compiler/host catalogue metadata; external library loading needs an explicit host policy.
 - Add Quick Watch, conditional/value-change watches, fuller safe expression/index inspection,
   expanded local editing and error-trapping controls supported by the runtime. Class-specific

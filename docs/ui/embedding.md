@@ -106,3 +106,38 @@ browser PNGs. `VBA_PLAYWRIGHT_MODULE` can point to an external cached Playwright
 `VBA_UI_REPORT_DIR` chooses the generated PNG directory; the default is ignored `reports/ui/`.
 The committed tests assert commands, geometry, accessibility and contrast; PNGs are reproducible
 inspection output, not a checked-in Microsoft or cross-platform pixel baseline.
+
+## M8 code-assistance corrections
+
+Completion now works from design-time source declarations and supplied `ApiMember` entries, including
+simple typed receivers. Typing a word/period or Ctrl+Space/Ctrl+J opens a caret-anchored list; arrows,
+Enter/Tab, Escape and pointer selection work in the source editor. Basic project signature help is
+nonexecuting metadata. Live parser failures are separate `Module::syntax_diagnostics`; they render
+red/underlined affected lines and clear on correction without Compile or diagnostic navigation.
+Use the model's checked editor/source byte projection when implementing another frontend; original
+source bytes/line endings remain authoritative. Compatible same-host reruns retain Static values;
+Reset clears the invocation/project state. Host identity changes prevent state transfer.
+
+`cargo xtask ui` also writes `light-completion`, `dark-completion`, `light-syntax-error` and
+`dark-syntax-error` PNGs. Chromium uses real keyboard source replacement, member completion and
+execution (`8`), then syntax error/correction, and captures `browser-completion`/`browser-syntax-error`.
+The standalone page's hidden source mirror and live feedback status are harness observations; they
+do not introduce web APIs into the embeddable model/panels. All images stay ignored under `reports/ui/`.
+See specification section 14 and the provenance manifest for public reference examples/cache hashes.
+
+## Ordinary editor commands
+
+| Operation | M8 support and verification |
+|---|---|
+| Undo / Redo | Source shortcuts Ctrl+Z / Ctrl+Y or Ctrl+Shift+Z (Command equivalents on macOS); functional Edit menu entries; keyboard and menu regression tests. History uses the toolkit's bounded, grouped undo behavior. |
+| Cut / Copy / Paste | Selection-aware keyboard clipboard operations; Copy/Cut produce real clipboard output; multiline Paste updates source through the same revision/size checks. Native Edit-menu Paste requests the platform clipboard. Chromium verifies the real clipboard round trip. |
+| Browser Paste menu | Disabled with a shortcut explanation: use Ctrl+V / Cmd+V or the browser paste command. Browser clipboard permission/user-gesture policy belongs to the browser shell. |
+| Selection/navigation/deletion | Pointer selection, Shift selection, Select All, arrows/Home/End and word/document navigation, Backspace/Delete and selection replacement use the source widget; regression tests cover Select All, Shift+End, deletion and Unicode source. |
+| New lines / indentation | Enter inserts new lines; Tab inserts indentation at the caret and Shift+Tab removes caret indentation. Untouched LF/CRLF/CR bytes remain intact. This does not implement automatic indentation or whole-block indent/outdent. |
+| Find / Replace | Literal, case-sensitive current-module search; Find Next advances then wraps; bounded Replace All. |
+| Remaining editing workflows | Whole-block indentation/comment commands, automatic indentation/case correction, bookmarks, richer find options, split/procedure views and docking/customisation remain M10. M8 does not claim every conventional editor feature. |
+
+Selection and undo/redo survive temporary Edit-menu focus. Escape cancels completion while keeping
+source focus; accepting completion and immediately typing within the same rendered frame preserves
+the new text. These interaction details have permanent regressions rather than relying on the
+presence of toolkit keyboard bindings alone.

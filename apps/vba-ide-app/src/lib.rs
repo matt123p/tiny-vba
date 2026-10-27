@@ -183,6 +183,17 @@ impl eframe::App for App {
             if let Some(status) = document.get_element_by_id("vba-status") {
                 status.set_text_content(Some(self.ide.mode().label()));
             }
+            if let Some(source) = document.get_element_by_id("vba-source") {
+                source.set_text_content(self.ide.active_module().map(|m| m.text.as_str()));
+            }
+            if let Some(feedback) = document.get_element_by_id("vba-feedback") {
+                let message = self
+                    .ide
+                    .active_module()
+                    .and_then(|m| m.syntax_diagnostics.first())
+                    .map_or_else(|| "Syntax OK".to_owned(), |d| d.to_string());
+                feedback.set_text_content(Some(&message));
+            }
             if let Some(output) = document.get_element_by_id("vba-output") {
                 output.set_text_content(Some(&self.ide.output().join("\n")));
             }

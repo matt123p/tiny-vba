@@ -304,3 +304,208 @@ fn action_ids_and_enabled_states_are_stable() -> R {
     assert!(!ide.enabled(Action::StepOut));
     Ok(())
 }
+
+#[test]
+fn m8_static_reruns_reset_and_source_revision() -> R {
+    let mut ide = Ide::new();
+    let source =
+        "Sub Main()\nStatic counter As Long\ncounter = counter + 1\nDebug.Print counter\nEnd Sub\n";
+    ide.add_module("Static.bas", source)?;
+    for expected in ["1", "2"] {
+        ide.dispatch(Action::Run, &mut NoHost)?;
+        tick(&mut ide, &mut NoHost)?;
+        assert_eq!(ide.output(), vec![expected]);
+    }
+    ide.dispatch(Action::Reset, &mut NoHost)?;
+    ide.dispatch(Action::Run, &mut NoHost)?;
+    tick(&mut ide, &mut NoHost)?;
+    assert_eq!(ide.output(), vec!["1"]);
+    ide.set_text(format!("{source}' revised\n"))?;
+    assert_eq!(ide.mode(), Mode::Stale);
+    ide.dispatch(Action::Reset, &mut NoHost)?;
+    ide.dispatch(Action::Run, &mut NoHost)?;
+    tick(&mut ide, &mut NoHost)?;
+    assert_eq!(ide.output(), vec!["1"]);
+    Ok(())
+}
+#[test]
+fn m8_line_endings_and_unicode_share_compiler_coordinates() -> R {
+    for ending in ["\n", "\r\n", "\r"] {
+        let mut ide = Ide::new();
+        let text = [
+            "Sub Main()",
+            "' café λ",
+            "Dim x As Long",
+            "x = 1",
+            "End Sub",
+            "",
+        ]
+        .join(ending);
+        ide.add_module("Lines.bas", &text)?;
+        let byte = text.find("x = 1").ok_or("statement")?;
+        let m = ide.active_module().ok_or("module")?;
+        assert_eq!(m.line_at(byte), 4);
+        assert_eq!(m.line_start(4), byte);
+        let file = m.source()?;
+        assert_eq!(file.position(file.span(byte as u32, byte as u32)?)?.0, 4);
+        ide.toggle_breakpoint_at(byte)?;
+        ide.dispatch(Action::Run, &mut NoHost)?;
+        tick(&mut ide, &mut NoHost)?;
+        assert_eq!(ide.execution().ok_or("stop")?.line, 4);
+    }
+    Ok(())
+}
+#[test]
+fn m8_design_completion_is_scoped_and_case_insensitive() -> R {
+    let mut ide = Ide::new();
+    ide.add_module(
+        "Other.bas",
+        "Private Sub Secret()\nEnd Sub\nPublic Sub Shared()\nEnd Sub\n",
+    )?;
+    let text = "Dim moduleValue As Long\nSub Main(ByVal argument As Long)\nDim counter As Long\nDebug.Print counter\nEnd Sub\nSub Other()\nDim hidden As Long\nEnd Sub\n";
+    ide.add_module("Main.bas", text)?;
+    ide.active_module_mut().ok_or("module")?.caret = text.find("Debug.Print").ok_or("caret")?;
+    for word in ["counter", "argument", "moduleValue", "Shared"] {
+        assert!(
+            ide.completions(&word[..2]).contains(&word.to_string()),
+            "missing {word}"
+        );
+    }
+    assert!(ide.completions("hi").is_empty());
+    assert!(ide.completions("Secret").is_empty());
+    assert_eq!(ide.completions("Debug.pr"), vec!["Print"]);
+    assert!(ide.completions("Unknown.").is_empty());
+    Ok(())
+}
+#[test]
+fn m8_live_syntax_feedback_clears_without_compile_and_preserves_caret() -> R {
+    let mut ide = Ide::demo()?;
+    ide.active_module_mut().ok_or("module")?.caret = 12;
+    ide.set_text("Sub Main()\nDim count As Long\ncount =\nEnd Sub\n".into())?;
+    let m = ide.active_module().ok_or("module")?;
+    assert!(!m.syntax_diagnostics.is_empty());
+    assert!(
+        m.syntax_error_lines()
+            .iter()
+            .any(|r| r.contains(&m.text.find("count =").unwrap_or(0))),
+        "{:?}",
+        m.syntax_diagnostics
+    );
+    assert_eq!(m.caret, 12);
+    ide.set_text("Sub Main()\nDim count As Long\ncount = 3\nEnd Sub\n".into())?;
+    assert!(
+        ide.active_module()
+            .ok_or("module")?
+            .syntax_diagnostics
+            .is_empty()
+    );
+    ide.set_text("Sub Main()\nEnd Function\n".into())?;
+    assert!(
+        !ide.active_module()
+            .ok_or("module")?
+            .syntax_diagnostics
+            .is_empty()
+    );
+    Ok(())
+}
+#[test]
+fn m8_receiver_completion_works_while_member_expression_is_incomplete() -> R {
+    let mut ide = Ide::new();
+    let text =
+        "Dim document As OtherType\nSub Main()\nDim document As Document\ndocument.\nEnd Sub\n";
+    ide.add_module("Main.bas", text)?;
+    ide.configure_host(
+        vec![],
+        Default::default(),
+        vec![vba_ide::ApiMember {
+            library: "Test host".into(),
+            owner: "Document".into(),
+            name: "Title".into(),
+            signature: "Title As String".into(),
+            supported: true,
+        }],
+    )?;
+    ide.active_module_mut().ok_or("module")?.caret =
+        text.find("document.\n").ok_or("caret")? + "document.".len();
+    assert_eq!(ide.completions("document."), vec!["Title"]);
+    Ok(())
+}
+#[test]
+fn m8_editor_diff_preserves_mixed_line_endings_and_unicode_offsets() -> R {
+    let mut ide = Ide::new();
+    ide.add_module(
+        "Mixed.bas",
+        "' café\r\nSub Main()\rDebug.Print 1\nEnd Sub\r",
+    )?;
+    let m = ide.active_module().ok_or("module")?;
+    let display = vba_ide::editor_text(&m.text);
+    assert_eq!(m.edited_source(&display), m.text);
+    let edited = display.replace("Print 1", "Print 2\n' new");
+    assert_eq!(
+        m.edited_source(&edited),
+        "' café\r\nSub Main()\rDebug.Print 2\r\n' new\nEnd Sub\r"
+    );
+    for (byte, _) in display.char_indices() {
+        let source = vba_ide::source_byte(&m.text, byte);
+        assert_eq!(vba_ide::editor_byte(&m.text, source), byte);
+    }
+    Ok(())
+}
+#[test]
+fn m8_signature_help_and_eof_error_have_source_evidence() -> R {
+    let mut ide = Ide::demo()?;
+    let text = vba_ide::DEMO.replace("SumTo(counter)", "SumTo(");
+    ide.set_text(text.clone())?;
+    ide.active_module_mut().ok_or("module")?.caret =
+        text.find("total = SumTo(").ok_or("caret")? + "total = SumTo(".len();
+    assert!(
+        ide.signature_help()
+            .is_some_and(|s| s.contains("ByVal limit As Long"))
+    );
+    ide.set_text("Sub Main()\nDebug.Print 1\n".into())?;
+    let m = ide.active_module().ok_or("module")?;
+    assert!(!m.syntax_diagnostics.is_empty());
+    assert!(m.syntax_error_lines().iter().any(|r| r.end > r.start));
+    ide.set_text("Sub Main()\nDebug.Print \"unterminated\nEnd Sub\n".into())?;
+    assert!(
+        !ide.active_module()
+            .ok_or("module")?
+            .syntax_diagnostics
+            .is_empty()
+    );
+    Ok(())
+}
+#[test]
+fn m8_host_identity_change_does_not_restore_previous_project_state() -> R {
+    struct IdentityHost(u64);
+    impl Host for IdentityHost {
+        fn identity(&self) -> u64 {
+            self.0
+        }
+        fn invoke(&mut self, call: vba_foreign::HostCall) -> vba_foreign::Reply {
+            NoHost.invoke(call)
+        }
+        fn resume(&mut self, token: u64) -> vba_foreign::Reply {
+            NoHost.resume(token)
+        }
+        fn cancel(&mut self, _token: u64) {}
+    }
+    let mut ide = Ide::new();
+    ide.add_module(
+        "Static.bas",
+        "Sub Main()\nStatic counter As Long\ncounter = counter + 1\nDebug.Print counter\nEnd Sub\n",
+    )?;
+    for (identity, expected) in [(42, "1"), (42, "2"), (43, "1")] {
+        let mut host = IdentityHost(identity);
+        ide.dispatch(Action::Run, &mut host)?;
+        tick(&mut ide, &mut host)?;
+        assert_eq!(ide.output(), vec![expected]);
+    }
+    assert!(
+        ide.configure_host(vec![], Default::default(), vec![])
+            .is_err()
+    );
+    ide.dispatch(Action::Reset, &mut NoHost)?;
+    ide.configure_host(vec![], Default::default(), vec![])?;
+    Ok(())
+}

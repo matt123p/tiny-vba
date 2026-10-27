@@ -1,7 +1,9 @@
 //! Toolkit-independent editor/project state and bounded debugger actions.
 //! This layer never opens files, dialogs, network connections or Office documents.
 #![forbid(unsafe_code)]
+mod code_aids;
 mod evaluate;
+pub use code_aids::{completion_prefix, editor_byte, editor_text, line_starts, source_byte};
 pub use evaluate::{display_value, type_name};
 use std::collections::{BTreeMap, BTreeSet};
 use vba_compiler::{CompileOptions, compile_modules};
@@ -27,6 +29,7 @@ fn error(message: &str) -> Diagnostic {
 pub struct Procedure {
     pub name: String,
     pub signature: String,
+    pub public: bool,
     pub start: usize,
     pub line: usize,
 }
@@ -41,6 +44,8 @@ pub struct Module {
     saved_text: String,
     pub breakpoints: BTreeSet<u32>,
     pub procedures: Vec<Procedure>,
+    pub syntax_diagnostics: Vec<Diagnostic>,
+    symbols: Vec<code_aids::Symbol>,
 }
 impl Module {
     pub fn dirty(&self) -> bool {
@@ -50,28 +55,33 @@ impl Module {
         SourceFile::new(self.id, self.name.clone(), self.text.clone())
     }
     pub fn line_at(&self, byte: usize) -> usize {
-        self.text
-            .get(..byte)
-            .unwrap_or_default()
-            .bytes()
-            .filter(|b| *b == b'\n')
+        line_starts(&self.text)
+            .take_while(|start| *start <= byte)
             .count()
-            + 1
+            .max(1)
     }
     pub fn line_start(&self, line: usize) -> usize {
         if line <= 1 {
             return 0;
         }
-        self.text
-            .match_indices('\n')
-            .nth(line.saturating_sub(2))
-            .map_or(self.text.len(), |(i, _)| i + 1)
+        line_starts(&self.text)
+            .nth(line - 1)
+            .unwrap_or(self.text.len())
     }
     fn refresh(&mut self) {
         self.procedures.clear();
-        if let Ok(source) = self.source()
-            && let Ok(parsed) = parse(&source, ModuleKind::Standard)
-        {
+        self.syntax_diagnostics.clear();
+        self.symbols.clear();
+        if let Ok(source) = self.source() {
+            let parsed = match parse(&source, ModuleKind::Standard) {
+                Ok(parsed) => parsed,
+                Err(diagnostic) => {
+                    self.syntax_diagnostics.push(diagnostic);
+                    return;
+                }
+            };
+            self.syntax_diagnostics = parsed.diagnostics.clone();
+            self.symbols = code_aids::symbols(&parsed.module);
             self.procedures = parsed
                 .module
                 .procedures
@@ -80,10 +90,11 @@ impl Module {
                     let start = p.span.start() as usize;
                     Procedure {
                         name: p.name.spelling.clone(),
+                        public: p.visibility != vba_syntax::Visibility::Private,
                         signature: source
                             .slice(p.span)
                             .unwrap_or_default()
-                            .lines()
+                            .split(['\r', '\n'])
                             .next()
                             .unwrap_or_default()
                             .into(),
@@ -246,6 +257,7 @@ pub struct Ide {
     roots: BTreeMap<String, ObjectRef>,
     requests: Vec<HostRequest>,
     temporary_breakpoint: Option<StatementId>,
+    session_host: Option<u64>,
 }
 impl Default for Ide {
     fn default() -> Self {
@@ -274,6 +286,7 @@ impl Ide {
             roots: BTreeMap::new(),
             requests: vec![],
             temporary_breakpoint: None,
+            session_host: None,
         }
     }
     pub fn demo() -> Result<Self> {
@@ -347,8 +360,11 @@ impl Ide {
             saved_text: text.into(),
             breakpoints: BTreeSet::new(),
             procedures: vec![],
+            syntax_diagnostics: vec![],
+            symbols: vec![],
         };
         module.refresh();
+        self.diagnostics.clear();
         self.modules.push(module);
         self.active = self.modules.len().saturating_sub(1);
         self.changed()?;
@@ -400,6 +416,7 @@ impl Ide {
         if had_breakpoints {
             self.message("Source changed: breakpoints cleared; set them against the new revision.");
         }
+        self.diagnostics.clear();
         self.changed()
     }
     pub fn mark_saved(&mut self, id: SourceId, revision: u64) -> Result<()> {
@@ -516,6 +533,12 @@ impl Ide {
             )?)
         };
         let mut session = Session::new(program, 1, vec![], binding, Limits::default())?;
+        if !self.stale
+            && self.session_host == Some(host.identity())
+            && let Some(previous) = &self.session
+        {
+            session.restore_project(previous.project_state()?)?;
+        }
         session.set_break_on_error(self.break_on_errors);
         self.controller = Controller::new();
         self.temporary_breakpoint = None;
@@ -543,6 +566,7 @@ impl Ide {
             session.request_pause();
         }
         self.session = Some(session);
+        self.session_host = Some(host.identity());
         self.stale = false;
         self.selected_frame = 0;
         self.diagnostics.clear();
@@ -1043,8 +1067,21 @@ impl Ide {
         let mut names = BTreeSet::new();
         if prefix.contains('.') {
             if let Some((owner, member)) = prefix.rsplit_once('.') {
+                let receiver_type = self
+                    .source_completions()
+                    .into_iter()
+                    .find(|(name, _)| name.eq_ignore_ascii_case(owner))
+                    .and_then(|(_, ty)| ty);
+                if owner.eq_ignore_ascii_case("Debug")
+                    && "print".starts_with(&member.to_ascii_lowercase())
+                {
+                    names.insert("Print".into());
+                }
                 for item in &self.catalog {
-                    if item.owner.eq_ignore_ascii_case(owner)
+                    if (item.owner.eq_ignore_ascii_case(owner)
+                        || receiver_type
+                            .as_ref()
+                            .is_some_and(|ty| item.owner.eq_ignore_ascii_case(ty)))
                         && item.supported
                         && item
                             .name
@@ -1056,14 +1093,12 @@ impl Ide {
                 }
             }
         } else {
-            for m in &self.modules {
-                for p in &m.procedures {
-                    if p.name
-                        .to_ascii_lowercase()
-                        .starts_with(&prefix.to_ascii_lowercase())
-                    {
-                        names.insert(p.name.clone());
-                    }
+            for (name, _) in self.source_completions() {
+                if name
+                    .to_ascii_lowercase()
+                    .starts_with(&prefix.to_ascii_lowercase())
+                {
+                    names.insert(name);
                 }
             }
             for (name, _, _) in self.locals() {
@@ -1082,6 +1117,23 @@ impl Ide {
                 "As",
                 "Long",
                 "String",
+                "Byte",
+                "Integer",
+                "Single",
+                "Double",
+                "Currency",
+                "Date",
+                "Variant",
+                "Object",
+                "Static",
+                "Public",
+                "Private",
+                "Const",
+                "Empty",
+                "Null",
+                "Nothing",
+                "True",
+                "False",
                 "Boolean",
                 "If",
                 "Then",

@@ -118,5 +118,55 @@ fn main() -> Result<(), Box<dyn Error>> {
             image.height()
         );
     }
+    for (name, theme, completion) in [
+        ("light-completion", Theme::light(), true),
+        ("dark-completion", Theme::dark(), true),
+        ("light-syntax-error", Theme::light(), false),
+        ("dark-syntax-error", Theme::dark(), false),
+    ] {
+        let mut ide = Ide::new();
+        let source = if completion {
+            "Sub Main()\n    Debug\nEnd Sub\n"
+        } else {
+            "Sub Main()\n    Dim counter As Long\n    counter =\nEnd Sub\n"
+        };
+        ide.add_module("Module1.bas", source)?;
+        if let Some(m) = ide.active_module_mut() {
+            m.caret = if completion {
+                source.find("Debug").ok_or("caret")? + 5
+            } else {
+                source.find("counter =").ok_or("caret")?
+            };
+        }
+        let state = Fixture {
+            ide,
+            view: EditorUi::default(),
+            theme,
+        };
+        let mut harness = Harness::builder()
+            .with_size(egui::vec2(1200.0, 800.0))
+            .wgpu()
+            .build_ui_state(
+                |ui, state: &mut Fixture| {
+                    for command in state.view.show(ui, &state.ide, state.theme) {
+                        if let Err(error) = vba_ui_egui::apply(&mut state.ide, command, &mut NoHost)
+                        {
+                            state.ide.message(error.to_string());
+                        }
+                    }
+                },
+                state,
+            );
+        harness.key_press(egui::Key::F7);
+        harness.run();
+        if completion {
+            harness.event(egui::Event::Text(".".into()));
+            harness.run();
+        }
+        let image = harness.render().map_err(std::io::Error::other)?;
+        let path = root.join(format!("{name}.png"));
+        image.save(&path)?;
+        println!("UI_SNAPSHOT {} original-code-assistance", path.display());
+    }
     Ok(())
 }

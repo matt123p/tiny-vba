@@ -1,7 +1,7 @@
-# M8 completion audit — open defects
+# M8 completion audit — findings and corrections
 
 Date: 2026-10-27. Audited implementation: `f4629598b7ce475f5fef4b478c5b6d93338877b6`.
-**Result: M8 is implemented, but full completion is not verified. Three delivered-scope defects remain.**
+**Original result: three delivered-scope defects found. The correction re-audit below records fixes and current verification.**
 The M10–M14 feature allocation is unchanged; these are M8 corrections, not new deferred features.
 
 The working tree was already committed. `git push origin main` pushed `f462959`, and
@@ -102,3 +102,39 @@ M8 can regain a verified-complete label after M8-A1–A3 are fixed, their perman
 pass, the required native/WASM/UI gates are rerun, the Windows CI regression is resolved and
 verified remotely, and the resulting commit is pushed. No M10–M14
 feature is required to close these three M8 findings.
+
+## Correction re-audit — 2026-10-27
+
+The failures above describe the original audited commit. All three product defects are now fixed:
+
+| Finding | Correction | Permanent regression evidence |
+|---|---|---|
+| M8-A1 | Transfer terminal VM ProjectState into compatible same-host invocations; Reset/source/host changes prevent reuse | `m8_static_reruns_reset_and_source_revision`, `m8_host_identity_change_does_not_restore_previous_project_state` |
+| M8-A2 | Advance beyond the previously found occurrence and wrap; remember query/source/caret | `m8_find_next_advances_and_wraps` (real Find field and pointer buttons) |
+| M8-A3 | Shared CR/CRLF/LF physical line starts and checked source/display projection; untouched mixed endings preserved | `m8_line_endings_and_unicode_share_compiler_coordinates`, `m8_editor_diff_preserves_mixed_line_endings_and_unicode_offsets`, `m8_cr_editor_typing_keeps_source_endings_and_gutter` |
+| Windows checkout assertion | Compare filesystem identity with `Path.samefile`, accepting Windows short/long aliases | Existing invoking-checkout regression; remote Windows confirmation is required below |
+
+The user additionally made functional IntelliSense/syntax feedback M8 requirements. Design-mode
+scoped symbols/parameters, simple typed receivers with supported host metadata, project signature
+help and an editor-anchored keyboard/pointer completion list replace the original dialog-only path.
+Live parser messages and red/underlined source lines now update/clear on edits without Compile or
+moving the typing caret. Tests inspect actual rendered underline sections in both themes. EOF and
+lexical errors, out-of-scope/private symbols, unknown receivers, correction, CR editing, Escape focus,
+fast typing after acceptance and normal editor commands are covered. Edit menu selection/clipboard/
+undo/redo commands preserve selection/history across focus changes. Browser Paste uses its standard
+keyboard route; the standalone web menu explains that boundary.
+
+`tools/audit_m8_completion.py` now runs the permanent `m8_` regressions directly; temporary failing
+probes have been removed. Public examples/references and intentional nonmodal/live-check policy are
+in UI specification section 14. All ten reference-page downloads and the prior Windows log remain
+ignored cache evidence; only provenance/observations are committed.
+
+Local gates: `cargo xtask ci` (236 workspace tests, format, strict Clippy and repository checks),
+`cargo xtask ui` (33 IDE/embedding, 21 UI interactions, shell tests and eleven original render variants),
+`cargo xtask wasm`, `cargo xtask wasm-run` (including 33 headless IDE tests), native Xvfb capture,
+`cargo xtask web` and Chromium keyboard/clipboard/debugger/syntax correction smoke. Generated product
+images remain in ignored `reports/ui/`; reference-cache content is never checked in.
+
+Remote CI: pending the pushed correction. Confirm Windows plus Linux/macOS, WASM, UI and corpus jobs
+before changing the milestone's final verification label. No fresh Office or real-fork integration
+result is inferred from these checks; M10–M14 boundaries remain explicit in the roadmap.

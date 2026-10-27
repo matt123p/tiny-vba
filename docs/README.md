@@ -70,7 +70,7 @@ and controlled native/WASI acceptance.
 - [Planned M10–M14 milestones: classic completion, forms, native extensions, AI and host acceptance](ui/post-m8-roadmap.md)
 - [Run, embed and reproduce visual evidence](ui/embedding.md)
 - [Acceptance and broader-spec feature status](ui/m8-acceptance.md)
-- [M8 completion audit: three open defects and reproduction](ui/m8-completion-audit.md)
+- [M8 completion audit: corrections, regression coverage and verification](ui/m8-completion-audit.md)
 - [Public source manifest](provenance/vbe_sources.yaml), [dependency/font provenance](provenance/ui-dependencies.json)
 
 Downloaded reference evidence is ignored under `.cache/evidence/`; original rendered PNGs are

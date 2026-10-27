@@ -98,10 +98,27 @@ baseline; they do not mark these later features complete. M9 conformance/release
 The [subsequent completion audit](m8-completion-audit.md) supersedes the earlier completed-gate
 label. Required baseline checks still pass, but full M8 completion needs these corrections:
 
-- [ ] M8-A1: preserve Static/project state across normal reruns until explicit Reset.
-- [ ] M8-A2: advance Find Next beyond the current match.
-- [ ] M8-A3: align lone-CR source coordinates with compiler/debugger positions.
+- [x] M8-A1: preserve Static/project state across normal reruns until explicit Reset.
+- [x] M8-A2: advance Find Next beyond the current match.
+- [x] M8-A3: align lone-CR source coordinates with compiler/debugger positions.
 - [ ] Resolve the Windows checkout-location CI failure and verify its remote job.
-- [ ] Add permanent regression coverage, rerun gates and push the corrections.
+- [x] Add permanent regression coverage and rerun local gates.
+- [ ] Push corrections and confirm all remote CI jobs.
 
 These are defects in the delivered M8 scope, independent of planned M10–M14 features.
+
+## Completion corrections (2026-10-27 user request)
+
+The reported broken IntelliSense and syntax feedback are M8 acceptance requirements.
+Implement in this order, keeping the existing model/rendering/shell boundaries:
+
+1. Record public Microsoft VBA behavior, independently authored acceptance examples and ignored-cache provenance.
+2. Preserve compatible project state across Run; correct Find Next, CR/LF coordinates and Windows checkout verification.
+3. Add design-time scoped symbol completion and receiver metadata, editor-anchored member/word completion with keyboard acceptance/cancellation, and project signature help.
+4. Refresh parser diagnostics on source edits; render every affected line with red text/underline and an accessible message, without moving the typing caret. Keep compile/runtime diagnostics separate from live parsing.
+5. Add regression and real typing tests, capture and inspect original light/dark/error/completion snapshots, exercise native and browser shells, then run CI/WASM gates.
+6. Update acceptance/progress/embedding scope, commit/push, and verify remote CI including Windows.
+
+M10 retains advanced completion/class-library resolution and advanced debugger features;
+M11–M14 retain the forms/extensions/AI/fork allocation. No proprietary reference assets or
+implementation code may enter the checkout; downloaded evidence stays under ignored `.cache/evidence/`.

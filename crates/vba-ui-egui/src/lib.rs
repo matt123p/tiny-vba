@@ -92,6 +92,16 @@ pub struct LayoutReport {
     pub source: Option<SourceId>,
     pub editor_scope: egui::Id,
 }
+#[derive(Clone, Copy)]
+enum EditOperation {
+    Undo,
+    Redo,
+    Cut,
+    Copy,
+    Paste,
+    SelectAll,
+    Delete,
+}
 /// Persistent view preferences; source and execution live in `Ide`, not in this renderer.
 pub struct EditorUi {
     pub project_visible: bool,
@@ -110,6 +120,16 @@ pub struct EditorUi {
     browser_search: String,
     completion: bool,
     completion_prefix: String,
+    completion_selected: usize,
+    completion_anchor: egui::Pos2,
+    last_find: Option<(String, SourceId, usize)>,
+    edit_operation: Option<EditOperation>,
+    source_selection: Option<(SourceId, egui::text::CCursorRange)>,
+    edit_menu_open: bool,
+    menu_history: Option<(
+        SourceId,
+        egui::util::undoer::Undoer<(egui::text::CCursorRange, String)>,
+    )>,
     focus_editor: bool,
     focus_find: bool,
     focus_pane: bool,
@@ -141,6 +161,13 @@ impl Default for EditorUi {
             browser_search: String::new(),
             completion: false,
             completion_prefix: String::new(),
+            completion_selected: 0,
+            completion_anchor: egui::Pos2::ZERO,
+            last_find: None,
+            edit_operation: None,
+            source_selection: None,
+            edit_menu_open: false,
+            menu_history: None,
             focus_editor: false,
             focus_find: false,
             focus_pane: false,
@@ -182,6 +209,9 @@ impl EditorUi {
             self.navigate = true;
         }
         self.last_diagnostic = diagnostic;
+        if self.last_source != ide.active_module().map(|m| m.id) {
+            self.completion = false;
+        }
         ui.push_id(self.instance,|ui|{
             let visuals=if theme.dark{egui::Visuals::dark()}else{egui::Visuals::light()};
             *ui.visuals_mut()=visuals;ui.visuals_mut().panel_fill=theme.chrome;ui.visuals_mut().window_fill=theme.chrome;ui.visuals_mut().override_text_color=Some(theme.text);ui.visuals_mut().extreme_bg_color=theme.editor;ui.visuals_mut().widgets.noninteractive.bg_stroke.color=theme.border;
@@ -257,11 +287,28 @@ if response.double_clicked(){self.focus_editor=true;}response.context_menu(|ui|{
                 && let Some(m) = ide.active_module()
                 && let Some(byte) = m
                     .text
-                    .get(m.caret.min(m.text.len())..)
+                    .get(
+                        if self.last_find.as_ref().is_some_and(|(q, id, byte)| {
+                            q == &self.find && *id == m.id && *byte == m.caret
+                        }) {
+                            m.caret.saturating_add(self.find.len()).min(m.text.len())
+                        } else {
+                            m.caret.min(m.text.len())
+                        }..,
+                    )
                     .and_then(|s| s.find(&self.find))
-                    .map(|i| i + m.caret)
+                    .map(|i| {
+                        i + if self.last_find.as_ref().is_some_and(|(q, id, byte)| {
+                            q == &self.find && *id == m.id && *byte == m.caret
+                        }) {
+                            m.caret.saturating_add(self.find.len()).min(m.text.len())
+                        } else {
+                            m.caret
+                        }
+                    })
                     .or_else(|| m.text.find(&self.find))
             {
+                self.last_find = Some((self.find.clone(), m.id, byte));
                 commands.push(Command::Caret(byte));
                 self.navigate = true;
             }
@@ -306,8 +353,43 @@ if response.double_clicked(){self.focus_editor=true;}response.context_menu(|ui|{
             self.action_button(ui, ide, Action::ReturnToHost, commands);
             self.action_button(ui, ide, Action::CloseProject, commands);
         });
+        let was_edit_open = self.edit_menu_open;
+        self.edit_menu_open = false;
         ui.menu_button("Edit", |ui| {
-            ui.label("Undo / Redo / Cut / Copy / Paste: use editor shortcuts");
+            self.edit_menu_open = true;
+            if !was_edit_open && let Some(m) = ide.active_module() {
+                let id = self
+                    .scope
+                    .unwrap_or(ui.scope_id())
+                    .with(("vba.source", m.id.0));
+                self.menu_history = egui::text_edit::TextEditState::load(ui.ctx(), id)
+                    .map(|state| (m.id, state.undoer()));
+            }
+            for (label, operation) in [
+                ("Undo    Ctrl+Z", EditOperation::Undo),
+                ("Redo    Ctrl+Y", EditOperation::Redo),
+                ("Cut    Ctrl+X", EditOperation::Cut),
+                ("Copy    Ctrl+C", EditOperation::Copy),
+                ("Paste    Ctrl+V", EditOperation::Paste),
+                ("Delete", EditOperation::Delete),
+                ("Select All    Ctrl+A", EditOperation::SelectAll),
+            ] {
+                let available = ide.active_module().is_some()
+                    && (!cfg!(target_arch = "wasm32")
+                        || !matches!(operation, EditOperation::Paste));
+                let response = ui.add_enabled(available, egui::Button::new(label));
+                if cfg!(target_arch = "wasm32") && matches!(operation, EditOperation::Paste) {
+                    response
+                        .clone()
+                        .on_hover_text("Use Ctrl+V / Cmd+V or the browser paste command");
+                }
+                if response.clicked() {
+                    self.edit_operation = Some(operation);
+                    self.completion = false;
+                    ui.close();
+                }
+            }
+            ui.separator();
             if ui.button("Find...    Ctrl+F").clicked() {
                 self.find_open = true;
                 self.focus_find = true;
@@ -319,20 +401,7 @@ if response.double_clicked(){self.focus_editor=true;}response.context_menu(|ui|{
                 ui.close();
             }
             if ui.button("Complete Word    Ctrl+Space").clicked() {
-                self.completion = true;
-                if let Some(m) = ide.active_module() {
-                    self.completion_prefix = m
-                        .text
-                        .get(..m.caret)
-                        .unwrap_or_default()
-                        .chars()
-                        .rev()
-                        .take_while(|c| c.is_ascii_alphanumeric() || *c == '_' || *c == '.')
-                        .collect::<String>()
-                        .chars()
-                        .rev()
-                        .collect();
-                }
+                self.request_completion(ide);
                 ui.close();
             }
         });
@@ -548,20 +617,7 @@ if response.double_clicked(){self.focus_editor=true;}response.context_menu(|ui|{
             i.consume_key(egui::Modifiers::CTRL, egui::Key::Space)
                 || i.consume_key(egui::Modifiers::CTRL, egui::Key::J)
         }) {
-            self.completion = true;
-            if let Some(m) = ide.active_module() {
-                self.completion_prefix = m
-                    .text
-                    .get(..m.caret)
-                    .unwrap_or_default()
-                    .chars()
-                    .rev()
-                    .take_while(|c| c.is_ascii_alphanumeric() || *c == '_' || *c == '.')
-                    .collect::<String>()
-                    .chars()
-                    .rev()
-                    .collect();
-            }
+            self.request_completion(ide);
         }
     }
     fn code_editor(
@@ -578,7 +634,18 @@ if response.double_clicked(){self.focus_editor=true;}response.context_menu(|ui|{
         let Some(m) = ide.active_module() else {
             return;
         };
-        let mut text = m.text.clone();
+        if let Some(d) = m.syntax_diagnostics.first() {
+            ui.colored_label(theme.breakpoint, format!("! Syntax: {d}"));
+        }
+        if let Some(signature) = ide.signature_help() {
+            ui.label(RichText::new(signature).monospace().color(theme.keyword));
+        }
+        let errors: Vec<_> = m
+            .syntax_error_lines()
+            .into_iter()
+            .map(|r| vba_ide::editor_byte(&m.text, r.start)..vba_ide::editor_byte(&m.text, r.end))
+            .collect();
+        let mut text = vba_ide::editor_text(&m.text);
         let font = FontId::monospace(self.font_size);
         let row_height = ui.fonts_mut(|f| f.row_height(&font));
         let stop = ide
@@ -588,7 +655,15 @@ if response.double_clicked(){self.focus_editor=true;}response.context_menu(|ui|{
             .diagnostics
             .first()
             .and_then(|d| d.span)
-            .filter(|s| s.source() == m.id);
+            .filter(|s| s.source() == m.id)
+            .map(|s| {
+                vba_ide::editor_byte(&m.text, s.start() as usize)
+                    ..vba_ide::editor_byte(&m.text, s.end() as usize)
+            });
+        let stop_range = stop.as_ref().map(|s| {
+            vba_ide::editor_byte(&m.text, s.span.start() as usize)
+                ..vba_ide::editor_byte(&m.text, s.span.end() as usize)
+        });
         let scroll_id = self
             .scope
             .unwrap_or(ui.scope_id())
@@ -602,10 +677,7 @@ if response.double_clicked(){self.focus_editor=true;}response.context_menu(|ui|{
                     ui.vertical(|ui| {
                         ui.spacing_mut().item_spacing.y = 0.0;
                         ui.add_space(2.0);
-                        for (line_start, line) in std::iter::once(0)
-                            .chain(m.text.match_indices('\n').map(|(i, _)| i + 1))
-                            .zip(1usize..)
-                        {
+                        for (line_start, line) in vba_ide::line_starts(&m.text).zip(1usize..) {
                             let breakpoint =
                                 m.breakpoints.iter().any(|b| m.line_at(*b as usize) == line);
                             let current = stop.as_ref().is_some_and(|s| s.line == line);
@@ -658,6 +730,116 @@ if response.double_clicked(){self.focus_editor=true;}response.context_menu(|ui|{
                             }
                         }
                     });
+                    let id = self
+                        .scope
+                        .unwrap_or(ui.scope_id())
+                        .with(("vba.source", m.id.0));
+                    if self.edit_operation.is_some()
+                        && (!ui.ctx().memory(|mem| mem.owns_ime_events(id))
+                            || ui.ctx().input(|i| i.pointer.any_released()))
+                    {
+                        ui.ctx().memory_mut(|mem| mem.request_focus(id));
+                        ui.ctx().request_repaint();
+                    } else if let Some(operation) = self.edit_operation.take() {
+                        if let Some((source, selection)) = self.source_selection
+                            && source == m.id
+                            && let Some(mut state) =
+                                egui::text_edit::TextEditState::load(ui.ctx(), id)
+                        {
+                            state.cursor.set_char_range(Some(selection));
+                            state.store(ui.ctx(), id);
+                        }
+                        if let Some((source, history)) = self.menu_history.take()
+                            && source == m.id
+                            && let Some(mut state) =
+                                egui::text_edit::TextEditState::load(ui.ctx(), id)
+                        {
+                            state.set_undoer(history);
+                            state.store(ui.ctx(), id);
+                        }
+                        ui.ctx().memory_mut(|memory| memory.request_focus(id));
+                        let key = match operation {
+                            EditOperation::Undo => Some((egui::Key::Z, egui::Modifiers::COMMAND)),
+                            EditOperation::Redo => Some((egui::Key::Y, egui::Modifiers::COMMAND)),
+                            EditOperation::SelectAll => {
+                                Some((egui::Key::A, egui::Modifiers::COMMAND))
+                            }
+                            EditOperation::Delete => {
+                                Some((egui::Key::Delete, egui::Modifiers::NONE))
+                            }
+                            EditOperation::Cut => {
+                                ui.ctx().input_mut(|i| i.events.push(egui::Event::Cut));
+                                None
+                            }
+                            EditOperation::Copy => {
+                                ui.ctx().input_mut(|i| i.events.push(egui::Event::Copy));
+                                None
+                            }
+                            EditOperation::Paste => {
+                                ui.ctx()
+                                    .send_viewport_cmd(egui::ViewportCommand::RequestPaste);
+                                None
+                            }
+                        };
+                        if let Some((key, modifiers)) = key {
+                            ui.ctx().input_mut(|i| {
+                                i.events.push(egui::Event::Key {
+                                    key,
+                                    physical_key: None,
+                                    pressed: true,
+                                    repeat: false,
+                                    modifiers,
+                                })
+                            });
+                        }
+                    }
+                    let mut accepted_completion = None;
+                    if self.completion {
+                        let choices = ide.completions(&self.completion_prefix);
+                        ui.ctx().input_mut(|input| {
+                            if input.consume_key(egui::Modifiers::NONE, egui::Key::Escape) {
+                                self.completion = false;
+                                return;
+                            }
+                            if input.consume_key(egui::Modifiers::NONE, egui::Key::ArrowDown) {
+                                self.completion_selected = (self.completion_selected + 1)
+                                    .min(choices.len().saturating_sub(1));
+                            }
+                            if input.consume_key(egui::Modifiers::NONE, egui::Key::ArrowUp) {
+                                self.completion_selected =
+                                    self.completion_selected.saturating_sub(1);
+                            }
+                            if input.consume_key(egui::Modifiers::NONE, egui::Key::Enter)
+                                || input.consume_key(egui::Modifiers::NONE, egui::Key::Tab)
+                            {
+                                if let Some(name) = choices.get(self.completion_selected) {
+                                    accepted_completion = Some(name.clone());
+                                }
+                                self.completion = false;
+                            }
+                        });
+                    }
+                    if let Some(name) = &accepted_completion
+                        && let Some((source, byte)) = self.completed_source(ide, name)
+                    {
+                        text = vba_ide::editor_text(&source);
+                        if let Some(mut state) = egui::text_edit::TextEditState::load(ui.ctx(), id)
+                        {
+                            let index = text
+                                .get(..vba_ide::editor_byte(&source, byte))
+                                .map_or(0, |s| s.chars().count());
+                            state
+                                .cursor
+                                .set_char_range(Some(egui::text::CCursorRange::one(
+                                    egui::text::CCursor::new(index),
+                                )));
+                            state.store(ui.ctx(), id);
+                        }
+                        commands.push(Command::Text(source));
+                        commands.push(Command::Caret(byte));
+                        self.focus_editor = true;
+                        self.navigate = false;
+                    }
                     let highlight_text = &mut self.highlight_text;
                     let highlight = &mut self.highlight;
                     let mut layouter = |ui: &egui::Ui, buf: &dyn egui::TextBuffer, _wrap: f32| {
@@ -669,24 +851,30 @@ if response.double_clicked(){self.focus_editor=true;}response.context_menu(|ui|{
                         }
                         for (range, class) in highlight.iter() {
                             if let Some(part) = buf.as_str().get(range.clone()) {
-                                let highlighted = stop.as_ref().is_some_and(|s| {
-                                    range.start < s.span.end() as usize
-                                        && range.end > s.span.start() as usize
-                                });
+                                let highlighted = stop_range
+                                    .as_ref()
+                                    .is_some_and(|s| range.start < s.end && range.end > s.start);
                                 job.append(
                                     part,
                                     0.0,
                                     egui::TextFormat {
                                         font_id: font.clone(),
-                                        underline: if diagnostic.is_some_and(|s| {
-                                            range.start < s.end() as usize
-                                                && range.end > s.start() as usize
-                                        }) {
+                                        underline: if errors
+                                            .iter()
+                                            .any(|r| range.start < r.end && range.end > r.start)
+                                            || diagnostic.as_ref().is_some_and(|s| {
+                                                range.start < s.end && range.end > s.start
+                                            }) {
                                             egui::Stroke::new(1.0, theme.breakpoint)
                                         } else {
                                             egui::Stroke::NONE
                                         },
-                                        color: if highlighted {
+                                        color: if errors
+                                            .iter()
+                                            .any(|r| range.start < r.end && range.end > r.start)
+                                        {
+                                            theme.breakpoint
+                                        } else if highlighted {
                                             theme.execution_text
                                         } else {
                                             match class {
@@ -709,15 +897,13 @@ if response.double_clicked(){self.focus_editor=true;}response.context_menu(|ui|{
                         }
                         ui.fonts_mut(|f| f.layout_job(job))
                     };
-                    let id = self
-                        .scope
-                        .unwrap_or(ui.scope_id())
-                        .with(("vba.source", m.id.0));
                     let navigate = self.navigate || self.last_source != Some(m.id);
                     if navigate {
                         if let Some(mut state) = egui::text_edit::TextEditState::load(ui.ctx(), id)
                         {
-                            let index = m.text.get(..m.caret).map_or(0, |s| s.chars().count());
+                            let index = text
+                                .get(..vba_ide::editor_byte(&m.text, m.caret))
+                                .map_or(0, |s| s.chars().count());
                             state
                                 .cursor
                                 .set_char_range(Some(egui::text::CCursorRange::one(
@@ -732,6 +918,12 @@ if response.double_clicked(){self.focus_editor=true;}response.context_menu(|ui|{
                         .id(id)
                         .font(font.clone())
                         .code_editor()
+                        .event_filter(egui::EventFilter {
+                            tab: true,
+                            escape: true,
+                            horizontal_arrows: true,
+                            vertical_arrows: true,
+                        })
                         .desired_width((ui.available_width() - 8.0).max(320.0))
                         .desired_rows(24)
                         .char_limit(vba_ide::SourceFile::MAX_BYTES)
@@ -755,12 +947,38 @@ if response.double_clicked(){self.focus_editor=true;}response.context_menu(|ui|{
                                 .nth(range.primary.index.into())
                                 .map_or(text.len(), |(i, _)| i)
                         });
-                    if output.response.changed() {
-                        commands.push(Command::Text(text));
+                    if let Some(cursor) = output.cursor_range {
+                        if output.response.has_focus() && self.edit_operation.is_none() {
+                            self.source_selection = Some((m.id, cursor));
+                        }
+                        self.completion_anchor = output
+                            .galley
+                            .pos_from_cursor(cursor.primary)
+                            .translate(output.galley_pos.to_vec2())
+                            .left_bottom();
                     }
-                    if let Some(byte) = caret
-                        && byte != m.caret
+                    let source = m.edited_source(&text);
+                    let source_caret = caret.map(|byte| vba_ide::source_byte(&source, byte));
+                    if output.response.changed() {
+                        let byte = caret.unwrap_or(0).min(text.len());
+                        let (prefix, _) = vba_ide::completion_prefix(&text, byte);
+                        self.completion = !prefix.is_empty()
+                            && !prefix.ends_with("..")
+                            && !vba_ide::syntax_spans(&text).iter().any(|(r, class)| {
+                                r.start < byte
+                                    && r.end >= byte
+                                    && matches!(class, SyntaxClass::String | SyntaxClass::Comment)
+                            });
+                        self.completion_prefix = prefix.to_owned();
+                        self.completion_selected = 0;
+                        commands.push(Command::Text(source));
+                    }
+                    if let Some(byte) = source_caret
+                        && (byte != m.caret || accepted_completion.is_some())
                     {
+                        if !output.response.changed() {
+                            self.completion = false;
+                        }
                         commands.push(Command::Caret(byte));
                     }
                     if navigate {
@@ -926,6 +1144,11 @@ if response.double_clicked(){self.focus_editor=true;}response.context_menu(|ui|{
                 for d in &ide.diagnostics {
                     ui.colored_label(theme.breakpoint, format!("! {d}"));
                 }
+                for module in &ide.modules {
+                    for d in &module.syntax_diagnostics {
+                        ui.colored_label(theme.breakpoint, format!("! {}: {d}", module.name));
+                    }
+                }
             }
         }
     }
@@ -1057,39 +1280,100 @@ if response.double_clicked(){self.focus_editor=true;}response.context_menu(|ui|{
             }
         }
         if self.completion {
-            let mut open = true;
-            egui::Window::new(RichText::new("Complete Word").color(theme.text))
-                .id(scope.with("completion"))
-                .frame(frame)
-                .open(&mut open)
-                .default_size([300.0, 220.0])
+            let choices = ide.completions(&self.completion_prefix);
+            let popup = egui::Area::new(scope.with("completion"))
+                .order(egui::Order::Tooltip)
+                .fixed_pos(self.completion_anchor)
+                .constrain(true)
                 .show(ctx, |ui| {
-                    *ui.visuals_mut() = if theme.dark {
-                        egui::Visuals::dark()
-                    } else {
-                        egui::Visuals::light()
-                    };
-                    ui.visuals_mut().override_text_color = Some(theme.text);
-                    ui.visuals_mut().extreme_bg_color = theme.editor;
-                    text_field(ui, &mut self.completion_prefix, "Symbol prefix");
-                    for name in ide.completions(&self.completion_prefix) {
-                        if ui.button(&name).clicked() {
-                            if let Some(m) = ide.active_module() {
-                                let start = m.caret.saturating_sub(self.completion_prefix.len());
-                                if m.text.get(start..m.caret)
-                                    == Some(self.completion_prefix.as_str())
-                                {
-                                    let mut text = m.text.clone();
-                                    text.replace_range(start..m.caret, &name);
-                                    commands.push(Command::Text(text));
-                                }
+                    egui::Frame::new()
+                        .fill(theme.editor)
+                        .stroke(egui::Stroke::new(1.0, theme.border))
+                        .inner_margin(6)
+                        .show(ui, |ui| {
+                            ui.visuals_mut().selection.bg_fill = theme.accent;
+                            ui.visuals_mut().selection.stroke.color = theme.editor;
+                            ui.visuals_mut().override_text_color = Some(theme.text);
+                            ui.set_max_width(320.0);
+                            ui.label(RichText::new("Complete Word").strong().color(theme.text));
+                            if choices.is_empty() {
+                                ui.label("No supported matches");
                             }
-                            self.completion = false;
-                        }
-                    }
-                    ui.label("Host members appear only from supplied metadata.");
+                            egui::ScrollArea::vertical()
+                                .max_height(180.0)
+                                .show(ui, |ui| {
+                                    for (i, name) in choices.iter().enumerate() {
+                                        let response = ui.selectable_label(
+                                            i == self.completion_selected,
+                                            RichText::new(name).color(
+                                                if i == self.completion_selected {
+                                                    theme.editor
+                                                } else {
+                                                    theme.text
+                                                },
+                                            ),
+                                        );
+                                        if i == self.completion_selected {
+                                            response.scroll_to_me(None);
+                                        }
+                                        if response.clicked() {
+                                            self.accept_completion(ide, name, commands);
+                                        }
+                                    }
+                                });
+                            ui.label(
+                                RichText::new("Up/Down select; Enter/Tab accept; Esc close")
+                                    .small()
+                                    .color(theme.muted),
+                            );
+                        });
                 });
-            self.completion &= open;
+            if ctx.input(|i| {
+                i.pointer.any_pressed()
+                    && i.pointer
+                        .interact_pos()
+                        .is_some_and(|p| !popup.response.rect.contains(p))
+            }) {
+                self.completion = false;
+            }
         }
+    }
+    fn request_completion(&mut self, ide: &Ide) {
+        if let Some(m) = ide.active_module() {
+            self.completion_prefix = vba_ide::completion_prefix(&m.text, m.caret).0.to_owned();
+            self.completion = !vba_ide::syntax_spans(&m.text).iter().any(|(r, class)| {
+                r.start < m.caret
+                    && r.end >= m.caret
+                    && matches!(class, SyntaxClass::String | SyntaxClass::Comment)
+            });
+            self.completion_selected = 0;
+            self.focus_editor = self.completion;
+        }
+    }
+    fn completed_source(&self, ide: &Ide, name: &str) -> Option<(String, usize)> {
+        let m = ide.active_module()?;
+        let (prefix, start) = vba_ide::completion_prefix(&m.text, m.caret);
+        if prefix != self.completion_prefix || m.text.get(start..m.caret).is_none() {
+            return None;
+        }
+        let end = m.caret
+            + m.text
+                .get(m.caret..)?
+                .chars()
+                .take_while(|c| c.is_alphanumeric() || *c == '_')
+                .map(char::len_utf8)
+                .sum::<usize>();
+        let mut text = m.text.clone();
+        text.replace_range(start..end, name);
+        Some((text, start + name.len()))
+    }
+    fn accept_completion(&mut self, ide: &Ide, name: &str, commands: &mut Vec<Command>) {
+        if let Some((text, byte)) = self.completed_source(ide, name) {
+            commands.push(Command::Text(text));
+            commands.push(Command::Caret(byte));
+            self.navigate = true;
+            self.focus_editor = true;
+        }
+        self.completion = false;
     }
 }

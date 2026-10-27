@@ -63,6 +63,46 @@
       "cache": ".cache/evidence/vbe/menus-commands.html",
       "observation": "Classic menu taxonomy and functional command names.",
       "rights": "Public reference for facts and observable behavior; no HTML, images, artwork or text incorporated in product assets. Microsoft terms apply to cached source."
+    },
+    {
+      "id": "editor-options",
+      "url": "https://learn.microsoft.com/en-us/office/vba/language/how-to/set-visual-basic-environment-options",
+      "publisher": "Microsoft Learn",
+      "retrieved": "2026-10-27",
+      "sha256": "ae7609c6ae464459283dde4a074528073ba26203ac6dae9490717ad56547ce59",
+      "cache": ".cache/evidence/vbe/editor-options.html",
+      "observation": "Line syntax checking, insertion-point member lists and function argument information.",
+      "rights": "Public reference for facts and observable behavior; no HTML, images, artwork or text incorporated in product assets. Microsoft terms apply to cached source."
+    },
+    {
+      "id": "editor-toolbar",
+      "url": "https://learn.microsoft.com/en-us/office/vba/language/reference/user-interface-help/editor-toolbar",
+      "publisher": "Microsoft Learn",
+      "retrieved": "2026-10-27",
+      "sha256": "7341d2233e520e97df0cdb8eeb9d286aaff6caa0283d97151b9fab95db8cd544",
+      "cache": ".cache/evidence/vbe/editor-toolbar.html",
+      "observation": "Member lists follow the period; parameter information appears in the Code window.",
+      "rights": "Public reference for facts and observable behavior; no HTML, images, artwork or text incorporated in product assets. Microsoft terms apply to cached source."
+    },
+    {
+      "id": "code-keys",
+      "url": "https://learn.microsoft.com/en-us/office/vba/language/reference/user-interface-help/code-window-general-use-keys",
+      "publisher": "Microsoft Learn",
+      "retrieved": "2026-10-27",
+      "sha256": "217a7f4b021b4e225153eb5dd112fa2791f4a0bef6752a32b98d24b27939bb37",
+      "cache": ".cache/evidence/vbe/code-keys.html",
+      "observation": "Ctrl+J lists members; Ctrl+Space completes words.",
+      "rights": "Public reference for facts and observable behavior; no HTML, images, artwork or text incorporated in product assets. Microsoft terms apply to cached source."
+    },
+    {
+      "id": "expected-end-sub",
+      "url": "https://learn.microsoft.com/en-us/office/vba/language/reference/user-interface-help/expected-end-sub",
+      "publisher": "Microsoft Learn",
+      "retrieved": "2026-10-27",
+      "sha256": "8cf73f0bceca2051c614c69207524ba9e816143f4dd1ae4df3289ce93e7c769f",
+      "cache": ".cache/evidence/vbe/expected-end-sub.html",
+      "observation": "A Sub must end with End Sub; End Function is a mismatched terminator.",
+      "rights": "Public reference for facts and observable behavior; no HTML, images, artwork or text incorporated in product assets. Microsoft terms apply to cached source."
     }
   ]
 }
