@@ -4,7 +4,7 @@ Updated 2026-10-27. Current stage: **M8 repository editor/debugger gate complete
 profile remains m5-host-v1 with verified IR 1/2/3/4. M9 conformance/release work is next. Real
 workbook integration, event order and package/trust/preservation evidence remain fork-owned.
 
-## GridCraft integration — in progress
+## GridCraft integration — baseline implemented
 
 Work is on `feat/gridcraft-integration` here and `feat/tiny-vba-integration` in the
 GridCraft fork. The staged plan, decisions, exact validation and resumption notes
@@ -13,7 +13,13 @@ fork-owned; no application dependency is added here. Workbook tests exposed the
 root-import member-dispatch defect fixed under [ADR 0017](decisions/0017-imported-root-members.md).
 The native VM regression covers exact Get/Call/Let/Set dispatch and named arguments.
 Windows xtask selects `python` rather than assuming a `python3` executable.
-Acceptance gates are being rerun; earlier M8 evidence is not new integration evidence.
+GridCraft consumes shared revision `4d80a9584b3daeb75d589c629eff272ecd5881fe`
+as a pinned Git dependency, with corpus/reference downloads explicitly opt-in.
+Fourteen real-workbook tests pass natively and as JavaScript-hosted WASM; eight
+shared-editor/control/source-save-discard tests pass. Light/dark/narrow/scaled
+actual-paused-state snapshots were rendered and inspected. The fork's full gate,
+exact commands, remaining profile limits and resumption state are recorded in
+the work log. Broader M14/WordCraft/events/forms/signatures are still planned.
 
 ## Post-M8 milestone allocation
 
