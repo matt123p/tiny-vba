@@ -88,7 +88,13 @@ program is terminal; a delivery runs to a boundary, shares static state and bind
 breakpoints, and waits through `resume_host` exactly-once. `reset_state` (terminal-only) and
 `rebind_roots` cover static reset and the host's own object-lifetime model; a stale root at
 delivery surfaces the host's reference error 91. Cancel/disconnect/host loss drain queued
-callbacks without executing them. Event ordering, `EnableEvents`, document events and UDF policy
+callbacks without executing them and permanently close the lifecycle even after completion.
+Reset requires a terminal/open/current session, clears output/static/Err state and prepares the
+original entry with original bound arguments; queued callbacks, instance/debugger identities and
+lifetime budgets survive. Invalid delivery quotas/host/source/lifecycle preserve the queue and
+outcome; argument types are checked before enqueue and queued metadata/payload share the cumulative
+session budget. Top-level ByRef arguments are owned locations. Run the callback suite natively and
+through cargo xtask wasm-run. Event ordering, `EnableEvents`, document events and UDF policy
 remain fork-owned over this queue.
 
 M6 is implemented under [ADR 0014](../../../docs/decisions/0014-m6-project-decoding.md).

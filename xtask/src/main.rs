@@ -97,6 +97,21 @@ fn run() -> Result<(), Box<dyn Error>> {
                     &import_runner,
                 ],
             )?;
+            command(
+                "cargo",
+                &[
+                    "test",
+                    "-p",
+                    "vba-vm",
+                    "--test",
+                    "callbacks",
+                    "--locked",
+                    "--target",
+                    "wasm32-wasip1",
+                    "--config",
+                    &import_runner,
+                ],
+            )?;
         }
         Some("layers") => command("python3", &["tools/check_repository.py", "layers"])?,
         Some("corpora") => command("python3", &["tools/check_repository.py", "corpora"])?,

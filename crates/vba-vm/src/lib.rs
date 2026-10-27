@@ -233,6 +233,8 @@ pub struct Session {
     allocated_locations: usize,
     stack_capacity: usize,
     callbacks: VecDeque<ScheduledCallback>,
+    closed: bool,
+    entry_arguments: Vec<Value>,
 }
 fn command(message: &str) -> Diagnostic {
     Diagnostic::new("VBA0034", message)
@@ -326,6 +328,12 @@ impl Session {
         for (arg, param) in arguments.iter().zip(&entry.parameters) {
             prepared.push(runtime::bind(param.kind, arg).map_err(runtime_diagnostic)?);
         }
+        let retained_bytes = prepared.iter().try_fold(0usize, |n, value| {
+            n.checked_add(value_bytes(value)).ok_or_else(resource)
+        })?;
+        if retained_bytes > limits.payload {
+            return Err(resource());
+        }
         let instance = fresh_instance()?;
         let mut session = Self {
             program,
@@ -356,7 +364,10 @@ impl Session {
             allocated_locations: 0,
             stack_capacity: 0,
             callbacks: VecDeque::new(),
+            closed: false,
+            entry_arguments: prepared.clone(),
         };
+        session.charge(retained_bytes)?;
         session.push_frame(entry_id, prepared.into_iter().map(Operand::Value).collect())?;
         Ok(session)
     }
@@ -483,12 +494,40 @@ impl Session {
         for value in &arguments {
             value.validate()?;
         }
+        let signature = &self
+            .program
+            .program()
+            .procedures
+            .get(id.0 as usize)
+            .ok_or_else(|| invariant("callback procedure"))?
+            .parameters;
+        let mut prepared = Vec::new();
+        reserve(&mut prepared, arguments.len())?;
+        for (value, parameter) in arguments.iter().zip(signature) {
+            if let Some(element) = parameter.array
+                && !matches!(value, Value::Array(array) if array.kind() == element)
+            {
+                return Err(command("callback array parameter element type mismatch"));
+            }
+            prepared.push(runtime::bind(parameter.kind, value).map_err(runtime_diagnostic)?);
+        }
+        let prepared_bytes = prepared.iter().try_fold(0usize, |n, value| {
+            n.checked_add(value_bytes(value)).ok_or_else(resource)
+        })?;
+        // Queued payloads share the session allocation/work budget.
+        let queue_bytes = prepared
+            .len()
+            .checked_mul(std::mem::size_of::<Value>())
+            .and_then(|n| n.checked_add(std::mem::size_of::<ScheduledCallback>()))
+            .and_then(|n| n.checked_add(prepared_bytes))
+            .ok_or_else(resource)?;
+        self.charge(queue_bytes)?;
         self.callbacks
             .try_reserve(1)
             .map_err(|_| command("callback queue limit"))?;
         self.callbacks.push_back(ScheduledCallback {
             procedure: id,
-            arguments,
+            arguments: prepared,
         });
         Ok(self.callbacks.len())
     }
@@ -535,6 +574,8 @@ impl Session {
                 }
             }
             binding.roots = roots;
+        } else if !roots.is_empty() {
+            return Err(command("host roots require a host binding"));
         }
         Ok(())
     }
@@ -548,12 +589,18 @@ impl Session {
         predicate: &mut impl FnMut(&CheckpointView) -> Result<bool>,
     ) -> Result<Outcome> {
         self.check_host(host)?;
+        if self.lifecycle_closed() || self.stale {
+            return Err(command("closed or stale session cannot deliver callbacks"));
+        }
+        if quota == 0 || quota > self.limits.slice {
+            return Err(command("invalid slice allowance"));
+        }
         if !self.terminal() {
             return Err(command(
                 "callbacks deliver only after the program is terminal",
             ));
         }
-        let Some(callback) = self.callbacks.pop_front() else {
+        let Some(callback) = self.callbacks.front() else {
             return Err(command("no callback is queued"));
         };
         let prepared = callback
@@ -575,10 +622,18 @@ impl Session {
         if !self.frames.is_empty() || self.visit.is_some() {
             return Err(invariant("callback delivery requires clean frames"));
         }
-        self.push_frame(
-            callback.procedure,
+        let procedure = callback.procedure;
+        self.callbacks.pop_front();
+        self.error = ErrorState::default();
+        self.raised_source = None;
+        if let Err(error) = self.push_frame(
+            procedure,
             prepared.into_iter().map(Operand::Value).collect(),
-        )?;
+        ) {
+            // A frame allocation failure must not leave a half-created invocation behind.
+            self.fail(error)?;
+            return Ok(self.state.clone());
+        }
         self.counters.callbacks_run = self
             .counters
             .callbacks_run
@@ -593,22 +648,37 @@ impl Session {
         }
         Ok(outcome)
     }
-    /// Clear persistent/static storage and captured output; refused unless the session is
-    /// terminal. The compiled program, identity and instance are unchanged.
+    /// Clear project state/output and prepare the original entry invocation again. Refused
+    /// unless terminal and open; queued callbacks and lifetime work budgets are retained.
     pub fn reset_state(&mut self) -> Result<()> {
-        if !self.terminal() {
-            return Err(command("reset requires a terminal invocation"));
+        if !self.terminal() || self.lifecycle_closed() || self.stale {
+            return Err(command(
+                "reset requires a terminal, open, current invocation",
+            ));
         }
         let persistent = self.persistent.values().copied().collect::<Vec<_>>();
         for location in &persistent {
             self.store.invalidate(*location)?;
             self.kinds.remove(location);
             self.array_types.remove(location);
-            self.allocated_locations = self.allocated_locations.saturating_sub(1);
         }
         self.persistent.clear();
         self.output.clear();
-        self.generation = self.generation.saturating_add(1);
+        self.error = ErrorState::default();
+        self.raised_source = None;
+        self.pause_requested = false;
+        self.generation()?;
+        let arguments = self
+            .entry_arguments
+            .iter()
+            .cloned()
+            .map(Operand::Value)
+            .collect();
+        if let Err(error) = self.push_frame(self.program.program().entry, arguments) {
+            self.fail(error.clone())?;
+            return Err(error);
+        }
+        self.state = Outcome::Yielded;
         Ok(())
     }
     pub fn limits(&self) -> &Limits {
@@ -733,16 +803,10 @@ impl Session {
         if self.frames.len() >= self.limits.depth || args.len() != proc.parameters.len() {
             return Err(resource());
         }
-        let owned_count = proc
-            .locals
-            .len()
-            .checked_sub(
-                proc.parameters
-                    .iter()
-                    .filter(|p| p.mode == ir::ParameterMode::ByRef)
-                    .count(),
-            )
-            .ok_or_else(resource)?;
+        let owned_count = proc.locals.iter().enumerate().filter(|(i, local)| {
+            !matches!(args.get(*i), Some(Operand::Reference(_)))
+                && !matches!(local.role, ir::SlotRole::Persistent(key) if self.persistent.contains_key(&key))
+        }).count();
         let count = self
             .allocated_locations
             .checked_add(owned_count)
@@ -818,7 +882,11 @@ impl Session {
                         }
                         Operand::Reference(*l)
                     }
-                    (Operand::Value(v), Some(ir::ParameterMode::ByVal)) => {
+                    (Operand::Value(v), mode)
+                        if mode == Some(ir::ParameterMode::ByVal)
+                            || (self.frames.is_empty()
+                                && mode == Some(ir::ParameterMode::ByRef)) =>
+                    {
                         if let Some(element) = params.get(i).and_then(|p| p.array)
                             && !matches!(v,Value::Array(a) if a.kind()==element)
                         {
@@ -1119,6 +1187,7 @@ impl Session {
     }
     pub fn cancel(&mut self, host: &mut impl Host) -> Result<()> {
         self.check_host(host)?;
+        self.closed = true;
         self.callbacks.clear();
         if self.terminal() {
             return Ok(());
@@ -1130,6 +1199,7 @@ impl Session {
     }
     pub fn disconnect(&mut self, host: &mut impl Host) -> Result<()> {
         self.check_host(host)?;
+        self.closed = true;
         self.callbacks.clear();
         if self.terminal() {
             return Ok(());
@@ -1146,6 +1216,7 @@ impl Session {
     }
     /// Use only when the host is already gone; it cannot claim external token cleanup.
     pub fn host_lost(&mut self) -> Result<()> {
+        self.closed = true;
         self.callbacks.clear();
         if self.terminal() {
             return Ok(());
@@ -1162,11 +1233,7 @@ impl Session {
     }
     /// Cancelled or host-disconnected: the embedding closed this session.
     fn lifecycle_closed(&self) -> bool {
-        match &self.state {
-            Outcome::Cancelled => true,
-            Outcome::Failed(failure) => failure.kind == FailureKind::HostDisconnected,
-            _ => false,
-        }
+        self.closed
     }
     fn terminal(&self) -> bool {
         matches!(

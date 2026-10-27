@@ -18,8 +18,9 @@ inside a callback use the existing exactly-once resume path. `cancel`, `disconne
 drain the queue without executing pending callbacks; scheduling is refused once the lifecycle is
 closed (cancelled/disconnected), not merely after normal completion.
 
-Lifecycle additions: `Session::reset_state()` clears persistent/static storage and captured output
-and bumps the generation, refused unless terminal; `Session::rebind_roots()` lets the host replace
+Lifecycle additions: `Session::reset_state()` clears persistent/static storage, Err and captured
+output, bumps the generation and prepares the original entry with its original bound arguments,
+refused unless terminal, open and current; `Session::rebind_roots()` lets the host replace
 root references (its own lifetime/generation model) under the same launch validation. A stale root
 at delivery surfaces the host's reference error 91 with no repeated dispatch. Generic-host
 reentrancy, drain, budget, failure-recovery, debugger-pause-in-callback and stale-reference tests
@@ -27,9 +28,19 @@ live in crates/vba-vm/tests/callbacks.rs. Event ordering, `Application.EnableEve
 events, UDF evaluation and any Office-shaped catalogue remain fork-owned over this generic queue.
 
 Verification from this checkout: cargo xtask ci passes formatting, strict all-target Clippy,
-**170 integration tests**, the 16-node workspace DAG, seven source pins/646 candidate hashes and
+**177 integration tests**, the 16-node workspace DAG, seven source pins/646 candidate hashes and
 M4 evidence checks. All 197 authored/reviewed language fixtures retain PASS. cargo xtask wasm
-compiles all libraries; cargo xtask wasm-run passes native/WASI acceptance. git diff --check passes.
+compiles all libraries; cargo xtask wasm-run passes native/WASI language/host/debugger acceptance,
+all **14 importer tests** and all **17 callback/lifecycle tests** on WASI. git diff --check passes.
+
+M7 acceptance audit corrections (2026-10-27): closing an already terminal invocation now closes
+its lifecycle permanently; invalid delivery quota/source/host/lifecycle requests preserve queue
+and outcome; reset prepares the original entry again with original bound arguments and fresh
+static/output/Err state. Reset retains queued callbacks, instance/debugger identities and lifetime
+work budgets and cannot reopen a closed session. Added native/WASI regressions, shared cumulative
+queue payload/metadata accounting, upfront argument conversion, owned top-level ByRef arguments,
+and clean frame-start resource failure. Corrected the plan's unsupported claim of fork event-order
+acceptance: Office event/workbook gates remain separate and unverified by this checkout.
 
 Next: the required reusable graphical editor/debugger slice on these VM APIs; M8 completes its
 acceptance gate.

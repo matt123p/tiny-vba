@@ -84,9 +84,15 @@ fresh top-level invocation on the same instance — sharing static state, bindin
 drives to a boundary in one call, applies breakpoints and the predicate, counts
 `counters().callbacks_run`, and waits through the existing exactly-once `resume_host` path. A
 stale host root at delivery surfaces the host's reference error 91 without a repeated dispatch.
-`cancel`/`disconnect`/`host_lost` drain the queue without executing. `Session::reset_state()`
-(static/output reset, terminal-only) and `Session::rebind_roots()` (host-owned lifetime under
-launch validation) complete the lifecycle. Nested/reentrant dispatch and mid-run injection stay
+`cancel`/`disconnect`/`host_lost` drain the queue and permanently close the lifecycle, including
+when already completed/failed. Invalid quota, host, lifecycle or stale-source delivery requests
+preserve queue and outcome. Callback argument types are checked before enqueue; queue metadata
+and payload share the cumulative session budget. Top-level ByRef arguments use owned locations.
+`Session::reset_state()` requires a terminal, open, current session, clears static/output/Err state,
+and prepares the original entry with its original bound arguments for `run_slice`. Queued callbacks,
+instance identity, debugger breakpoints and lifetime work budgets survive reset; an exhausted
+budget produces a clean terminal failure. `Session::rebind_roots()` validates host identity and
+required roots and refuses nonempty roots without a host binding. Nested/reentrant dispatch and mid-run injection stay
 rejected; event ordering and Office-shaped event policy remain fork-owned.
 
 `vba-debug::Controller` binds breakpoints to the VM instance, compiled revision and StatementId. Multiple

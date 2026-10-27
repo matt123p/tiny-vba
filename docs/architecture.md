@@ -117,7 +117,10 @@ edge changed. Schema 2 provenance and evidence checks remain above shipping engi
 M7 ([ADR 0015](decisions/0015-m7-callbacks-and-lifecycle.md)) keeps the VM non-reentrant and adds
 the bounded generic callback queue, terminal-only delivery, static reset and host root rebinding
 inside vba-vm; no new crate or DAG edge. Forks implement event sinks over this queue and own event
-ordering and `Application.EnableEvents` policy above it.
+ordering and `Application.EnableEvents` policy above it. Lifecycle closure is independent of the
+last invocation outcome; reset prepares the original entry again while retaining the instance,
+queued callbacks and lifetime budgets. Callback validation precedes queue mutation, and queued
+payload/metadata share the session allocation budget.
 
 M5 ([ADR 0013](decisions/0013-m5-host-contract.md)) adds IR 4 with hidden `HostRoot` slots and the
 `host-roots-v4` feature; `Capabilities::ir4_structural()` is the compiler's structural default while
