@@ -1187,14 +1187,15 @@ impl Binder<'_> {
         kind: ForeignKind,
         extra: Option<&ast::Expr>,
     ) -> Result<Expr> {
-        // An imported source name owns the whole member application; binding its member
-        // expression separately would wrap one foreign call inside another.
+        // A fixed-member alias owns the whole application. A root-object import must
+        // instead bind the root and retain the requested member/kind/arguments.
         if let ast::ExprKind::Name(name) = &target.kind
             && !self.symbols.contains_key(&name.key())
             && let Some(import) = self
                 .imports
                 .iter()
                 .find(|i| i.name.eq_ignore_ascii_case(&name.spelling))
+                .filter(|i| i.member.is_some())
                 .cloned()
         {
             if !matches!(kind, ForeignKind::Call | ForeignKind::Get) {

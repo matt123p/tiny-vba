@@ -1,6 +1,8 @@
 # Plan of action
 
 Updated 2026-10-27. This plan builds the interpreter and editor/debugger UI here; document/Office integration stays external.
+The user-requested GridCraft M14 baseline is now underway in the fork; follow the
+[staged integration work log](gridcraft-integration.md) to resume or verify it.
 Setup and the documented M0–M3 subsets are complete. The detailed [bytecode/VM specification](bytecode-vm-specification.md)
 and [ADR 0004](decisions/0004-bytecode-vm-contract.md) are written before frontend work continues.
 M2 binding/lowering and M3 execution/debugger are implemented. M4 now meets its original

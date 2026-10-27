@@ -3,6 +3,7 @@
 Updated 2026-10-27. Stage: M4 external acceptance complete; M5–M7 in-repo contracts and M8 standalone/embeddable UI gate implemented. **The documented m5-host-v1 consumer, including M3 control, M4 scalar widths and IR 4 host roots, has execution evidence; the 44 authored and 153 reviewed fixtures remain asserted 197 PASS / 0 UNSUPPORTED.**
 
 | Dimension | Status | Evidence / next gate |
+| Imported object member dispatch | Implemented binder correction | ADR 0017; vba-vm/tests/embedding.rs preserves actual Get/Call/Let/Set, named arguments and returned object targets |
 |---|---|---|
 | Workspace and crate boundaries | Implemented setup | cargo xtask layers |
 | CLI parse/check/compile/disasm/run, help/version and explicit unsupported errors | Implemented M3 | apps/vba-cli/tests/cli.rs |

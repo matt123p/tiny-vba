@@ -16,6 +16,10 @@ fn command(program: &str, args: &[&str]) -> Result<(), Box<dyn Error>> {
     Ok(())
 }
 
+fn python() -> &'static str {
+    if cfg!(windows) { "python" } else { "python3" }
+}
+
 fn workspace_root(start: &Path) -> io::Result<PathBuf> {
     start
         .ancestors()
@@ -50,7 +54,7 @@ fn run() -> Result<(), Box<dyn Error>> {
                 ],
             )?;
             command("cargo", &["test", "--workspace", "--locked"])?;
-            command("python3", &["tools/check_repository.py"])?;
+            command(python(), &["tools/check_repository.py"])?;
         }
         Some("wasm-run") => {
             command(
@@ -105,6 +109,8 @@ fn run() -> Result<(), Box<dyn Error>> {
                     "vba-vm",
                     "--test",
                     "callbacks",
+                    "--test",
+                    "embedding",
                     "--locked",
                     "--target",
                     "wasm32-wasip1",
@@ -200,8 +206,8 @@ fn run() -> Result<(), Box<dyn Error>> {
                 ],
             )?;
         }
-        Some("layers") => command("python3", &["tools/check_repository.py", "layers"])?,
-        Some("corpora") => command("python3", &["tools/check_repository.py", "corpora"])?,
+        Some("layers") => command(python(), &["tools/check_repository.py", "layers"])?,
+        Some("corpora") => command(python(), &["tools/check_repository.py", "corpora"])?,
         Some("wasm") => command(
             "cargo",
             &[

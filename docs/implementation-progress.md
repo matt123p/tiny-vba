@@ -4,6 +4,17 @@ Updated 2026-10-27. Current stage: **M8 repository editor/debugger gate complete
 profile remains m5-host-v1 with verified IR 1/2/3/4. M9 conformance/release work is next. Real
 workbook integration, event order and package/trust/preservation evidence remain fork-owned.
 
+## GridCraft integration — in progress
+
+Work is on `feat/gridcraft-integration` here and `feat/tiny-vba-integration` in the
+GridCraft fork. The staged plan, decisions, exact validation and resumption notes
+are in [the integration work log](gridcraft-integration.md). Office objects remain
+fork-owned; no application dependency is added here. Workbook tests exposed the
+root-import member-dispatch defect fixed under [ADR 0017](decisions/0017-imported-root-members.md).
+The native VM regression covers exact Get/Call/Let/Set dispatch and named arguments.
+Windows xtask selects `python` rather than assuming a `python3` executable.
+Acceptance gates are being rerun; earlier M8 evidence is not new integration evidence.
+
 ## Post-M8 milestone allocation
 
 On 2026-10-27, assigned the remaining UI specification work to explicit **planned** milestones

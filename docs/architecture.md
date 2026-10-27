@@ -60,7 +60,10 @@ records this runtime-only refinement; it changes no IR operands, packages or dep
 The generic foreign protocol carries invocation kind, target/reference, named/positional/omitted arguments,
 ByRef obligations and explicit result/error/wait state. Its owned M0 Rust prototype is proven against a deterministic host; VM wiring remains M3 work.
 It must not know Excel/Word names, Range behavior, Office enums or document storage.
-The applications implement a bridge to their own Office compatibility layers. The VM owns VBA class instances;
+The applications implement a bridge to their own Office compatibility layers.
+Root-object imports preserve member Get/Call/Let/Set dispatch; fixed-member aliases
+retain their M5 shortcut semantics ([ADR 0017](decisions/0017-imported-root-members.md)).
+The VM owns VBA class instances;
 external object references preserve host identity/lifetime without defining a parallel Office registry.
 
 No `vba-office-bridge`, `vba-excel-host`, `office-*` or `automation-*` crate belongs in this workspace.
