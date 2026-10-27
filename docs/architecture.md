@@ -2,8 +2,8 @@
 
 Status: M0–M4 complete for the documented [M4 language profile](m4-language.md), with
 verified IR 1/2/3/4 and explicit-frame execution; the M5 native host contract is implemented
-([ADR 0013](decisions/0013-m5-host-contract.md)). Graphical IDE, importer and fork-owned workbook
-integration remain later gates.
+([ADR 0013](decisions/0013-m5-host-contract.md)). M6 read-only project decoding is implemented
+([ADR 0014](decisions/0014-m6-project-decoding.md)); graphical IDE and fork-owned workbook integration remain later gates.
 
 The current scaffold and future headless engine can compile and test without Office, UI toolkits,
 application forks or corpus downloads. This repository also owns an optional editor/debugger UI
@@ -31,13 +31,13 @@ See the [M2 compiler contract](compiler.md) for supported source, API and struct
 | vba-vm | Frames, instruction pointer, budgets, inspection hooks; host-root binding and protocol checks | diagnostics, ir, values, runtime, foreign |
 | vba-debug | Breakpoint/step/inspection controller | diagnostics, vm |
 | vba-dap | Later DAP adapter | debug |
-| vba-project | Read-only source/project decoder | diagnostics |
+| vba-project | Bounded read-only MS-OVBA source/project decoder | diagnostics, cfb (=0.14.0), encoding_rs (=0.8.42) |
 | vba-testkit | Deterministic generic foreign host, trace support and bounded embedding driver | debug, diagnostics, foreign, ir, values, vm |
 | vba-conformance | Scenario validation, typed expectations and M4 outcome judgment; comparison/reports later | diagnostics, testkit, values, vm |
 | vba-cli | Source parsing, compilation/disassembly/execution and fixture validation | conformance, diagnostics, syntax, compiler, ir, values, vm |
 | xtask | Maintenance commands | none |
 
-Some dependencies still reserve boundaries. DAP and project remain scaffolds. Runtime, VM and debug implement the [M3 contract](runtime.md); semantics/compiler/IR implement M2 with generic member lowering added at M3.
+Some dependencies still reserve boundaries. DAP remains a scaffold; project implements [M6 source decoding](project-import.md). Runtime, VM and debug implement the [M3 contract](runtime.md); semantics/compiler/IR implement M2 with generic member lowering added at M3.
 Syntax implements the bounded lexer/parser described in [frontend](frontend.md) and
 [ADR 0005](decisions/0005-m1-frontend.md); its only dependency remains diagnostics.
 Diagnostics, values, foreign, testkit and conformance implement the bounded M0 contracts in
@@ -121,3 +121,9 @@ import validation/binding, and the testkit gained debug/ir/vm edges for its reus
 driver (`run_to_boundary`, `statement`). `vba-foreign` owns the native protocol version; the VM
 checks `Host::protocol` before dispatch and binds named roots through `HostBinding`. No Office
 names or catalogue enter the engine; workbook-level FillCells evidence stays fork-owned.
+
+M6 adds reviewed external dependencies only to vba-project. Its bounded in-memory CFB adapter
+returns source/module/reference metadata and explicit corrupt/unsupported/protected/limit errors;
+no compiler, VM or host edge exists. [ADR 0014](decisions/0014-m6-project-decoding.md) records
+licences, portability, source identity semantics and work limits. External requirements are
+pinned in tools/architecture.json separately from the unchanged 16-node workspace DAG.

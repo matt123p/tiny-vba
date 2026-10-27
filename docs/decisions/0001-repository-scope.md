@@ -34,7 +34,7 @@ Date: 2026-10-26. Status: adopted for setup, with open implementation decisions 
 | Parser implementation | Pure Rust lexer plus Pratt expressions/recursive-descent statements; no generated C dependency | M1 |
 | Compatibility profile | Explicit Excel365Windows64 intent; exact Office build and locale still unmeasured; keep Mac results separate | Before adopting oracle results |
 | Unlicensed workbook specimens | Keep candidates external and NOT_RUN; adopt only after rights/capability review | Before fixture adoption |
-| Read-only MS-OVBA decoder | Evaluate the ovba source/licence/API behind a decoder boundary; docs disagree on tim-weis versus ekuurila origin | M6 |
+| Read-only MS-OVBA decoder — resolved | Independent bounded MS-OVBA reader with pinned cfb/encoding_rs; ovba not adopted; [ADR 0014](0014-m6-project-decoding.md) | M6 complete |
 | Missing Office architecture document | Obtain or author it in the fork-owned compatibility design | Before cross-repo contract freeze |
 | Word-specific corpus | None is identified in supplied docs; curate licensed .docm/.dotm later rather than inventing a source | Word integration |
 

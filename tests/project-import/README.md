@@ -1,7 +1,11 @@
-# project-import
+# Project import fixtures
 
-Read-only source decoding, malformed project streams, encoding and limits.
+M6 uses independently authored in-memory CFB/MS-OVBA projects in
+[the owning crate's test support](../../crates/vba-project/tests/support/mod.rs).
+[Fourteen integration tests](../../crates/vba-project/tests/import.rs) cover read-only extraction,
+identities/code names, references/attributes, encoding, malformed/protected/unsupported projects,
+cycles, truncations and limits. The same suite executes natively and on WASI.
 
-This directory reserves the test-data location; it is not automatically discovered by Cargo.
-Rust integration tests must live under the owning crate’s `tests/` directory and load these fixtures using `CARGO_MANIFEST_DIR`.
-No VBA scenarios execute yet. See [the implementation plan](../../docs/implementation-plan.md).
+No proprietary binary fixtures or third-party workbooks are needed. Source with Auto_Open and
+an unknown host call remains inert after decoding. No VBA executes during these importer tests.
+See [the import contract](../../docs/project-import.md).

@@ -57,3 +57,7 @@ record the completed external gate, schema 2 provenance and IR 3 extension.
 foreign/value/debug APIs, hidden IR 4 host-root imports and the reusable bridge driver;
 [runtime](runtime.md) and [the compatibility matrix](compatibility-matrix.md) carry the
 implemented surface.
+
+[M6 read-only project import](project-import.md) and [ADR 0014](decisions/0014-m6-project-decoding.md)
+record the bounded decoder, reviewed external dependencies, source identities, protection refusals
+and controlled native/WASI acceptance.

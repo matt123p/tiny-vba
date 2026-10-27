@@ -1,8 +1,47 @@
 # Implementation progress
 
-Updated 2026-10-26. Current stage: **M5 native host contract implemented** on top of the completed
-M4 external acceptance. Current runtime profile: m5-host-v1 with verified IR 1/2/3/4. The graphical
-IDE slice (implementation-plan step 3) is next; real workbook FillCells evidence stays fork-owned.
+Updated 2026-10-27. Current stage: **M6 read-only project source decoding complete**.
+The runtime profile remains m5-host-v1 with verified IR 1/2/3/4; decoding is independent of execution.
+M7 callbacks/lifecycle and the required M8 graphical IDE remain next; real workbook integration
+and package/trust/preservation evidence stay fork-owned.
+
+## M6 project source decoding
+
+Implemented [ADR 0014](decisions/0014-m6-project-decoding.md) and the
+[bounded import contract](project-import.md) in vba-project, finishing the incoming decoder slice.
+The read-only API consumes controlled vbaProject.bin CFB bytes and returns project information,
+registered/project/control references and standard/class/document modules with distinct module/
+stream/code-name identities, source offsets, flags, descriptions and preserved source/attributes.
+Caller-owned SourceId allocation preserves diagnostic locations without inventing global identities.
+Strict code-page conversion retains the encoding identity; Unicode metadata/name maps must agree.
+
+Protection envelopes are checked only to refuse restricted/password/hidden projects. Unknown
+encodings/records and designers fail explicitly. Corrected PROJECTlk's classification to unsupported
+ActiveX licence metadata, rather than protection. Added complete CFB-sector validation after a
+truncation regression showed the underlying library accepts missing final padding. Hard and
+caller-lowered bounds cover input/streams/decompression/output/counts/depth; metered CFB reading
+and strict cycle checks bound hostile metadata work. Cache consistency is explicitly NotChecked;
+P-code, trust decisions, compilation, execution and binary writing remain absent from this API.
+
+Reviewed/pinned cfb 0.14.0 (MIT) and encoding_rs 0.8.42 ((Apache-2.0 OR MIT) AND BSD-3-Clause).
+The dependency checker now distinguishes reviewed external pins from workspace DAG nodes; only
+vba-project gains those normal dependencies. No interpreter implementation or proprietary fixture
+was imported. Fourteen authored integration tests build controlled binary records in memory and
+cover exact metadata/source results, Unicode identities and diagnostic spans, representative
+encodings, optional records, empty projects, protected/unsupported/corrupt inputs, every directory
+truncation, selected header mutations, CFB tree/FAT cycles, compression vectors and all limits.
+Source containing Auto_Open/unknown host calls remains inert; the crate has no VM/host/compiler edge.
+
+Verification from this checkout: cargo xtask ci passes formatting, strict all-target Clippy,
+**160 integration tests**, the 16-node workspace DAG, seven source pins/646 candidate hashes and
+M4 evidence checks. All 197 authored/reviewed language fixtures retain their existing PASS results.
+cargo xtask wasm compiles all libraries for wasm32-unknown-unknown. cargo xtask wasm-run passes
+native/WASI language/host/debugger acceptance and now executes the same **14 importer tests on
+WASI**, with no preopened directories. git diff --check passes. No separate MSRV, macOS/Windows,
+external-workbook import, browser runtime or Office observation is claimed.
+
+Next smallest task: specify bounded generic callback/reentrancy and disconnect/reset ownership
+for M7 before adding callback entry points; continue the reusable graphical IDE slice under M8.
 
 ## M5 native host integration contract
 

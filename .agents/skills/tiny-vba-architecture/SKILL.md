@@ -88,3 +88,11 @@ Read [the report](../../../docs/m4-oracle-report.md) and current language contra
 plus 153 inherited upstream-reported Excel Mac scenarios PASS. Schema 2 and the reviewed allowlist
 preserve raw results/environment/hashes; no fresh Office run is claimed. Use m5-host-v1
 and explicit IR 3/4 capabilities, retaining IR 1/2 refusal rules. Unselected external cases remain NOT_RUN.
+
+M6 is implemented under [ADR 0014](../../../docs/decisions/0014-m6-project-decoding.md).
+Read [the import contract](../../../docs/project-import.md) before changing vba-project.
+Keep extraction read-only/inert, project-local ModuleId separate from caller-owned SourceId,
+UTF-8 attribute spans and code names distinct from stream/display names. Preserve explicit
+corrupt/unsupported/protected/limit refusals and container/decompression work caps. cfb/encoding_rs
+are reviewed pinned external dependencies; package preservation and trust UX remain fork-owned.
+The 14 controlled importer tests run natively and under WASI through cargo xtask wasm-run.

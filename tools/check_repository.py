@@ -23,7 +23,9 @@ def contained(base, relative):
 
 
 def layers():
-    allowed = json.loads((ROOT / 'tools/architecture.json').read_text())['allowed_normal_dependencies']
+    graph = json.loads((ROOT / 'tools/architecture.json').read_text())
+    allowed = graph['allowed_normal_dependencies']
+    external = graph.get('allowed_external_dependencies', {})
     metadata = json.loads(subprocess.check_output(
         ['cargo', 'metadata', '--locked', '--no-deps', '--format-version', '1'], cwd=ROOT, text=True))
     actual = {}
@@ -36,7 +38,10 @@ def layers():
         dependencies = package['dependencies']
         actual[package['name']] = sorted(d['name'] for d in dependencies if d['kind'] is None)
         for dependency in dependencies:
-            if dependency['name'] not in allowed:
+            if dependency['name'] in external:
+                if dependency['source'] is None or dependency['req'] != external[dependency['name']]:
+                    raise ValueError(f'unreviewed external dependency version: {dependency["name"]}')
+            elif dependency['name'] not in allowed:
                 raise ValueError(f'{package["name"]}: unreviewed dependency {dependency["name"]}')
             if dependency['name'] in {'vba-testkit', 'vba-conformance'} and not (
                 package['name'] == 'vba-conformance' or
@@ -55,7 +60,8 @@ def layers():
             return
         visiting.add(name)
         for dependency in actual[name]:
-            visit(dependency)
+            if dependency in allowed:
+                visit(dependency)
         visiting.remove(name)
         done.add(name)
 

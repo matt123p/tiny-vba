@@ -46,6 +46,8 @@
       "vba-vm"
     ],
     "vba-project": [
+      "cfb",
+      "encoding_rs",
       "vba-diagnostics"
     ],
     "vba-semantics": [
@@ -76,5 +78,9 @@
       "vba-syntax",
       "vba-values"
     ]
+  },
+  "allowed_external_dependencies": {
+    "cfb": "=0.14.0",
+    "encoding_rs": "=0.8.42"
   }
 }

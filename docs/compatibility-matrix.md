@@ -1,6 +1,6 @@
 # Compatibility matrix
 
-Updated 2026-10-26. Stage: M4 external acceptance complete; M5 native host contract implemented. **The documented m5-host-v1 consumer, including M3 control, M4 scalar widths and IR 4 host roots, has execution evidence; the 44 authored and 153 reviewed fixtures remain asserted 197 PASS / 0 UNSUPPORTED.**
+Updated 2026-10-27. Stage: M4 external acceptance complete; M5 native host contract and M6 source decoding implemented. **The documented m5-host-v1 consumer, including M3 control, M4 scalar widths and IR 4 host roots, has execution evidence; the 44 authored and 153 reviewed fixtures remain asserted 197 PASS / 0 UNSUPPORTED.**
 
 | Dimension | Status | Evidence / next gate |
 |---|---|---|
@@ -28,7 +28,7 @@ Updated 2026-10-26. Stage: M4 external acceptance complete; M5 native host contr
 | Breakpoints, stepping, local inspect/edit/resume | Implemented M3 headless API | vba-vm execution tests with vba-debug controller; no graphical UI/DAP |
 | Native / WASM execution | Implemented M3 smoke | cargo xtask wasm-run; identical typed results, pause/edit/host counts and cancellation |
 | Replacement-session isolation | Implemented M3 correction | recycled-client-ID regression in VM tests and native/WASI smoke; [ADR 0008](decisions/0008-vm-instance-isolation.md) |
-| MS-OVBA source decoding | Not implemented | M6 |
+| MS-OVBA source decoding | Implemented M6 bounded profile | [Import contract](project-import.md), [ADR 0014](decisions/0014-m6-project-decoding.md), 14 native/WASI tests; controlled authored projects only; package/trust/preservation gates stay fork-owned |
 | Oracle comparison / executable scenario runner | M4 runner implemented for self-authored fixtures; oracle comparison not implemented | `conformance run` (20 PASS / 0 UNSUPPORTED); M9 owns oracle goldens |
 | Fuzzing | Not implemented | APIs required before targets |
 | Excel/Word APIs and OOXML round-trip | External ownership | Gridcraft/Wordcraft forks |

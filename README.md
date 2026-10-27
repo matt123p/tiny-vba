@@ -3,8 +3,8 @@
 A new, standalone VBA interpreter, editor and debugger in Rust, intended to run natively and in WebAssembly.
 Develop, run and test the language engine without Gridcraft, Wordcraft, Microsoft Office or a graphical interface.
 
-**Current status:** M4 acceptance is complete and the M5 host contract is implemented. The Rust
-engine includes verified IR 1/2/3/4, explicit-frame execution, a headless debugger, scalar
+**Current status:** M4 acceptance is complete; the M5 host contract and M6 read-only project
+decoder are implemented. The Rust engine includes verified IR 1/2/3/4, explicit-frame execution, a headless debugger, scalar
 conversions, Currency/Date, arrays, optional/named calls, whole-array ByRef, ParamArray,
 Option Base, static/module state, VBA handlers and host-root imports with a versioned native host
 protocol. The current execution profile is `m5-host-v1` ([ADR 0013](docs/decisions/0013-m5-host-contract.md)).
@@ -12,6 +12,7 @@ protocol. The current execution profile is `m5-host-v1` ([ADR 0013](docs/decisio
 All **44 authored scenarios and 153 reviewed ReflexGrid cases pass**. The latter match published
 Microsoft Excel Mac oracle expectations; this is inherited evidence, not a new local Excel run.
 See [the acceptance report](docs/m4-oracle-report.md) and [language scope](docs/m4-language.md).
+[M6 project import](docs/project-import.md) extracts bounded source/metadata without execution.
 The graphical editor/debugger, DAP and Office integration remain later milestones.
 
 
@@ -24,7 +25,7 @@ and design conventions. See the [editor/debugger UI contract](docs/editor-debugg
 ## Start here
 
 Rust is pinned by `rust-toolchain.toml`; Python 3.11+ and Git support repository checks only.
-No third-party Rust crates or Office installations are needed for M0–M4. Node 18+ runs the WASI smoke test.
+M6 uses pinned cfb and encoding_rs dependencies; Office is not required. Node 18+ runs the WASI smoke test.
 
 ```sh
 cargo run -p vba-cli -- --help

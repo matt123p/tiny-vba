@@ -78,3 +78,11 @@ call/get and can never be written or captured. `HostBinding` carries case-insens
 vba-vm/tests/embedding.rs is the break/edit/resume proof with exactly one dispatch. Office-shaped
 names, catalogues, workbook FillCells evidence, undo/recalc and permission gates remain fork-owned
 (Gridcraft); do not add them here.
+
+M6 is implemented under [ADR 0014](../../../docs/decisions/0014-m6-project-decoding.md).
+Read [the import contract](../../../docs/project-import.md) before changing vba-project.
+Keep extraction read-only/inert, project-local ModuleId separate from caller-owned SourceId,
+UTF-8 attribute spans and code names distinct from stream/display names. Preserve explicit
+corrupt/unsupported/protected/limit refusals and container/decompression work caps. cfb/encoding_rs
+are reviewed pinned external dependencies; package preservation and trust UX remain fork-owned.
+The 14 controlled importer tests run natively and under WASI through cargo xtask wasm-run.

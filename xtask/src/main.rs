@@ -78,6 +78,25 @@ fn run() -> Result<(), Box<dyn Error>> {
                 .to_str()
                 .ok_or_else(|| io::Error::other("non-UTF-8 WASM artifact path"))?;
             command("node", &["tools/run_wasi.cjs", artifact])?;
+            // Cargo runs each test from its crate directory; use the current checkout's runner.
+            let import_runner = format!(
+                "target.wasm32-wasip1.runner=[\"node\", {:?}]",
+                root.join("tools/run_wasi.cjs")
+            );
+            // Execute the same controlled project-import suite on the WASI target.
+            command(
+                "cargo",
+                &[
+                    "test",
+                    "-p",
+                    "vba-project",
+                    "--locked",
+                    "--target",
+                    "wasm32-wasip1",
+                    "--config",
+                    &import_runner,
+                ],
+            )?;
         }
         Some("layers") => command("python3", &["tools/check_repository.py", "layers"])?,
         Some("corpora") => command("python3", &["tools/check_repository.py", "corpora"])?,
