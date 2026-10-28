@@ -1,12 +1,41 @@
 # Implementation progress
 
 Updated 2026-10-28. The classic-editor/debugger profile is implemented; its
-historical milestone is M10. Runtime remains m5-host-v1 with verified IR 1/2/3/4.
+historical milestone is M10. Runtime remains m5-host-v1 with verified IR 1/2/3/4/5.
 The [remaining plan](implementation-plan.md) now uses **M1–M8** for future work.
-Next: **M1.1b**, nominal host object identity/assignment and typed-declaration proof. Real
+Next: **M1.2**, default-member dispatch. New M1.1 host type binding is complete. Real
 Office objects, document events, trust and packaging remain fork-owned.
 
-## New M1.1 — explicit reference binding increment
+## New M1.1 completion — generic core and fork-owned acceptance
+
+Completed nominal host binding under [ADR 0021](decisions/0021-nominal-host-object-types.md),
+with [resumable implementation/evidence](m1-host-references.md). The core carries
+opaque library/version/type identity and IR 5 constraints, and queries a host-owned
+read-only resolver. It owns no Excel definitions, object store or GridCraft dependency.
+The boundary audit finds only oracle metadata references to Excel in non-test
+interpreter Rust; the reviewed 19-crate DAG remains headless and acyclic.
+
+Storage/alias/array/temporary/return checks, host writeback precommit, debugger
+edits, rootless embeddings, isolated snapshots, callbacks, persistent restore,
+lifetime and resource budgets are verified. Code aids preserve library scope
+through qualified/chained types rather than mixing same-named classes.
+
+GridCraft owns its four Excel type descriptors and resolver over its existing
+object store. Its authored unchanged Worksheet/Excel.Range source executes real
+cell writes, typed calls/results and pause/edit/resume. Wrong classes fail with
+13; stale/foreign/closed handles with 91. This is registered-type compatibility,
+not a complete Excel typelib or general unchanged-workbook claim.
+
+Core validation: 304 workspace tests and 118 actual WASI tests, strict CI and
+headless WASM compilation pass. Fork validation and the immutable dependency pin
+are recorded in the M1 log and GridCraft's `docs/vba-m1-types.md`. M1.2/M1.3 remain
+the default-member/collection work; no implicit implementation is inferred here.
+GridCraft's final pin is tiny-vba `98a88c3`, with adapter commit `139016d7`:
+33 native and actual JavaScript/WASM adapter tests, 2,561 full-CI test/doctest
+results, 1,150 optional window tests, strict window Clippy and browser feature
+build pass. Both feature branches remain separate from main.
+
+## First M1.1 explicit-reference increment — historical checkpoint
 
 Implemented validated native reference snapshots, ordered namespace resolution,
 registered enum declarations and executable typed constants. Compiler defaults

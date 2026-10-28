@@ -5,6 +5,7 @@ in implementation order. Completed work and the old-to-new milestone mapping
 belong in [implementation progress](implementation-progress.md#plan-renumbering--2026-10-28).
 Historical reports and ADRs retain their original milestone numbers; use this
 document's numbers for new work.
+Task IDs within an active milestone stay stable; completed tasks move to progress.
 
 tiny-vba owns reusable language/runtime, debugger, editor and form contracts.
 GridCraft and WordCraft own Office objects, document state, storage, trust,
@@ -15,7 +16,7 @@ separate and native host dispatch in Rust.
 
 | Milestone | Remaining work | Prerequisites |
 |---|---|---|
-| M1 | Host types, default members and collections | Existing generic host/compiler contracts |
+| M1 | Default members and collections | Existing generic host/type/compiler contracts |
 | M2 | Class/document semantics and standard Office UserForms | M1 type/member contracts; runtime before designer execution |
 | M3 | Excel range and worksheet coverage | M1 |
 | M4 | Excel identity, values and member semantics | M1 and applicable M3 reference behavior |
@@ -31,17 +32,11 @@ proceed alongside Excel work; its document/form events need the shared M2 contra
 Build tests and collect lawful evidence throughout every milestone. M8 is the
 final release gate, not a reason to postpone fuzzing, benchmarks or regression tests.
 
-## M1 — Host types, default members and collections
+## M1 — Default members and collections
 
 Owner: tiny-vba generic language/foreign contracts; forks supply Office metadata
-and actual objects. Start with M1.1's contract and an independently authored
-typed-declaration proof.
+and actual objects. Start with M1.2's default-member contract and a generic proof.
 
-- **M1.1:** Implement nominal host object type identity and assignment validation
-  so declarations such as `As Worksheet` and `As Excel.Range` compile and execute
-  unchanged against registered types. Cover parameters/ByRef, returns, arrays,
-  host results and debugger edits. Preserve Object/Variant late binding and
-  explicit missing-reference errors; keep Office names out of the shared engine.
 - **M1.2:** Implement default Get/Let/Set and parameterized Item dispatch,
   including chained applications, named/omitted arguments, ByRef obligations,
   return types and exact errors. Retain actual member applications.

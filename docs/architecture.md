@@ -1,7 +1,7 @@
 # Architecture
 
 Status: M0–M4 complete for the documented [M4 language profile](m4-language.md), with
-verified IR 1/2/3/4 and explicit-frame execution; the M5 native host contract is implemented
+verified IR 1/2/3/4/5 and explicit-frame execution; the M5 native host contract is implemented
 ([ADR 0013](decisions/0013-m5-host-contract.md)). M6 read-only project decoding is implemented
 ([ADR 0014](decisions/0014-m6-project-decoding.md)); M8's reusable graphical IDE and native/web shells are implemented under
 [ADR 0016](decisions/0016-m8-embeddable-editor.md). Fork-owned workbook integration remains a separate gate.

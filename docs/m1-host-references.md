@@ -6,17 +6,17 @@ This follows the **new** remaining plan numbering, not historical M1 frontend wo
 ## Stage state
 
 Continuation 2026-10-28: user explicitly requested M1.1 completion and a boundary
-audit. Nominal identity/IR 5 metadata and VM storage checks are being implemented
+audit. Nominal identity/IR 5 metadata and VM storage checks are complete
 on the same feature branch. Type queries use a read-only host-supplied resolver
 over the host's existing object store, not an engine-side registry. No Office
-type names or object implementations enter the engine. Completion requires new
-positive/negative/lifecycle tests and the fork-owned typed-source proof below.
+type names or object implementations enter the engine. Positive/negative/lifecycle
+tests and the fork-owned typed-source proof below all pass.
 
 | Stage | State / next proof |
 |---|---|
 | M1.1a explicit reference snapshots, enum types and constants | Complete for the documented profile; all gates below pass |
 | M1.1b nominal host object types | Core complete: explicit resolver, IR 5 metadata and typed storage/lifetime checks; native/WASI gates pass |
-| M1.1c unchanged typed Office source | Pending: generic object-type execution proofs first, then fork-owned `As Worksheet` / `As Excel.Range` tests |
+| M1.1c unchanged typed Office source | Complete for registered types: GridCraft native/JavaScript-WASM Worksheet/Excel.Range source and real cell effects pass |
 | M1.2 default members / M1.3 collections | Pending; no capability claim from reference metadata |
 
 ## Nominal core checkpoint
@@ -45,7 +45,33 @@ Boundary audit found no Excel/GridCraft object definitions in shipping interpret
 libraries. The only Excel-related matches in non-test Rust code are conformance
 oracle metadata, not object definitions. The 19-crate DAG remains headless/acyclic
 with no application dependency. Excel descriptors/resolver and unchanged-source
-proof are being implemented solely in GridCraft for M1.1c.
+proof live solely in GridCraft for M1.1c.
+
+## M1.1 final cross-repository acceptance
+
+M1.1 is complete for explicit registered host types. GridCraft commit
+[`139016d715665a0e8f7a5ec2502f45bc8ab7dfb7`](https://github.com/matt123p/gridcraft/commit/139016d715665a0e8f7a5ec2502f45bc8ab7dfb7)
+contains the Excel definitions, shared existing object store, read-only resolver
+and [fork acceptance report](https://github.com/matt123p/gridcraft/blob/139016d715665a0e8f7a5ec2502f45bc8ab7dfb7/docs/vba-m1-types.md).
+It pins tiny-vba's tested implementation
+[`98a88c37ac125cf4de65d42c0e9d9120e731e49d`](https://github.com/matt123p/tiny-vba/commit/98a88c37ac125cf4de65d42c0e9d9120e731e49d)
+in both manifests and all lockfile source entries. No sibling path override,
+embedded interpreter checkout or reverse dependency is introduced.
+
+All final fork gates pass against that exact pin: **33 adapter tests natively
+and in actual Node/wasm-bindgen execution**, **2,561 full-CI test/doctest results**
+and all ten CI steps, **1,150 optional window tests**, strict all-target window
+Clippy, and the browser VBA feature build. Original source is retained byte for
+byte while typed declarations/calls/results execute real cell writes. Invalid
+class assignments and paused edits preserve values and prior committed effects.
+Qualified Worksheet/Range completion is verified with the explicit Excel namespace.
+
+Neither main branch was merged. Both feature branches are `feat/m1-host-types`.
+The supplied Excel reference is a four-class adapter profile, not an installed
+typelib, COM loader or complete Excel API. Existing unregistered types/default
+members/collections/events/forms/package gaps remain explicit. No new Office
+oracle observation, downloaded macro execution or vendor implementation/assets
+were used. Only public behavior references and independently authored fixtures.
 
 ## First reference increment contract (historical checkpoint)
 
@@ -102,5 +128,5 @@ Public behavior references consulted, with original code/tests:
 - [Microsoft: Enum statement and library reference priority](https://learn.microsoft.com/en-us/office/vba/language/reference/user-interface-help/enum-statement)
 - [Microsoft: undefined types and required references](https://learn.microsoft.com/en-us/office/vba/language/how-to/user-defined-type-not-defined)
 
-Next: complete the fork-owned M1.1c acceptance and publish its pinned dependency
-and evidence. Default members and enumeration remain separate M1.2/M1.3 work.
+Next: M1.2 default-member dispatch, followed by M1.3 enumeration. These remain
+separate work; nominal type metadata does not silently implement either.
