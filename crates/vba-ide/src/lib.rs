@@ -611,15 +611,16 @@ impl Ide {
     }
     fn launch(&mut self, host: &mut impl Host, step: bool) -> Result<()> {
         let program = self.compile()?;
-        let binding = if self.imports.is_empty() && self.roots.is_empty() {
-            None
-        } else {
-            Some(HostBinding::for_program(
-                &program,
-                host.identity(),
-                self.roots.clone(),
-            )?)
-        };
+        let binding =
+            if self.imports.is_empty() && self.roots.is_empty() && self.type_resolver.is_none() {
+                None
+            } else {
+                Some(HostBinding::for_program(
+                    &program,
+                    host.identity(),
+                    self.roots.clone(),
+                )?)
+            };
         let mut session = Session::new_with_type_resolver(
             program,
             1,

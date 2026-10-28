@@ -488,6 +488,11 @@ impl Session {
                 &mut self.counters.type_checks,
                 self.limits.instructions,
             )?;
+            if !self.persistent.contains_key(&key)
+                && let Some(ty) = &nominal
+            {
+                self.charge(nominal_bytes(ty))?;
+            }
             prepared.push((key, kind, value, nominal));
         }
         let extra = prepared

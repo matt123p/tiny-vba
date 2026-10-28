@@ -154,3 +154,32 @@ fn qualified_catalog_owners_do_not_guess_between_same_named_library_types() -> R
     assert_eq!(ide.completions("item.V"), vec!["Value"]);
     Ok(())
 }
+
+#[test]
+fn type_resolver_configuration_does_not_require_imported_root_names() -> R {
+    let mut ide = Ide::new();
+    ide.add_module(
+        "Main.bas",
+        "Sub Main()\nDim item As HostLib.Item\nSet item=Nothing\nEnd Sub",
+    )?;
+    ide.configure_reference_bindings(ReferenceSet::new(vec![ReferenceLibrary {
+        name: "HostLib".into(),
+        version: "1".into(),
+        available: true,
+        types: vec![ReferenceType {
+            name: "Item".into(),
+            kind: ReferenceTypeKind::Object,
+        }],
+        constants: vec![],
+    }])?)?;
+    ide.configure_type_resolver(Some(Arc::new(Types)))?;
+    ide.dispatch(Action::Run, &mut TestHost)?;
+    for _ in 0..100 {
+        if ide.mode() != Mode::Running {
+            break;
+        }
+        ide.tick(&mut TestHost)?;
+    }
+    assert_eq!(ide.mode(), Mode::Completed);
+    Ok(())
+}

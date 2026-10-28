@@ -33,9 +33,9 @@ Immediate snapshots, persistent restore and handle lifetime. Object-array identi
 survives Variant copies/resize/Erase. Wrong types give error 13, stale handles error
 91, missing providers explicit unsupported errors. Generic Object/Variant remain.
 
-Core validation: **303 workspace tests PASS**, strict CI/Clippy/format/layer checks
-PASS, headless WASM compile PASS, **117 actual WASI tests PASS**. Thirteen new VM
-nominal tests and two IDE workflows prove the boundaries, including atomic waited
+Core validation: **304 workspace tests PASS**, strict CI/Clippy/format/layer checks
+PASS, headless WASM compile PASS, **118 actual WASI tests PASS**. Thirteen new VM
+nominal tests and three IDE workflows prove the boundaries, including atomic waited
 writeback, callbacks, state restore and query-budget exhaustion. The structural
 golden's profile header changes to ir5-structural; its scalar IR stays unchanged.
 Qualified declared types also resolve catalogue completion/Quick Info without
