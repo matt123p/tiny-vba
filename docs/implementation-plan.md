@@ -1,7 +1,7 @@
 # Remaining implementation plan
 
-Updated 2026-10-28. This plan contains **remaining work only**, numbered M1–M8
-in implementation order. Completed work and the old-to-new milestone mapping
+Updated 2026-10-28. This plan contains **remaining work only**, using stable M2–M8 IDs
+in implementation order after completed M1. Completed work and the old-to-new milestone mapping
 belong in [implementation progress](implementation-progress.md#plan-renumbering--2026-10-28).
 Historical reports and ADRs retain their original milestone numbers; use this
 document's numbers for new work.
@@ -16,7 +16,6 @@ separate and native host dispatch in Rust.
 
 | Milestone | Remaining work | Prerequisites |
 |---|---|---|
-| M1 | Default members and collections | Existing generic host/type/compiler contracts |
 | M2 | Class/document semantics and standard Office UserForms | M1 type/member contracts; runtime before designer execution |
 | M3 | Excel range and worksheet coverage | M1 |
 | M4 | Excel identity, values and member semantics | M1 and applicable M3 reference behavior |
@@ -31,23 +30,6 @@ M3 can proceed alongside M2 after M1. WordCraft's object-model work in M6 can
 proceed alongside Excel work; its document/form events need the shared M2 contract.
 Build tests and collect lawful evidence throughout every milestone. M8 is the
 final release gate, not a reason to postpone fuzzing, benchmarks or regression tests.
-
-## M1 — Default members and collections
-
-Owner: tiny-vba generic language/foreign contracts; forks supply Office metadata
-and actual objects. Start with M1.2's default-member contract and a generic proof.
-
-- **M1.2:** Implement default Get/Let/Set and parameterized Item dispatch,
-  including chained applications, named/omitted arguments, ByRef obligations,
-  return types and exact errors. Retain actual member applications.
-- **M1.3:** Add bounded host collection enumeration and the language constructs
-  required by selected collection workflows. GridCraft supplies Worksheets/Sheets,
-  Count/Item and supported sheet kinds.
-
-Acceptance: generic host regressions and fork tests for unchanged typed
-declarations, `Worksheets.Count`, indexed/default Item and collection loops.
-Verify exact values, argument/error behavior, stale handles and cancellation
-natively and through actual WASM execution.
 
 ## M2 — Class/document semantics and standard Office UserForms
 

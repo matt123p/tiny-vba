@@ -76,6 +76,8 @@ and controlled native/WASI acceptance.
 - [Remaining UI/host scope: standard Office forms and integration](ui/post-m8-roadmap.md)
 - [ADR 0019: remaining plan scope and numbering](decisions/0019-remaining-plan-scope.md)
 - [New M1 host-reference implementation log](m1-host-references.md)
+- [M1.2/M1.3 default members, collections and acceptance](m1-defaults-and-collections.md)
+- [ADR 0022: generic defaults and enumeration](decisions/0022-default-members-and-enumeration.md)
 - [ADR 0020: explicit host reference snapshots](decisions/0020-explicit-host-reference-snapshots.md)
 - [ADR 0021: nominal host object identity and validation](decisions/0021-nominal-host-object-types.md)
 - [Run, embed and reproduce visual evidence](ui/embedding.md)

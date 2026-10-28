@@ -1,10 +1,42 @@
 # Implementation progress
 
 Updated 2026-10-28. The classic-editor/debugger profile is implemented; its
-historical milestone is M10. Runtime remains m5-host-v1 with verified IR 1/2/3/4/5.
-The [remaining plan](implementation-plan.md) now uses **M1–M8** for future work.
-Next: **M1.2**, default-member dispatch. New M1.1 host type binding is complete. Real
-Office objects, document events, trust and packaging remain fork-owned.
+historical milestone is M10. Runtime remains m5-host-v1 with verified IR 1/2/3/4/5/6.
+The [remaining plan](implementation-plan.md) retains stable **M2–M8** task IDs.
+**M1.x is complete** for the declared registered-type/default/collection profile.
+Next: **M2.1**, class/document runtime semantics. Office objects, document events,
+trust and packaging remain fork-owned.
+
+## New M1.2/M1.3 completion — defaults, iteration and real workbook acceptance
+
+[ADR 0022](decisions/0022-default-members-and-enumeration.md) and the
+[implementation/evidence log](m1-defaults-and-collections.md) record the full
+contract and stages. IR 6 preserves generic Get/Let/Set intent, chained/indexed
+applications, named/omitted/native ByRef arguments and value/reference contexts.
+For Each has bounded owned host snapshots, live native array aliases, typed
+controls, resize locks, source/Next checkpoints, error/resume cleanup and
+canonical paused element edits. Safe watches remain inert. The headless
+19-crate DAG and repository ownership boundary are unchanged.
+
+GridCraft exclusively supplies six Excel object types, real Worksheets/Sheets
+roots, Count/Item/defaults and cell iteration through native commands. Original
+unchanged source verifies typed loops, names/order, Range defaults/indexes,
+values/errors, handle budgets, stale references, undo and trust revocation.
+A worksheet UDF loops over a two-dimensional value array and recalculates when
+its precedents change. Broader M2–M8 compatibility is not claimed.
+
+Core: 316 workspace tests, strict `cargo xtask ci`, headless WASM compilation and
+130 actual WASI tests pass. GridCraft: 40 native and 40 actual JavaScript/WASM
+adapter tests; full CI passes all 10 gates with 2,568 test/doctest results;
+1,150 optional desktop VBA-window tests, strict window Clippy and browser VBA
+compilation pass. Node 24.22.1 provides the successful JS/WASM run; an older
+Node 24.14.0 shutdown crash is explicitly recorded, not counted as success.
+
+Published feature branch in both repositories: `feat/m1-defaults-and-collections`.
+GridCraft commit `55d3b1bb825499086581afdbd2e07eec87bc3c29` pins tested tiny-vba
+commit `d80e0393b408e0421a8df7e16667dbbbc970783b` by Git revision, with no embedded
+copy or path override. Main branches are unchanged. Completed M1 is removed
+from the remaining plan; M2–M8 IDs are retained for follow-up references.
 
 ## New M1.1 completion — generic core and fork-owned acceptance
 

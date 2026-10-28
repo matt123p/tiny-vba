@@ -6,10 +6,10 @@ User request: complete the remaining M1.x work, preserving repository separation
 | Stage | State |
 |---|---|
 | M1.2 generic default invocation / value contexts | Complete; 316 native / 130 WASI suite results |
-| M1.2 fork-owned default members / indexed Item | Pending |
+| M1.2 fork-owned default members / indexed Item | Complete; native / JS-WASM acceptance |
 | M1.3 bounded enumeration / For Each / debugger lifecycle | Complete; core CI / WASM / WASI gates pass |
-| M1.3 fork-owned collection objects and unchanged source | Pending |
-| Final native/WASM/UI/fork gates and documentation closure | Pending |
+| M1.3 fork-owned collection objects and unchanged source | Complete; 40 native / 40 JS-WASM adapter tests |
+| Final native/WASM/UI/fork gates and documentation closure | Complete; full CI and affected desktop/browser gates |
 
 Core owns explicit generic invocation kinds and verified execution. No Excel
 member names or object definitions enter tiny-vba. GridCraft owns default-member
@@ -33,10 +33,32 @@ All code and fixtures are original. Documentation is not a fresh Office oracle.
 Implementation checkpoint: generic IR 6/default contexts, dynamic array/object
 applications, canonical ByRef versus property temporaries, For Each lowering,
 array locks, source-region/error cleanup and paused element editing are in place.
-The authored `defaults_collections` suite has 12 native regressions; it is also
-part of `cargo xtask wasm-run`. Final counts/gates will be recorded at closure.
-GridCraft adapter work is on the matching feature branch; its final pin follows
-tested core publication. Main branches remain untouched.
+The authored `defaults_collections` suite has 12 regressions executed natively
+and as part of `cargo xtask wasm-run`. Core validation: 316 workspace tests,
+strict full CI, headless WASM compilation and 130 actual WASI tests pass.
+
+GridCraft's matching feature branch passes 40 native and 40 JavaScript/WASM
+adapter tests, including unchanged source, real commands/undo, trust revocation,
+collection errors/order/resource limits and spreadsheet UDF recalculation.
+Full fork CI passes all 10 gates with 2,568 test/doctest results. Strict optional
+window Clippy, 1,150 desktop window tests and browser VBA compilation pass.
+Existing browser dead-code warnings remain. Node 24.14.0 crashed in runner
+shutdown; the complete suite passes with successful exit on existing Node
+24.22.1. No failed runner attempt is counted as success.
+
+Publication: [tested tiny-vba code](https://github.com/matt123p/tiny-vba/commit/d80e0393b408e0421a8df7e16667dbbbc970783b),
+[GridCraft adapter and immutable pin](https://github.com/matt123p/gridcraft/commit/55d3b1bb825499086581afdbd2e07eec87bc3c29).
+Both branches are `feat/m1-defaults-and-collections`; main branches are untouched.
+GridCraft has no embedded tiny-vba copy, submodule or sibling path override.
+The core exposes no Excel object definitions; the fork's existing shared object
+store owns the six Excel types and default/collection selection.
+
+Logs remain ignored under tiny-vba `target/m1-ci.log`, `m1-wasm.log`,
+`m1-wasm-run.log` and GridCraft `target/m1-collections-native.log`,
+`m1-collections-wasm-node24.log`, `m1-grid-ci.log`, `m1-window-clippy.log`,
+`m1-window-tests.log`, `m1-web-vba.log`. M1.x is complete for this declared
+profile. Next is M2.1; larger range/identity/event/package acceptance remains
+in M2–M8, without renumbering established follow-up task IDs.
 
 Public references used to define behavior (documentation, not fresh Office results):
 
