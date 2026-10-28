@@ -70,6 +70,59 @@ fn setup(wait: bool) -> Result<(Ide, DocumentHost), Box<dyn Error>> {
     ))
 }
 #[test]
+fn isolated_immediate_host_calls_require_policy_and_cancel_waits_once() -> R {
+    let (mut ide, mut host) = setup(false)?;
+    let byte = ide
+        .active_module()
+        .and_then(|m| m.text.find("counter = counter +"))
+        .ok_or("statement")?;
+    ide.toggle_breakpoint_at(byte)?;
+    ide.dispatch(Action::Run, &mut host)?;
+    for _ in 0..100 {
+        ide.tick(&mut host)?;
+        if ide.mode() == Mode::Break {
+            break;
+        }
+    }
+    assert_eq!(host.writes, 1);
+    assert!(
+        ide.evaluate_with_host(
+            "bridge.Record(1)",
+            &mut host,
+            vba_ide::EvaluationPolicy::default()
+        )
+        .is_err()
+    );
+    assert_eq!(host.writes, 1);
+    assert_eq!(
+        ide.evaluate_with_host(
+            "bridge.Record(1)",
+            &mut host,
+            vba_ide::EvaluationPolicy {
+                allow_isolated_calls_and_host_effects: true
+            }
+        )?,
+        Value::Empty
+    );
+    assert_eq!(host.writes, 2);
+    host.wait = true;
+    assert!(
+        ide.evaluate_with_host(
+            "bridge.Record(1)",
+            &mut host,
+            vba_ide::EvaluationPolicy {
+                allow_isolated_calls_and_host_effects: true
+            }
+        )
+        .is_err()
+    );
+    assert_eq!(host.writes, 3);
+    assert_eq!(host.cancelled, vec![71]);
+    assert_eq!(host.polls, 0);
+    assert_eq!(ide.mode(), Mode::Break);
+    Ok(())
+}
+#[test]
 fn embedded_break_edit_resume_dispatches_host_effect_exactly_once() -> R {
     let (mut ide, mut host) = setup(false)?;
     let byte = ide

@@ -3,10 +3,8 @@ use crate::{Result, error};
 use vba_diagnostics::{SourceFile, SourceId};
 use vba_syntax::{Expr, ExprKind, ModuleKind, StatementKind, parse};
 use vba_values::{Value, VbaString};
-pub fn evaluate(expression: &str, lookup: &impl Fn(&str) -> Result<Value>) -> Result<Value> {
-    if expression.trim().is_empty()
-        || expression.len() > 1024
-        || expression.contains(['\n', '\r', ':'])
+pub(crate) fn expression_ast(expression: &str) -> Result<Expr> {
+    if expression.trim().is_empty() || expression.len() > 1024 || expression.contains(['\n', '\r'])
     {
         return Err(error("expected a bounded single expression"));
     }
@@ -15,7 +13,14 @@ pub fn evaluate(expression: &str, lookup: &impl Fn(&str) -> Result<Value>) -> Re
     );
     let file = SourceFile::new(SourceId(u64::MAX), "watch.bas".into(), text)?;
     let parsed = parse(&file, ModuleKind::Standard)?;
-    if !parsed.syntax_valid() {
+    if !parsed.syntax_valid()
+        || parsed.module.procedures.len() != 1
+        || parsed
+            .module
+            .procedures
+            .first()
+            .is_none_or(|p| p.body.len() != 1)
+    {
         return Err(error("invalid watch expression"));
     }
     let statement = parsed
@@ -27,7 +32,63 @@ pub fn evaluate(expression: &str, lookup: &impl Fn(&str) -> Result<Value>) -> Re
     let StatementKind::Assign { value, .. } = &statement.kind else {
         return Err(error("invalid expression"));
     };
-    evaluate_ast(value, lookup, 0)
+    Ok(value.clone())
+}
+pub fn evaluate(expression: &str, lookup: &impl Fn(&str) -> Result<Value>) -> Result<Value> {
+    evaluate_ast(&expression_ast(expression)?, lookup, 0)
+}
+fn indices(
+    arguments: &[vba_syntax::Argument],
+    lookup: &impl Fn(&str) -> Result<Value>,
+    depth: usize,
+) -> Result<Vec<i32>> {
+    if arguments.is_empty() || arguments.len() > 60 {
+        return Err(error("invalid array rank"));
+    }
+    arguments
+        .iter()
+        .map(|a| {
+            if a.name.is_some() {
+                return Err(error("array indices cannot be named"));
+            }
+            let value = evaluate_ast(
+                a.value
+                    .as_ref()
+                    .ok_or_else(|| error("array index required"))?,
+                lookup,
+                depth + 1,
+            )?;
+            let Value::Long(index) = vba_runtime::bind(vba_values::ScalarKind::Long, &value)
+                .map_err(|e| error(&format!("{e:?}")))?
+            else {
+                return Err(error("invalid array index"));
+            };
+            Ok(index)
+        })
+        .collect()
+}
+pub fn edit_target(
+    target: &str,
+    value: Value,
+    lookup: &impl Fn(&str) -> Result<Value>,
+) -> Result<(String, Value)> {
+    match expression_ast(target)?.kind {
+        ExprKind::Name(name) => Ok((name.spelling, value)),
+        ExprKind::Apply { target, arguments } => {
+            let ExprKind::Name(name) = &target.kind else {
+                return Err(error("only local array elements are editable"));
+            };
+            let Value::Array(mut array) = lookup(&name.spelling)? else {
+                return Err(error("local array required"));
+            };
+            let offset = array.offset(&indices(&arguments, lookup, 0)?)?;
+            let value =
+                vba_runtime::bind(array.kind(), &value).map_err(|e| error(&format!("{e:?}")))?;
+            array.set(offset, value)?;
+            Ok((name.spelling.clone(), Value::Array(array)))
+        }
+        _ => Err(error("only locals and local array elements are editable")),
+    }
 }
 fn evaluate_ast(
     expr: &Expr,
@@ -68,8 +129,21 @@ fn evaluate_ast(
             vba_runtime::binary(op, &eval(left)?, &eval(right)?)
                 .map_err(|e| error(&format!("{e:?}")))
         }
-        ExprKind::Member { .. } | ExprKind::Apply { .. } => Err(error(
-            "Side effects refused: calls, array indexing and property access are not available in safe watches",
+        ExprKind::Apply { target, arguments } => {
+            let Value::Array(array) = eval(target)? else {
+                return Err(error(
+                    "Side effects refused: only local array indexing is available",
+                ));
+            };
+            let offset = array.offset(&indices(arguments, lookup, depth)?)?;
+            array
+                .elements()
+                .get(offset)
+                .cloned()
+                .ok_or_else(|| error("array subscript outside bounds"))
+        }
+        ExprKind::Member { .. } => Err(error(
+            "Side effects refused: property access is not available in safe watches",
         )),
     }
 }

@@ -18,7 +18,8 @@ vba-ui-egui.workspace = true
 [target.'cfg(target_arch = "wasm32")'.dependencies]
 wasm-bindgen.workspace = true
 wasm-bindgen-futures.workspace = true
-web-sys.workspace = true
+web-sys = { workspace = true, features = ["HtmlAnchorElement", "HtmlInputElement", "HtmlElement", "Node", "File", "FileList", "Blob", "Event", "EventTarget", "Url"] }
+js-sys.workspace = true
 
 [target.'cfg(not(target_arch = "wasm32"))'.dependencies]
 image.workspace = true

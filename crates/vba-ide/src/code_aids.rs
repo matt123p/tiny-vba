@@ -31,6 +31,8 @@ pub(crate) struct Symbol {
     ty: Option<String>,
     scope: Option<Span>,
     public: bool,
+    span: Span,
+    constant: bool,
 }
 pub(crate) fn symbols(module: &vba_syntax::Module) -> Vec<Symbol> {
     let mut out = Vec::new();
@@ -40,6 +42,8 @@ pub(crate) fn symbols(module: &vba_syntax::Module) -> Vec<Symbol> {
             ty: d.ty.as_ref().map(|t| t.spelling.clone()),
             scope,
             public: d.visibility == Visibility::Public,
+            span: d.name.span,
+            constant: d.constant.is_some(),
         })
     };
     for d in &module.declarations {
@@ -75,6 +79,8 @@ pub(crate) fn symbols(module: &vba_syntax::Module) -> Vec<Symbol> {
             ty: None,
             scope: None,
             public: p.visibility != Visibility::Private,
+            span: p.name.span,
+            constant: false,
         });
         for arg in &p.parameters {
             out.push(Symbol {
@@ -82,6 +88,8 @@ pub(crate) fn symbols(module: &vba_syntax::Module) -> Vec<Symbol> {
                 ty: arg.ty.as_ref().map(|t| t.spelling.clone()),
                 scope: Some(p.span),
                 public: false,
+                span: arg.name.span,
+                constant: false,
             });
         }
     }
@@ -116,6 +124,57 @@ impl Module {
     }
 }
 impl Ide {
+    pub(crate) fn definition(&self, name: &str) -> Option<(crate::SourceId, usize)> {
+        let active = self.active_module()?;
+        let mut choices = Vec::new();
+        for m in &self.modules {
+            for symbol in &m.symbols {
+                let visible = if m.id == active.id {
+                    symbol.scope.is_none_or(|s| {
+                        active.caret >= s.start() as usize && active.caret <= s.end() as usize
+                    })
+                } else {
+                    symbol.public && symbol.scope.is_none()
+                };
+                if visible && symbol.name.eq_ignore_ascii_case(name) {
+                    let priority = if m.id != active.id {
+                        2
+                    } else if symbol.scope.is_none() {
+                        1
+                    } else {
+                        0
+                    };
+                    choices.push((priority, m.id, symbol.span.start() as usize));
+                }
+            }
+        }
+        choices.sort_by_key(|(priority, _, _)| *priority);
+        choices.first().map(|(_, id, byte)| (*id, *byte))
+    }
+    pub(crate) fn constant_names(&self) -> Vec<String> {
+        let Some(active) = self.active_module() else {
+            return vec![];
+        };
+        self.modules
+            .iter()
+            .flat_map(|m| {
+                m.symbols
+                    .iter()
+                    .filter(move |s| {
+                        s.constant
+                            && if m.id == active.id {
+                                s.scope.is_none_or(|scope| {
+                                    active.caret >= scope.start() as usize
+                                        && active.caret <= scope.end() as usize
+                                })
+                            } else {
+                                s.public && s.scope.is_none()
+                            }
+                    })
+                    .map(|s| s.name.clone())
+            })
+            .collect()
+    }
     pub(crate) fn source_completions(&self) -> Vec<(String, Option<String>)> {
         let mut out = Vec::new();
         let Some(active) = self.active_module() else {
@@ -147,32 +206,7 @@ impl Ide {
     }
     /// Signature help for a project procedure or supported catalog member; never executes VBA.
     pub fn signature_help(&self) -> Option<String> {
-        let m = self.active_module()?;
-        let line = m.text.get(m.line_start(m.line_at(m.caret))..m.caret)?;
-        let before = line.rsplit_once('(')?.0.trim_end();
-        let (name, _) = completion_prefix(before, before.len());
-        if !self
-            .source_completions()
-            .iter()
-            .any(|(n, _)| n.eq_ignore_ascii_case(name))
-            && !name.contains('.')
-        {
-            return None;
-        }
-        for module in std::iter::once(m).chain(self.modules.iter().filter(|other| other.id != m.id))
-        {
-            if let Some(p) = module
-                .procedures
-                .iter()
-                .find(|p| p.name.eq_ignore_ascii_case(name) && (module.id == m.id || p.public))
-            {
-                return Some(p.signature.clone());
-            }
-        }
-        self.catalog
-            .iter()
-            .find(|a| a.supported && format!("{}.{}", a.owner, a.name).eq_ignore_ascii_case(name))
-            .map(|a| a.signature.clone())
+        self.parameter_info().map(|info| info.signature)
     }
 }
 

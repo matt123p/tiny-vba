@@ -1,8 +1,9 @@
 //! Standalone native/browser shell. Source IO stays here; panels and IDE remain embeddable.
 #![forbid(unsafe_code)]
 use eframe::egui;
-#[cfg(not(target_arch = "wasm32"))]
 use vba_ide::Action;
+#[cfg(target_arch = "wasm32")]
+mod browser_files;
 use vba_ide::{HostRequest, Ide, Mode, NoHost};
 use vba_ui_egui::{EditorUi, Theme, apply};
 pub struct App {
@@ -15,6 +16,8 @@ pub struct App {
     close_window: bool,
     #[cfg(target_arch = "wasm32")]
     browser_source: String,
+    #[cfg(target_arch = "wasm32")]
+    browser_files: browser_files::BrowserFiles,
     #[cfg(not(target_arch = "wasm32"))]
     capture: Option<std::path::PathBuf>,
     frames: u32,
@@ -31,6 +34,8 @@ impl App {
             close_window: false,
             #[cfg(target_arch = "wasm32")]
             browser_source: String::new(),
+            #[cfg(target_arch = "wasm32")]
+            browser_files: Default::default(),
             #[cfg(not(target_arch = "wasm32"))]
             capture: None,
             frames: 0,
@@ -50,6 +55,39 @@ impl App {
             }
             if let Some(visible) = storage.get_string("vba.properties_visible") {
                 self.view.properties_visible = visible != "false";
+            }
+            if let Some(width) = storage
+                .get_string("vba.tab_width")
+                .and_then(|s| s.parse::<usize>().ok())
+                .filter(|n| (1..=16).contains(n))
+            {
+                self.view.tab_width = width;
+            }
+            for (key, target) in [
+                ("vba.auto_indent", &mut self.view.auto_indent),
+                ("vba.correct_case", &mut self.view.correct_case),
+                ("vba.procedure_view", &mut self.view.procedure_view),
+                ("vba.split_view", &mut self.view.split_view),
+                ("vba.project_right", &mut self.view.project_right),
+                ("vba.debugger_right", &mut self.view.debugger_right),
+            ] {
+                if let Some(value) = storage.get_string(key) {
+                    *target = value == "true";
+                }
+            }
+            if let Some(actions) = storage.get_string("vba.toolbar") {
+                self.view.toolbar_actions = [
+                    Action::Save,
+                    Action::Run,
+                    Action::Pause,
+                    Action::Reset,
+                    Action::StepInto,
+                    Action::StepOver,
+                    Action::StepOut,
+                ]
+                .into_iter()
+                .filter(|action| actions.split(',').take(16).any(|id| id == action.id()))
+                .collect();
             }
         }
     }
@@ -89,6 +127,25 @@ impl App {
         }
     }
     fn file_ui(&mut self, ctx: &egui::Context) {
+        #[cfg(target_arch = "wasm32")]
+        if let Some(imported) = self.browser_files.take_import() {
+            if matches!(self.file_request, Some(HostRequest::Import)) {
+                match imported {
+                    Ok((name, text)) => match self.ide.add_module(&name, &text) {
+                        Ok(_) => {
+                            self.file_request = None;
+                            self.ide.message("Source file imported without execution.");
+                        }
+                        Err(d) => self.ide.message(d.to_string()),
+                    },
+                    Err(message) => self.ide.message(message),
+                }
+            } else {
+                self.ide.message(
+                    "Upload completed after cancellation; project source was not changed.",
+                );
+            }
+        }
         if self.file_request.is_some() {
             let mut close = false;
             egui::Window::new("Source File").collapsible(false).show(ctx,|ui|{
@@ -106,14 +163,17 @@ impl App {
             }
             #[cfg(target_arch="wasm32")]
             {ui.label("Browser source transfer");match &mut self.file_request {Some(HostRequest::Import)=>{
+                if ui.button("Choose Source File...").clicked() && let Err(message)=self.browser_files.choose(ctx.clone()) {self.ide.message(message);}
                 ui.label("Paste a UTF-8 .bas module:");
                 ui.add(egui::TextEdit::multiline(&mut self.browser_source).desired_rows(12).char_limit(vba_ide::SourceFile::MAX_BYTES)).on_hover_text("Source to import");
                 if ui.button("Import Source").clicked(){
                     if !self.path.to_ascii_lowercase().ends_with(".bas"){self.ide.message("Choose a .bas module name.");}
                     else {match self.ide.add_module(&self.path,&self.browser_source){Ok(_)=>{close=true;self.browser_source.clear();},Err(d)=>self.ide.message(d.to_string())}}
                 }
-            },Some(HostRequest::Save{text,..}|HostRequest::Export{text,..})=>{ui.add(egui::TextEdit::multiline(text).desired_rows(12)).on_hover_text("Source export — copy to your chosen file");
-                if ui.button("Copy Source").clicked(){ui.ctx().copy_text(text.clone());}},_=>{}}ui.label("This browser shell has no ambient filesystem access. Use the native shell for file IO.");}
+            },Some(HostRequest::Save{name,text,..}|HostRequest::Export{name,text,..})=>{
+                if ui.button("Download Source File").clicked() {match self.browser_files.download(name,text) {Ok(())=>self.ide.message("Download requested. Source remains modified until save is acknowledged."),Err(message)=>self.ide.message(message)}}
+                ui.add(egui::TextEdit::multiline(text).desired_rows(12)).on_hover_text("Source export — copy to your chosen file");
+                if ui.button("Copy Source").clicked(){ui.ctx().copy_text(text.clone());}},_=>{}}ui.label("Uploads/downloads are explicit browser actions; no ambient filesystem access.");}
             if ui.button("Cancel / Close").clicked(){close=true;}
         });
             if close {
@@ -146,6 +206,27 @@ impl App {
 }
 impl eframe::App for App {
     fn save(&mut self, storage: &mut dyn eframe::Storage) {
+        storage.set_string("vba.tab_width", self.view.tab_width.to_string());
+        for (key, value) in [
+            ("vba.auto_indent", self.view.auto_indent),
+            ("vba.correct_case", self.view.correct_case),
+            ("vba.procedure_view", self.view.procedure_view),
+            ("vba.split_view", self.view.split_view),
+            ("vba.project_right", self.view.project_right),
+            ("vba.debugger_right", self.view.debugger_right),
+        ] {
+            storage.set_string(key, value.to_string());
+        }
+        storage.set_string(
+            "vba.toolbar",
+            self.view
+                .toolbar_actions
+                .iter()
+                .take(16)
+                .map(|action| action.id())
+                .collect::<Vec<_>>()
+                .join(","),
+        );
         storage.set_string("vba.font_size", self.view.font_size.to_string());
         storage.set_string("vba.project_visible", self.view.project_visible.to_string());
         storage.set_string(

@@ -1,6 +1,7 @@
 //! Embeddable Classic VBA editor/debugger panels. The caller owns context, theme, host and IO.
 #![forbid(unsafe_code)]
 mod theme;
+mod views;
 use egui::{Color32, FontId, RichText, TextEdit, Vec2};
 use std::sync::atomic::{AtomicU32, Ordering};
 static NEXT_VIEW: AtomicU32 = AtomicU32::new(1);
@@ -21,6 +22,19 @@ pub enum Command {
     EditLocal(String, String),
     Immediate(String),
     RunToCursor,
+    RenameModule(SourceId, String),
+    RemoveModule(SourceId, bool),
+    ExportModule(SourceId),
+    ToggleBookmark,
+    NextBookmark(bool),
+    NavigateBack,
+    Navigate(SourceId, usize),
+    Report(String),
+    SetNextStatement,
+    BreakOnErrors(bool),
+    AddWatchKind(String, vba_ide::WatchKind),
+    Definition(String),
+    IsolatedImmediate(String),
 }
 /// Execute a rendered command through the same headless IDE action route.
 pub fn apply(
@@ -74,6 +88,40 @@ pub fn apply(
         Command::EditLocal(name, value) => ide.edit_local(&name, &value),
         Command::Immediate(text) => ide.immediate(&text),
         Command::RunToCursor => ide.run_to_cursor(host),
+        Command::RenameModule(id, name) => ide.rename_module(id, &name),
+        Command::RemoveModule(id, discard) => ide.remove_module(id, discard),
+        Command::ExportModule(id) => ide.export_before_remove(id),
+        Command::ToggleBookmark => ide.toggle_bookmark(),
+        Command::NextBookmark(reverse) => ide.next_bookmark(reverse),
+        Command::NavigateBack => ide.navigate_back(),
+        Command::Navigate(id, byte) => ide.navigate(id, byte),
+        Command::Report(message) => {
+            ide.message(message);
+            Ok(())
+        }
+        Command::SetNextStatement => ide.set_next_statement(),
+        Command::BreakOnErrors(enabled) => {
+            ide.set_break_on_errors(enabled);
+            Ok(())
+        }
+        Command::AddWatchKind(expression, kind) => {
+            ide.add_watch_kind(&expression, kind, None, None)
+        }
+        Command::Definition(name) => ide.go_to_definition(&name),
+        Command::IsolatedImmediate(text) => {
+            let expression = text.trim().strip_prefix('?').ok_or_else(|| {
+                vba_ide::Diagnostic::new("VBA_IDE", "Isolated evaluation requires ? expression")
+            })?;
+            let value = ide.evaluate_with_host(
+                expression.trim(),
+                host,
+                vba_ide::EvaluationPolicy {
+                    allow_isolated_calls_and_host_effects: true,
+                },
+            )?;
+            ide.message(format!("Isolated evaluation: {}", display_value(&value)));
+            Ok(())
+        }
     }
 }
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -94,6 +142,7 @@ pub struct LayoutReport {
 }
 #[derive(Clone, Copy)]
 enum EditOperation {
+    Block(vba_ide::BlockEdit),
     Undo,
     Redo,
     Cut,
@@ -141,6 +190,23 @@ pub struct EditorUi {
     last_diagnostic: Option<vba_ide::Span>,
     highlight_text: String,
     highlight: Vec<(std::ops::Range<usize>, SyntaxClass)>,
+    rename_module: Option<(SourceId, String)>,
+    remove_module: Option<SourceId>,
+    pub tab_width: usize,
+    watch_kind: vba_ide::WatchKind,
+    quick_watch: bool,
+    info: Option<String>,
+    references_open: bool,
+    constants_open: bool,
+    pub auto_indent: bool,
+    pub correct_case: bool,
+    pub allow_isolated_immediate: bool,
+    pub procedure_view: bool,
+    pub split_view: bool,
+    split_procedure: usize,
+    pub project_right: bool,
+    pub debugger_right: bool,
+    pub toolbar_actions: Vec<Action>,
 }
 impl Default for EditorUi {
     fn default() -> Self {
@@ -182,12 +248,42 @@ impl Default for EditorUi {
             last_diagnostic: None,
             highlight_text: String::new(),
             highlight: vec![],
+            rename_module: None,
+            remove_module: None,
+            tab_width: 4,
+            watch_kind: vba_ide::WatchKind::Expression,
+            quick_watch: false,
+            info: None,
+            references_open: false,
+            constants_open: false,
+            auto_indent: true,
+            correct_case: true,
+            allow_isolated_immediate: false,
+            procedure_view: false,
+            split_view: false,
+            split_procedure: 0,
+            project_right: false,
+            debugger_right: false,
+            toolbar_actions: vec![
+                Action::Save,
+                Action::Run,
+                Action::Pause,
+                Action::Reset,
+                Action::StepInto,
+                Action::StepOver,
+                Action::StepOut,
+            ],
         }
     }
 }
 fn heading(ui: &mut egui::Ui, label: &str, theme: Theme) {
     ui.label(RichText::new(label).strong().color(theme.text));
     ui.separator();
+}
+fn window_theme(ui:&mut egui::Ui,theme:Theme) {
+    *ui.visuals_mut()=if theme.dark {egui::Visuals::dark()} else {egui::Visuals::light()};
+    ui.visuals_mut().override_text_color=Some(theme.text);
+    ui.visuals_mut().extreme_bg_color=theme.editor;
 }
 fn text_field(ui: &mut egui::Ui, text: &mut String, label: &str) -> egui::Response {
     ui.add(TextEdit::singleline(text).hint_text(label))
@@ -221,6 +317,7 @@ impl EditorUi {
                 egui::MenuBar::new().ui(ui,|ui|self.menus(ui,ide,&mut commands));
                 ui.separator();ui.horizontal_wrapped(|ui|{
                     for (action,glyph) in [(Action::Save,"Save"),(Action::Run,"Run"),(Action::Pause,"Break"),(Action::Reset,"Reset"),(Action::StepInto,"Into"),(Action::StepOver,"Over"),(Action::StepOut,"Out")] {
+                        if !self.toolbar_actions.contains(&action) {continue;}
                         let label=format!("{}  {}",match action{Action::Run=>">",Action::Pause=>"||",Action::Reset=>"[]",Action::Save=>"M",_=>"->"},glyph);
                         if ui.add_enabled(ide.enabled(action),egui::Button::new(label)).on_hover_text(format!("{} ({})",action.label(),action.shortcut())).clicked(){commands.push(Command::Action(action));}
                     }
@@ -236,7 +333,8 @@ impl EditorUi {
             let mut project_rect=None;
             if self.project_visible {
                 let size=if ui.available_width()<720.0{180.0}else{236.0};
-                let p=egui::Panel::left("vba.project").default_size(size).min_size(145.0).max_size(340.0).resizable(true).show(ui,|ui|{
+                let project=if self.project_right {egui::Panel::right("vba.project.right")} else {egui::Panel::left("vba.project")};
+                let p=project.default_size(size).min_size(145.0).max_size(340.0).resizable(true).show(ui,|ui|{
                     heading(ui,"Project Explorer",theme);
                     ui.horizontal(|ui|{if ui.small_button("View Code").on_hover_text("View Code (F7)").clicked(){self.focus_editor=true;self.navigate=true;}ui.add_enabled(false,egui::Button::new("View Object")).on_hover_text("An object/form designer requires a host adapter");});
                     egui::ScrollArea::vertical().id_salt("project.tree").max_height((ui.available_height()-190.0).max(90.0)).show(ui,|ui|{
@@ -252,7 +350,9 @@ if response.double_clicked(){self.focus_editor=true;}response.context_menu(|ui|{
                     if self.properties_visible {heading(ui,"Properties Window",theme);ui.horizontal(|ui|{ui.selectable_label(true,"Alphabetic").on_hover_text("Alphabetic properties");ui.add_enabled(false,egui::Button::new("Categorized")).on_hover_text("Only module metadata is available");});if let Some(m)=ide.active_module(){egui::Grid::new("properties").striped(true).show(ui,|ui|{ui.label("(Name)");ui.label(&m.name);ui.end_row();ui.label("Type");ui.label("Standard module");ui.end_row();ui.label("Status");ui.label(if m.dirty(){"Modified"}else{"Saved"});ui.end_row();});ui.label(RichText::new("Module metadata is read-only.").small().color(theme.muted));}}
                 });project_rect=Some(p.response.rect);
             }
-            let debug=egui::Panel::bottom("vba.debugger").default_size(220.0).min_size(135.0).max_size((ui.available_height()*0.65).max(135.0)).resizable(true).show(ui,|ui|{
+            let right=self.debugger_right && ui.available_width()>700.0;
+            let debug_panel=if right {egui::Panel::right("vba.debugger.right").default_size(320.0).min_size(180.0).max_size((ui.available_width()*0.5).max(180.0))} else {egui::Panel::bottom("vba.debugger").default_size(220.0).min_size(135.0).max_size((ui.available_height()*0.65).max(135.0))};
+            let debug=debug_panel.resizable(true).show(ui,|ui|{
                 ui.horizontal_wrapped(|ui|{for (pane,name) in [(Pane::Locals,"Locals"),(Pane::Immediate,"Immediate"),(Pane::Watches,"Watches"),(Pane::Stack,"Call Stack"),(Pane::Output,"Output")] {if ui.selectable_label(self.pane==pane,name).clicked(){self.pane=pane;}}});ui.separator();
                 egui::ScrollArea::both().id_salt("debug.content").auto_shrink([false,false]).show(ui,|ui|self.debug_pane(ui,ide,&mut commands,theme));
             });
@@ -266,7 +366,11 @@ if response.double_clicked(){self.focus_editor=true;}response.context_menu(|ui|{
                         if !compact {ui.label(RichText::new("Full Module View").small().color(theme.muted));}
                     });ui.separator();
                     if self.find_open { self.find_bar(ui,ide,&mut commands); }
-                    self.code_editor(ui,ide,&mut commands,theme);
+                    if self.split_view {
+                        let height=(ui.available_height()*0.5).max(90.0);
+                        egui::Panel::bottom("vba.split").default_size(height).min_size(80.0).resizable(true).show(ui,|ui|self.procedure_editor(ui,ide,&mut commands,theme,true));
+                    }
+                    if self.procedure_view {self.procedure_editor(ui,ide,&mut commands,theme,false);} else {self.code_editor(ui,ide,&mut commands,theme);}
                 }else{ui.centered_and_justified(|ui|ui.label("Insert or import a module to begin."));}
             });
             self.report=Some(LayoutReport{editor:editor.response.rect,project:project_rect,debugger:debug.response.rect,source:ide.active_module().map(|m|m.id),editor_scope:self.scope.unwrap_or(ui.scope_id())});
@@ -350,6 +454,16 @@ if response.double_clicked(){self.focus_editor=true;}response.context_menu(|ui|{
                 self.action_button(ui, ide, a, commands);
             }
             ui.separator();
+            if let Some(m) = ide.active_module() {
+                if ui.button("Rename Module...").clicked() {
+                    self.rename_module = Some((m.id, m.name.clone()));
+                    ui.close();
+                }
+                if ui.button("Remove Module...").clicked() {
+                    self.remove_module = Some(m.id);
+                    ui.close();
+                }
+            }
             self.action_button(ui, ide, Action::ReturnToHost, commands);
             self.action_button(ui, ide, Action::CloseProject, commands);
         });
@@ -390,6 +504,22 @@ if response.double_clicked(){self.focus_editor=true;}response.context_menu(|ui|{
                 }
             }
             ui.separator();
+            for (label, operation) in [
+                ("Indent    Ctrl+M", vba_ide::BlockEdit::Indent),
+                ("Outdent    Ctrl+Shift+M", vba_ide::BlockEdit::Outdent),
+                ("Comment Block", vba_ide::BlockEdit::Comment),
+                ("Uncomment Block", vba_ide::BlockEdit::Uncomment),
+            ] {
+                if ui
+                    .add_enabled(ide.active_module().is_some(), egui::Button::new(label))
+                    .clicked()
+                {
+                    self.edit_operation = Some(EditOperation::Block(operation));
+                    self.completion = false;
+                    ui.close();
+                }
+            }
+            ui.separator();
             if ui.button("Find...    Ctrl+F").clicked() {
                 self.find_open = true;
                 self.focus_find = true;
@@ -404,8 +534,49 @@ if response.double_clicked(){self.focus_editor=true;}response.context_menu(|ui|{
                 self.request_completion(ide);
                 ui.close();
             }
+            if ui.button("List Constants    Ctrl+Shift+J").clicked() {
+                self.constants_open = true;
+                ui.close();
+            }
+            if ui.button("Quick Info    Ctrl+I").clicked() {
+                self.info = Some(
+                    ide.quick_info(&ide.word_at_caret())
+                        .unwrap_or_else(|| "No metadata for this symbol".into()),
+                );
+                ui.close();
+            }
+            if ui.button("Parameter Info    Ctrl+Shift+I").clicked() {
+                self.info = Some(
+                    ide.signature_help()
+                        .unwrap_or_else(|| "No parameter metadata at the caret".into()),
+                );
+                ui.close();
+            }
+            if ui.button("Definition    Shift+F2").clicked() {
+                commands.push(Command::Definition(ide.word_at_caret()));
+                self.navigate = true;
+                ui.close();
+            }
         });
         ui.menu_button("View", |ui| {
+            ui.checkbox(&mut self.procedure_view, "Procedure View");
+            ui.checkbox(&mut self.split_view, "Split Code View");
+            if ui.button("Toggle Bookmark").clicked() {
+                commands.push(Command::ToggleBookmark);
+                ui.close();
+            }
+            for (label, reverse) in [("Next Bookmark", false), ("Previous Bookmark", true)] {
+                if ui.button(label).clicked() {
+                    commands.push(Command::NextBookmark(reverse));
+                    self.navigate = true;
+                    ui.close();
+                }
+            }
+            if ui.button("Last Position    Ctrl+Shift+F2").clicked() {
+                commands.push(Command::NavigateBack);
+                self.navigate = true;
+                ui.close();
+            }
             if ui.button("Code    F7").clicked() {
                 self.focus_editor = true;
                 self.navigate = true;
@@ -493,11 +664,8 @@ if response.double_clicked(){self.focus_editor=true;}response.context_menu(|ui|{
                 }
                 ui.close();
             }
-            Self::unavailable(
-                ui,
-                "Set Next Statement",
-                "The VM has no verified instruction-pointer relocation contract",
-            );
+            if ui.add_enabled(ide.mode()==Mode::Break,egui::Button::new("Set Next Statement")).on_hover_text("Verified straight-line active procedure only; control-flow/handler regions are refused").clicked() { commands.push(Command::SetNextStatement); self.navigate=true; ui.close(); }
+            if ui.add_enabled(ide.mode()==Mode::Break,egui::Button::new("Quick Watch...    Shift+F9")).clicked() { self.quick_watch=true; self.watch=ide.word_at_caret(); ui.close(); }
             if ui.button("Add Watch...").clicked() {
                 self.pane = Pane::Watches;
                 ui.close();
@@ -518,11 +686,10 @@ if response.double_clicked(){self.focus_editor=true;}response.context_menu(|ui|{
                 self.options_open = true;
                 ui.close();
             }
-            Self::unavailable(
-                ui,
-                "References...",
-                "External library loading is not available in the standalone host",
-            );
+            if ui.button("References...").clicked() {
+                self.references_open = true;
+                ui.close();
+            }
             Self::unavailable(
                 ui,
                 "Digital Signature...",
@@ -553,6 +720,14 @@ if response.double_clicked(){self.focus_editor=true;}response.context_menu(|ui|{
         });
     }
     fn shortcuts(&mut self, ctx: &egui::Context, ide: &Ide, commands: &mut Vec<Command>) {
+        if ctx.input_mut(|i|i.consume_key(egui::Modifiers::CTRL|egui::Modifiers::SHIFT,egui::Key::M)) {self.edit_operation=Some(EditOperation::Block(vba_ide::BlockEdit::Outdent));}
+        if ctx.input_mut(|i|i.consume_key(egui::Modifiers::CTRL,egui::Key::M)) {self.edit_operation=Some(EditOperation::Block(vba_ide::BlockEdit::Indent));}
+        if ctx.input_mut(|i|i.consume_key(egui::Modifiers::SHIFT,egui::Key::F2)) {commands.push(Command::Definition(ide.word_at_caret()));self.navigate=true;}
+        if ctx.input_mut(|i|i.consume_key(egui::Modifiers::CTRL|egui::Modifiers::SHIFT,egui::Key::F2)) {commands.push(Command::NavigateBack);self.navigate=true;}
+        if ctx.input_mut(|i|i.consume_key(egui::Modifiers::SHIFT,egui::Key::F9)) && ide.mode()==Mode::Break {self.quick_watch=true;self.watch=ide.word_at_caret();}
+        if ctx.input_mut(|i|i.consume_key(egui::Modifiers::CTRL|egui::Modifiers::SHIFT,egui::Key::J)) {self.constants_open=true;}
+        if ctx.input_mut(|i|i.consume_key(egui::Modifiers::CTRL|egui::Modifiers::SHIFT,egui::Key::I)) {self.info=Some(ide.signature_help().unwrap_or_else(||"No parameter metadata at the caret".into()));}
+        if ctx.input_mut(|i|i.consume_key(egui::Modifiers::CTRL,egui::Key::I)) {self.info=Some(ide.quick_info(&ide.word_at_caret()).unwrap_or_else(||"No metadata for this symbol".into()));}
         let bindings = [
             (egui::Modifiers::NONE, egui::Key::F5, Action::Run),
             (
@@ -637,8 +812,25 @@ if response.double_clicked(){self.focus_editor=true;}response.context_menu(|ui|{
         if let Some(d) = m.syntax_diagnostics.first() {
             ui.colored_label(theme.breakpoint, format!("! Syntax: {d}"));
         }
-        if let Some(signature) = ide.signature_help() {
-            ui.label(RichText::new(signature).monospace().color(theme.keyword));
+        if let Some(info) = ide.parameter_info() {
+            if let Some(active) = info.active {
+                ui.horizontal_wrapped(|ui| {
+                    ui.monospace(info.signature.get(..active.start).unwrap_or_default());
+                    ui.label(
+                        RichText::new(info.signature.get(active.clone()).unwrap_or_default())
+                            .monospace()
+                            .strong()
+                            .color(theme.keyword),
+                    );
+                    ui.monospace(info.signature.get(active.end..).unwrap_or_default());
+                });
+            } else {
+                ui.label(
+                    RichText::new(info.signature)
+                        .monospace()
+                        .color(theme.keyword),
+                );
+            }
         }
         let errors: Vec<_> = m
             .syntax_error_lines()
@@ -759,6 +951,65 @@ if response.double_clicked(){self.focus_editor=true;}response.context_menu(|ui|{
                         }
                         ui.ctx().memory_mut(|memory| memory.request_focus(id));
                         let key = match operation {
+                            EditOperation::Block(operation) => {
+                                let selection = self
+                                    .source_selection
+                                    .filter(|(source, _)| *source == m.id)
+                                    .map(|(_, s)| s.as_sorted_char_range())
+                                    .unwrap_or_else(|| {
+                                        let at = text
+                                            .get(..vba_ide::editor_byte(&m.text, m.caret))
+                                            .map_or(0, |s| s.chars().count());
+                                        at.into()..at.into()
+                                    });
+                                let byte =
+                                    |at| text.char_indices().nth(at).map_or(text.len(), |(b, _)| b);
+                                let start =
+                                    vba_ide::source_byte(&m.text, byte(selection.start.into()));
+                                let end = vba_ide::source_byte(&m.text, byte(selection.end.into()));
+                                match vba_ide::edit_block(
+                                    &m.text,
+                                    start..end,
+                                    operation,
+                                    self.tab_width,
+                                ) {
+                                    Ok(edited) => {
+                                        let display = vba_ide::editor_text(&edited.text);
+                                        let a = display
+                                            .get(
+                                                ..vba_ide::editor_byte(
+                                                    &edited.text,
+                                                    edited.selection.start,
+                                                ),
+                                            )
+                                            .map_or(0, |s| s.chars().count());
+                                        let b = display
+                                            .get(
+                                                ..vba_ide::editor_byte(
+                                                    &edited.text,
+                                                    edited.selection.end,
+                                                ),
+                                            )
+                                            .map_or(0, |s| s.chars().count());
+                                        let range = egui::text::CCursorRange::two(
+                                            egui::text::CCursor::new(a),
+                                            egui::text::CCursor::new(b),
+                                        );
+                                        if let Some(mut state) =
+                                            egui::text_edit::TextEditState::load(ui.ctx(), id)
+                                        {
+                                            state.cursor.set_char_range(Some(range));
+                                            state.store(ui.ctx(), id);
+                                        }
+                                        self.source_selection = Some((m.id, range));
+                                        commands.push(Command::Caret(edited.selection.start));
+                                        commands.push(Command::Text(edited.text));
+                                        text = display;
+                                    }
+                                    Err(d) => commands.push(Command::Report(d.to_string())),
+                                }
+                                None
+                            }
                             EditOperation::Undo => Some((egui::Key::Z, egui::Modifiers::COMMAND)),
                             EditOperation::Redo => Some((egui::Key::Y, egui::Modifiers::COMMAND)),
                             EditOperation::SelectAll => {
@@ -939,7 +1190,7 @@ if response.double_clicked(){self.focus_editor=true;}response.context_menu(|ui|{
                         output.response.request_focus();
                         self.focus_editor = false;
                     }
-                    let caret = output
+                    let mut caret = output
                         .cursor_range
                         .filter(|_| output.response.has_focus())
                         .map(|range| {
@@ -956,6 +1207,31 @@ if response.double_clicked(){self.focus_editor=true;}response.context_menu(|ui|{
                             .pos_from_cursor(cursor.primary)
                             .translate(output.galley_pos.to_vec2())
                             .left_bottom();
+                    }
+                    if output.response.changed()
+                        && ui.ctx().input(|i| i.key_pressed(egui::Key::Enter))
+                        && let Some(at) = caret
+                    {
+                        match ide.format_after_newline(
+                            &text,
+                            at,
+                            self.auto_indent,
+                            self.correct_case,
+                        ) {
+                            Ok((formatted, at)) => {
+                                text = formatted;
+                                caret = Some(at);
+                                let index = text.get(..at).map_or(0, |s| s.chars().count());
+                                let mut state = output.state.clone();
+                                state
+                                    .cursor
+                                    .set_char_range(Some(egui::text::CCursorRange::one(
+                                        egui::text::CCursor::new(index),
+                                    )));
+                                state.store(ui.ctx(), id);
+                            }
+                            Err(d) => commands.push(Command::Report(d.to_string())),
+                        }
                     }
                     let source = m.edited_source(&text);
                     let source_caret = caret.map(|byte| vba_ide::source_byte(&source, byte));
@@ -1063,9 +1339,29 @@ if response.double_clicked(){self.focus_editor=true;}response.context_menu(|ui|{
                 ui.horizontal(|ui| {
                     text_field(ui, &mut self.watch, "Watch expression");
                     if ui.button("Add Watch").clicked() {
-                        commands.push(Command::AddWatch(std::mem::take(&mut self.watch)));
+                        commands.push(Command::AddWatchKind(
+                            std::mem::take(&mut self.watch),
+                            self.watch_kind,
+                        ));
                     }
                 });
+                egui::ComboBox::new("watch.type", "Watch type")
+                    .selected_text(format!("{:?}", self.watch_kind))
+                    .show_ui(ui, |ui| {
+                        for (kind, label) in [
+                            (vba_ide::WatchKind::Expression, "Watch Expression"),
+                            (
+                                vba_ide::WatchKind::BreakWhenTrue,
+                                "Break When Value Is True",
+                            ),
+                            (
+                                vba_ide::WatchKind::BreakWhenChanged,
+                                "Break When Value Changes",
+                            ),
+                        ] {
+                            ui.selectable_value(&mut self.watch_kind, kind, label);
+                        }
+                    });
                 egui::Grid::new("watches.grid")
                     .striped(true)
                     .show(ui, |ui| {
@@ -1128,11 +1424,20 @@ if response.double_clicked(){self.focus_editor=true;}response.context_menu(|ui|{
                     if (r.lost_focus() && ui.input(|i| i.key_pressed(egui::Key::Enter)))
                         || ui.button("Evaluate").clicked()
                     {
-                        commands.push(Command::Immediate(std::mem::take(&mut self.immediate)));
+                        let text = std::mem::take(&mut self.immediate);
+                        commands.push(if self.allow_isolated_immediate {
+                            Command::IsolatedImmediate(text)
+                        } else {
+                            Command::Immediate(text)
+                        });
                         r.request_focus();
                     }
                 });
-                ui.label(RichText::new("? expression or active-frame local = expression; no procedure/property execution").small().color(theme.muted));
+                ui.checkbox(
+                    &mut self.allow_isolated_immediate,
+                    "Allow isolated calls and host effects for ? expressions",
+                );
+                ui.label(RichText::new(if self.allow_isolated_immediate {"Child VM: selected locals are snapshots and project state is isolated. Host effects are real and are not rolled back."} else {"? expression or active-frame local = expression; no procedure/property execution"}).small().color(theme.muted));
             }
             Pane::Output => {
                 for line in ide.output() {
@@ -1245,12 +1550,148 @@ if response.double_clicked(){self.focus_editor=true;}response.context_menu(|ui|{
                 ui.visuals_mut().override_text_color = Some(theme.text);
                 ui.visuals_mut().extreme_bg_color = theme.editor;
                 ui.add(egui::Slider::new(&mut self.font_size, 11.0..=22.0).text("Code font size"));
+                ui.add(egui::Slider::new(&mut self.tab_width, 1..=16).text("Tab width"));
+                ui.checkbox(&mut self.auto_indent,"Auto Indent");
+                ui.checkbox(&mut self.correct_case,"Auto Case Correction");
+                ui.checkbox(&mut self.project_right,"Dock Project Explorer on right");
+                ui.checkbox(&mut self.debugger_right,"Dock debugger on right (bottom on narrow views)");
+                ui.collapsing("Toolbar Customization",|ui| {
+                    for action in [Action::Save,Action::Run,Action::Pause,Action::Reset,Action::StepInto,Action::StepOver,Action::StepOut] {
+                        let mut selected=self.toolbar_actions.contains(&action);
+                        if ui.checkbox(&mut selected,action.label()).changed() {self.toolbar_actions.retain(|a|*a!=action);if selected {self.toolbar_actions.push(action);}}
+                    }
+                });
                 ui.label("Monospace font is inherited from the host.");
-                ui.label("Full Module View • safe watch evaluation");
-                ui.label(
-                    "Advanced error trapping, UserForms and designer docking are unavailable.",
-                );
+                let mut trap=ide.break_on_errors;
+                if ui.checkbox(&mut trap,"Break on all errors (including handled errors)").changed() { commands.push(Command::BreakOnErrors(trap)); }
+                ui.label("Unchecked: stop only on unhandled errors. Class-specific trapping belongs to class support.");
             });
+        if self.quick_watch {
+            let mut open = true;
+            egui::Window::new("Quick Watch")
+                .id(scope.with("quick.watch"))
+                .open(&mut open)
+                .frame(frame)
+                .show(ctx, |ui| {
+                    window_theme(ui,theme);
+                    text_field(ui, &mut self.watch, "Quick Watch expression");
+                    match ide.evaluate(&self.watch) {
+                        Ok(value) => {
+                            ui.monospace(format!(
+                                "{}: {}",
+                                vba_ide::type_name(&value),
+                                display_value(&value)
+                            ));
+                        }
+                        Err(d) => {
+                            ui.label(d.message);
+                        }
+                    }
+                    if ui.button("Add to Watches").clicked() {
+                        commands.push(Command::AddWatch(self.watch.clone()));
+                    }
+                    ui.label(
+                        "Read-only inspection; functions and property getters are not invoked.",
+                    );
+                });
+            self.quick_watch = open;
+        }
+        if let Some(info) = &self.info {
+            let mut open = true;
+            egui::Window::new("Symbol Information")
+                .id(scope.with("symbol.info"))
+                .open(&mut open)
+                .frame(frame)
+                .show(ctx, |ui| {
+                    window_theme(ui,theme);
+                    ui.monospace(info);
+                });
+            if !open {
+                self.info = None;
+            }
+        }
+        egui::Window::new("References")
+            .id(scope.with("references"))
+            .open(&mut self.references_open)
+            .frame(frame)
+            .show(ctx, |ui| {
+                window_theme(ui,theme);
+                ui.label(
+                    "Metadata supplied by the host; this dialog never loads native libraries.",
+                );
+                for reference in &ide.references {
+                    ui.label(format!(
+                        "{} {}{}",
+                        reference.name,
+                        reference.version,
+                        if reference.available {
+                            ""
+                        } else {
+                            " [missing]"
+                        }
+                    ));
+                    if let Some(url) = &reference.help_url {
+                        ui.hyperlink_to("Reference Help", url);
+                    }
+                }
+                if ide.references.is_empty() {
+                    ui.label("No external reference metadata supplied.");
+                }
+            });
+        egui::Window::new("List Constants").id(scope.with("constants")).open(&mut self.constants_open).frame(frame).show(ctx,|ui| {
+            window_theme(ui,theme);
+            text_field(ui,&mut self.browser_search,"Constant prefix");
+            egui::ScrollArea::vertical().max_height(300.0).show(ui,|ui| {for name in ide.list_constants(&self.browser_search) { if ui.selectable_label(false,&name).clicked() { ui.ctx().copy_text(name); } }});
+            ui.label("Select to copy a name. Host constant metadata does not grant execution capabilities.");
+        });
+        if let Some((source, name)) = &mut self.rename_module {
+            let mut done = false;
+            egui::Window::new("Rename Module")
+                .id(scope.with("rename.module"))
+                .collapsible(false)
+                .show(ctx, |ui| {
+                    window_theme(ui,theme);
+                    text_field(ui, name, "Module name");
+                    if ui.button("Rename").clicked() {
+                        commands.push(Command::RenameModule(*source, name.clone()));
+                        done = true;
+                    }
+                    if ui.button("Cancel").clicked() {
+                        done = true;
+                    }
+                });
+            if done {
+                self.rename_module = None;
+            }
+        }
+        if let Some(source) = self.remove_module {
+            let mut done = false;
+            egui::Window::new("Remove Module?")
+                .id(scope.with("remove.module"))
+                .collapsible(false)
+                .show(ctx, |ui| {
+                    window_theme(ui,theme);
+                    ui.label(
+                        "Export source before removing it. Cancelling export keeps the module.",
+                    );
+                    if ui.button("Export Source First...").clicked() {
+                        commands.push(Command::ExportModule(source));
+                    }
+                    if ui
+                        .button("Remove Without Export (Discard Source)")
+                        .clicked()
+                    {
+                        commands.push(Command::RemoveModule(source, true));
+                        done = true;
+                    }
+                    if ui.button("Keep Module").clicked() {
+                        done = true;
+                    }
+                });
+            if done {
+                self.remove_module = None;
+            }
+        }
         if let Some((name, value)) = &mut self.local_edit {
             let name = name.clone();
             let mut done = false;

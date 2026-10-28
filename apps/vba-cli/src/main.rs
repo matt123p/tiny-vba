@@ -1,5 +1,7 @@
 //! Standalone frontend: help/version, parsing, fixture validation and typed scenario runs.
 #![forbid(unsafe_code)]
+#[cfg(feature = "dap")]
+mod dap;
 mod debugger;
 use std::{fs::File, io::Read, process::ExitCode};
 use vba_conformance::{MAX_SCENARIO_BYTES, Scenario, Status, describe_value};
@@ -305,6 +307,28 @@ fn compile_source(
 fn main() -> ExitCode {
     let mut args = std::env::args().skip(1);
     match args.next().as_deref() {
+        Some("dap") => {
+            #[cfg(feature = "dap")]
+            {
+                let path = args.next();
+                if args.next().is_some() {
+                    eprintln!("usage: vba-cli dap [source.bas]");
+                    return ExitCode::from(2);
+                }
+                return match dap::serve(path.as_deref()) {
+                    Ok(()) => ExitCode::SUCCESS,
+                    Err(e) => {
+                        eprintln!("{e}");
+                        ExitCode::from(2)
+                    }
+                };
+            }
+            #[cfg(not(feature = "dap"))]
+            {
+                eprintln!("DAP requires --features dap");
+                ExitCode::from(2)
+            }
+        }
         None | Some("--help" | "-h" | "help") => {
             println!(
                 "tiny-vba: VBA interpreter and debugger\n\nUsage: vba-cli <command> [options]\n\nImplemented: --help, --version, conformance validate|run <scenario>, parse <source.bas|source.cls>\nM2: check|compile|disasm <source.bas> [--entry <name>]\nM3: run <source.bas> [--entry <name>]\nM8: debug <source.bas> [--entry <name>] [--script <commands.txt>]\nPlanned commands: dap, inspect-project\nrun executes the m5-host-v1 profile. conformance run executes a validated fixture and compares its typed expectation (MISMATCH/CRASH/TIMEOUT exit 1; INVALID_FIXTURE exits 2; PASS/UNSUPPORTED exit 0). Unsupported forms and targets fail with exit 2. Fixture validation does not execute scenarios."
@@ -400,7 +424,7 @@ fn main() -> ExitCode {
                 ExitCode::from(2)
             }
         },
-        Some(command @ ("dap" | "inspect-project")) => {
+        Some(command @ "inspect-project") => {
             eprintln!("{}", Diagnostic::unsupported(command));
             ExitCode::from(2)
         }

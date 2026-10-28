@@ -11,4 +11,5 @@ publish = false
 workspace = true
 
 [dependencies]
-vba-debug.workspace = true
+vba-ide.workspace = true
+serde_json.workspace = true

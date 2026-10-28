@@ -2,8 +2,14 @@
 //! This layer never opens files, dialogs, network connections or Office documents.
 #![forbid(unsafe_code)]
 mod code_aids;
+mod editing;
+mod immediate;
+mod metadata;
+pub use immediate::EvaluationPolicy;
+pub use metadata::{ConstantInfo, ParameterInfo, ReferenceInfo};
 mod evaluate;
 pub use code_aids::{completion_prefix, editor_byte, editor_text, line_starts, source_byte};
+pub use editing::{BlockEdit, EditedBlock, edit_block};
 pub use evaluate::{display_value, type_name};
 use std::collections::{BTreeMap, BTreeSet};
 use vba_compiler::{CompileOptions, compile_modules};
@@ -31,6 +37,7 @@ pub struct Procedure {
     pub signature: String,
     pub public: bool,
     pub start: usize,
+    pub end: usize,
     pub line: usize,
 }
 #[derive(Clone, Debug)]
@@ -42,6 +49,7 @@ pub struct Module {
     pub revision: u64,
     pub saved_revision: u64,
     saved_text: String,
+    saved_name: String,
     pub breakpoints: BTreeSet<u32>,
     pub procedures: Vec<Procedure>,
     pub syntax_diagnostics: Vec<Diagnostic>,
@@ -49,7 +57,7 @@ pub struct Module {
 }
 impl Module {
     pub fn dirty(&self) -> bool {
-        self.text != self.saved_text
+        self.text != self.saved_text || self.name != self.saved_name
     }
     pub fn source(&self) -> Result<SourceFile> {
         SourceFile::new(self.id, self.name.clone(), self.text.clone())
@@ -99,6 +107,7 @@ impl Module {
                             .unwrap_or_default()
                             .into(),
                         start,
+                        end: p.span.end() as usize,
                         line: self.line_at(start),
                     }
                 })
@@ -225,10 +234,20 @@ pub struct ApiMember {
     pub signature: String,
     pub supported: bool,
 }
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum WatchKind {
+    Expression,
+    BreakWhenTrue,
+    BreakWhenChanged,
+}
 #[derive(Clone, Debug)]
 pub struct Watch {
     pub expression: String,
     pub result: std::result::Result<Value, String>,
+    pub kind: WatchKind,
+    pub procedure: Option<String>,
+    pub module: Option<SourceId>,
+    previous: Option<(u64, Value)>,
 }
 #[derive(Clone, Debug)]
 pub struct StopLocation {
@@ -258,6 +277,11 @@ pub struct Ide {
     requests: Vec<HostRequest>,
     temporary_breakpoint: Option<StatementId>,
     session_host: Option<u64>,
+    bookmarks: BTreeSet<(u64, usize)>,
+    navigation: Vec<(SourceId, usize)>,
+    pub constants: Vec<ConstantInfo>,
+    pub references: Vec<ReferenceInfo>,
+    watch_evaluations: u64,
 }
 impl Default for Ide {
     fn default() -> Self {
@@ -287,6 +311,11 @@ impl Ide {
             requests: vec![],
             temporary_breakpoint: None,
             session_host: None,
+            bookmarks: BTreeSet::new(),
+            navigation: Vec::new(),
+            constants: Vec::new(),
+            references: Vec::new(),
+            watch_evaluations: 0,
         }
     }
     pub fn demo() -> Result<Self> {
@@ -358,6 +387,7 @@ impl Ide {
             revision: 0,
             saved_revision: 0,
             saved_text: text.into(),
+            saved_name: name.into(),
             breakpoints: BTreeSet::new(),
             procedures: vec![],
             syntax_diagnostics: vec![],
@@ -416,6 +446,9 @@ impl Ide {
         if had_breakpoints {
             self.message("Source changed: breakpoints cleared; set them against the new revision.");
         }
+        let source = self.active_module().map(|m| m.id.0);
+        self.bookmarks.retain(|(id, _)| Some(*id) != source);
+        self.navigation.retain(|(id, _)| Some(id.0) != source);
         self.diagnostics.clear();
         self.changed()
     }
@@ -430,6 +463,7 @@ impl Ide {
         }
         module.saved_revision = revision;
         module.saved_text = module.text.clone();
+        module.saved_name = module.name.clone();
         Ok(())
     }
     pub fn take_requests(&mut self) -> Vec<HostRequest> {
@@ -541,6 +575,10 @@ impl Ide {
         }
         session.set_break_on_error(self.break_on_errors);
         self.controller = Controller::new();
+        self.watch_evaluations = 0;
+        for watch in &mut self.watches {
+            watch.previous = None;
+        }
         self.temporary_breakpoint = None;
         for module in &self.modules {
             for byte in &module.breakpoints {
@@ -697,8 +735,28 @@ impl Ide {
         let outcome = if previous == 1 {
             session.resume_host(host)?
         } else {
-            session.run_slice(host, FRAME_QUOTA, &mut |view| {
-                self.controller.should_pause(view)
+            session.run_slice_inspected(host, FRAME_QUOTA, &mut |view, session| {
+                let mut stop=self.controller.should_pause(view)?;
+                if view.visible {
+                    let procedure=session.program().program().procedures.get(view.procedure.0 as usize).map(|p|p.name.as_str());
+                    for watch in &mut self.watches {
+                        if matches!(watch.kind,WatchKind::Expression) || watch.module.is_some_and(|id|id!=view.span.source())
+                            || watch.procedure.as_ref().is_some_and(|name| procedure.is_none_or(|p| !p.eq_ignore_ascii_case(name))) { continue; }
+                        self.watch_evaluations=self.watch_evaluations.saturating_add(1);
+                        if self.watch_evaluations>100_000 { return Err(error("conditional watch evaluation budget exceeded; reset or remove watch")); }
+                        let result=evaluate::evaluate(&watch.expression,&|name|session.read_checkpoint_local(view,name));
+                        if let Ok(value)=&result {
+                            let compared=if matches!(watch.kind,WatchKind::BreakWhenTrue) {
+                                vba_runtime::condition(value).map(Value::Boolean).map_err(|e|error(&format!("{e:?}")))?
+                            } else { value.clone() };
+                            let previous=watch.previous.as_ref().filter(|(frame,_)|*frame==view.frame).map(|(_,value)|value);
+                            stop |= match watch.kind { WatchKind::Expression=>false, WatchKind::BreakWhenChanged=>previous.is_some_and(|old|old!=&compared), WatchKind::BreakWhenTrue=>compared==Value::Boolean(true) && previous!=Some(&Value::Boolean(true)) };
+                            watch.previous=Some((view.frame,compared));
+                        }
+                        watch.result=result.map_err(|d|d.message);
+                    }
+                }
+                Ok(stop)
             })?
         };
         if let Outcome::Failed(failure) = &outcome {
@@ -809,10 +867,13 @@ impl Ide {
     pub fn edit_local(&mut self, name: &str, expression: &str) -> Result<()> {
         let value = self.evaluate(expression)?;
         let handle = self.handle()?;
+        let session = self.session.as_ref().ok_or_else(|| error("no session"))?;
+        let (name, value) =
+            evaluate::edit_target(name, value, &|name| session.read_local(handle, name))?;
         self.session
             .as_mut()
             .ok_or_else(|| error("no session"))?
-            .edit_local(handle, name, value)?;
+            .edit_local(handle, &name, value)?;
         self.refresh_watches();
         Ok(())
     }
@@ -832,16 +893,28 @@ impl Ide {
         }
         if let Some((name, expression)) = text.split_once('=') {
             let name = name.trim();
-            if name.is_empty() || !name.chars().all(|c| c.is_ascii_alphanumeric() || c == '_') {
-                return Err(error("only a local-variable assignment is supported"));
-            }
             return self.edit_local(name, expression.trim());
         }
         Err(error(
             "Immediate supports ? expression and active-frame local assignment; calls and property access are unavailable",
         ))
     }
+    pub fn set_break_on_errors(&mut self, enabled: bool) {
+        self.break_on_errors = enabled;
+        if let Some(session) = &mut self.session {
+            session.set_break_on_error(enabled);
+        }
+    }
     pub fn add_watch(&mut self, expression: &str) -> Result<()> {
+        self.add_watch_kind(expression, WatchKind::Expression, None, None)
+    }
+    pub fn add_watch_kind(
+        &mut self,
+        expression: &str,
+        kind: WatchKind,
+        module: Option<SourceId>,
+        procedure: Option<String>,
+    ) -> Result<()> {
         if expression.len() > 1024
             || expression.trim().is_empty()
             || self.watches.len() >= MAX_WATCHES
@@ -851,6 +924,10 @@ impl Ide {
         self.watches.push(Watch {
             expression: expression.into(),
             result: Err("Not in break mode".into()),
+            kind,
+            module,
+            procedure,
+            previous: None,
         });
         self.refresh_watches();
         Ok(())
@@ -1025,6 +1102,26 @@ impl Ide {
         });
         self.temporary_breakpoint = if permanent { None } else { Some(statement) };
         self.dispatch(Action::Run, host)
+    }
+    pub fn set_next_statement(&mut self) -> Result<()> {
+        let handle = self.handle()?;
+        let byte = self
+            .active_module()
+            .ok_or_else(|| error("no active module"))?
+            .caret;
+        let target = self
+            .statements(byte)?
+            .first()
+            .map(|(id, _)| *id)
+            .ok_or_else(|| error("no executable target"))?;
+        self.session
+            .as_mut()
+            .ok_or_else(|| error("no session"))?
+            .set_next_statement(handle, target)?;
+        self.selected_frame = 0;
+        self.show_execution();
+        self.refresh_watches();
+        Ok(())
     }
     pub fn find(&mut self, query: &str, from: usize) -> Option<(usize, usize)> {
         let module = self.active_module_mut()?;

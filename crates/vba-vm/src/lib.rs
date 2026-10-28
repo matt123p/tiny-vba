@@ -1085,10 +1085,32 @@ impl Session {
     }
     pub fn read_local(&self, handle: Handle, name: &str) -> Result<Value> {
         self.validate_handle(handle, false)?;
+        self.read_frame_local(handle.frame, name)
+    }
+    /// Read-only checkpoint inspection for conditional debugger predicates. A view
+    /// is valid only during its current visible visit, before its one-visit permit.
+    pub fn read_checkpoint_local(&self, view: &CheckpointView, name: &str) -> Result<Value> {
+        if self.stale
+            || !matches!(self.state, Outcome::Yielded)
+            || !view.visible
+            || self
+                .visit
+                .as_ref()
+                .is_none_or(|v| v.permit || &v.view != view)
+        {
+            return Err(command("stale or unavailable checkpoint inspection"));
+        }
+        let value = self.read_frame_local(view.frame, name)?;
+        if value_bytes(&value) > 1024 * 1024 {
+            return Err(command("checkpoint inspection payload limit"));
+        }
+        Ok(value)
+    }
+    fn read_frame_local(&self, frame_id: u64, name: &str) -> Result<Value> {
         let frame = self
             .frames
             .iter()
-            .find(|f| f.id == handle.frame)
+            .find(|f| f.id == frame_id)
             .ok_or_else(|| command("stale frame"))?;
         let proc = self
             .program
@@ -1156,6 +1178,53 @@ impl Session {
             p.frames = frames;
         }
         Ok(())
+    }
+    /// Relocate within a verified straight-line procedure at source checkpoints.
+    /// Control-flow/handler regions require compiler relocation metadata and are
+    /// refused rather than guessed from source line numbers.
+    pub fn set_next_statement(&mut self, handle: Handle, statement: StatementId) -> Result<()> {
+        self.validate_handle(handle, true)?;
+        if !matches!(&self.state,Outcome::Paused(p) if p.reason==PauseReason::Checkpoint)
+            || !self.top()?.stack.is_empty()
+            || self.pending_fault.is_some()
+            || self.top()?.handler.target.is_some()
+            || self.top()?.handler.resume_next
+            || self.top()?.handler.fault.is_some()
+        {
+            return Err(command(
+                "relocation requires an ordinary active-frame source checkpoint",
+            ));
+        }
+        let procedure = self.proc()?;
+        if procedure.code.iter().enumerate().any(|(at, i)| {
+            matches!(i, I::Branch { .. } | I::OnError { .. } | I::Resume { .. })
+                || matches!(i,I::Jump(pc) if pc.0 as usize != at.saturating_add(1))
+        }) {
+            return Err(command(
+                "relocation across control-flow or handler regions is not supported",
+            ));
+        }
+        let (index, target) = procedure
+            .checkpoints
+            .iter()
+            .enumerate()
+            .find(|(_, c)| c.statement == statement && c.visible && c.role == ir::SiteRole::Source)
+            .ok_or_else(|| command("target is not a visible checkpoint in the active procedure"))?;
+        let pc = target.enter_pc;
+        let site = ir::SiteId(u32::try_from(index).map_err(|_| resource())?);
+        if !matches!(procedure.code.get(pc.0 as usize),Some(I::Checkpoint(s)) if *s==site) {
+            return Err(command("invalid relocation checkpoint"));
+        }
+        self.top_mut()?.pc = pc;
+        self.top_mut()?.fault_pc = pc;
+        self.top_mut()?.checkpoint = Some(site);
+        self.top_mut()?.captured.fill(None);
+        self.visit_serial = self.visit_serial.checked_add(1).ok_or_else(resource)?;
+        self.visit = Some(Visit {
+            view: self.view(site, self.visit_serial)?,
+            permit: false,
+        });
+        self.pause(PauseReason::Checkpoint)
     }
     fn cleanup(&mut self) {
         let persistent = &self.persistent;
@@ -1409,6 +1478,14 @@ impl Session {
         quota: u32,
         predicate: &mut impl FnMut(&CheckpointView) -> Result<bool>,
     ) -> Result<Outcome> {
+        self.run_slice_inspected(host, quota, &mut |view, _| predicate(view))
+    }
+    pub fn run_slice_inspected(
+        &mut self,
+        host: &mut impl Host,
+        quota: u32,
+        predicate: &mut impl FnMut(&CheckpointView, &Session) -> Result<bool>,
+    ) -> Result<Outcome> {
         if quota == 0 || quota > self.limits.slice {
             return Err(command("invalid slice allowance"));
         }
@@ -1448,7 +1525,8 @@ impl Session {
                     .as_ref()
                     .ok_or_else(|| invariant("visit missing"))?;
                 if !visit.permit
-                    && (predicate(&visit.view)? || (visit.view.visible && self.pause_requested))
+                    && (predicate(&visit.view, self)?
+                        || (visit.view.visible && self.pause_requested))
                 {
                     self.pause_requested = false;
                     self.pause(PauseReason::Checkpoint)?;

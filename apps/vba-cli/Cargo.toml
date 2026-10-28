@@ -11,6 +11,7 @@ publish = false
 workspace = true
 
 [dependencies]
+vba-dap = { workspace = true, optional = true }
 vba-ide.workspace = true
 vba-diagnostics.workspace = true
 vba-conformance.workspace = true
@@ -24,3 +25,6 @@ vba-values.workspace = true
 vba-debug.workspace = true
 vba-foreign.workspace = true
 vba-testkit.workspace = true
+
+[features]
+dap = ["dep:vba-dap"]

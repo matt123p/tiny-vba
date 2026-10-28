@@ -27,6 +27,7 @@ vba-testkit = { path = "crates/vba-testkit" }
 vba-conformance = { path = "crates/vba-conformance" }
 vba-ide = { path = "crates/vba-ide" }
 vba-ui-egui = { path = "crates/vba-ui-egui" }
+serde_json = "=1.0.154"
 egui = { version = "=0.37.0", features = ["default_fonts"] }
 eframe = { version = "=0.37.0", default-features = false, features = ["default_fonts", "glow", "x11", "wayland", "accesskit", "clipboard", "persistence"] }
 egui_kittest = { version = "=0.37.0", features = ["wgpu", "snapshot"] }
@@ -34,6 +35,7 @@ image = { version = "=0.25.10", default-features = false, features = ["png"] }
 wasm-bindgen = "=0.2.126"
 wasm-bindgen-futures = "=0.4.76"
 web-sys = { version = "=0.3.103", features = ["Document", "Window", "HtmlCanvasElement", "Element"] }
+js-sys = "=0.3.103"
 
 # Same egui API family and reviewed fork as the embedding applications (ADR 0016).
 [patch.crates-io]
