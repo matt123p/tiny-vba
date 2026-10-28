@@ -1,4 +1,4 @@
-IR 1 profile="ir4-structural" revision="source-1" entry=0 launch=[]
+IR 1 profile="ir5-structural" revision="source-1" entry=0 launch=[]
 features={"integer-long-ops", "scalar-core"}
 source 0 id=0 module="Arithmetic.bas" file="Arithmetic.bas"
 constant 0 Integer(6)

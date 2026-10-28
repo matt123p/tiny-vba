@@ -56,6 +56,17 @@ fn render(out: &mut Output, p: &Program) -> fmt::Result {
             s.file.name()
         )?;
     }
+    for nominal in &p.nominal_locals {
+        writeln!(
+            out,
+            "nominal procedure={} slot={} library={:?} version={:?} type={:?}",
+            nominal.procedure.0,
+            nominal.slot.0,
+            nominal.ty.library(),
+            nominal.ty.version(),
+            nominal.ty.name()
+        )?;
+    }
     for (i, v) in p.constants.iter().enumerate() {
         write!(out, "constant {i} ")?;
         scalar(out, v)?;

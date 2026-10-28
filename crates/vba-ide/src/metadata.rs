@@ -22,6 +22,17 @@ pub struct ReferenceInfo {
 }
 
 impl Ide {
+    /// Borrow the host's existing object model for bounded, read-only type checks.
+    pub fn configure_type_resolver(
+        &mut self,
+        resolver: Option<std::sync::Arc<dyn vba_foreign::ObjectTypeResolver>>,
+    ) -> Result<()> {
+        if self.session.is_some() {
+            return Err(error("reset before changing the object type resolver"));
+        }
+        self.type_resolver = resolver;
+        Ok(())
+    }
     /// Configure executable enum/constant bindings explicitly, without a loader.
     /// UI discovery is derived from the same snapshot; reset before replacement.
     pub fn configure_reference_bindings(

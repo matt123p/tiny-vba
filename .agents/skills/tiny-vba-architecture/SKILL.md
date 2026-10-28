@@ -10,6 +10,12 @@ IDs in this skill and earlier ADRs are historical; use the progress mapping when
 planning future work. Office-supplied standard controls remain in scope, third-party
 ActiveX/OLE controls do not. Native extensions/translation and AI are not scheduled.
 
+ADR 0021 adds generic nominal type identity in values, IR 5 local metadata and a
+foreign read-only type resolver over the host's existing object store. Office
+types/resolvers remain in forks. No reverse dependency, parallel object registry,
+JSON dispatch or implicit library activation is permitted. M1.2 defaults and M1.3
+collections do not follow automatically from nominal binding.
+
 Read [architecture](../../../docs/architecture.md), the [actual dependency graph](../../../tools/architecture.json),
 [ADR 0001](../../../docs/decisions/0001-repository-scope.md) and
 [ADR 0002](../../../docs/decisions/0002-editor-debugger-ui.md).

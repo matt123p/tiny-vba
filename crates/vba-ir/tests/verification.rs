@@ -80,6 +80,7 @@ fn base() -> TestResult<Program> {
         foreign: vec![],
     };
     Ok(Program {
+        nominal_locals: vec![],
         ir_version: 1,
         required_features: BTreeSet::from(["scalar-core".into()]),
         profile: "ir1-structural".into(),

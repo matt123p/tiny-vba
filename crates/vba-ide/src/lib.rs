@@ -279,6 +279,7 @@ pub struct Ide {
     session: Option<Session>,
     imports: Vec<Import>,
     reference_bindings: vba_foreign::ReferenceSet,
+    type_resolver: Option<std::sync::Arc<dyn vba_foreign::ObjectTypeResolver>>,
     roots: BTreeMap<String, ObjectRef>,
     requests: Vec<HostRequest>,
     temporary_breakpoint: Option<StatementId>,
@@ -318,6 +319,7 @@ impl Ide {
             session: None,
             imports: vec![],
             reference_bindings: vba_foreign::ReferenceSet::default(),
+            type_resolver: None,
             roots: BTreeMap::new(),
             requests: vec![],
             temporary_breakpoint: None,
@@ -618,7 +620,14 @@ impl Ide {
                 self.roots.clone(),
             )?)
         };
-        let mut session = Session::new(program, 1, vec![], binding, Limits::default())?;
+        let mut session = Session::new_with_type_resolver(
+            program,
+            1,
+            vec![],
+            binding,
+            Limits::default(),
+            self.type_resolver.clone(),
+        )?;
         if !self.stale
             && self.session_host == Some(host.identity())
             && let Some(previous) = &self.session

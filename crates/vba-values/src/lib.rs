@@ -1,5 +1,7 @@
 //! Typed scalar/array values and bounded canonical writable locations.
 #![forbid(unsafe_code)]
+mod nominal;
+pub use nominal::NominalType;
 /// Version of this native Rust public contract.
 pub const API_VERSION: u32 = 1;
 
@@ -335,6 +337,7 @@ impl Intrinsic {
 /// Bounded, column-major VBA array. Bounds and element kind survive copying.
 #[derive(Clone, Debug, PartialEq)]
 pub struct VbaArray {
+    nominal: Option<NominalType>,
     kind: ScalarKind,
     bounds: Vec<(i32, i32)>,
     elements: Vec<Value>,
@@ -355,6 +358,7 @@ impl VbaArray {
             .map_err(|_| Diagnostic::new("VBA0003", "array allocation failed"))?;
         elements.resize_with(length, || kind.initial_value());
         Ok(Self {
+            nominal: None,
             kind,
             bounds,
             elements,
@@ -386,6 +390,7 @@ impl VbaArray {
     }
     pub fn empty(kind: ScalarKind, lower: i32) -> Self {
         Self {
+            nominal: None,
             kind,
             bounds: vec![(lower, lower.saturating_sub(1))],
             elements: Vec::new(),
@@ -415,6 +420,28 @@ impl VbaArray {
     }
     pub fn kind(&self) -> ScalarKind {
         self.kind
+    }
+    pub fn nominal_type(&self) -> Option<&NominalType> {
+        self.nominal.as_ref()
+    }
+    pub fn with_nominal_type(mut self, ty: Option<NominalType>) -> Result<Self, Diagnostic> {
+        if ty.is_some() && self.kind != ScalarKind::Object {
+            return Err(Diagnostic::new(
+                "VBA_ARRAY_13",
+                "nominal array requires Object elements",
+            ));
+        }
+        let bytes =
+            |ty: &NominalType| 96 + ty.library().len() + ty.version().len() + ty.name().len();
+        self.payload = self
+            .payload
+            .saturating_sub(self.nominal.as_ref().map_or(0, bytes))
+            .saturating_add(ty.as_ref().map_or(0, bytes));
+        if self.payload > 8 * 1024 * 1024 {
+            return Err(Diagnostic::new("VBA0003", "array payload budget exceeded"));
+        }
+        self.nominal = ty;
+        Ok(self)
     }
     pub fn bounds(&self) -> &[(i32, i32)] {
         &self.bounds
@@ -447,7 +474,8 @@ impl VbaArray {
         if !self.dynamic {
             return Err(Diagnostic::new("VBA_ARRAY_10", "Array is fixed"));
         }
-        let mut new = Self::new(self.kind, bounds, true)?;
+        let mut new =
+            Self::new(self.kind, bounds, true)?.with_nominal_type(self.nominal.clone())?;
         if preserve && !self.bounds.is_empty() {
             if self.bounds.len() != new.bounds.len()
                 || self
@@ -477,6 +505,7 @@ impl VbaArray {
                 self.bounds.clone()
             },
             self.dynamic,
-        )
+        )?
+        .with_nominal_type(self.nominal.clone())
     }
 }

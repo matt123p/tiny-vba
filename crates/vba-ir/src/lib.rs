@@ -28,7 +28,9 @@ pub const IR_VERSION: u32 = 1;
 pub const IR2_VERSION: u32 = 2;
 pub const IR3_VERSION: u32 = 3;
 pub const IR4_VERSION: u32 = 4;
-pub const FEATURES: [&str; 16] = [
+pub const IR5_VERSION: u32 = 5;
+pub const FEATURES: [&str; 17] = [
+    "nominal-objects-v5",
     "scalar-core",
     "host-roots-v4",
     "integer-long-ops",
@@ -371,6 +373,7 @@ pub struct LaunchSignature {
 }
 #[derive(Clone, Debug)]
 pub struct Program {
+    pub nominal_locals: Vec<NominalLocal>,
     pub ir_version: u32,
     pub required_features: BTreeSet<String>,
     pub profile: String,
@@ -380,6 +383,12 @@ pub struct Program {
     pub sources: Vec<Source>,
     pub constants: Vec<Value>,
     pub procedures: Vec<Procedure>,
+}
+#[derive(Clone, Debug)]
+pub struct NominalLocal {
+    pub procedure: ProcedureId,
+    pub slot: LocalSlot,
+    pub ty: vba_values::NominalType,
 }
 /// A structural execution target, not a claim that a VM implements its operations.
 #[derive(Clone, Debug)]
@@ -434,9 +443,22 @@ impl Capabilities {
         caps
     }
     pub fn ir4_structural() -> Self {
+        let mut caps = Self::ir5_structural();
+        caps.profile = "ir4-structural".into();
+        caps.ir_versions.remove(&IR5_VERSION);
+        caps.features.remove("nominal-objects-v5");
+        caps
+    }
+    pub fn ir5_structural() -> Self {
         Self {
-            profile: "ir4-structural".into(),
-            ir_versions: BTreeSet::from([IR_VERSION, IR2_VERSION, IR3_VERSION, IR4_VERSION]),
+            profile: "ir5-structural".into(),
+            ir_versions: BTreeSet::from([
+                IR_VERSION,
+                IR2_VERSION,
+                IR3_VERSION,
+                IR4_VERSION,
+                IR5_VERSION,
+            ]),
             features: FEATURES.iter().map(|s| (*s).into()).collect(),
             instructions: OPCODES.into_iter().collect(),
             unary: [UnaryOp::Negate, UnaryOp::Not].into_iter().collect(),

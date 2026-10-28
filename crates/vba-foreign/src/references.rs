@@ -6,7 +6,7 @@ use vba_values::{ScalarKind, Value};
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum ReferenceTypeKind {
     Enum,
-    /// Retained for missing/unsupported-type diagnostics, never erased to Object.
+    /// Object storage plus a separate verified nominal identity; never an untyped alias.
     Object,
 }
 #[derive(Clone, Debug)]
@@ -167,9 +167,7 @@ impl ReferenceSet {
             .ok_or_else(|| invalid("reference type missing"))?;
         match ty.kind {
             ReferenceTypeKind::Enum => Ok(Some(ScalarKind::Long)),
-            ReferenceTypeKind::Object => {
-                Err(Diagnostic::unsupported("nominal host object type binding"))
-            }
+            ReferenceTypeKind::Object => Ok(Some(ScalarKind::Object)),
         }
     }
     pub fn constant(&self, name: &str) -> Result<Option<&Value>, Diagnostic> {
@@ -188,5 +186,27 @@ impl ReferenceSet {
                 .ok_or_else(|| invalid("reference constant missing"))?
                 .value,
         ))
+    }
+    pub fn object_type(&self, name: &str) -> Result<Option<vba_values::NominalType>, Diagnostic> {
+        if name.len() > 257 {
+            return Err(invalid("reference type name limit exceeded"));
+        }
+        let Some(&(library, index)) = self.types.get(&name.to_ascii_lowercase()) else {
+            self.check_missing(name)?;
+            return Ok(None);
+        };
+        let library = self.available(library)?;
+        let ty = library
+            .types
+            .get(index)
+            .ok_or_else(|| invalid("reference type missing"))?;
+        if ty.kind != ReferenceTypeKind::Object {
+            return Ok(None);
+        }
+        Ok(Some(vba_values::NominalType::new(
+            &library.name,
+            &library.version,
+            &ty.name,
+        )?))
     }
 }

@@ -37,7 +37,7 @@ impl Default for CompileOptions {
             imports: Vec::new(),
             entry: "Answer".into(),
             revision: "source-1".into(),
-            capabilities: ir::Capabilities::ir4_structural(),
+            capabilities: ir::Capabilities::ir5_structural(),
             limits: ir::VerifyLimits::default(),
         }
     }
@@ -106,11 +106,14 @@ pub fn compile_modules(
     let mut procedures = Vec::new();
     let mut persistent_ids = BTreeMap::new();
     let mut features = BTreeSet::from(["scalar-core".to_owned()]);
-    for procedure in &program.procedures {
+    let mut nominal_locals = Vec::new();
+    for (procedure_index, procedure) in program.procedures.iter().enumerate() {
         if procedure.signature.parameters.iter().any(|p| p.optional) {
             features.insert("argument-defaults-v2".into());
         }
         let mut builder = Builder {
+            procedure: ir::ProcedureId(idx(procedure_index)?),
+            nominal_locals: &mut nominal_locals,
             program: &program,
             constants: &mut constants,
             raw_keys: &mut raw_keys,
@@ -199,8 +202,29 @@ pub fn compile_modules(
         .procedures
         .get(program.entry)
         .ok_or_else(|| error("entry invariant"))?;
+    for (procedure, bound) in program.procedures.iter().enumerate() {
+        for (slot, local) in bound.locals.iter().enumerate() {
+            if let Some(ty) = &local.nominal {
+                if nominal_locals.len() >= 4096 {
+                    return Err(resource());
+                }
+                features.insert("nominal-objects-v5".into());
+                push(
+                    &mut nominal_locals,
+                    ir::NominalLocal {
+                        procedure: ir::ProcedureId(idx(procedure)?),
+                        slot: ir::LocalSlot(idx(slot)?),
+                        ty: ty.clone(),
+                    },
+                )?;
+            }
+        }
+    }
     let mut ir = ir::Program {
-        ir_version: if features.iter().any(|f| f.ends_with("-v4")) {
+        nominal_locals,
+        ir_version: if features.iter().any(|f| f.ends_with("-v5")) {
+            ir::IR5_VERSION
+        } else if features.iter().any(|f| f.ends_with("-v4")) {
             ir::IR4_VERSION
         } else if features.iter().any(|f| f.ends_with("-v3")) {
             ir::IR3_VERSION
@@ -270,6 +294,8 @@ struct Block {
     foreign: Vec<(usize, ir::ForeignSite)>,
 }
 struct Builder<'a> {
+    procedure: ir::ProcedureId,
+    nominal_locals: &'a mut Vec<ir::NominalLocal>,
     program: &'a bound::BoundProgram,
     constants: &'a mut Vec<Value>,
     raw_keys: &'a mut BTreeMap<ConstantKey, ir::ConstantId>,
@@ -501,8 +527,26 @@ impl Builder<'_> {
                         }
                     }
                 }
-                bound::Argument::Temporary { value, kind } => {
+                bound::Argument::Temporary {
+                    value,
+                    kind,
+                    nominal,
+                } => {
                     let slot = self.scratch(*kind)?;
+                    if let Some(ty) = nominal {
+                        if self.nominal_locals.len() >= 4096 {
+                            return Err(resource());
+                        }
+                        push(
+                            self.nominal_locals,
+                            ir::NominalLocal {
+                                procedure: self.procedure,
+                                slot: ir::LocalSlot(idx(slot)?),
+                                ty: ty.clone(),
+                            },
+                        )?;
+                        self.feature("nominal-objects-v5");
+                    }
                     self.capture_argument(block, slot, value)?;
                     bound::Argument::Reference(slot)
                 }

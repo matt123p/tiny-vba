@@ -12,7 +12,7 @@ use vba_values::{Location, Locations, ScalarKind, Value};
 type Result<T> = std::result::Result<T, Diagnostic>;
 pub const PROFILE: &str = runtime::PROFILE;
 pub fn capabilities() -> ir::Capabilities {
-    let mut c = ir::Capabilities::ir4_structural();
+    let mut c = ir::Capabilities::ir5_structural();
     c.profile = PROFILE.into();
 
     c
@@ -151,6 +151,7 @@ pub enum Outcome {
 }
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub struct Counters {
+    pub type_checks: u64,
     pub instructions: u64,
     pub host_calls: u64,
     pub host_polls: u64,
@@ -205,6 +206,9 @@ pub struct ProjectState {
     values: BTreeMap<u32, Value>,
 }
 pub struct Session {
+    nominal_declarations: BTreeMap<(ir::ProcedureId, ir::LocalSlot), vba_values::NominalType>,
+    nominal_types: BTreeMap<Location, vba_values::NominalType>,
+    type_resolver: Option<std::sync::Arc<dyn foreign::ObjectTypeResolver>>,
     array_types: BTreeMap<Location, ScalarKind>,
     output: Vec<vba_values::VbaString>,
     persistent: BTreeMap<u32, Location>,
@@ -254,6 +258,9 @@ fn reserve<T>(v: &mut Vec<T>, n: usize) -> Result<()> {
 fn value_bytes(v: &Value) -> usize {
     v.payload_bytes()
 }
+fn nominal_bytes(ty: &vba_values::NominalType) -> usize {
+    128 + ty.library().len() + ty.version().len() + ty.name().len()
+}
 
 impl Session {
     pub fn new(
@@ -263,9 +270,37 @@ impl Session {
         binding: Option<HostBinding>,
         limits: Limits,
     ) -> Result<Self> {
+        Self::new_with_type_resolver(program, identity, arguments, binding, limits, None)
+    }
+    pub fn new_with_type_resolver(
+        program: ir::VerifiedProgram,
+        identity: u64,
+        arguments: Vec<Value>,
+        binding: Option<HostBinding>,
+        limits: Limits,
+        type_resolver: Option<std::sync::Arc<dyn foreign::ObjectTypeResolver>>,
+    ) -> Result<Self> {
         // A structural target or caller-invented capability set never enables missing runtime code.
         ir::recheck(&program, &capabilities(), &ir::VerifyLimits::default())?;
         let p = program.program();
+        if let Some(resolver) = &type_resolver
+            && binding
+                .as_ref()
+                .is_none_or(|b| b.identity != resolver.identity())
+        {
+            return Err(command("type resolver must match the bound host identity"));
+        }
+        let nominal_payload = p.nominal_locals.iter().try_fold(0usize, |n, entry| {
+            n.checked_add(nominal_bytes(&entry.ty)).ok_or_else(resource)
+        })?;
+        if nominal_payload > limits.payload {
+            return Err(resource());
+        }
+        let nominal_declarations = p
+            .nominal_locals
+            .iter()
+            .map(|n| ((n.procedure, n.slot), n.ty.clone()))
+            .collect();
         let entry = p
             .procedures
             .get(p.entry.0 as usize)
@@ -336,6 +371,9 @@ impl Session {
         }
         let instance = fresh_instance()?;
         let mut session = Self {
+            nominal_declarations,
+            nominal_types: BTreeMap::new(),
+            type_resolver,
             program,
             identity,
             instance,
@@ -367,7 +405,11 @@ impl Session {
             closed: false,
             entry_arguments: prepared.clone(),
         };
-        session.charge(retained_bytes)?;
+        session.charge(
+            retained_bytes
+                .checked_add(nominal_payload)
+                .ok_or_else(resource)?,
+        )?;
         session.push_frame(entry_id, prepared.into_iter().map(Operand::Value).collect())?;
         Ok(session)
     }
@@ -424,11 +466,33 @@ impl Session {
                 .ok_or_else(|| command("unknown persistent slot"))?;
             let value = runtime::bind(kind, &value).map_err(runtime_diagnostic)?;
             self.charge(value_bytes(&value))?;
-            prepared.push((key, kind, value));
+            let nominal = self
+                .program
+                .program()
+                .nominal_locals
+                .iter()
+                .find(|n| {
+                    self.program
+                        .program()
+                        .procedures
+                        .get(n.procedure.0 as usize)
+                        .and_then(|p| p.locals.get(n.slot.0 as usize))
+                        .is_some_and(|l| l.role == ir::SlotRole::Persistent(key))
+                })
+                .map(|n| n.ty.clone());
+            check_nominal(
+                nominal.as_ref(),
+                &value,
+                self.type_resolver.as_deref(),
+                self.binding.as_ref().map(|b| b.identity),
+                &mut self.counters.type_checks,
+                self.limits.instructions,
+            )?;
+            prepared.push((key, kind, value, nominal));
         }
         let extra = prepared
             .iter()
-            .filter(|(key, _, _)| !self.persistent.contains_key(key))
+            .filter(|(key, _, _, _)| !self.persistent.contains_key(key))
             .count();
         if self
             .allocated_locations
@@ -437,9 +501,9 @@ impl Session {
         {
             return Err(resource());
         }
-        for (key, kind, value) in prepared {
+        for (key, kind, value, nominal) in prepared {
             if let Some(location) = self.persistent.get(&key).copied() {
-                self.store.write(location, value)?;
+                self.write_value(location, value)?;
             } else {
                 if self.allocated_locations >= self.limits.locations {
                     return Err(resource());
@@ -448,6 +512,9 @@ impl Session {
                 self.allocated_locations += 1;
                 self.persistent.insert(key, location);
                 self.kinds.insert(location, kind);
+                if let Some(ty) = nominal {
+                    self.nominal_types.insert(location, ty);
+                }
             }
         }
         Ok(())
@@ -503,13 +570,27 @@ impl Session {
             .parameters;
         let mut prepared = Vec::new();
         reserve(&mut prepared, arguments.len())?;
-        for (value, parameter) in arguments.iter().zip(signature) {
+        for (index, (value, parameter)) in arguments.iter().zip(signature).enumerate() {
             if let Some(element) = parameter.array
                 && !matches!(value, Value::Array(array) if array.kind() == element)
             {
                 return Err(command("callback array parameter element type mismatch"));
             }
-            prepared.push(runtime::bind(parameter.kind, value).map_err(runtime_diagnostic)?);
+            let value = runtime::bind(parameter.kind, value).map_err(runtime_diagnostic)?;
+            let nominal = self.nominal_declarations.get(&(
+                id,
+                ir::LocalSlot(u32::try_from(index).map_err(|_| resource())?),
+            ));
+            check_array_identity(nominal, parameter.array, &value)?;
+            check_nominal(
+                nominal,
+                &value,
+                self.type_resolver.as_deref(),
+                self.binding.as_ref().map(|b| b.identity),
+                &mut self.counters.type_checks,
+                self.limits.instructions,
+            )?;
+            prepared.push(value);
         }
         let prepared_bytes = prepared.iter().try_fold(0usize, |n, value| {
             n.checked_add(value_bytes(value)).ok_or_else(resource)
@@ -623,6 +704,28 @@ impl Session {
             return Err(invariant("callback delivery requires clean frames"));
         }
         let procedure = callback.procedure;
+        for (index, value) in prepared.iter().enumerate() {
+            let nominal = self.nominal_declarations.get(&(
+                procedure,
+                ir::LocalSlot(u32::try_from(index).map_err(|_| resource())?),
+            ));
+            let element = self
+                .program
+                .program()
+                .procedures
+                .get(procedure.0 as usize)
+                .and_then(|p| p.parameters.get(index))
+                .and_then(|p| p.array);
+            check_array_identity(nominal, element, value)?;
+            check_nominal(
+                nominal,
+                value,
+                self.type_resolver.as_deref(),
+                self.binding.as_ref().map(|b| b.identity),
+                &mut self.counters.type_checks,
+                self.limits.instructions,
+            )?;
+        }
         self.callbacks.pop_front();
         self.error = ErrorState::default();
         self.raised_source = None;
@@ -661,6 +764,7 @@ impl Session {
             self.store.invalidate(*location)?;
             self.kinds.remove(location);
             self.array_types.remove(location);
+            self.nominal_types.remove(location);
         }
         self.persistent.clear();
         self.output.clear();
@@ -788,6 +892,30 @@ impl Session {
             .copied()
             .ok_or_else(|| invariant("slot missing"))
     }
+    fn check_value(&mut self, location: Location, value: &Value) -> Result<()> {
+        check_nominal(
+            self.nominal_types.get(&location),
+            value,
+            self.type_resolver.as_deref(),
+            self.binding.as_ref().map(|b| b.identity),
+            &mut self.counters.type_checks,
+            self.limits.instructions,
+        )
+    }
+    fn write_value(&mut self, location: Location, value: Value) -> Result<()> {
+        check_array_identity(
+            self.nominal_types.get(&location),
+            self.array_types.get(&location).copied(),
+            &value,
+        )?;
+        self.check_value(location, &value)?;
+        self.store.write(location, value)
+    }
+    fn read_value(&mut self, location: Location) -> Result<Value> {
+        let value = self.store.read(location)?.clone();
+        self.check_value(location, &value)?;
+        Ok(value)
+    }
     fn advance(&mut self) -> Result<()> {
         let f = self.top_mut()?;
         f.pc.0 = f.pc.0.checked_add(1).ok_or_else(resource)?;
@@ -830,6 +958,13 @@ impl Session {
             .and_then(|n| n.checked_add(stack_max * 64))
             .ok_or_else(resource)?;
         self.charge(frame_bytes)?;
+        let nominal_payload = self
+            .nominal_declarations
+            .range((id, ir::LocalSlot(0))..=(id, ir::LocalSlot(u32::MAX)))
+            .try_fold(0usize, |n, (_, ty)| {
+                n.checked_add(nominal_bytes(ty)).ok_or_else(resource)
+            })?;
+        self.charge(nominal_payload)?;
         let proc = self
             .program
             .program()
@@ -841,6 +976,9 @@ impl Session {
         let mut values = Vec::new();
         reserve(&mut values, locals.len())?;
         for (i, local) in locals.iter().enumerate() {
+            let expected = self
+                .nominal_declarations
+                .get(&(id, ir::LocalSlot(u32::try_from(i).map_err(|_| resource())?)));
             let v = if local.role == ir::SlotRole::HostRoot {
                 let reference = self
                     .binding
@@ -865,7 +1003,9 @@ impl Session {
             } else if let Some(arg) = args.get(i) {
                 match (arg, params.get(i).map(|p| p.mode)) {
                     (Operand::Reference(l), Some(ir::ParameterMode::ByRef)) => {
-                        if self.kinds.get(l) != Some(&local.kind) {
+                        if self.kinds.get(l) != Some(&local.kind)
+                            || self.nominal_types.get(l) != expected
+                        {
                             return Err(runtime_diagnostic(runtime::Error::Vba {
                                 number: 13,
                                 message: "ByRef argument type mismatch".into(),
@@ -902,6 +1042,19 @@ impl Session {
             } else {
                 Operand::Value(local.kind.initial_value())
             };
+            let value = match &v {
+                Operand::Value(value) => value,
+                Operand::Reference(location) => self.store.read(*location)?,
+            };
+            check_array_identity(expected, local.array, value)?;
+            check_nominal(
+                expected,
+                value,
+                self.type_resolver.as_deref(),
+                self.binding.as_ref().map(|b| b.identity),
+                &mut self.counters.type_checks,
+                self.limits.instructions,
+            )?;
             values.push(v);
         }
         let mut slots = Vec::new();
@@ -911,7 +1064,7 @@ impl Session {
         reserve(&mut owned, owned_count)?;
         reserve(&mut stack, stack_max)?;
         reserve(&mut self.frames, 1)?;
-        for (local, value) in locals.iter().zip(values) {
+        for (index, (local, value)) in locals.iter().zip(values).enumerate() {
             let location = match value {
                 Operand::Reference(l) => l,
                 Operand::Value(v) => {
@@ -926,6 +1079,12 @@ impl Session {
                     l
                 }
             };
+            if let Some(ty) = self.nominal_declarations.get(&(
+                id,
+                ir::LocalSlot(u32::try_from(index).map_err(|_| resource())?),
+            )) {
+                self.nominal_types.insert(location, ty.clone());
+            }
             if let Some(element) = local.array
                 && self
                     .array_types
@@ -1087,6 +1246,34 @@ impl Session {
         self.validate_handle(handle, false)?;
         self.read_frame_local(handle.frame, name)
     }
+    pub fn local_nominal_type(
+        &self,
+        handle: Handle,
+        name: &str,
+    ) -> Result<Option<vba_values::NominalType>> {
+        self.validate_handle(handle, false)?;
+        let frame = self
+            .frames
+            .iter()
+            .find(|f| f.id == handle.frame)
+            .ok_or_else(|| command("stale frame"))?;
+        let proc = self
+            .program
+            .program()
+            .procedures
+            .get(frame.procedure.0 as usize)
+            .ok_or_else(|| invariant("frame procedure"))?;
+        let slot = proc
+            .locals
+            .iter()
+            .position(|l| l.visible && l.name.eq_ignore_ascii_case(name))
+            .ok_or_else(|| command("unknown local"))?;
+        let location = frame
+            .slots
+            .get(slot)
+            .ok_or_else(|| invariant("local slot"))?;
+        Ok(self.nominal_types.get(location).cloned())
+    }
     /// Read-only checkpoint inspection for conditional debugger predicates. A view
     /// is valid only during its current visible visit, before its one-visit permit.
     pub fn read_checkpoint_local(&self, view: &CheckpointView, name: &str) -> Result<Value> {
@@ -1172,7 +1359,7 @@ impl Session {
             return Err(command("array element type mismatch"));
         }
         self.charge(value_bytes(&value))?;
-        self.store.write(location, value)?;
+        self.write_value(location, value)?;
         let frames = self.snapshots()?;
         if let Outcome::Paused(p) = &mut self.state {
             p.frames = frames;
@@ -1469,6 +1656,7 @@ impl Session {
             self.store.invalidate(location)?;
             self.kinds.remove(&location);
             self.array_types.remove(&location);
+            self.nominal_types.remove(&location);
         }
         Ok(())
     }
@@ -1599,6 +1787,15 @@ impl Session {
                 }
                 let actual = array.kind();
                 self.kinds.insert(location, actual);
+                if !self.nominal_types.contains_key(&location)
+                    && let Some(ty) = self.nominal_types.get(&owner)
+                {
+                    let bytes = nominal_bytes(ty);
+                    self.charge(bytes)?;
+                    if let Some(ty) = self.nominal_types.get(&owner).cloned() {
+                        self.nominal_types.insert(location, ty);
+                    }
+                }
                 self.push(Operand::Reference(location))?;
                 self.advance()?;
             }
@@ -1624,6 +1821,9 @@ impl Session {
                     return Ok(());
                 }
                 let allocation = vba_values::VbaArray::allocation_bytes(kind, &bounds)?;
+                let allocation = allocation
+                    .checked_add(self.nominal_types.get(&owner).map_or(0, nominal_bytes))
+                    .ok_or_else(resource)?;
                 let preserved = if preserve { value_bytes(old) } else { 0 };
                 self.charge(allocation.checked_add(preserved).ok_or_else(resource)?)?;
                 let old = self.store.read(owner)?;
@@ -1638,7 +1838,8 @@ impl Session {
                     };
                     array.resize(bounds, preserve)?
                 };
-                self.store.write(owner, Value::Array(array))?;
+                let array = array.with_nominal_type(self.nominal_types.get(&owner).cloned())?;
+                self.write_value(owner, Value::Array(array))?;
                 self.advance()?;
             }
             I::ArrayErase => {
@@ -1655,7 +1856,7 @@ impl Session {
                     return Err(invariant("erase owner"));
                 };
                 let array = array.erase()?;
-                self.store.write(owner, Value::Array(array))?;
+                self.write_value(owner, Value::Array(array))?;
                 self.advance()?;
             }
             I::OnError {
@@ -1779,7 +1980,7 @@ impl Session {
                 self.advance()?;
             }
             I::ReadLocal(slot) => {
-                let v = self.store.read(self.location(slot)?)?.clone();
+                let v = self.read_value(self.location(slot)?)?;
                 self.push(Operand::Value(v))?;
                 self.advance()?;
             }
@@ -1789,7 +1990,7 @@ impl Session {
             }
             I::ReadRef => {
                 let l = self.pop_ref()?;
-                let v = self.store.read(l)?.clone();
+                let v = self.read_value(l)?;
                 self.push(Operand::Value(v))?;
                 self.advance()?;
             }
@@ -1815,7 +2016,7 @@ impl Session {
                     }));
                 }
                 self.charge(value_bytes(&value))?;
-                self.store.write(location, value)?;
+                self.write_value(location, value)?;
                 self.advance()?;
             }
             I::DupValue => {
@@ -1959,9 +2160,8 @@ impl Session {
                 self.pause(PauseReason::Stop)?;
             }
             I::Return => {
-                let proc = self.proc()?;
-                let result = if let Some(slot) = proc.result {
-                    ReturnValue::Function(self.store.read(self.location(slot)?)?.clone())
+                let result = if let Some(slot) = self.proc()?.result {
+                    ReturnValue::Function(self.read_value(self.location(slot)?)?)
                 } else {
                     ReturnValue::Sub
                 };
@@ -1984,6 +2184,7 @@ impl Session {
                     self.store.invalidate(location)?;
                     self.kinds.remove(&location);
                     self.array_types.remove(&location);
+                    self.nominal_types.remove(&location);
                 }
                 if self.frames.is_empty() {
                     self.cleanup();
@@ -2052,11 +2253,33 @@ impl Session {
             ir::ForeignKind::Set => foreign::InvokeKind::Set,
         };
         let kinds = &self.kinds;
+        let nominal_types = &self.nominal_types;
+        let resolver = self.type_resolver.as_deref();
+        let host_identity = self.binding.as_ref().map(|b| b.identity);
+        let checks = &mut self.counters.type_checks;
+        let check_limit = self.limits.instructions;
         let array_types = &self.array_types;
         let used = &mut self.allocation_bytes;
         let cap = self.limits.payload;
         let mut validate = |l, v: &Value| {
             validate_write(kinds, array_types, l, v)?;
+            if let Some(location) = l {
+                check_array_identity(
+                    nominal_types.get(&location),
+                    array_types.get(&location).copied(),
+                    v,
+                )?;
+            }
+            if let Some(location) = l {
+                check_nominal(
+                    nominal_types.get(&location),
+                    v,
+                    resolver,
+                    host_identity,
+                    checks,
+                    check_limit,
+                )?;
+            }
             let next = used.checked_add(value_bytes(v)).ok_or_else(resource)?;
             if next > cap {
                 return Err(resource());
@@ -2124,11 +2347,33 @@ impl Session {
             return Ok(self.state.clone());
         }
         let kinds = &self.kinds;
+        let nominal_types = &self.nominal_types;
+        let resolver = self.type_resolver.as_deref();
+        let host_identity = self.binding.as_ref().map(|b| b.identity);
+        let checks = &mut self.counters.type_checks;
+        let check_limit = self.limits.instructions;
         let array_types = &self.array_types;
         let used = &mut self.allocation_bytes;
         let cap = self.limits.payload;
         let mut validate = |l, v: &Value| {
             validate_write(kinds, array_types, l, v)?;
+            if let Some(location) = l {
+                check_array_identity(
+                    nominal_types.get(&location),
+                    array_types.get(&location).copied(),
+                    v,
+                )?;
+            }
+            if let Some(location) = l {
+                check_nominal(
+                    nominal_types.get(&location),
+                    v,
+                    resolver,
+                    host_identity,
+                    checks,
+                    check_limit,
+                )?;
+            }
             let next = used.checked_add(value_bytes(v)).ok_or_else(resource)?;
             if next > cap {
                 return Err(resource());
@@ -2156,6 +2401,92 @@ impl Session {
         }
         Ok(self.state.clone())
     }
+}
+fn check_array_identity(
+    expected: Option<&vba_values::NominalType>,
+    element: Option<ScalarKind>,
+    value: &Value,
+) -> Result<()> {
+    if element == Some(ScalarKind::Object)
+        && let Value::Array(array) = value
+        && array.nominal_type() != expected
+    {
+        return Err(runtime_diagnostic(runtime::Error::Vba {
+            number: 13,
+            message: "array declared object identity mismatch".into(),
+        }));
+    }
+    Ok(())
+}
+fn check_nominal(
+    expected: Option<&vba_values::NominalType>,
+    value: &Value,
+    resolver: Option<&dyn foreign::ObjectTypeResolver>,
+    host: Option<u64>,
+    checks: &mut u64,
+    limit: u64,
+) -> Result<()> {
+    let Some(expected) = expected else {
+        return Ok(());
+    };
+    if let Value::Array(array) = value
+        && array.nominal_type() != Some(expected)
+    {
+        return Err(runtime_diagnostic(runtime::Error::Vba {
+            number: 13,
+            message: "nominal array type mismatch".into(),
+        }));
+    }
+    let values = match value {
+        Value::Array(array) => array.elements(),
+        value => std::slice::from_ref(value),
+    };
+    for value in values {
+        *checks = checks.checked_add(1).ok_or_else(resource)?;
+        if *checks > limit {
+            return Err(resource());
+        }
+        match value {
+            Value::Nothing | Value::Empty => (),
+            Value::Object(object) => {
+                if Some(object.host) != host {
+                    return Err(runtime_diagnostic(runtime::Error::Vba {
+                        number: 91,
+                        message: "foreign or disconnected object".into(),
+                    }));
+                }
+                let resolver = resolver.ok_or_else(|| {
+                    Diagnostic::unsupported("nominal assignments require a host type resolver")
+                })?;
+                if Some(resolver.identity()) != host {
+                    return Err(command("type resolver identity changed"));
+                }
+                let supported = resolver.supports_type(*object, expected).map_err(|e| {
+                    if e.number == 0 || e.description.len() > 65536 {
+                        protocol("invalid type resolver error")
+                    } else {
+                        runtime_diagnostic(runtime::Error::Vba {
+                            number: e.number,
+                            message: e.description,
+                        })
+                    }
+                })?;
+                if !supported {
+                    return Err(runtime_diagnostic(runtime::Error::Vba {
+                        number: 13,
+                        message: "nominal object type mismatch".into(),
+                    }));
+                }
+            }
+            _ => {
+                return Err(runtime_diagnostic(runtime::Error::Vba {
+                    number: 13,
+                    message: "nominal object type mismatch".into(),
+                }));
+            }
+        }
+    }
+    Ok(())
 }
 fn validate_write(
     kinds: &BTreeMap<Location, ScalarKind>,

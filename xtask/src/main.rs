@@ -119,6 +119,8 @@ fn run() -> Result<(), Box<dyn Error>> {
                     "inspection",
                     "--test",
                     "references",
+                    "--test",
+                    "nominal",
                     "--locked",
                     "--target",
                     "wasm32-wasip1",

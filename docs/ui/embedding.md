@@ -4,7 +4,9 @@ New M1.1 callers may explicitly configure executable enum/constant references vi
 `Ide::configure_reference_bindings(ReferenceSet)`. This updates discovery from the
 same validated snapshot used by ordinary and isolated compilation. Reset before
 reconfiguration. Existing `configure_metadata` is display-only; neither API loads
-libraries. Nominal object types remain unsupported. See
+libraries. Nominal object values require an explicit read-only host type resolver
+configured through `configure_type_resolver`; scalar/array Immediate snapshots
+retain their nominal identity. See
 [the M1 profile](../m1-host-references.md).
 
 The same `vba-ide` model and `vba-ui-egui` renderer power the standalone native app, browser app and

@@ -1,5 +1,5 @@
 Current compiler additions are in [the M4 language contract](m4-language.md) and
-[ADR 0012](decisions/0012-m4-oracle-acceptance.md): ir3-structural is the default target;
+[ADR 0012](decisions/0012-m4-oracle-acceptance.md); current default target is ir5-structural:
 IR 1/2 remain supported. Array parameter/layout metadata, ParamArray packing and named reference
 capture are checked before execution. The historical M2/M4-first-slice restrictions below are
 superseded only by those explicitly documented additions.
@@ -9,9 +9,12 @@ New M1.1 additionally supports qualified declared-type syntax and explicit
 enum types bind to Long; typed reference constants resolve in expressions,
 constant declarations, defaults and bounds. Source symbols retain precedence.
 Missing/undefined types and references fail explicitly. Nominal host object types
-remain unsupported; they are not aliases for Object. See
+carry verified IR 5 identity and require a host resolver for non-Nothing values;
+they are not aliases for Object. See
 [the exact profile](m1-host-references.md) and
 [ADR 0020](decisions/0020-explicit-host-reference-snapshots.md).
+The nominal extension and legacy-consumer refusal are in
+[ADR 0021](decisions/0021-nominal-host-object-types.md).
 
 # M2 binding and verified bytecode
 

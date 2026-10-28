@@ -15,6 +15,7 @@ pub struct BoundProgram {
 }
 #[derive(Clone, Debug)]
 pub struct BoundParameter {
+    pub nominal: Option<vba_values::NominalType>,
     pub array: Option<ScalarKind>,
     pub param_array: bool,
     pub name: String,
@@ -26,6 +27,7 @@ pub struct BoundParameter {
 }
 #[derive(Clone, Debug)]
 pub struct BoundLocal {
+    pub nominal: Option<vba_values::NominalType>,
     pub host_root: bool,
     pub persistent: Option<String>,
     pub array: Option<ScalarKind>,
@@ -37,6 +39,7 @@ pub struct BoundLocal {
 }
 #[derive(Clone, Debug)]
 pub struct Signature {
+    pub nominal_result: Option<vba_values::NominalType>,
     pub module: usize,
     pub name: String,
     pub kind: ast::ProcedureKind,
@@ -116,6 +119,7 @@ pub enum Argument {
         argument: Box<Argument>,
     },
     Temporary {
+        nominal: Option<vba_values::NominalType>,
         value: Expr,
         kind: ScalarKind,
     },
@@ -239,6 +243,23 @@ fn kind(
             )
             .at(ty.span)
         })
+}
+fn nominal(
+    ty: Option<&ast::Name>,
+    references: &vba_foreign::ReferenceSet,
+) -> Result<Option<vba_values::NominalType>> {
+    let Some(ty) = ty else {
+        return Ok(None);
+    };
+    if ScalarKind::ALL
+        .iter()
+        .any(|kind| format!("{kind:?}").eq_ignore_ascii_case(&ty.spelling))
+    {
+        return Ok(None);
+    }
+    references
+        .object_type(&ty.spelling)
+        .map_err(|d| d.at(ty.span))
 }
 // Logical binding payload is bounded independently of the verifier. Fixed 256-byte node
 // charges cover owned AST/bound-node cells; UTF-16 buffers and source/token copies add payload.
@@ -478,6 +499,12 @@ pub fn bind_with_references(
             let Some(value) = declaration.constant.as_ref() else {
                 continue;
             };
+            if nominal(declaration.ty.as_ref(), references)?.is_some() {
+                return Err(err(
+                    "object constant declaration is invalid",
+                    declaration.span,
+                ));
+            }
             let value = literal(value, references, Some(&constants))?;
             let value = if declaration.ty.is_some() {
                 vba_runtime::bind(
@@ -564,6 +591,7 @@ pub fn bind_with_references(
                 push(
                     &mut parameters,
                     BoundParameter {
+                        nominal: nominal(parameter.ty.as_ref(), references)?,
                         name: parameter.name.spelling.clone(),
                         array: parameter.array.then_some(element),
                         param_array: parameter.param_array,
@@ -588,6 +616,7 @@ pub fn bind_with_references(
             push(
                 &mut signatures,
                 Signature {
+                    nominal_result: nominal(procedure.result_type.as_ref(), references)?,
                     module: mi,
                     name: procedure.name.spelling.clone(),
                     kind: procedure.kind,
@@ -704,6 +733,11 @@ pub fn bind_with_references(
                 .last_mut()
                 .ok_or_else(|| err("parameter local", param.span))?
                 .array = param.array;
+            binder
+                .locals
+                .last_mut()
+                .ok_or_else(|| err("parameter local", param.span))?
+                .nominal = param.nominal.clone();
         }
         if let Some(kind) = sig.result {
             binder.local(
@@ -714,6 +748,11 @@ pub fn bind_with_references(
                 true,
                 &mut local_names,
             )?;
+            binder
+                .locals
+                .last_mut()
+                .ok_or_else(|| err("result local", sig.span))?
+                .nominal = sig.nominal_result.clone();
         }
         binder.collect(&syntax.body, &mut local_names)?;
         for declaration in &module.declarations {
@@ -739,6 +778,7 @@ pub fn bind_with_references(
                 .ok_or_else(|| err("module local", declaration.span))?;
             local.persistent = Some(format!("{}:module:{}", sig.module, declaration.name.key()));
             local.array = declaration.dimensions.as_ref().map(|_| element);
+            local.nominal = nominal(declaration.ty.as_ref(), references)?;
         }
         let mut body = binder.block(&syntax.body)?;
         let mut initializers = Vec::new();
@@ -832,6 +872,7 @@ impl Binder<'_> {
         push(
             &mut self.locals,
             BoundLocal {
+                nominal: None,
                 host_root: false,
                 persistent: None,
                 array: None,
@@ -850,6 +891,9 @@ impl Binder<'_> {
                 ast::StatementKind::Declare(declarations) => {
                     for d in declarations {
                         if let Some(expr) = &d.constant {
+                            if nominal(d.ty.as_ref(), self.references)?.is_some() {
+                                return Err(err("object constant declaration is invalid", d.span));
+                            }
                             kind(None, &d.name, self.references)?;
 
                             if !names.insert(d.name.key()) {
@@ -885,6 +929,7 @@ impl Binder<'_> {
                                 .last_mut()
                                 .ok_or_else(|| err("declaration local", d.span))?;
                             local.array = d.dimensions.as_ref().map(|_| element);
+                            local.nominal = nominal(d.ty.as_ref(), self.references)?;
                             if d.persistent {
                                 local.persistent = Some(format!(
                                     "{}:{}:{}",
@@ -961,6 +1006,7 @@ impl Binder<'_> {
         push(
             &mut self.locals,
             BoundLocal {
+                nominal: None,
                 host_root: false,
                 persistent: None,
                 array: None,
@@ -1112,7 +1158,9 @@ impl Binder<'_> {
                 } else if let ast::ExprKind::Name(name) = &expr.kind {
                     let slot = self.slot(name)?;
                     if self.locals.get(slot).is_none_or(|l| {
-                        l.kind != param.kind || (param.array.is_some() && l.array != param.array)
+                        l.kind != param.kind
+                            || l.nominal != param.nominal
+                            || (param.array.is_some() && l.array != param.array)
                     }) {
                         return Err(err("ByRef declared type mismatch", expr.span));
                     }
@@ -1125,7 +1173,10 @@ impl Binder<'_> {
                         kind,
                     } = bound.kind
                     {
-                        if kind != param.kind {
+                        if kind != param.kind
+                            || self.locals.get(slot).and_then(|l| l.nominal.as_ref())
+                                != param.nominal.as_ref()
+                        {
                             return Err(err("ByRef array element type mismatch", expr.span));
                         }
                         Argument::Element {
@@ -1135,6 +1186,7 @@ impl Binder<'_> {
                         }
                     } else {
                         Argument::Temporary {
+                            nominal: param.nominal.clone(),
                             value: bound,
                             kind: param.kind,
                         }
@@ -1153,6 +1205,7 @@ impl Binder<'_> {
                     Argument::Value(expr)
                 } else {
                     Argument::Temporary {
+                        nominal: param.nominal.clone(),
                         value: expr,
                         kind: param.kind,
                     }
@@ -1200,6 +1253,7 @@ impl Binder<'_> {
                 Argument::Value(expr)
             } else {
                 Argument::Temporary {
+                    nominal: param.nominal.clone(),
                     value: expr,
                     kind: param.kind,
                 }
@@ -1338,6 +1392,7 @@ impl Binder<'_> {
             push(
                 &mut self.locals,
                 BoundLocal {
+                    nominal: None,
                     host_root: true,
                     persistent: None,
                     array: None,
@@ -1736,7 +1791,9 @@ impl Binder<'_> {
                     .and_then(|l| l.array)
                     .ok_or_else(|| err("ReDim requires declared array", name.span))?;
                 if let Some(ty) = ty
-                    && kind(Some(ty), name, self.references)? != element
+                    && (kind(Some(ty), name, self.references)? != element
+                        || nominal(Some(ty), self.references)?.as_ref()
+                            != self.locals.get(slot).and_then(|l| l.nominal.as_ref()))
                 {
                     return Err(err("ReDim element type change", ty.span));
                 }

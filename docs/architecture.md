@@ -159,7 +159,10 @@ Native extensions/translation and AI assistance are removed from planned scope.
 New M1.1's first increment adds validated `vba-foreign::ReferenceSet` snapshots
 to compiler/binder options. Registered enums lower to Long; constants become
 typed IR constants. IDE discovery and compilation share an explicitly configured
-snapshot. Nominal host object types remain unsupported pending assignment checks.
+snapshot. Nominal host object identity and storage checks now use IR 5 and an
+explicit read-only host resolver under [ADR 0021](decisions/0021-nominal-host-object-types.md).
+Office definitions/object stores remain in the forks; no parallel registry or
+application dependency enters tiny-vba.
 [ADR 0020](decisions/0020-explicit-host-reference-snapshots.md) adds no dependency,
 IR version or host invocation ABI; [the stage log](m1-host-references.md) records
 remaining work and execution evidence.

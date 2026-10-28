@@ -5,14 +5,47 @@ This follows the **new** remaining plan numbering, not historical M1 frontend wo
 
 ## Stage state
 
+Continuation 2026-10-28: user explicitly requested M1.1 completion and a boundary
+audit. Nominal identity/IR 5 metadata and VM storage checks are being implemented
+on the same feature branch. Type queries use a read-only host-supplied resolver
+over the host's existing object store, not an engine-side registry. No Office
+type names or object implementations enter the engine. Completion requires new
+positive/negative/lifecycle tests and the fork-owned typed-source proof below.
+
 | Stage | State / next proof |
 |---|---|
 | M1.1a explicit reference snapshots, enum types and constants | Complete for the documented profile; all gates below pass |
-| M1.1b nominal host object types | Pending: specify type identity/assignability and verify every storage path, including ByRef, arrays, host results and debugger edits |
+| M1.1b nominal host object types | Core complete: explicit resolver, IR 5 metadata and typed storage/lifetime checks; native/WASI gates pass |
 | M1.1c unchanged typed Office source | Pending: generic object-type execution proofs first, then fork-owned `As Worksheet` / `As Excel.Range` tests |
 | M1.2 default members / M1.3 collections | Pending; no capability claim from reference metadata |
 
-## Implemented contract
+## Nominal core checkpoint
+
+[ADR 0021](decisions/0021-nominal-host-object-types.md) extends the first increment
+below. `ReferenceTypeKind::Object` now binds with a canonical `NominalType` and
+verified IR 5 metadata. `Session::new_with_type_resolver` and
+`Ide::configure_type_resolver` accept a read-only host query backed by the host's
+existing object store. tiny-vba has no Office definitions or parallel object registry.
+
+Checks cover scalar/array assignment, ByVal/ByRef, compiler temporaries, returns,
+entry/callback arguments, foreign results/writebacks, debugger edits, isolated
+Immediate snapshots, persistent restore and handle lifetime. Object-array identity
+survives Variant copies/resize/Erase. Wrong types give error 13, stale handles error
+91, missing providers explicit unsupported errors. Generic Object/Variant remain.
+
+Core validation: **302 workspace tests PASS**, strict CI/Clippy/format/layer checks
+PASS, headless WASM compile PASS, **116 actual WASI tests PASS**. Thirteen new VM
+nominal tests and one IDE workflow prove the boundaries, including atomic waited
+writeback, callbacks, state restore and query-budget exhaustion. The structural
+golden's profile header changes to ir5-structural; its scalar IR stays unchanged.
+
+Boundary audit found no Excel/GridCraft object definitions in shipping interpreter
+libraries. The only Excel-related matches in non-test Rust code are conformance
+oracle metadata, not object definitions. The 19-crate DAG remains headless/acyclic
+with no application dependency. Excel descriptors/resolver and unchanged-source
+proof are being implemented solely in GridCraft for M1.1c.
+
+## First reference increment contract (historical checkpoint)
 
 [ADR 0020](decisions/0020-explicit-host-reference-snapshots.md) records ownership,
 bounds and refusals. Hosts construct `vba_foreign::ReferenceSet::new` with ordered
@@ -67,7 +100,5 @@ Public behavior references consulted, with original code/tests:
 - [Microsoft: Enum statement and library reference priority](https://learn.microsoft.com/en-us/office/vba/language/reference/user-interface-help/enum-statement)
 - [Microsoft: undefined types and required references](https://learn.microsoft.com/en-us/office/vba/language/how-to/user-defined-type-not-defined)
 
-Next: M1.1b's nominal host object contract. Keep generic Object/Variant late binding
-unchanged, and do not enable nominal declarations until assignment, lifetime and
-host-result checks are enforced. Do not start default-member fallback or enumerate
-host objects implicitly while implementing this type boundary.
+Next: complete the fork-owned M1.1c acceptance and publish its pinned dependency
+and evidence. Default members and enumeration remain separate M1.2/M1.3 work.

@@ -38,7 +38,7 @@ Updated 2026-10-27. Stage: M4 external acceptance complete; M5–M7 in-repo cont
 | Excel/Word APIs and OOXML round-trip | External ownership | Gridcraft/Wordcraft forks |
 | GridCraft Excel.v1 baseline | Fork-owned implementation | Native and JavaScript/WASM workbook tests, shared editor/control/source IO tests, inspected native snapshots; [scope/evidence](gridcraft-integration.md). Broader events, WordCraft, signatures/forms remain planned |
 | Classes and standard Office UserForms | Planned new M2; currently unsupported | [Form/class milestone and gate](implementation-plan.md#m2--classdocument-semantics-and-standard-office-userforms) |
-| Explicit host references, enum types and constants | New M1.1 first increment implemented | Qualified types, ordered library/module constants, missing-reference diagnostics and native/WASI VM/IDE tests; [profile](m1-host-references.md). Nominal host object binding remains unsupported |
+| Explicit host references, enum/nominal types and constants | New M1.1 core implemented; fork proof tracked separately | Qualified types, ordered constants, IR 5 nominal storage/lifetime/ByRef checks and native/WASI VM/IDE tests; [profile](m1-host-references.md). Office definitions stay in forks |
 | Third-party ActiveX/OLE controls not supplied with Office | Out of scope for now | No loading, execution, designer or acceptance work scheduled |
 | Arbitrary COM/DLL execution, P-code and binary add-ins | Outside current scope | Standard Office control support does not imply unrestricted binary compatibility |
 | Binary VBA source writing/signature handling | Planned reviewed contract in new M7 | Original-byte preservation is not edited-source writeback |

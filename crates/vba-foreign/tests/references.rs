@@ -53,10 +53,14 @@ fn missing_references_and_nominal_objects_never_become_generic_objects() -> R {
         name: "Document".into(),
         kind: ReferenceTypeKind::Object,
     });
-    assert!(
-        ReferenceSet::new(vec![object])?
-            .declared_kind("Host.Document")
-            .is_err()
+    let refs = ReferenceSet::new(vec![object])?;
+    assert_eq!(
+        refs.declared_kind("Host.Document")?,
+        Some(ScalarKind::Object)
+    );
+    assert_eq!(
+        refs.object_type("Host.Document")?,
+        Some(vba_values::NominalType::new("Host", "1.0", "Document")?)
     );
     Ok(())
 }

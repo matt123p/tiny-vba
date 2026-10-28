@@ -122,7 +122,7 @@ fn validate(
 ) -> Result<Vec<u32>> {
     if !matches!(
         p.ir_version,
-        IR_VERSION | IR2_VERSION | IR3_VERSION | IR4_VERSION
+        IR_VERSION | IR2_VERSION | IR3_VERSION | IR4_VERSION | IR5_VERSION
     ) || p.profile != caps.profile
         || !caps.ir_versions.contains(&p.ir_version)
     {
@@ -151,6 +151,57 @@ fn validate(
     budget.table(p.sources.len() + p.procedures.len() + p.constants.len())?;
     budget.text(&p.profile)?;
     budget.text(&p.revision)?;
+    bound(p.nominal_locals.len(), 4096)?;
+    if !p.nominal_locals.is_empty() {
+        if p.ir_version < IR5_VERSION {
+            return Err(incompatible("nominal metadata requires IR 5"));
+        }
+        feature(p, caps, "nominal-objects-v5")?;
+    }
+    let mut nominal_seen = BTreeSet::new();
+    let mut nominal_slots = BTreeMap::new();
+    let mut persistent_nominal = std::collections::BTreeMap::new();
+    for nominal in &p.nominal_locals {
+        nominal_slots.insert(
+            (nominal.procedure.0 as usize, nominal.slot.0 as usize),
+            &nominal.ty,
+        );
+        budget.table(1)?;
+        budget.text(nominal.ty.library())?;
+        budget.text(nominal.ty.version())?;
+        budget.text(nominal.ty.name())?;
+        let local = p
+            .procedures
+            .get(nominal.procedure.0 as usize)
+            .and_then(|proc| proc.locals.get(nominal.slot.0 as usize))
+            .ok_or_else(|| invalid("invalid nominal local"))?;
+        if !nominal_seen.insert((nominal.procedure, nominal.slot))
+            || !(local.kind == ScalarKind::Object && local.array.is_none()
+                || local.kind == ScalarKind::Variant && local.array == Some(ScalarKind::Object))
+            || matches!(local.role, SlotRole::ScratchReference | SlotRole::HostRoot)
+        {
+            return Err(invalid("invalid nominal local shape"));
+        }
+        if let SlotRole::Persistent(key) = local.role
+            && persistent_nominal
+                .insert(key, &nominal.ty)
+                .is_some_and(|old| old != &nominal.ty)
+        {
+            return Err(invalid("inconsistent persistent nominal identity"));
+        }
+    }
+    for (procedure, proc) in p.procedures.iter().enumerate() {
+        bound(proc.locals.len(), limits.slots)?;
+        budget.table(proc.locals.len())?;
+        for (slot, local) in proc.locals.iter().enumerate() {
+            if let SlotRole::Persistent(key) = local.role
+                && let Some(expected) = persistent_nominal.get(&key)
+                && nominal_slots.get(&(procedure, slot)) != Some(expected)
+            {
+                return Err(invalid("persistent alias drops nominal identity"));
+            }
+        }
+    }
     let mut source_bytes = 0usize;
     let mut identities = BTreeSet::new();
     for s in &p.sources {

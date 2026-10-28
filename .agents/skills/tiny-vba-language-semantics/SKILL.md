@@ -9,8 +9,11 @@ New M1.1 adds explicit reference enum/constant binding under
 [ADR 0020](../../../docs/decisions/0020-explicit-host-reference-snapshots.md).
 Qualified type syntax preserves spans; registered enums use shared Long coercion
 and existing IR. Reference constants must obey scope, qualification and missing-
-reference rules in runtime expressions, defaults and bounds. Nominal object types
-remain explicitly unsupported; their assignment contract is the next M1.1 stage.
+reference rules in runtime expressions, defaults and bounds. Nominal objects now
+carry verified IR 5 metadata under ADR 0021. Preserve exact declared ByRef identity,
+typed temporaries and array tags through Variant/resize/Erase. Type checks use the
+host's read-only resolver, not Office definitions in the engine; legacy IR rejects
+nominal metadata. Calls/edits/restores must not bypass the shared validation path.
 
 Read [architecture](../../../docs/architecture.md) and the relevant sections of the
 [interpreter specification](../../../docs/vba-interpreter-rust-implementation-spec.md).

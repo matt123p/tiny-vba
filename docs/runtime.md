@@ -208,3 +208,16 @@ The current profile includes required typed whole-array ByRef parameters, positi
 Option Base and qualified VBA.Array, and source-order named array-reference capture under IR 3.
 Host writeback checks all scalar representation tags and declared array element kinds before commit.
 Historical matrices below/above do not override [the current contract](m4-language.md).
+# Nominal host types (new M1.1)
+
+[ADR 0021](decisions/0021-nominal-host-object-types.md) adds explicitly gated IR 5
+nominal metadata to the existing runtime profile. Embeddings supply a read-only
+`ObjectTypeResolver` over their existing object model via
+`Session::new_with_type_resolver`. Plain `Session::new` retains empty-resolver
+behavior; typed Nothing values work, non-Nothing nominal values require a provider.
+Typed scalar/array storage, aliases, temporaries, results, host writebacks and
+debugger edits share checks. Handles include host/object/generation; wrong types
+fail with 13 and stale handles with 91. Query work/payload is budgeted; no Office
+object definitions, COM loader or duplicate registry are introduced. See
+[M1 acceptance](m1-host-references.md) for exact tests and remaining stages.
+

@@ -38,18 +38,41 @@ impl Ide {
                     m.procedures
                         .iter()
                         .all(|p| !p.name.eq_ignore_ascii_case(name))
-                }) && locals
-                    .iter()
-                    .all(|(local, _, _)| !local.eq_ignore_ascii_case(name))
+                }) && locals.iter().all(|(local, _, _)| {
+                    !local
+                        .to_ascii_lowercase()
+                        .starts_with(&name.to_ascii_lowercase())
+                })
             })
             .ok_or_else(|| error("Immediate entry namespace exhausted"))?;
+        let mut prologue = String::new();
         let parameters = locals
             .iter()
-            .map(|(name, _, _)| format!("ByVal {name} As Variant"))
-            .collect::<Vec<_>>()
+            .enumerate()
+            .map(|(index, (local, kind, value))| {
+                let nominal = self
+                    .session
+                    .as_ref()
+                    .ok_or_else(|| error("no paused session"))?
+                    .local_nominal_type(self.handle()?, local)?;
+                if let Some(ty) = nominal {
+                    let ty = format!("{}.{}", ty.library(), ty.name());
+                    if *kind == vba_values::ScalarKind::Variant {
+                        let snapshot = format!("{name}Snapshot{index}");
+                        prologue.push_str(&format!("Dim {local}() As {ty}\n"));
+                        if matches!(value, Value::Array(_)) {
+                            prologue.push_str(&format!("{local}={snapshot}\n"));
+                        }
+                        return Ok(format!("ByVal {snapshot} As Variant"));
+                    }
+                    return Ok(format!("ByVal {local} As {ty}"));
+                }
+                Ok(format!("ByVal {local} As Variant"))
+            })
+            .collect::<Result<Vec<_>>>()?
             .join(", ");
         let wrapper = format!(
-            "\nPrivate Function {name}({parameters}) As Variant\n{name} = {expression}\nEnd Function\n"
+            "\nPrivate Function {name}({parameters}) As Variant\n{prologue}{name} = {expression}\nEnd Function\n"
         );
         let active = self
             .active_module()
@@ -94,7 +117,7 @@ impl Ide {
                 self.roots.clone(),
             )?)
         };
-        let mut child = Session::new(
+        let mut child = Session::new_with_type_resolver(
             program,
             1,
             locals.into_iter().map(|(_, _, value)| value).collect(),
@@ -110,6 +133,7 @@ impl Ide {
                 callbacks: 0,
                 ..Limits::default()
             },
+            self.type_resolver.clone(),
         )?;
         loop {
             match child.run_slice(host, 256, &mut |_| Ok(false))? {

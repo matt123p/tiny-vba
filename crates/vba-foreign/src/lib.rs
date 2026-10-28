@@ -73,6 +73,17 @@ pub trait Host {
     fn resume(&mut self, token: u64) -> Reply;
     fn cancel(&mut self, token: u64);
 }
+/// Read-only, bounded type query over the embedding's existing object store.
+/// Implementations must check full handle identity/lifetime and never invoke VBA,
+/// properties, user code, IO or COM activation. No object registry is owned here.
+pub trait ObjectTypeResolver: std::fmt::Debug + Send + Sync {
+    fn identity(&self) -> u64;
+    fn supports_type(
+        &self,
+        object: ObjectRef,
+        expected: &vba_values::NominalType,
+    ) -> Result<bool, ForeignError>;
+}
 #[derive(Clone, Debug, PartialEq)]
 pub enum Outcome {
     Complete(Value),
