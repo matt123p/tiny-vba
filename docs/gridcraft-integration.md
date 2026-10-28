@@ -1,5 +1,74 @@
 # GridCraft integration work log
 
+## Desktop editor window and Excel entry points (2026-10-28, complete)
+
+User correction: desktop VBE should support a separate native window, with a
+separate embedded build/launch option for browser and desktop hosts. Remove the
+unrequested permanent VB/Macros quick-access launch buttons. Use Developer → Code
+→ Visual Basic/Macros, View → Macros → View Macros, Macro dialog → Edit, and
+Alt+F11/Alt+F8. Original user-assigned toolbar macros remain explicit customizations.
+
+Stages: inspect GridCraft's existing immediate viewport/window owner; add optional
+`vba-window` (implies `vba`) and per-launch selection while retaining `vba` embedded;
+keep one shared Ide/Bridge, workbook UI live in window mode, one root execution
+tick, focus/close/dirty-source safeguards; correct launch/menu/dialog surfaces;
+test both feature combinations, native viewport close/focus, browser fallback,
+keyboard and UI placement, then full gates and original rendered inspection.
+All changes remain on integration feature branches; GridCraft main is untouched.
+
+Public references consulted 2026-10-28, behavioral paraphrases only:
+https://support.microsoft.com/en-us/excel/create-custom-functions-in-excel
+(VBE opens separately),
+https://support.microsoft.com/en-us/excel/run-a-macro-in-excel
+(Developer Visual Basic/Macros and Edit/Step workflow),
+https://support.microsoft.com/en-us/office/vba/find-help-on-using-the-visual-basic-editor
+(Developer entry), and the previously recorded shortcut/Developer visibility pages.
+No tutorial code, screenshots or assets are copied. The shared egui immediate
+viewport API is inspected from its pinned local source; no API is invented.
+
+Acceptance: GridCraft commit `a3f7743485f1c9ae653d7c7019a1257123c04df3` on
+`feat/tiny-vba-integration`. `vba-window` implies `vba` and selects a separate
+native viewport in the desktop shell; `vba` alone embeds. Browser/headless hosts
+embed and have no native viewport fields. `vba.open {separateWindow: false}`
+overrides a window-enabled desktop; `true` requires the native feature/host.
+Repeated launch focuses the same editor, and changing presentation retains one
+Ide/Bridge. Root logic alone advances execution; breakpoint/failure transitions
+reveal the editor. OS editor close hides it, preserves dirty source and returns
+focus to its workbook. Existing project/workbook close guards remain enforced.
+
+Corrected UI: no permanent VB/Macros quick-access launch buttons; user-assigned
+toolbar macros remain. Developer Code exposes Visual Basic/Macros; Controls keeps
+Insert/Design Mode. File Options Customize Ribbon Main Tabs enables Developer.
+View Macros opens a selection list with Edit/Step Into/Run. Edit navigates to the
+selected module/procedure; Functions are excluded from the macro list and remain
+in Insert Function. Extra GridCraft assignment actions are explicitly collapsed.
+Blank workbooks no longer auto-load the demonstration macro; test fixtures request
+it explicitly. The shared editor source/project title identifies its workbook.
+
+Final evidence (ignored GridCraft `target/vba-window-*` logs): full ten-step CI
+passes **2,553 tests**; full window-enabled UI suite passes **1,150 tests**, including
+**21** VBA workflow cases and **four** nested native-viewport cases. The embedded
+workflow suite also passes. Tests cover selected-macro navigation, Step Into,
+options/menu/shortcut routes, empty source, host capability refusal, viewport
+focus/reuse/close, dirty source retention, embedded overrides, automatic breakpoint
+activation and no additional VM slice/host effects from child rendering. Strict
+all-target Clippy passes for both feature combinations. Real browser compilation
+and WASM compilation with `vba-window` selected both pass with embedded behavior.
+The real Windows app was built/run in a dedicated preferences-disabled smoke
+instance; distinct Book2 and Book2 — Visual Basic native windows were inspected,
+returning to the workbook preserved the editor project, and the instance was closed.
+Nine original light/dark/narrow snapshots were regenerated and visually inspected.
+One intermediate CI attempt encountered Windows' executable lock while this owned
+smoke process ran; closing it and rerunning the gate passed. No user process or
+workbook was stopped. No manual macOS/Linux or hosted CI result is claimed.
+
+tiny-vba product code/dependency pin is unchanged. Its own CI, WASM and actual WASI
+gates pass (`target/window-presentation-*`). Work stays on integration branches;
+neither main branch is merged by this stage. Launch from GridCraft with
+`cargo +1.99.1 run -p gridcraft --features vba-window` (separate desktop) or
+`cargo +1.99.1 run -p gridcraft --features vba` (embedded), then Developer →
+Visual Basic or Alt+F11. Feature/command details are in GridCraft `docs/vba.md`.
+
 ## Spreadsheet entry points continuation — complete for the selected profile
 
 User scope: editor launch, toolbar/menu commands, assigned worksheet buttons and

@@ -41,6 +41,14 @@ the correction record above supersedes this historical failure state.
 
 ## GridCraft integration — selected spreadsheet profile complete
 
+The 2026-10-28 desktop-window correction is complete in GridCraft `a3f77434`:
+separate native `vba-window` and embedded `vba` presentations share one project/VM;
+Excel-style Developer/View/Macro Edit routes replace permanent launch buttons.
+Full GridCraft CI (2,553 tests), optional window UI (1,150 tests), both feature
+lint/build paths and browser fallback pass. Native Windows windows and original
+snapshots were inspected. The [work log](gridcraft-integration.md) records exact
+evidence and remaining platform limits. Shared tiny-vba code is unchanged.
+
 GridCraft commit `b496325b` adds the requested editor/toolbar/menu/keyboard launch,
 assigned worksheet shapes and worksheet-callable Functions. Its full gate passes
 2,553 tests; the full optional UI suite passes 1,143 (18 VBA cases), and all 25
