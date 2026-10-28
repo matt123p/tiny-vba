@@ -1,5 +1,65 @@
 # GridCraft integration work log
 
+## Excel object-model audit (2026-10-28, complete for the exposed profile)
+
+Publication checked first: both feature branches are clean and pushed, GridCraft
+`a3f7743485f1c9ae653d7c7019a1257123c04df3` and tiny-vba
+`8f48057f9701d51b1c2309f92e17de19cbb98d12`. Main branches remain untouched.
+
+The goal is unchanged Excel workbook source. The existing adapter is a bounded
+subset, not that acceptance gate. Audit owners, argument signatures, return
+objects, default members, values, import and events against public Microsoft
+Learn references; keep independently authored executable regressions in GridCraft.
+Correct confirmed adapter mismatches there, then run native/WASM and repository
+gates before publishing the feature branch. Record remaining blockers explicitly
+in a fork-owned compatibility matrix; do not represent preservation of a binary
+project as successful execution or binary source writeback.
+
+Initial findings: Workbook incorrectly accepts Application-only Range/Cells and
+ActiveWorkbook/ThisWorkbook; Worksheet.Range lacks optional Cell2 (including
+Range-object endpoints); Worksheets requires an index rather than returning a
+collection; Cells lacks no-argument/one-index forms. Range.Value currently follows
+Value2 despite Excel's format-based Currency/Date distinction. Executable
+document/class modules, events and general default-member behavior remain major
+unchanged-workbook blockers. Public documentation is behavior reference only;
+no Office implementation, tutorial code, vendor asset or external fixture adopted.
+
+Published GridCraft `97123e580deb309329668a994ebc6004030e1a86` on
+`feat/tiny-vba-integration`: corrected Workbook member ownership; same-sheet,
+two-endpoint Worksheet.Range with strings/Range handles and named Cell1/Cell2;
+Application/Parent links; Range.Worksheet, Row, Column and Count. Typed native
+host calls and engine mutation/undo/recalc ownership remain unchanged. Endpoint
+validation covers stale/foreign/wrong-type/cross-sheet handles and resource bounds.
+Updated completion metadata and fixed an optional window test initializer lint.
+
+The fork's [compatibility matrix](https://github.com/matt123p/gridcraft/blob/97123e580deb309329668a994ebc6004030e1a86/docs/vba-excel-compatibility.md)
+records every exposed dispatch area, value/import/UDF paths, public references,
+unsupported behavior and ordered stages. Most urgent: generic host types/default
+members and collection binding in tiny-vba, with Excel types/constants/objects in
+GridCraft. Independently authored refusal tests confirm that `As Worksheet` and
+`As Excel.Range` fail compilation and pin collection/Cells/Address gaps. These
+passing refusal checks are not workbook compatibility passes. Events/document
+modules, value coercion, references, controls and binary writeback still block
+general unchanged Excel workbooks; this audit does not close that larger goal.
+
+Final validation: GridCraft full `cargo +1.99.1 xtask ci` passes all ten gates,
+2,557 tests; all 29 adapter tests pass natively and in actual Node-hosted WASM;
+all 1,150 optional window UI tests and strict all-target adapter/window Clippy
+pass. Native tests use the existing pinned craft-fonts input and serial execution.
+Tiny-vba `cargo xtask ci` passes (237 tests), `cargo xtask wasm` and `cargo xtask
+wasm-run` pass (67 execution tests). Product pin remains `ea38c3f`; no shared
+runtime code changed. Logs stay ignored under each repository's
+`target/vba-audit-*.log`. Corpus validation checked seven pins with 0/646 external
+candidate hashes available; no new external corpus run or fresh Excel oracle
+observation is claimed. Only public Microsoft Learn behavior references were
+used, with original tests/implementation and no downloaded code/assets/fixtures.
+
+Next smallest stage: design generic host type/default-member and collection
+semantics, then prove unchanged typed Excel declaration and Worksheets/Range Item
+source in fork tests. Keep language mechanisms in tiny-vba and Office behavior
+in GridCraft; retain separate pinned Git dependencies and explicit unsupported
+errors. Both feature branches are published; neither main branch was changed.
+
 ## Desktop editor window and Excel entry points (2026-10-28, complete)
 
 User correction: desktop VBE should support a separate native window, with a
