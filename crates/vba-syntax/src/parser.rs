@@ -786,8 +786,26 @@ impl Parser<'_> {
         Ok(body)
     }
     fn for_statement(&mut self, start: Span, mut site: StatementSite) -> PResult<Statement> {
-        if self.at("Each") {
-            return Err(self.unsupported("For Each"));
+        if self.eat("Each") {
+            let counter = self.name()?;
+            self.require("In")?;
+            let group = self.expr(0)?;
+            site.span = self.span(start)?;
+            self.boundary()?;
+            let body = self.block()?;
+            let next_start = self.require("Next")?.span;
+            let next_counter = if self.end() { None } else { Some(self.name()?) };
+            let next = self.site(self.span(next_start)?)?;
+            return Ok(Statement {
+                site,
+                kind: StatementKind::ForEach(Box::new(ForEachLoop {
+                    counter,
+                    group,
+                    body,
+                    next,
+                    next_counter,
+                })),
+            });
         }
         let counter = self.name()?;
         self.require("=")?;

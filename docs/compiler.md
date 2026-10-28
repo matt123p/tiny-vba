@@ -1,5 +1,5 @@
 Current compiler additions are in [the M4 language contract](m4-language.md) and
-[ADR 0012](decisions/0012-m4-oracle-acceptance.md); current default target is ir5-structural:
+[ADR 0012](decisions/0012-m4-oracle-acceptance.md); current default target is ir6-structural:
 IR 1/2 remain supported. Array parameter/layout metadata, ParamArray packing and named reference
 capture are checked before execution. The historical M2/M4-first-slice restrictions below are
 superseded only by those explicitly documented additions.
@@ -166,3 +166,26 @@ retain Let/Set. Source foreign arguments are ByVal or omitted with names preserv
 snapshot descriptors are verified/tested separately. Nested/default/indexed property ambiguity and
 implicit Office globals remain unsupported. These sites need explicit embedding permissions at
 runtime. See [M3 contract](runtime.md); runtime operations never enter the compiler layer.
+
+## New M1.2/M1.3: unnamed members and collection loops
+
+ADR 0022 adds IR 6 features `default-members-v6` and `enumeration-v6`.
+Object applications preserve the target and argument list, including nested
+applications, named/omitted operands and native ByRef snapshots. Explicit property
+writes retain Let/Set and parameter lists. The reserved `$value` argument carries
+the assignment operand after named indexes; `$target` is internal VM metadata and
+is removed before host dispatch. Older profiles reject these operations.
+
+Object-reference evaluation is separate from value evaluation. Assignments,
+operators, conditions and scalar intrinsic/ByVal parameter contexts resolve an
+object's default Get; Set and object/Variant parameter contexts retain identity.
+Default-property ByRef arguments are temporaries; dynamically typed array element
+arguments retain canonical aliases and exact declared-kind checks.
+
+`For Each control In group` evaluates its group once. Controls are Variant or
+Object/registered object types, and arrays require Variant. Nested loops cannot
+reuse a control; matching Next names and Exit For are checked. Verified init,
+advance and cleanup instructions retain source/Next checkpoints. Native arrays
+use live element reads; host collection enumeration uses a bounded owned snapshot.
+See [implementation and evidence](m1-defaults-and-collections.md). Earlier
+historical restrictions on default/collection syntax above are superseded here.

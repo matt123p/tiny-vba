@@ -1,6 +1,6 @@
 # M3/M4 runtime and debugger
 
-Implemented 2026-10-26, extended by new M1.1. The current consumer is `m5-host-v1`, using verified IR 1/2/3/4/5.
+Implemented 2026-10-26, extended by new M1.1. The current consumer is `m5-host-v1`, using verified IR 1/2/3/4/5/6.
 The [M4 language contract](m4-language.md) and [ADR 0011](decisions/0011-m4-language-extension.md)
 define scalar coercions, arrays, arguments, persistent state, builtins and VBA handlers.
 [ADR 0013](decisions/0013-m5-host-contract.md) adds the versioned native host protocol and hidden
@@ -220,3 +220,31 @@ debugger edits share checks. Handles include host/object/generation; wrong types
 fail with 13 and stale handles with 91. Query work/payload is budgeted; no Office
 object definitions, COM loader or duplicate registry are introduced. See
 [M1 acceptance](m1-host-references.md) for exact tests and remaining stages.
+
+## New M1.2/M1.3 execution contract (ADR 0022)
+
+Explicit unnamed Get/Let/Set and Enumerate calls use an empty member string.
+Named calls still require a bounded nonempty name. Primitive value resolution,
+dynamic native array access and primitive Variant assignment bypass the host.
+Effectful defaults require an explicit permitted site and consume ordinary host,
+instruction, polling and payload budgets. Recursive object defaults revisit only
+the resolution instruction, never the completed target/index expressions.
+Wait/resume/cancel uses the existing foreign continuation. Safe Watch evaluation
+does not invoke a default property or enumerate a host object.
+
+IR 6 permits identical aliased foreign snapshots with last-write order after
+precommit validation; earlier IR preserves its refusal. This snapshot ABI does
+not pretend to provide a live shared document borrow. Assignment intent and
+Missing/named values are preserved; `$value` identifies a property assignment
+operand independently of positional/named index operands.
+
+Enumerate returns an owned VbaArray (at most 65,536 elements and its existing
+payload bound). Native arrays use their original canonical location for live
+reads, including writes made through aliases and paused element edits. Whole
+array replacement, ReDim and Erase while iterating fail with error 10; loop
+bookkeeping work shares a bounded enumeration-work counter. Each frame has at
+most 64 cursors. Next without initialized iteration fails with error 92.
+Source-region bounds release cursors when jumping outside the loop; active
+error handlers retain them until Resume. Exit/return/unwind/reset/cancel drops
+owned snapshots; no additional external iterator tokens or document locks exist.
+Paused element edits use canonical element locations and retain nominal checks.

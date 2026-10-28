@@ -166,3 +166,13 @@ application dependency enters tiny-vba.
 [ADR 0020](decisions/0020-explicit-host-reference-snapshots.md) adds no dependency,
 IR version or host invocation ABI; [the stage log](m1-host-references.md) records
 remaining work and execution evidence.
+
+## Default members and iteration (ADR 0022)
+
+IR 6 adds generic unnamed invocation intent and verified enumeration instructions.
+Syntax/semantics/compiler own source binding and value/reference contexts; the VM
+owns bounded cursors, canonical native array reads and continuation cleanup.
+vba-foreign carries native arguments and bounded snapshot replies. The existing
+crate DAG is unchanged. Hosts exclusively own default-member selection, collection
+objects, signatures, ordering, lifetimes and document effects. No Office object
+definition, registry, package IO or application dependency enters tiny-vba.

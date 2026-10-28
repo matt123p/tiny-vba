@@ -120,3 +120,8 @@ CI/WASM gates for affected UI changes. Keep accessibility checks enabled; render
 light/dark/narrow/scaled/host-theme/focus output. No downloaded reference evidence enters Git:
 .cache/evidence/ is ignored and provenance/notices/pins are verified. Do not claim full C0/C1,
 Office event/workbook, Set Next Statement or unsafe evaluation support from standalone UI evidence.
+
+ADR 0022 adds IR 6 generic default invocation/value contexts and bounded For Each.
+Read docs/m1-defaults-and-collections.md and the current compiler/runtime contract.
+Office defaults, collections and signatures remain fork-owned. Preserve safe
+watch evaluation, canonical array aliases, resize locks and wait/cancel semantics.

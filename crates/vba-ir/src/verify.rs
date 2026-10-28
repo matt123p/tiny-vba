@@ -122,7 +122,7 @@ fn validate(
 ) -> Result<Vec<u32>> {
     if !matches!(
         p.ir_version,
-        IR_VERSION | IR2_VERSION | IR3_VERSION | IR4_VERSION | IR5_VERSION
+        IR_VERSION | IR2_VERSION | IR3_VERSION | IR4_VERSION | IR5_VERSION | IR6_VERSION
     ) || p.profile != caps.profile
         || !caps.ir_versions.contains(&p.ir_version)
     {
@@ -504,7 +504,57 @@ fn validate(
         }
         for site in &proc.foreign {
             feature(p, caps, "foreign-snapshot-v1")?;
-            name(&site.member)?;
+            let implicit = matches!(
+                site.kind,
+                ForeignKind::DefaultGet
+                    | ForeignKind::DefaultLet
+                    | ForeignKind::DefaultSet
+                    | ForeignKind::AssignValue
+                    | ForeignKind::ArgumentGet
+                    | ForeignKind::ValueGet
+                    | ForeignKind::Enumerate
+                    | ForeignKind::EnumerateObjects
+            );
+            if implicit {
+                if p.ir_version < IR6_VERSION || !site.member.is_empty() {
+                    return Err(invalid("invalid implicit member contract"));
+                }
+                feature(
+                    p,
+                    caps,
+                    if matches!(
+                        site.kind,
+                        ForeignKind::Enumerate | ForeignKind::EnumerateObjects
+                    ) {
+                        "enumeration-v6"
+                    } else {
+                        "default-members-v6"
+                    },
+                )?;
+                if matches!(
+                    site.kind,
+                    ForeignKind::ValueGet | ForeignKind::Enumerate | ForeignKind::EnumerateObjects
+                ) && !site.arguments.is_empty()
+                {
+                    return Err(invalid("implicit operation takes no arguments"));
+                }
+            } else {
+                name(&site.member)?;
+            }
+            if matches!(site.kind, ForeignKind::ArgumentGet) != site.result_reference.is_some() {
+                return Err(invalid("default argument result mode"));
+            }
+            if let Some(slot) = site.result_reference
+                && !matches!(
+                    proc.locals.get(slot.0 as usize),
+                    Some(Local {
+                        role: SlotRole::Scratch,
+                        ..
+                    })
+                )
+            {
+                return Err(invalid("default argument temporary"));
+            }
             budget.text(&site.member)?;
             bound(site.arguments.len(), 256)?;
             budget.table(site.arguments.len())?;
@@ -647,6 +697,79 @@ fn procedure(
         }
         let active_id = active.ok_or_else(|| invalid("missing checkpoint"))?;
         match instruction {
+            Instruction::EnumerationInit {
+                state,
+                source,
+                start,
+                end,
+            } => {
+                feature(p, caps, "enumeration-v6")?;
+                if p.ir_version < IR6_VERSION
+                    || start >= end
+                    || !matches!(
+                        proc.locals.get(state.0 as usize),
+                        Some(Local {
+                            kind: ScalarKind::Variant,
+                            role: SlotRole::Scratch,
+                            ..
+                        })
+                    )
+                {
+                    return Err(invalid("enumeration state or region"));
+                }
+                let active = proc
+                    .checkpoints
+                    .get(active_id.0 as usize)
+                    .ok_or_else(|| invalid("enumeration checkpoint"))?;
+                if *start != active.span.start() || *end > proc.declaration.end() {
+                    return Err(invalid("enumeration source region"));
+                }
+                if let Some(slot) = source
+                    && proc.locals.get(slot.0 as usize).is_none()
+                {
+                    return Err(invalid("enumeration source"));
+                }
+                value(&mut stack)?;
+            }
+            Instruction::EnumerationNext { state, control } => {
+                feature(p, caps, "enumeration-v6")?;
+                if p.ir_version < IR6_VERSION
+                    || !matches!(
+                        proc.locals.get(state.0 as usize),
+                        Some(Local {
+                            kind: ScalarKind::Variant,
+                            role: SlotRole::Scratch,
+                            ..
+                        })
+                    )
+                    || !matches!(
+                        proc.locals.get(control.0 as usize),
+                        Some(Local {
+                            kind: ScalarKind::Variant | ScalarKind::Object,
+                            array: None,
+                            ..
+                        })
+                    )
+                {
+                    return Err(invalid("enumeration locals"));
+                }
+                stack.push(Stack::Value);
+            }
+            Instruction::EnumerationEnd(state) => {
+                feature(p, caps, "enumeration-v6")?;
+                if p.ir_version < IR6_VERSION
+                    || !matches!(
+                        proc.locals.get(state.0 as usize),
+                        Some(Local {
+                            kind: ScalarKind::Variant,
+                            role: SlotRole::Scratch,
+                            ..
+                        })
+                    )
+                {
+                    return Err(invalid("enumeration state"));
+                }
+            }
             Instruction::SaveReference(slot) | Instruction::LoadReference(slot) => {
                 if p.ir_version < IR3_VERSION {
                     return Err(invalid("reference capture requires IR 3"));
@@ -944,7 +1067,16 @@ fn procedure(
                     }
                 }
                 value(&mut stack)?;
-                stack.push(Stack::Value);
+                if let Some(slot) = site.result_reference {
+                    stack.push(Stack::Reference(
+                        proc.locals
+                            .get(slot.0 as usize)
+                            .ok_or_else(|| invalid("argument result slot"))?
+                            .kind,
+                    ));
+                } else {
+                    stack.push(Stack::Value);
+                }
             }
             Instruction::Stop => {
                 feature(p, caps, "debug-stop")?;

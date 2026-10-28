@@ -37,7 +37,7 @@ impl Default for CompileOptions {
             imports: Vec::new(),
             entry: "Answer".into(),
             revision: "source-1".into(),
-            capabilities: ir::Capabilities::ir5_structural(),
+            capabilities: ir::Capabilities::ir6_structural(),
             limits: ir::VerifyLimits::default(),
         }
     }
@@ -222,7 +222,9 @@ pub fn compile_modules(
     }
     let mut ir = ir::Program {
         nominal_locals,
-        ir_version: if features.iter().any(|f| f.ends_with("-v5")) {
+        ir_version: if features.iter().any(|f| f.ends_with("-v6")) {
+            ir::IR6_VERSION
+        } else if features.iter().any(|f| f.ends_with("-v5")) {
             ir::IR5_VERSION
         } else if features.iter().any(|f| f.ends_with("-v4")) {
             ir::IR4_VERSION
@@ -376,7 +378,8 @@ impl Builder<'_> {
                         self.statement(*end)?;
                     }
                 }
-                bound::StatementKind::For { body, next, .. } => {
+                bound::StatementKind::For { body, next, .. }
+                | bound::StatementKind::ForEach { body, next, .. } => {
                     self.record(body)?;
                     self.statement(*next)?;
                 }
@@ -501,6 +504,57 @@ impl Builder<'_> {
                 (position, arg)
             };
             let arg = match arg {
+                bound::Argument::DefaultReference {
+                    value,
+                    kind,
+                    nominal,
+                } => {
+                    let bound::ExprKind::Foreign {
+                        target,
+                        member,
+                        arguments,
+                        ..
+                    } = &value.kind
+                    else {
+                        return Err(error("default argument invariant"));
+                    };
+                    let temporary = self.scratch(*kind)?;
+                    if let Some(ty) = nominal {
+                        push(
+                            self.nominal_locals,
+                            ir::NominalLocal {
+                                procedure: self.procedure,
+                                slot: ir::LocalSlot(idx(temporary)?),
+                                ty: ty.clone(),
+                            },
+                        )?;
+                        self.feature("nominal-objects-v5");
+                    }
+                    self.foreign(
+                        block,
+                        target,
+                        bound::ForeignKind::ArgumentGet,
+                        member,
+                        arguments,
+                    )?;
+                    self.blocks
+                        .get_mut(block)
+                        .and_then(|b| b.foreign.last_mut())
+                        .ok_or_else(|| error("argument site"))?
+                        .1
+                        .result_reference = Some(ir::LocalSlot(idx(temporary)?));
+                    let capture_slot = self.scratch(*kind)?;
+                    self.locals
+                        .get_mut(capture_slot)
+                        .ok_or_else(|| error("capture local"))?
+                        .role = ir::SlotRole::ScratchReference;
+                    self.feature("argument-captures-v3");
+                    self.emit(
+                        block,
+                        ir::Instruction::SaveReference(ir::LocalSlot(idx(capture_slot)?)),
+                    )?;
+                    bound::Argument::CapturedReference(capture_slot)
+                }
                 bound::Argument::Element {
                     slot,
                     indices,
@@ -643,12 +697,39 @@ impl Builder<'_> {
         args: &[bound::ForeignArgument],
     ) -> Result<()> {
         self.feature("foreign-snapshot-v1");
+        if matches!(
+            kind,
+            bound::ForeignKind::Enumerate | bound::ForeignKind::EnumerateObjects
+        ) {
+            self.feature("enumeration-v6");
+        } else if matches!(
+            kind,
+            bound::ForeignKind::DefaultGet
+                | bound::ForeignKind::DefaultLet
+                | bound::ForeignKind::DefaultSet
+                | bound::ForeignKind::AssignValue
+                | bound::ForeignKind::ArgumentGet
+                | bound::ForeignKind::ValueGet
+        ) {
+            self.feature("default-members-v6");
+        }
         self.expr(block, target)?;
         let mut arguments = Vec::new();
         for arg in args {
             let mode = if let Some(value) = &arg.value {
-                self.expr(block, value)?;
-                ir::ArgumentMode::Value
+                if arg.reference
+                    && let bound::ExprKind::Local(slot) = value.kind
+                    && self
+                        .locals
+                        .get(slot)
+                        .is_some_and(|l| l.role != ir::SlotRole::HostRoot)
+                {
+                    self.emit(block, ir::Instruction::RefLocal(ir::LocalSlot(idx(slot)?)))?;
+                    ir::ArgumentMode::Reference
+                } else {
+                    self.expr(block, value)?;
+                    ir::ArgumentMode::Value
+                }
             } else {
                 ir::ArgumentMode::Omitted
             };
@@ -661,7 +742,37 @@ impl Builder<'_> {
                 },
             )?;
         }
+        if matches!(
+            kind,
+            bound::ForeignKind::DefaultLet
+                | bound::ForeignKind::DefaultSet
+                | bound::ForeignKind::AssignValue
+                | bound::ForeignKind::ArgumentGet
+        ) && let bound::ExprKind::Local(slot) = target.kind
+            && self
+                .locals
+                .get(slot)
+                .is_some_and(|l| l.role != ir::SlotRole::HostRoot)
+        {
+            self.emit(block, ir::Instruction::RefLocal(ir::LocalSlot(idx(slot)?)))?;
+            push(
+                &mut arguments,
+                ir::Argument {
+                    mode: ir::ArgumentMode::Reference,
+                    name: Some("$target".into()),
+                    parameter: None,
+                },
+            )?;
+        }
         let kind = match kind {
+            bound::ForeignKind::DefaultGet => ir::ForeignKind::DefaultGet,
+            bound::ForeignKind::DefaultLet => ir::ForeignKind::DefaultLet,
+            bound::ForeignKind::DefaultSet => ir::ForeignKind::DefaultSet,
+            bound::ForeignKind::ArgumentGet => ir::ForeignKind::ArgumentGet,
+            bound::ForeignKind::AssignValue => ir::ForeignKind::AssignValue,
+            bound::ForeignKind::ValueGet => ir::ForeignKind::ValueGet,
+            bound::ForeignKind::Enumerate => ir::ForeignKind::Enumerate,
+            bound::ForeignKind::EnumerateObjects => ir::ForeignKind::EnumerateObjects,
             bound::ForeignKind::Call => ir::ForeignKind::Call,
             bound::ForeignKind::Get => ir::ForeignKind::Get,
             bound::ForeignKind::Let => ir::ForeignKind::Let,
@@ -678,6 +789,7 @@ impl Builder<'_> {
             (
                 pc,
                 ir::ForeignSite {
+                    result_reference: None,
                     checkpoint: ir::SiteId(0),
                     kind,
                     member: member.into(),
@@ -897,6 +1009,73 @@ impl Builder<'_> {
                     false_target = header;
                 }
                 Ok(false_target)
+            }
+            bound::StatementKind::ForEach {
+                counter,
+                group,
+                body,
+                next: next_site,
+            } => {
+                self.feature("enumeration-v6");
+                let state = ir::LocalSlot(idx(self.scratch(ScalarKind::Variant)?)?);
+                let cleanup = self.block(*next_site, ir::SiteRole::LoopAdvance, false)?;
+                self.emit(cleanup, ir::Instruction::EnumerationEnd(state))?;
+                self.jump(cleanup, next)?;
+                let advance = self.block(*next_site, ir::SiteRole::LoopAdvance, true)?;
+                let test = self.block(site, ir::SiteRole::LoopTest, false)?;
+                let body = self.sequence(body, advance, Some(cleanup), exit)?;
+                self.emit(
+                    test,
+                    ir::Instruction::EnumerationNext {
+                        state,
+                        control: ir::LocalSlot(idx(*counter)?),
+                    },
+                )?;
+                self.emit(
+                    test,
+                    ir::Instruction::Branch {
+                        if_true: ir::Pc(idx(body)?),
+                        if_false: ir::Pc(idx(cleanup)?),
+                    },
+                )?;
+                self.jump(advance, test)?;
+                let init = self.block(site, ir::SiteRole::LoopInit, true)?;
+                let object_control = self
+                    .locals
+                    .get(*counter)
+                    .is_some_and(|l| l.kind == ScalarKind::Object);
+                self.foreign(
+                    init,
+                    group,
+                    if object_control {
+                        bound::ForeignKind::EnumerateObjects
+                    } else {
+                        bound::ForeignKind::Enumerate
+                    },
+                    "",
+                    &[],
+                )?;
+                self.emit(
+                    init,
+                    ir::Instruction::EnumerationInit {
+                        state,
+                        source: if let bound::ExprKind::Local(slot) = group.kind {
+                            Some(ir::LocalSlot(idx(slot)?))
+                        } else {
+                            None
+                        },
+                        start: site.span.start(),
+                        end: next_site.span.end(),
+                    },
+                )?;
+                self.jump(init, test)?;
+                for id in [init, test, advance] {
+                    self.blocks
+                        .get_mut(id)
+                        .ok_or_else(|| error("enumeration block"))?
+                        .resume = Some(cleanup);
+                }
+                Ok(init)
             }
             bound::StatementKind::For {
                 counter,

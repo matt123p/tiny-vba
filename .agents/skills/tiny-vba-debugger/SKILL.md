@@ -88,3 +88,8 @@ Checkpoint inspection must reject foreign/stale/permitted visits; conditional wa
 and visibly disable on budget exhaustion. Relocation rejects branches/handlers/faults/ancestor frames
 and invalidates the old pause without execution. DAP wraps vba-ide, not a second session controller;
 JSON is optional transport only. Run native/WASI protocol tests and CLI subprocess lifecycle tests.
+
+ADR 0022 adds IR 6 generic default invocation/value contexts and bounded For Each.
+Read docs/m1-defaults-and-collections.md and the current compiler/runtime contract.
+Office defaults, collections and signatures remain fork-owned. Preserve safe
+watch evaluation, canonical array aliases, resize locks and wait/cancel semantics.

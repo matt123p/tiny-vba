@@ -132,6 +132,7 @@ pub enum StatementKind {
         single_line: bool,
         end: Option<StatementSite>,
     },
+    ForEach(Box<ForEachLoop>),
     For(Box<ForLoop>),
     Exit(ExitKind),
     Stop,
@@ -187,6 +188,15 @@ pub enum ExprKind {
         target: Box<Expr>,
         arguments: Vec<Argument>,
     },
+}
+
+#[derive(Clone, Debug)]
+pub struct ForEachLoop {
+    pub counter: Name,
+    pub group: Expr,
+    pub body: Vec<Statement>,
+    pub next: StatementSite,
+    pub next_counter: Option<Name>,
 }
 
 #[derive(Clone, Debug)]

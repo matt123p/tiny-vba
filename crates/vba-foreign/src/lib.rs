@@ -9,6 +9,10 @@ use vba_values::{Location, Locations, ObjectRef, Value};
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum InvokeKind {
+    DefaultGet,
+    DefaultLet,
+    DefaultSet,
+    Enumerate,
     Call,
     Get,
     Let,
@@ -128,7 +132,14 @@ impl Session {
         if invocation.target.host != host.identity() {
             return Err(protocol("target belongs to another host"));
         }
-        if invocation.member.is_empty()
+        if (invocation.member.is_empty()
+            != matches!(
+                invocation.kind,
+                InvokeKind::DefaultGet
+                    | InvokeKind::DefaultLet
+                    | InvokeKind::DefaultSet
+                    | InvokeKind::Enumerate
+            ))
             || invocation.member.len() > 256
             || invocation.arguments.len() > 256
         {

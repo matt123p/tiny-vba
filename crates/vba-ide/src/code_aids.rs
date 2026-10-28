@@ -68,6 +68,7 @@ pub(crate) fn symbols(module: &vba_syntax::Module) -> Vec<Symbol> {
                         pending.push(otherwise);
                     }
                     StatementKind::For(f) => pending.push(&f.body),
+                    StatementKind::ForEach(f) => pending.push(&f.body),
                     _ => {}
                 }
             }

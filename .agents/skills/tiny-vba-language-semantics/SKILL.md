@@ -99,3 +99,8 @@ Read [the report](../../../docs/m4-oracle-report.md) and current language contra
 plus 153 inherited upstream-reported Excel Mac scenarios PASS. Schema 2 and the reviewed allowlist
 preserve raw results/environment/hashes; no fresh Office run is claimed. Use m5-host-v1
 and explicit IR 3/4 capabilities, retaining IR 1/2 refusal rules. Unselected external cases remain NOT_RUN.
+
+ADR 0022 adds IR 6 generic default invocation/value contexts and bounded For Each.
+Read docs/m1-defaults-and-collections.md and the current compiler/runtime contract.
+Office defaults, collections and signatures remain fork-owned. Preserve safe
+watch evaluation, canonical array aliases, resize locks and wait/cancel semantics.

@@ -29,7 +29,10 @@ pub const IR2_VERSION: u32 = 2;
 pub const IR3_VERSION: u32 = 3;
 pub const IR4_VERSION: u32 = 4;
 pub const IR5_VERSION: u32 = 5;
-pub const FEATURES: [&str; 17] = [
+pub const IR6_VERSION: u32 = 6;
+pub const FEATURES: [&str; 19] = [
+    "default-members-v6",
+    "enumeration-v6",
     "nominal-objects-v5",
     "scalar-core",
     "host-roots-v4",
@@ -99,6 +102,9 @@ pub const BINARY_OPS: [BinaryOp; 19] = [
 ];
 #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
 pub enum Opcode {
+    EnumerationInit,
+    EnumerationNext,
+    EnumerationEnd,
     SaveReference,
     LoadReference,
     RefElement,
@@ -128,7 +134,10 @@ pub enum Opcode {
     Stop,
     Return,
 }
-pub const OPCODES: [Opcode; 28] = [
+pub const OPCODES: [Opcode; 31] = [
+    Opcode::EnumerationInit,
+    Opcode::EnumerationNext,
+    Opcode::EnumerationEnd,
     Opcode::SaveReference,
     Opcode::LoadReference,
     Opcode::Intrinsic,
@@ -166,6 +175,17 @@ pub enum AssignmentKind {
 }
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum Instruction {
+    EnumerationInit {
+        state: LocalSlot,
+        source: Option<LocalSlot>,
+        start: u32,
+        end: u32,
+    },
+    EnumerationNext {
+        state: LocalSlot,
+        control: LocalSlot,
+    },
+    EnumerationEnd(LocalSlot),
     SaveReference(LocalSlot),
     LoadReference(LocalSlot),
     RefElement {
@@ -222,6 +242,9 @@ pub enum Instruction {
 impl Instruction {
     pub fn opcode(&self) -> Opcode {
         match self {
+            Self::EnumerationInit { .. } => Opcode::EnumerationInit,
+            Self::EnumerationNext { .. } => Opcode::EnumerationNext,
+            Self::EnumerationEnd(_) => Opcode::EnumerationEnd,
             Self::SaveReference(_) => Opcode::SaveReference,
             Self::LoadReference(_) => Opcode::LoadReference,
             Self::RefElement { .. } => Opcode::RefElement,
@@ -332,6 +355,14 @@ pub struct CallSite {
 }
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum ForeignKind {
+    DefaultGet,
+    DefaultLet,
+    DefaultSet,
+    Enumerate,
+    ValueGet,
+    AssignValue,
+    ArgumentGet,
+    EnumerateObjects,
     Call,
     Get,
     Let,
@@ -339,6 +370,7 @@ pub enum ForeignKind {
 }
 #[derive(Clone, Debug)]
 pub struct ForeignSite {
+    pub result_reference: Option<LocalSlot>,
     pub checkpoint: SiteId,
     pub kind: ForeignKind,
     pub member: String,
@@ -450,14 +482,28 @@ impl Capabilities {
         caps
     }
     pub fn ir5_structural() -> Self {
+        let mut caps = Self::ir6_structural();
+        caps.profile = "ir5-structural".into();
+        caps.ir_versions.remove(&IR6_VERSION);
+        caps.features.retain(|f| !f.ends_with("-v6"));
+        caps.instructions.retain(|op| {
+            !matches!(
+                op,
+                Opcode::EnumerationInit | Opcode::EnumerationNext | Opcode::EnumerationEnd
+            )
+        });
+        caps
+    }
+    pub fn ir6_structural() -> Self {
         Self {
-            profile: "ir5-structural".into(),
+            profile: "ir6-structural".into(),
             ir_versions: BTreeSet::from([
                 IR_VERSION,
                 IR2_VERSION,
                 IR3_VERSION,
                 IR4_VERSION,
                 IR5_VERSION,
+                IR6_VERSION,
             ]),
             features: FEATURES.iter().map(|s| (*s).into()).collect(),
             instructions: OPCODES.into_iter().collect(),

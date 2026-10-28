@@ -937,12 +937,14 @@ impl Ide {
         let value = self.evaluate(expression)?;
         let handle = self.handle()?;
         let session = self.session.as_ref().ok_or_else(|| error("no session"))?;
-        let (name, value) =
+        let (name, indices, value) =
             evaluate::edit_target(name, value, &|name| session.read_local(handle, name))?;
-        self.session
-            .as_mut()
-            .ok_or_else(|| error("no session"))?
-            .edit_local(handle, &name, value)?;
+        let session = self.session.as_mut().ok_or_else(|| error("no session"))?;
+        if let Some(indices) = indices {
+            session.edit_array_element(handle, &name, &indices, value)?;
+        } else {
+            session.edit_local(handle, &name, value)?;
+        }
         self.refresh_watches();
         Ok(())
     }

@@ -62,6 +62,14 @@ pub struct Expr {
 }
 #[derive(Clone, Copy, Debug)]
 pub enum ForeignKind {
+    DefaultGet,
+    DefaultLet,
+    DefaultSet,
+    Enumerate,
+    ValueGet,
+    AssignValue,
+    ArgumentGet,
+    EnumerateObjects,
     Call,
     Get,
     Let,
@@ -69,6 +77,7 @@ pub enum ForeignKind {
 }
 #[derive(Clone, Debug)]
 pub struct ForeignArgument {
+    pub reference: bool,
     pub name: Option<String>,
     pub value: Option<Expr>,
 }
@@ -108,6 +117,11 @@ pub enum ExprKind {
 }
 #[derive(Clone, Debug)]
 pub enum Argument {
+    DefaultReference {
+        value: Expr,
+        kind: ScalarKind,
+        nominal: Option<vba_values::NominalType>,
+    },
     CapturedReference(usize),
     Element {
         slot: usize,
@@ -185,6 +199,12 @@ pub enum StatementKind {
         arms: Vec<IfArm>,
         otherwise: Vec<Statement>,
         end: Option<ast::StatementSite>,
+    },
+    ForEach {
+        counter: usize,
+        group: Expr,
+        body: Vec<Statement>,
+        next: ast::StatementSite,
     },
     For {
         counter: usize,
@@ -398,6 +418,12 @@ fn preflight(module: &ast::Module, budget: &mut Budget) -> Result<()> {
                         }
                     }
                     for st in otherwise {
+                        push(&mut pending, (Node::Statement(st), depth + 1), span)?;
+                    }
+                }
+                ast::StatementKind::ForEach(f) => {
+                    push(&mut pending, (Node::Expr(&f.group), depth + 1), span)?;
+                    for st in &f.body {
                         push(&mut pending, (Node::Statement(st), depth + 1), span)?;
                     }
                 }
@@ -717,6 +743,7 @@ pub fn bind_with_references(
             references,
             root_slots: BTreeMap::new(),
             loop_depth: 0,
+            loop_controls: BTreeSet::new(),
         };
         let mut local_names = BTreeSet::new();
         for param in &sig.parameters {
@@ -849,6 +876,7 @@ struct Binder<'a> {
     references: &'a vba_foreign::ReferenceSet,
     root_slots: BTreeMap<String, usize>,
     loop_depth: usize,
+    loop_controls: BTreeSet<usize>,
 }
 impl Binder<'_> {
     fn local(
@@ -950,6 +978,7 @@ impl Binder<'_> {
                     self.collect(otherwise, names)?;
                 }
                 ast::StatementKind::For(loop_) => self.collect(&loop_.body, names)?,
+                ast::StatementKind::ForEach(loop_) => self.collect(&loop_.body, names)?,
                 _ => (),
             }
         }
@@ -1112,7 +1141,7 @@ impl Binder<'_> {
                         .value
                         .as_ref()
                         .ok_or_else(|| err("ParamArray value", arg.span))?;
-                    push(&mut values, self.expr(value)?, arg.span)?;
+                    push(&mut values, self.value_expr(value)?, arg.span)?;
                 }
                 used.insert(index);
                 push(
@@ -1154,7 +1183,15 @@ impl Binder<'_> {
             }
             let bound = if let Some(expr) = &arg.value {
                 if param.by_val {
-                    Argument::Value(self.expr(expr)?)
+                    Argument::Value(
+                        if param.array.is_none()
+                            && !matches!(param.kind, ScalarKind::Object | ScalarKind::Variant)
+                        {
+                            self.value_expr(expr)?
+                        } else {
+                            self.expr(expr)?
+                        },
+                    )
                 } else if let ast::ExprKind::Name(name) = &expr.kind {
                     let slot = self.slot(name)?;
                     if self.locals.get(slot).is_none_or(|l| {
@@ -1167,7 +1204,15 @@ impl Binder<'_> {
                     Argument::Reference(slot)
                 } else {
                     let bound = self.expr(expr)?;
-                    if let ExprKind::Element {
+                    if matches!(&bound.kind,ExprKind::Foreign{kind:ForeignKind::DefaultGet,target,..} if matches!(target.kind,ExprKind::Local(_)))
+                        && matches!(expr.kind, ast::ExprKind::Apply { .. })
+                    {
+                        Argument::DefaultReference {
+                            value: bound,
+                            kind: param.kind,
+                            nominal: param.nominal.clone(),
+                        }
+                    } else if let ExprKind::Element {
                         slot,
                         indices,
                         kind,
@@ -1187,7 +1232,12 @@ impl Binder<'_> {
                     } else {
                         Argument::Temporary {
                             nominal: param.nominal.clone(),
-                            value: bound,
+                            value: if matches!(param.kind, ScalarKind::Object | ScalarKind::Variant)
+                            {
+                                bound
+                            } else {
+                                self.value_context(bound)
+                            },
                             kind: param.kind,
                         }
                     }
@@ -1350,6 +1400,7 @@ impl Binder<'_> {
             push(
                 &mut args,
                 ForeignArgument {
+                    reference: false,
                     name: arg.name.as_ref().map(|n| n.spelling.clone()),
                     value: arg.value.as_ref().map(|e| self.expr(e)).transpose()?,
                 },
@@ -1360,8 +1411,13 @@ impl Binder<'_> {
             push(
                 &mut args,
                 ForeignArgument {
-                    name: None,
-                    value: Some(self.expr(value)?),
+                    reference: false,
+                    name: Some("$value".into()),
+                    value: Some(if matches!(kind, ForeignKind::Set) {
+                        self.expr(value)?
+                    } else {
+                        self.value_expr(value)?
+                    }),
                 },
                 value.span,
             )?;
@@ -1375,6 +1431,92 @@ impl Binder<'_> {
                 arguments: args,
             },
         })
+    }
+    fn default_member(
+        &mut self,
+        target: &ast::Expr,
+        arguments: &[ast::Argument],
+        kind: ForeignKind,
+        extra: Option<&ast::Expr>,
+    ) -> Result<Expr> {
+        let bound_target = self.expr(target)?;
+        let mut args = Vec::new();
+        let mut names = BTreeSet::new();
+        for arg in arguments {
+            if let Some(name) = &arg.name {
+                if !names.insert(name.key()) {
+                    return Err(err("duplicate named argument", arg.span));
+                }
+            } else if !names.is_empty() {
+                return Err(err("positional argument after named", arg.span));
+            }
+            push(
+                &mut args,
+                ForeignArgument {
+                    reference: matches!(
+                        arg.value.as_ref().map(|e| &e.kind),
+                        Some(ast::ExprKind::Name(_))
+                    ),
+                    name: arg.name.as_ref().map(|n| n.spelling.clone()),
+                    value: arg.value.as_ref().map(|e| self.expr(e)).transpose()?,
+                },
+                arg.span,
+            )?;
+        }
+        if let Some(value) = extra {
+            // The assignment operand is not a positional source argument.
+            push(
+                &mut args,
+                ForeignArgument {
+                    reference: false,
+                    name: Some("$value".into()),
+                    value: Some(if matches!(kind, ForeignKind::DefaultSet) {
+                        self.expr(value)?
+                    } else {
+                        self.value_expr(value)?
+                    }),
+                },
+                value.span,
+            )?;
+        }
+        Ok(Expr {
+            span: target.span,
+            kind: ExprKind::Foreign {
+                target: Box::new(bound_target),
+                kind,
+                member: String::new(),
+                arguments: args,
+            },
+        })
+    }
+    fn value_expr(&mut self, source: &ast::Expr) -> Result<Expr> {
+        let value = self.expr(source)?;
+        Ok(self.value_context(value))
+    }
+    fn value_context(&self, value: Expr) -> Expr {
+        let needed = match &value.kind {
+            ExprKind::Local(slot) => self.locals.get(*slot).is_some_and(|l| {
+                l.array.is_none() && matches!(l.kind, ScalarKind::Object | ScalarKind::Variant)
+            }),
+            ExprKind::Foreign { .. } | ExprKind::Element { .. } => true,
+            ExprKind::Call { procedure, .. } => self.signatures.get(*procedure).is_some_and(|s| {
+                matches!(s.result, Some(ScalarKind::Object | ScalarKind::Variant))
+            }),
+            _ => false,
+        };
+        if needed {
+            Expr {
+                span: value.span,
+                kind: ExprKind::Foreign {
+                    target: Box::new(value),
+                    kind: ForeignKind::ValueGet,
+                    member: String::new(),
+                    arguments: vec![],
+                },
+            }
+        } else {
+            value
+        }
     }
     fn imported(
         &mut self,
@@ -1413,10 +1555,33 @@ impl Binder<'_> {
             kind: ExprKind::Local(slot),
         };
         let Some(member) = &import.member else {
-            if !args.is_empty() {
-                return Err(err("root object is not callable", span));
+            if args.is_empty() {
+                return Ok(target);
             }
-            return Ok(target);
+            let mut arguments = Vec::new();
+            for arg in args {
+                push(
+                    &mut arguments,
+                    ForeignArgument {
+                        reference: matches!(
+                            arg.value.as_ref().map(|e| &e.kind),
+                            Some(ast::ExprKind::Name(_))
+                        ),
+                        name: arg.name.as_ref().map(|n| n.spelling.clone()),
+                        value: arg.value.as_ref().map(|e| self.expr(e)).transpose()?,
+                    },
+                    arg.span,
+                )?;
+            }
+            return Ok(Expr {
+                span,
+                kind: ExprKind::Foreign {
+                    target: Box::new(target),
+                    kind: ForeignKind::DefaultGet,
+                    member: String::new(),
+                    arguments,
+                },
+            });
         };
         let mut arguments = Vec::new();
         let mut named = false;
@@ -1429,6 +1594,7 @@ impl Binder<'_> {
             push(
                 &mut arguments,
                 ForeignArgument {
+                    reference: false,
                     name: arg.name.as_ref().map(|n| n.spelling.clone()),
                     value: arg.value.as_ref().map(|e| self.expr(e)).transpose()?,
                 },
@@ -1540,7 +1706,27 @@ impl Binder<'_> {
                                 .value
                                 .as_ref()
                                 .ok_or_else(|| err("missing intrinsic argument", argument.span))?;
-                            push(&mut values, self.expr(value)?, argument.span)?;
+                            push(
+                                &mut values,
+                                if matches!(
+                                    function,
+                                    vba_values::Intrinsic::IsObject
+                                        | vba_values::Intrinsic::Array
+                                        | vba_values::Intrinsic::ArrayBaseOne
+                                        | vba_values::Intrinsic::IIf
+                                        | vba_values::Intrinsic::IsArray
+                                        | vba_values::Intrinsic::LBound
+                                        | vba_values::Intrinsic::UBound
+                                        | vba_values::Intrinsic::IsMissing
+                                        | vba_values::Intrinsic::VarType
+                                        | vba_values::Intrinsic::TypeName
+                                ) {
+                                    self.expr(value)?
+                                } else {
+                                    self.value_expr(value)?
+                                },
+                                argument.span,
+                            )?;
                         }
                         return Ok(Expr {
                             span: expr.span,
@@ -1553,7 +1739,7 @@ impl Binder<'_> {
                     return self.foreign(object, name, arguments, ForeignKind::Call, None);
                 }
                 let ast::ExprKind::Name(name) = &target.kind else {
-                    return Err(unsupported("member/default/array application", expr.span));
+                    return self.default_member(target, arguments, ForeignKind::DefaultGet, None);
                 };
                 if !self.symbols.contains_key(&name.key())
                     && let Some(import) = self
@@ -1565,10 +1751,7 @@ impl Binder<'_> {
                     return self.imported(&import, arguments, expr.span);
                 }
                 if let Some(Symbol::Local(slot)) = self.symbols.get(&name.key()).cloned()
-                    && let Some(kind) = self.locals.get(slot).and_then(|l| {
-                        l.array
-                            .or((l.kind == ScalarKind::Variant).then_some(ScalarKind::Variant))
-                    })
+                    && let Some(kind) = self.locals.get(slot).and_then(|l| l.array)
                 {
                     return Ok(Expr {
                         span: expr.span,
@@ -1578,6 +1761,14 @@ impl Binder<'_> {
                             indices: self.indices(arguments, expr.span)?,
                         },
                     });
+                }
+                if let Some(Symbol::Local(slot)) = self.symbols.get(&name.key())
+                    && self
+                        .locals
+                        .get(*slot)
+                        .is_some_and(|l| matches!(l.kind, ScalarKind::Object | ScalarKind::Variant))
+                {
+                    return self.default_member(target, arguments, ForeignKind::DefaultGet, None);
                 }
                 if !self
                     .lookup
@@ -1604,7 +1795,27 @@ impl Binder<'_> {
                             .value
                             .as_ref()
                             .ok_or_else(|| err("intrinsic argument missing", argument.span))?;
-                        push(&mut values, self.expr(value)?, argument.span)?;
+                        push(
+                            &mut values,
+                            if matches!(
+                                function,
+                                vba_values::Intrinsic::IsObject
+                                    | vba_values::Intrinsic::Array
+                                    | vba_values::Intrinsic::ArrayBaseOne
+                                    | vba_values::Intrinsic::IIf
+                                    | vba_values::Intrinsic::IsArray
+                                    | vba_values::Intrinsic::LBound
+                                    | vba_values::Intrinsic::UBound
+                                    | vba_values::Intrinsic::IsMissing
+                                    | vba_values::Intrinsic::VarType
+                                    | vba_values::Intrinsic::TypeName
+                            ) {
+                                self.expr(value)?
+                            } else {
+                                self.value_expr(value)?
+                            },
+                            argument.span,
+                        )?;
                     }
                     return Ok(Expr {
                         span: expr.span,
@@ -1634,7 +1845,7 @@ impl Binder<'_> {
                 }
                 ExprKind::Unary {
                     op: op.clone(),
-                    value: Box::new(self.expr(value)?),
+                    value: Box::new(self.value_expr(value)?),
                 }
             }
             ast::ExprKind::Binary { op, left, right } => {
@@ -1643,8 +1854,8 @@ impl Binder<'_> {
                 }
                 ExprKind::Binary {
                     op: op.clone(),
-                    left: Box::new(self.expr(left)?),
-                    right: Box::new(self.expr(right)?),
+                    left: Box::new(self.value_expr(left)?),
+                    right: Box::new(self.value_expr(right)?),
                 }
             }
             ast::ExprKind::Member { target, name } => {
@@ -1829,10 +2040,86 @@ impl Binder<'_> {
                     arguments,
                 } = &target.kind
                 {
-                    let ast::ExprKind::Name(name) = &array.kind else {
-                        return Err(unsupported("array target", target.span));
+                    let write = if *object {
+                        ForeignKind::DefaultSet
+                    } else {
+                        ForeignKind::DefaultLet
                     };
+                    if let ast::ExprKind::Member {
+                        target: owner,
+                        name,
+                    } = &array.kind
+                    {
+                        return Ok(Statement {
+                            site,
+                            kind: StatementKind::Foreign(self.foreign(
+                                owner,
+                                name,
+                                arguments,
+                                if *object {
+                                    ForeignKind::Set
+                                } else {
+                                    ForeignKind::Let
+                                },
+                                Some(value),
+                            )?),
+                        });
+                    }
+                    let ast::ExprKind::Name(name) = &array.kind else {
+                        return Ok(Statement {
+                            site,
+                            kind: StatementKind::Foreign(self.default_member(
+                                array,
+                                arguments,
+                                write,
+                                Some(value),
+                            )?),
+                        });
+                    };
+                    if !self.symbols.contains_key(&name.key())
+                        && self
+                            .imports
+                            .iter()
+                            .any(|i| i.name.eq_ignore_ascii_case(&name.spelling))
+                    {
+                        if self.imports.iter().any(|i| {
+                            i.name.eq_ignore_ascii_case(&name.spelling) && i.member.is_none()
+                        }) {
+                            return Ok(Statement {
+                                site,
+                                kind: StatementKind::Foreign(self.default_member(
+                                    array,
+                                    arguments,
+                                    write,
+                                    Some(value),
+                                )?),
+                            });
+                        }
+                        return Ok(Statement {
+                            site,
+                            kind: StatementKind::Foreign(self.default_member(
+                                target,
+                                &[],
+                                write,
+                                Some(value),
+                            )?),
+                        });
+                    }
                     let slot = self.slot(name)?;
+                    if self.locals.get(slot).is_some_and(|l| {
+                        l.array.is_none()
+                            && matches!(l.kind, ScalarKind::Object | ScalarKind::Variant)
+                    }) {
+                        return Ok(Statement {
+                            site,
+                            kind: StatementKind::Foreign(self.default_member(
+                                array,
+                                arguments,
+                                write,
+                                Some(value),
+                            )?),
+                        });
+                    }
                     let kind = self
                         .locals
                         .get(slot)
@@ -1875,6 +2162,26 @@ impl Binder<'_> {
                 let ast::ExprKind::Name(name) = &target.kind else {
                     return Err(unsupported("nonlocal assignment", target.span));
                 };
+                if !self.symbols.contains_key(&name.key())
+                    && self
+                        .imports
+                        .iter()
+                        .any(|i| i.name.eq_ignore_ascii_case(&name.spelling) && i.member.is_none())
+                {
+                    return Ok(Statement {
+                        site,
+                        kind: StatementKind::Foreign(self.default_member(
+                            target,
+                            &[],
+                            if *object {
+                                ForeignKind::DefaultSet
+                            } else {
+                                ForeignKind::DefaultLet
+                            },
+                            Some(value),
+                        )?),
+                    });
+                }
                 let slot = self.slot(name)?;
                 if *object
                     && self
@@ -1884,9 +2191,45 @@ impl Binder<'_> {
                 {
                     return Err(err("Set target must be Object or Variant", target.span));
                 }
+                if !*object
+                    && self
+                        .locals
+                        .get(slot)
+                        .is_some_and(|l| l.kind == ScalarKind::Object)
+                {
+                    return Ok(Statement {
+                        site,
+                        kind: StatementKind::Foreign(self.default_member(
+                            target,
+                            &[],
+                            ForeignKind::DefaultLet,
+                            Some(value),
+                        )?),
+                    });
+                }
+                if !*object
+                    && self
+                        .locals
+                        .get(slot)
+                        .is_some_and(|l| l.array.is_none() && l.kind == ScalarKind::Variant)
+                {
+                    return Ok(Statement {
+                        site,
+                        kind: StatementKind::Foreign(self.default_member(
+                            target,
+                            &[],
+                            ForeignKind::AssignValue,
+                            Some(value),
+                        )?),
+                    });
+                }
                 StatementKind::Assign {
                     slot,
-                    value: self.expr(value)?,
+                    value: if *object {
+                        self.expr(value)?
+                    } else {
+                        self.value_expr(value)?
+                    },
                     object: *object,
                 }
             }
@@ -1910,7 +2253,7 @@ impl Binder<'_> {
                                 .value
                                 .as_ref()
                                 .ok_or_else(|| err("Debug.Print argument", arg.span))?;
-                            push(&mut values, self.expr(value)?, arg.span)?;
+                            push(&mut values, self.value_expr(value)?, arg.span)?;
                         }
                         return Ok(Statement {
                             site,
@@ -1997,7 +2340,7 @@ impl Binder<'_> {
                         &mut bound_arms,
                         IfArm {
                             site: arm.site,
-                            condition: self.expr(&arm.condition)?,
+                            condition: self.value_expr(&arm.condition)?,
                             body: self.block(&arm.body)?,
                         },
                         site.span,
@@ -2007,6 +2350,45 @@ impl Binder<'_> {
                     arms: bound_arms,
                     otherwise: self.block(otherwise)?,
                     end: *end,
+                }
+            }
+            ast::StatementKind::ForEach(loop_) => {
+                let counter = self.slot(&loop_.counter)?;
+                let control = self
+                    .locals
+                    .get(counter)
+                    .cloned()
+                    .ok_or_else(|| err("loop control", site.span))?;
+                if control.array.is_some()
+                    || !matches!(control.kind, ScalarKind::Variant | ScalarKind::Object)
+                {
+                    return Err(err("For Each control must be Variant or Object", site.span));
+                }
+                if loop_
+                    .next_counter
+                    .as_ref()
+                    .is_some_and(|n| n.key() != loop_.counter.key())
+                {
+                    return Err(err("Next counter mismatch", loop_.next.span));
+                }
+                let group = self.expr(&loop_.group)?;
+                if control.kind != ScalarKind::Variant
+                    && matches!(&group.kind,ExprKind::Local(slot) if self.locals.get(*slot).is_some_and(|l|l.array.is_some()))
+                {
+                    return Err(err("For Each array control must be Variant", site.span));
+                }
+                if !self.loop_controls.insert(counter) {
+                    return Err(err("loop control already in use", site.span));
+                }
+                self.loop_depth += 1;
+                let body = self.block(&loop_.body);
+                self.loop_depth -= 1;
+                self.loop_controls.remove(&counter);
+                StatementKind::ForEach {
+                    counter,
+                    group,
+                    body: body?,
+                    next: loop_.next,
                 }
             }
             ast::StatementKind::For(loop_) => {
@@ -2046,11 +2428,15 @@ impl Binder<'_> {
                         kind: ExprKind::Constant(Value::Integer(1)),
                     }
                 };
-                let start = self.expr(&loop_.start)?;
-                let limit = self.expr(&loop_.limit)?;
+                let start = self.value_expr(&loop_.start)?;
+                let limit = self.value_expr(&loop_.limit)?;
+                if !self.loop_controls.insert(counter) {
+                    return Err(err("loop control already in use", site.span));
+                }
                 self.loop_depth += 1;
                 let body = self.block(&loop_.body);
                 self.loop_depth -= 1;
+                self.loop_controls.remove(&counter);
                 StatementKind::For {
                     counter,
                     start,

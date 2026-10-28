@@ -12,7 +12,7 @@ use vba_values::{Location, Locations, ScalarKind, Value};
 type Result<T> = std::result::Result<T, Diagnostic>;
 pub const PROFILE: &str = runtime::PROFILE;
 pub fn capabilities() -> ir::Capabilities {
-    let mut c = ir::Capabilities::ir5_structural();
+    let mut c = ir::Capabilities::ir6_structural();
     c.profile = PROFILE.into();
 
     c
@@ -151,6 +151,7 @@ pub enum Outcome {
 }
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub struct Counters {
+    pub enumeration_work: u64,
     pub type_checks: u64,
     pub instructions: u64,
     pub host_calls: u64,
@@ -175,7 +176,15 @@ struct ErrorState {
     source: String,
     erl: i32,
 }
+struct Enumeration {
+    source: Option<Location>,
+    values: vba_values::VbaArray,
+    index: usize,
+    start: u32,
+    end: u32,
+}
 struct Frame {
+    enumerations: BTreeMap<ir::LocalSlot, Enumeration>,
     captured: Vec<Option<Location>>,
     handler: Handler,
     id: u64,
@@ -229,6 +238,8 @@ pub struct Session {
     pause_requested: bool,
     stale: bool,
     foreign: foreign::Session,
+    host_result_reference: Option<Location>,
+    argument_continuation: bool,
     pending_fault: Option<Failure>,
     error: ErrorState,
     raised_source: Option<String>,
@@ -391,6 +402,8 @@ impl Session {
             pause_requested: false,
             stale: false,
             foreign: foreign::Session::default(),
+            host_result_reference: None,
+            argument_continuation: false,
             pending_fault: None,
             error: ErrorState::default(),
             raised_source: None,
@@ -908,6 +921,17 @@ impl Session {
         )
     }
     fn write_value(&mut self, location: Location, value: Value) -> Result<()> {
+        if array_locked(
+            &self.frames,
+            location,
+            &mut self.counters.enumeration_work,
+            self.limits.instructions,
+        )? {
+            return Err(runtime_diagnostic(runtime::Error::Vba {
+                number: 10,
+                message: "Array is locked by For Each".into(),
+            }));
+        }
         check_array_identity(
             self.nominal_types.get(&location),
             self.array_types.get(&location).copied(),
@@ -1107,6 +1131,7 @@ impl Session {
         reserve(&mut captured, slots.len())?;
         captured.resize(slots.len(), None);
         self.frames.push(Frame {
+            enumerations: BTreeMap::new(),
             captured,
             handler: Handler::default(),
             id: self.next_frame,
@@ -1341,6 +1366,43 @@ impl Session {
         }
         Ok(())
     }
+    pub fn edit_array_element(
+        &mut self,
+        handle: Handle,
+        name: &str,
+        indices: &[i32],
+        value: Value,
+    ) -> Result<()> {
+        self.validate_handle(handle, true)?;
+        let index = self
+            .proc()?
+            .locals
+            .iter()
+            .position(|l| l.visible && l.name.eq_ignore_ascii_case(name))
+            .ok_or_else(|| command("unknown local"))?;
+        let owner = self.location(ir::LocalSlot(u32::try_from(index).map_err(|_| resource())?))?;
+        let Value::Array(array) = self.store.read(owner)? else {
+            return Err(command("local array required"));
+        };
+        let kind = array.kind();
+        let location = self.store.element(owner, indices)?;
+        if self.kinds.len() >= 65536 {
+            return Err(resource());
+        }
+        self.kinds.insert(location, kind);
+        if let Some(ty) = self.nominal_types.get(&owner).cloned() {
+            self.charge(nominal_bytes(&ty))?;
+            self.nominal_types.insert(location, ty);
+        }
+        let value = runtime::bind(kind, &value).map_err(runtime_diagnostic)?;
+        self.charge(value_bytes(&value))?;
+        self.write_value(location, value)?;
+        let frames = self.snapshots()?;
+        if let Outcome::Paused(p) = &mut self.state {
+            p.frames = frames;
+        }
+        Ok(())
+    }
     pub fn edit_local(&mut self, handle: Handle, name: &str, value: Value) -> Result<()> {
         self.validate_handle(handle, true)?;
         let index = self
@@ -1419,6 +1481,8 @@ impl Session {
         self.pause(PauseReason::Checkpoint)
     }
     fn cleanup(&mut self) {
+        self.host_result_reference = None;
+        self.argument_continuation = false;
         let persistent = &self.persistent;
         for location in self.kinds.keys() {
             if !persistent.values().any(|l| l == location) {
@@ -1527,6 +1591,8 @@ impl Session {
             "VBA_RUNTIME_9" => (FailureKind::Runtime, Some(9)),
             "VBA_RUNTIME_20" => (FailureKind::Runtime, Some(20)),
             "VBA_RUNTIME_91" => (FailureKind::Runtime, Some(91)),
+            "VBA_RUNTIME_10" => (FailureKind::Runtime, Some(10)),
+            "VBA_RUNTIME_92" => (FailureKind::Runtime, Some(92)),
             "VBA_RUNTIME_94" => (FailureKind::Runtime, Some(94)),
             "VBA_RUNTIME_448" => (FailureKind::Runtime, Some(448)),
             "VBA0001" => (FailureKind::Unsupported, None),
@@ -1537,6 +1603,8 @@ impl Session {
         self.deliver_failure(self.failure(kind, number, error.message)?)
     }
     fn deliver_failure(&mut self, failure: Failure) -> Result<()> {
+        self.host_result_reference = None;
+        self.argument_continuation = false;
         if self.break_on_error && failure.kind == FailureKind::Runtime {
             self.pending_fault = Some(failure);
             self.pause(PauseReason::Fault)?;
@@ -1705,6 +1773,17 @@ impl Session {
                 .cloned()
                 .ok_or_else(|| invariant("PC outside verified code"))?;
             if let I::Checkpoint(site) = instruction {
+                let span = self
+                    .proc()?
+                    .checkpoints
+                    .get(site.0 as usize)
+                    .ok_or_else(|| invariant("checkpoint"))?
+                    .span;
+                if self.top()?.handler.fault.is_none() {
+                    self.top_mut()?
+                        .enumerations
+                        .retain(|_, e| span.start() >= e.start && span.end() <= e.end);
+                }
                 self.top_mut()?.checkpoint = Some(site);
                 if self.visit.is_none() {
                     self.visit_serial = self.visit_serial.checked_add(1).ok_or_else(resource)?;
@@ -1744,6 +1823,74 @@ impl Session {
     }
     fn dispatch(&mut self, host: &mut impl Host, instruction: I) -> Result<()> {
         match instruction {
+            I::EnumerationInit {
+                state,
+                source,
+                start,
+                end,
+            } => {
+                let Value::Array(values) = self.pop_value()? else {
+                    return Err(protocol("enumeration reply must be a bounded array"));
+                };
+                let source = source
+                    .map(|s| self.location(s))
+                    .transpose()?
+                    .filter(|l| matches!(self.store.read(*l), Ok(Value::Array(_))));
+                if self.top()?.enumerations.len() >= 64 {
+                    return Err(resource());
+                }
+                self.top_mut()?.enumerations.insert(
+                    state,
+                    Enumeration {
+                        source,
+                        values,
+                        index: 0,
+                        start,
+                        end,
+                    },
+                );
+                self.advance()?;
+            }
+            I::EnumerationNext { state, control } => {
+                let cursor = self.top()?.enumerations.get(&state).ok_or_else(|| {
+                    runtime_diagnostic(runtime::Error::Vba {
+                        number: 92,
+                        message: "For Each is not initialized".into(),
+                    })
+                })?;
+                let values = if let Some(source) = cursor.source {
+                    let Value::Array(array) = self.store.read(source)? else {
+                        return Err(invariant("enumerated array replaced"));
+                    };
+                    array
+                } else {
+                    &cursor.values
+                };
+                let value = values.elements().get(cursor.index).cloned();
+                if let Some(value) = value {
+                    self.charge(value_bytes(&value))?;
+                    self.top_mut()?
+                        .enumerations
+                        .get_mut(&state)
+                        .ok_or_else(|| invariant("enumeration state"))?
+                        .index += 1;
+                    let location = self.location(control)?;
+                    let kind = *self
+                        .kinds
+                        .get(&location)
+                        .ok_or_else(|| invariant("enumeration control kind"))?;
+                    let value = runtime::bind(kind, &value).map_err(runtime_diagnostic)?;
+                    self.write_value(location, value)?;
+                    self.push_prepaid(Value::Boolean(true))?;
+                } else {
+                    self.push_prepaid(Value::Boolean(false))?;
+                }
+                self.advance()?;
+            }
+            I::EnumerationEnd(state) => {
+                self.top_mut()?.enumerations.remove(&state);
+                self.advance()?;
+            }
             I::SaveReference(slot) => {
                 let location = self.pop_ref()?;
                 self.store.read(location)?;
@@ -2202,33 +2349,28 @@ impl Session {
         Ok(())
     }
     fn invoke(&mut self, host: &mut impl Host, site: ir::ForeignSiteId) -> Result<()> {
-        let binding = self
-            .binding
-            .as_ref()
-            .ok_or_else(|| Diagnostic::unsupported("foreign host is not bound"))?;
-        if !binding.permitted.contains(&(self.top()?.procedure, site)) {
-            return Err(Diagnostic::unsupported(
-                "foreign call site is not permitted",
-            ));
-        }
-        if self.counters.host_calls >= self.limits.host_calls {
-            return Err(resource());
-        }
-        let site = self
+        let site_id = site;
+        let mut site = self
             .proc()?
             .foreign
             .get(site.0 as usize)
             .cloned()
             .ok_or_else(|| invariant("foreign site"))?;
+        if self.argument_continuation {
+            site.arguments.clear();
+            self.argument_continuation = false;
+        }
         let mut arguments = Vec::new();
-        reserve(&mut arguments, site.arguments.len())?;
         let mut references = BTreeSet::new();
+        reserve(&mut arguments, site.arguments.len())?;
         for arg in site.arguments.iter().rev() {
             let value = match arg.mode {
                 ir::ArgumentMode::Value => foreign::ArgumentValue::ByVal(self.pop_value()?),
                 ir::ArgumentMode::Reference => {
                     let location = self.pop_ref()?;
-                    if !references.insert(location) {
+                    if !references.insert(location)
+                        && self.program.program().ir_version < ir::IR6_VERSION
+                    {
                         return Err(Diagnostic::unsupported("aliased foreign ByRef snapshots"));
                     }
                     foreign::ArgumentValue::ByRef(location)
@@ -2242,31 +2384,266 @@ impl Session {
         }
         arguments.reverse();
         let target = self.pop_value()?;
-        let Value::Object(target) = target else {
-            return Err(Diagnostic::unsupported("foreign target must be Object"));
+        let owner = if matches!(
+            site.kind,
+            ir::ForeignKind::DefaultLet
+                | ir::ForeignKind::DefaultSet
+                | ir::ForeignKind::AssignValue
+                | ir::ForeignKind::ArgumentGet
+        ) && arguments
+            .last()
+            .is_some_and(|a| a.name.as_deref() == Some("$target"))
+        {
+            match arguments.pop().map(|a| a.value) {
+                Some(foreign::ArgumentValue::ByRef(l)) => Some(l),
+                _ => return Err(invariant("assignment location")),
+            }
+        } else {
+            None
         };
+        if matches!(site.kind, ir::ForeignKind::AssignValue)
+            && !matches!(target, Value::Object(_) | Value::Nothing)
+        {
+            let value = match arguments.pop().map(|a| a.value) {
+                Some(foreign::ArgumentValue::ByVal(v)) => v,
+                _ => return Err(invariant("assignment value")),
+            };
+            let owner = owner.ok_or_else(|| invariant("assignment target"))?;
+            let kind = *self
+                .kinds
+                .get(&owner)
+                .ok_or_else(|| invariant("assignment kind"))?;
+            let value = runtime::assign(kind, &value, false).map_err(runtime_diagnostic)?;
+            self.write_value(owner, value)?;
+            self.push_prepaid(Value::Empty)?;
+            return self.advance();
+        }
+        if matches!(
+            site.kind,
+            ir::ForeignKind::DefaultLet | ir::ForeignKind::DefaultSet
+        ) && matches!(target, Value::Array(_))
+        {
+            let value = match arguments.pop().map(|a| a.value) {
+                Some(foreign::ArgumentValue::ByVal(v)) => v,
+                _ => return Err(invariant("array assignment value")),
+            };
+            let mut indices = Vec::new();
+            for arg in &arguments {
+                if arg.name.is_some() {
+                    return Err(runtime_diagnostic(runtime::Error::Vba {
+                        number: 448,
+                        message: "Array index cannot be named".into(),
+                    }));
+                }
+                let value = match &arg.value {
+                    foreign::ArgumentValue::ByVal(v) => v,
+                    foreign::ArgumentValue::ByRef(l) => self.store.read(*l)?,
+                    foreign::ArgumentValue::Omitted => &Value::Missing,
+                };
+                let Value::Long(index) =
+                    runtime::bind(ScalarKind::Long, value).map_err(runtime_diagnostic)?
+                else {
+                    return Err(invariant("index conversion"));
+                };
+                indices.push(index);
+            }
+            let owner = owner.ok_or_else(|| {
+                runtime_diagnostic(runtime::Error::Vba {
+                    number: 13,
+                    message: "Array assignment requires a variable".into(),
+                })
+            })?;
+            let location = self.store.element(owner, &indices)?;
+            let Value::Array(array) = &target else {
+                return Err(invariant("array target"));
+            };
+            let kind = array.kind();
+            if self.kinds.len() >= 65536 && !self.kinds.contains_key(&location) {
+                return Err(resource());
+            }
+            self.charge(256)?;
+            self.kinds.insert(location, kind);
+            if let Some(ty) = self.nominal_types.get(&owner).cloned() {
+                self.charge(nominal_bytes(&ty))?;
+                self.nominal_types.insert(location, ty);
+            }
+            let value = runtime::assign(
+                kind,
+                &value,
+                matches!(site.kind, ir::ForeignKind::DefaultSet),
+            )
+            .map_err(runtime_diagnostic)?;
+            self.write_value(location, value)?;
+            self.push_prepaid(Value::Empty)?;
+            return self.advance();
+        }
+        if matches!(site.kind, ir::ForeignKind::ValueGet)
+            && !matches!(target, Value::Object(_) | Value::Nothing)
+        {
+            self.push_prepaid(target)?;
+            return self.advance();
+        }
+        if matches!(site.kind, ir::ForeignKind::Enumerate) && matches!(target, Value::Array(_)) {
+            self.push_prepaid(target)?;
+            return self.advance();
+        }
+        if matches!(
+            site.kind,
+            ir::ForeignKind::DefaultGet | ir::ForeignKind::ArgumentGet
+        ) && let Value::Array(array) = &target
+        {
+            let mut indices = Vec::new();
+            for arg in &arguments {
+                if arg.name.is_some() {
+                    return Err(runtime_diagnostic(runtime::Error::Vba {
+                        number: 448,
+                        message: "Array index cannot be named".into(),
+                    }));
+                }
+                let value = match &arg.value {
+                    foreign::ArgumentValue::ByVal(v) => v,
+                    foreign::ArgumentValue::ByRef(l) => self.store.read(*l)?,
+                    foreign::ArgumentValue::Omitted => &Value::Missing,
+                };
+                let Value::Long(index) =
+                    runtime::bind(ScalarKind::Long, value).map_err(runtime_diagnostic)?
+                else {
+                    return Err(invariant("index conversion"));
+                };
+                indices.push(index);
+            }
+            let offset = array.offset(&indices)?;
+            if let Some(temporary) = site.result_reference {
+                let kind = self
+                    .proc()?
+                    .locals
+                    .get(temporary.0 as usize)
+                    .ok_or_else(|| invariant("argument temporary"))?
+                    .kind;
+                if kind != array.kind() {
+                    return Err(runtime_diagnostic(runtime::Error::Vba {
+                        number: 13,
+                        message: "ByRef array element type mismatch".into(),
+                    }));
+                }
+                let owner = owner.ok_or_else(|| invariant("argument array owner"))?;
+                let location = self.store.element(owner, &indices)?;
+                if self.kinds.len() >= 65536 && !self.kinds.contains_key(&location) {
+                    return Err(resource());
+                }
+                self.charge(256)?;
+                self.kinds.insert(location, kind);
+                if let Some(ty) = self.nominal_types.get(&owner).cloned() {
+                    self.charge(nominal_bytes(&ty))?;
+                    self.nominal_types.insert(location, ty);
+                }
+                self.push(Operand::Reference(location))?;
+                return self.advance();
+            }
+            let value = array
+                .elements()
+                .get(offset)
+                .cloned()
+                .ok_or_else(|| invariant("array offset"))?;
+            self.push_prepaid(value)?;
+            return self.advance();
+        }
+        let Value::Object(target) = target else {
+            return Err(runtime_diagnostic(runtime::Error::Vba {
+                number: if matches!(target, Value::Nothing) {
+                    91
+                } else {
+                    13
+                },
+                message: "Object required".into(),
+            }));
+        };
+        let binding = self
+            .binding
+            .as_ref()
+            .ok_or_else(|| Diagnostic::unsupported("foreign host is not bound"))?;
+        if !binding
+            .permitted
+            .contains(&(self.top()?.procedure, site_id))
+        {
+            return Err(Diagnostic::unsupported(
+                "foreign call site is not permitted",
+            ));
+        }
+        if self.counters.host_calls >= self.limits.host_calls {
+            return Err(resource());
+        }
         self.charge(256 * arguments.len() + 65536)?; // reserve reply/snapshot budget before host effects
         self.counters.host_calls = self
             .counters
             .host_calls
             .checked_add(1)
             .ok_or_else(resource)?;
+        self.host_result_reference = site
+            .result_reference
+            .map(|s| self.location(s))
+            .transpose()?;
         let kind = match site.kind {
+            ir::ForeignKind::DefaultGet
+            | ir::ForeignKind::ArgumentGet
+            | ir::ForeignKind::ValueGet => foreign::InvokeKind::DefaultGet,
+            ir::ForeignKind::DefaultLet | ir::ForeignKind::AssignValue => {
+                foreign::InvokeKind::DefaultLet
+            }
+            ir::ForeignKind::DefaultSet => foreign::InvokeKind::DefaultSet,
+            ir::ForeignKind::Enumerate | ir::ForeignKind::EnumerateObjects => {
+                foreign::InvokeKind::Enumerate
+            }
             ir::ForeignKind::Call => foreign::InvokeKind::Call,
             ir::ForeignKind::Get => foreign::InvokeKind::Get,
             ir::ForeignKind::Let => foreign::InvokeKind::Let,
             ir::ForeignKind::Set => foreign::InvokeKind::Set,
         };
+        let result_reference = self.host_result_reference;
+        let frames = &self.frames;
         let kinds = &self.kinds;
         let nominal_types = &self.nominal_types;
         let resolver = self.type_resolver.as_deref();
         let host_identity = self.binding.as_ref().map(|b| b.identity);
+        let enum_work = &mut self.counters.enumeration_work;
         let checks = &mut self.counters.type_checks;
         let check_limit = self.limits.instructions;
         let array_types = &self.array_types;
         let used = &mut self.allocation_bytes;
         let cap = self.limits.payload;
-        let mut validate = |l, v: &Value| {
+        let mut validate = |l: Option<Location>, v: &Value| {
+            if let Some(location) = l
+                && array_locked(frames, location, enum_work, check_limit)?
+            {
+                return Err(runtime_diagnostic(runtime::Error::Vba {
+                    number: 10,
+                    message: "Array is locked by For Each".into(),
+                }));
+            }
+            if l.is_none()
+                && let Some(location) = result_reference
+            {
+                let kind = *kinds
+                    .get(&location)
+                    .ok_or_else(|| invariant("argument result kind"))?;
+                let value = if matches!(v, Value::Object(_))
+                    && !matches!(kind, ScalarKind::Object | ScalarKind::Variant)
+                {
+                    None
+                } else {
+                    Some(runtime::bind(kind, v).map_err(runtime_diagnostic)?)
+                };
+                if let Some(value) = value {
+                    check_nominal(
+                        nominal_types.get(&location),
+                        &value,
+                        resolver,
+                        host_identity,
+                        checks,
+                        check_limit,
+                    )?;
+                }
+            }
             validate_write(kinds, array_types, l, v)?;
             if let Some(location) = l {
                 check_array_identity(
@@ -2306,23 +2683,50 @@ impl Session {
                 &mut validate,
             )
             .map_err(|e| {
-                if e.code == "VBA0031" {
+                if e.code == "VBA0031" || e.code.starts_with("VBA_RUNTIME_") {
                     e
                 } else {
                     protocol(&e.message)
                 }
             })?;
-        self.advance()?;
+        // Revisit only the coercion instruction, never the target expression. Object-valued
+        // default properties are resolved until a primitive or a resource/error boundary.
+        if !matches!(
+            site.kind,
+            ir::ForeignKind::ValueGet | ir::ForeignKind::ArgumentGet
+        ) {
+            self.advance()?;
+        }
         self.accept_host(outcome)
     }
     fn accept_host(&mut self, outcome: foreign::Outcome) -> Result<()> {
         match outcome {
             foreign::Outcome::Suspended => self.state = Outcome::Waiting,
             foreign::Outcome::Complete(value) => {
-                self.push_prepaid(value)?;
+                if let Some(location) = self.host_result_reference.take() {
+                    let kind = *self
+                        .kinds
+                        .get(&location)
+                        .ok_or_else(|| invariant("argument result kind"))?;
+                    if matches!(value, Value::Object(_))
+                        && !matches!(kind, ScalarKind::Object | ScalarKind::Variant)
+                    {
+                        self.host_result_reference = Some(location);
+                        self.argument_continuation = true;
+                        self.push_prepaid(value)?;
+                    } else {
+                        let value = runtime::bind(kind, &value).map_err(runtime_diagnostic)?;
+                        self.write_value(location, value)?;
+                        self.push(Operand::Reference(location))?;
+                        self.advance()?;
+                    }
+                } else {
+                    self.push_prepaid(value)?;
+                }
                 self.state = Outcome::Yielded;
             }
             foreign::Outcome::Error(error) => {
+                self.host_result_reference = None;
                 let failure =
                     self.failure(FailureKind::Runtime, Some(error.number), error.description)?;
                 self.deliver_failure(failure)?;
@@ -2351,16 +2755,51 @@ impl Session {
             self.fail(error)?;
             return Ok(self.state.clone());
         }
+        let result_reference = self.host_result_reference;
+        let frames = &self.frames;
         let kinds = &self.kinds;
         let nominal_types = &self.nominal_types;
         let resolver = self.type_resolver.as_deref();
         let host_identity = self.binding.as_ref().map(|b| b.identity);
+        let enum_work = &mut self.counters.enumeration_work;
         let checks = &mut self.counters.type_checks;
         let check_limit = self.limits.instructions;
         let array_types = &self.array_types;
         let used = &mut self.allocation_bytes;
         let cap = self.limits.payload;
-        let mut validate = |l, v: &Value| {
+        let mut validate = |l: Option<Location>, v: &Value| {
+            if let Some(location) = l
+                && array_locked(frames, location, enum_work, check_limit)?
+            {
+                return Err(runtime_diagnostic(runtime::Error::Vba {
+                    number: 10,
+                    message: "Array is locked by For Each".into(),
+                }));
+            }
+            if l.is_none()
+                && let Some(location) = result_reference
+            {
+                let kind = *kinds
+                    .get(&location)
+                    .ok_or_else(|| invariant("argument result kind"))?;
+                let value = if matches!(v, Value::Object(_))
+                    && !matches!(kind, ScalarKind::Object | ScalarKind::Variant)
+                {
+                    None
+                } else {
+                    Some(runtime::bind(kind, v).map_err(runtime_diagnostic)?)
+                };
+                if let Some(value) = value {
+                    check_nominal(
+                        nominal_types.get(&location),
+                        &value,
+                        resolver,
+                        host_identity,
+                        checks,
+                        check_limit,
+                    )?;
+                }
+            }
             validate_write(kinds, array_types, l, v)?;
             if let Some(location) = l {
                 check_array_identity(
@@ -2390,7 +2829,7 @@ impl Session {
             .foreign
             .resume_checked(host, &mut self.store, &mut validate)
             .map_err(|e| {
-                if e.code == "VBA0031" {
+                if e.code == "VBA0031" || e.code.starts_with("VBA_RUNTIME_") {
                     e
                 } else {
                     protocol(&e.message)
@@ -2406,6 +2845,20 @@ impl Session {
         }
         Ok(self.state.clone())
     }
+}
+fn array_locked(frames: &[Frame], location: Location, work: &mut u64, limit: u64) -> Result<bool> {
+    for frame in frames {
+        for cursor in frame.enumerations.values() {
+            *work = work.checked_add(1).ok_or_else(resource)?;
+            if *work > limit {
+                return Err(resource());
+            }
+            if cursor.source == Some(location) {
+                return Ok(true);
+            }
+        }
+    }
+    Ok(false)
 }
 fn check_array_identity(
     expected: Option<&vba_values::NominalType>,
@@ -2521,6 +2974,8 @@ fn runtime_diagnostic(error: runtime::Error) -> Diagnostic {
         runtime::Error::Vba { number, message } => Diagnostic::new(
             match number {
                 6 => "VBA_RUNTIME_6",
+                10 => "VBA_RUNTIME_10",
+                92 => "VBA_RUNTIME_92",
                 11 => "VBA_RUNTIME_11",
                 13 => "VBA_RUNTIME_13",
                 5 => "VBA_RUNTIME_5",

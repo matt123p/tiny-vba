@@ -497,6 +497,7 @@ fn foreign_argument_modes_all_kinds_and_stop_are_structurally_verified() -> Test
             .extend(["foreign-snapshot-v1".into(), "debug-stop".into()]);
         let proc = proc_mut(&mut p)?;
         proc.foreign = vec![ForeignSite {
+            result_reference: None,
             checkpoint: SiteId(0),
             kind,
             member: "Member".into(),
@@ -603,6 +604,7 @@ fn damaged_foreign_descriptors_and_missing_target_operands_are_rejected() -> Tes
     p.required_features.insert("foreign-snapshot-v1".into());
     let proc = proc_mut(&mut p)?;
     proc.foreign = vec![ForeignSite {
+        result_reference: None,
         checkpoint: SiteId(0),
         kind: ForeignKind::Call,
         member: "Call".into(),

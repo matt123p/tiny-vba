@@ -71,21 +71,21 @@ pub fn edit_target(
     target: &str,
     value: Value,
     lookup: &impl Fn(&str) -> Result<Value>,
-) -> Result<(String, Value)> {
+) -> Result<(String, Option<Vec<i32>>, Value)> {
     match expression_ast(target)?.kind {
-        ExprKind::Name(name) => Ok((name.spelling, value)),
+        ExprKind::Name(name) => Ok((name.spelling, None, value)),
         ExprKind::Apply { target, arguments } => {
             let ExprKind::Name(name) = &target.kind else {
                 return Err(error("only local array elements are editable"));
             };
-            let Value::Array(mut array) = lookup(&name.spelling)? else {
+            let Value::Array(array) = lookup(&name.spelling)? else {
                 return Err(error("local array required"));
             };
-            let offset = array.offset(&indices(&arguments, lookup, 0)?)?;
+            let indices = indices(&arguments, lookup, 0)?;
+            array.offset(&indices)?;
             let value =
                 vba_runtime::bind(array.kind(), &value).map_err(|e| error(&format!("{e:?}")))?;
-            array.set(offset, value)?;
-            Ok((name.spelling.clone(), Value::Array(array)))
+            Ok((name.spelling.clone(), Some(indices), value))
         }
         _ => Err(error("only locals and local array elements are editable")),
     }

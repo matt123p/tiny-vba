@@ -124,3 +124,8 @@ UTF-8 attribute spans and code names distinct from stream/display names. Preserv
 corrupt/unsupported/protected/limit refusals and container/decompression work caps. cfb/encoding_rs
 are reviewed pinned external dependencies; package preservation and trust UX remain fork-owned.
 The 14 controlled importer tests run natively and under WASI through cargo xtask wasm-run.
+
+ADR 0022 adds IR 6 generic default invocation/value contexts and bounded For Each.
+Read docs/m1-defaults-and-collections.md and the current compiler/runtime contract.
+Office defaults, collections and signatures remain fork-owned. Preserve safe
+watch evaluation, canonical array aliases, resize locks and wait/cancel semantics.

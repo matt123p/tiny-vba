@@ -86,3 +86,10 @@ M4 completion adds whole-array/ParamArray parameter syntax and explicit legality
 are recognized at physical line starts; a following colon-separated bare name is parsed as a
 call. Option Base is bound explicitly, duplicate directives are rejected and qualified VBA
 intrinsic calls use the deterministic registry. See [current acceptance](m4-oracle-report.md).
+
+## New M1 collection syntax
+
+The parser preserves For Each ... In ... Next (optional matching control), including
+nested loops and Exit For. Binding requires Variant/Object collection controls,
+Variant native-array controls and distinct nested control variables. Other loop
+constructs are unchanged. See [M1 implementation](m1-defaults-and-collections.md).
