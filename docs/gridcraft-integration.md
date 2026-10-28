@@ -132,9 +132,11 @@ The earlier default-branch approval block is resolved for tiny-vba.
 The user clarified that GridCraft must remain on its feature branch. GridCraft's
 `main` push to `b496325b` completed before that clarification interrupted the
 command; its prior remote main was `d8c5f588`. The local checkout is back on
-`feat/tiny-vba-integration`, retaining all work. Restoring GridCraft's original
-remote main would rewrite its just-published history and is pending explicit
-rollback approval; no further GridCraft main mutation has been performed.
+`feat/tiny-vba-integration`, retaining all work. With explicit rollback approval,
+GridCraft's local and remote `main` were restored to `d8c5f588` using an exact
+`--force-with-lease` expectation of `b496325b`. The integration was first published
+and is preserved on remote `feat/tiny-vba-integration` at `b496325b`. Both remote
+refs were verified after the rollback; tiny-vba remains merged on its own `main`.
 
 Started 2026-10-27. This is the interruption/resumption record for the user-requested
 integration. Interpreter and shared IDE remain in tiny-vba; Excel objects and the
