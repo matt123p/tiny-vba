@@ -24,63 +24,13 @@ pub struct ReferenceInfo {
 impl Ide {
     pub(crate) fn catalog_owner_matches(&self, item: &crate::ApiMember, declared: &str) -> bool {
         if let Ok(Some(ty)) = self.reference_bindings.object_type(declared) {
-            if item
+            return item
                 .owner
                 .eq_ignore_ascii_case(&format!("{}.{}", ty.library(), ty.name()))
-            {
-                return true;
-            }
-            if !item.owner.eq_ignore_ascii_case(ty.name()) {
-                return false;
-            }
-            if item.library.eq_ignore_ascii_case(ty.library()) {
-                return true;
-            }
-            return self
-                .reference_bindings
-                .libraries()
-                .iter()
-                .filter(|r| r.available)
-                .flat_map(|r| &r.types)
-                .filter(|t| {
-                    t.kind == vba_foreign::ReferenceTypeKind::Object
-                        && t.name.eq_ignore_ascii_case(ty.name())
-                })
-                .count()
-                == 1;
+                || item.library.eq_ignore_ascii_case(ty.library())
+                    && item.owner.eq_ignore_ascii_case(ty.name());
         }
         item.owner.eq_ignore_ascii_case(declared)
-    }
-    fn catalog_type(&self, declared: String) -> String {
-        if self
-            .catalog
-            .iter()
-            .any(|m| m.supported && m.owner.eq_ignore_ascii_case(&declared))
-        {
-            return declared;
-        }
-        if let Ok(Some(ty)) = self.reference_bindings.object_type(&declared) {
-            let count = self
-                .reference_bindings
-                .libraries()
-                .iter()
-                .filter(|r| r.available)
-                .flat_map(|r| &r.types)
-                .filter(|t| {
-                    t.kind == vba_foreign::ReferenceTypeKind::Object
-                        && t.name.eq_ignore_ascii_case(ty.name())
-                })
-                .count();
-            if count == 1
-                && let Some(member) = self
-                    .catalog
-                    .iter()
-                    .find(|m| m.supported && m.owner.eq_ignore_ascii_case(ty.name()))
-            {
-                return member.owner.clone();
-            }
-        }
-        declared
     }
     /// Borrow the host's existing object model for bounded, read-only type checks.
     pub fn configure_type_resolver(
@@ -143,7 +93,7 @@ impl Ide {
         }
         let mut parts = receiver.split('.');
         let root = parts.next()?;
-        let ty = self
+        let mut ty = self
             .source_completions()
             .into_iter()
             .find(|(name, _)| name.eq_ignore_ascii_case(root))
@@ -154,7 +104,6 @@ impl Ide {
                     .find(|item| item.supported && item.owner.eq_ignore_ascii_case(root))
                     .map(|item| item.owner.clone())
             })?;
-        let mut ty = self.catalog_type(ty);
         for (depth, part) in parts.enumerate() {
             if depth >= 32 {
                 return None;
@@ -168,7 +117,31 @@ impl Ide {
             let at = words
                 .iter()
                 .rposition(|word| word.eq_ignore_ascii_case("As"))?;
-            ty = self.catalog_type(words.get(at + 1)?.trim_matches(['(', ')']).to_string());
+            let returned = words.get(at + 1)?.trim_matches(['(', ')']);
+            let owner = if member.owner.contains('.') {
+                self.reference_bindings
+                    .object_type(&member.owner)
+                    .ok()
+                    .flatten()
+            } else {
+                None
+            };
+            let library = owner
+                .as_ref()
+                .map_or(member.library.as_str(), |ty| ty.library());
+            let qualified = format!("{library}.{returned}");
+            ty = if !returned.contains('.')
+                && self
+                    .reference_bindings
+                    .object_type(&qualified)
+                    .ok()
+                    .flatten()
+                    .is_some()
+            {
+                qualified
+            } else {
+                returned.to_string()
+            };
         }
         Some(ty)
     }

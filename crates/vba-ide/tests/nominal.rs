@@ -127,7 +127,7 @@ fn qualified_catalog_owners_do_not_guess_between_same_named_library_types() -> R
     let id = ide.add_module("Main.bas", source)?;
     ide.navigate(id, source.find("Dim item").ok_or("caret")? + 8)?;
     ide.configure_reference_bindings(ReferenceSet::new(
-        ["HostLib", "OtherLib"]
+        ["OtherLib", "HostLib"]
             .into_iter()
             .map(|name| ReferenceLibrary {
                 name: name.into(),
@@ -152,6 +152,21 @@ fn qualified_catalog_owners_do_not_guess_between_same_named_library_types() -> R
     assert!(ide.completions("item.V").is_empty());
     ide.configure_host(vec![], Default::default(), vec![member("HostLib.Item")])?;
     assert_eq!(ide.completions("item.V"), vec!["Value"]);
+    ide.configure_host(
+        vec![],
+        Default::default(),
+        vec![
+            member("HostLib.Item"),
+            vba_ide::ApiMember {
+                library: "HostLib".into(),
+                owner: "Item".into(),
+                name: "Child".into(),
+                signature: "Property Get Child() As Item".into(),
+                supported: true,
+            },
+        ],
+    )?;
+    assert_eq!(ide.completions("item.Child.V"), vec!["Value"]);
     Ok(())
 }
 

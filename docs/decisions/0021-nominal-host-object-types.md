@@ -15,6 +15,9 @@ Host-supplied assignability includes supported interfaces. Resolver identity mus
 match the session's host; full object handle identity/generation and lifetime
 remain host-owned. Wrong type yields VBA error 13, stale/foreign objects error 91.
 Nothing is valid for object slots. Untyped Object/Variant late binding remains.
+Nominal code aids also use the registered library namespace. Catalogue owners
+must be fully qualified or paired with the matching `ApiMember.library`; display
+labels and same-named classes from another library do not establish identity.
 
 IR 5 adds verified per-procedure/local nominal metadata with an explicit
 `nominal-objects-v5` capability. Old IR 1–4 consumers reject it. Parameter/result,
