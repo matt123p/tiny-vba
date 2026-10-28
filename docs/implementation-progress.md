@@ -3,8 +3,27 @@
 Updated 2026-10-28. The classic-editor/debugger profile is implemented; its
 historical milestone is M10. Runtime remains m5-host-v1 with verified IR 1/2/3/4.
 The [remaining plan](implementation-plan.md) now uses **M1–M8** for future work.
-Next: **M1.1**, generic host-type contract and typed-declaration proof. Real
+Next: **M1.1b**, nominal host object identity/assignment and typed-declaration proof. Real
 Office objects, document events, trust and packaging remain fork-owned.
+
+## New M1.1 — explicit reference binding increment
+
+Implemented validated native reference snapshots, ordered namespace resolution,
+registered enum declarations and executable typed constants. Compiler defaults
+remain reference-free. IDE discovery/compilation and isolated Immediate evaluation
+use the same explicit snapshot; reset guards prevent mid-session replacement.
+See [the resumable work log](m1-host-references.md) and
+[ADR 0020](decisions/0020-explicit-host-reference-snapshots.md).
+
+Nominal object declarations remain explicitly unsupported rather than erased to
+generic Object. M1.1 is **in progress**, not complete: next enforce nominal type
+identity/assignability across storage paths, then prove unchanged typed source in
+the forks. M1.2 default members and M1.3 collections have not started. No GridCraft
+changes, Office oracle runs or new external macro execution are included.
+
+Validation: 288 workspace tests (11 new), strict CI/layer/provenance checks,
+headless WASM compilation and 102 actual WASI tests pass. The resumable log records
+the supported profile and the next nominal-object checkpoint.
 
 ## Plan renumbering — 2026-10-28
 

@@ -155,3 +155,11 @@ document persistence remain fork-owned in M3–M7. M8 owns final conformance/rel
 Third-party ActiveX/OLE controls not supplied with Office applications are excluded.
 Native extensions/translation and AI assistance are removed from planned scope.
 [ADR 0019](decisions/0019-remaining-plan-scope.md) changes no implemented DAG/API.
+
+New M1.1's first increment adds validated `vba-foreign::ReferenceSet` snapshots
+to compiler/binder options. Registered enums lower to Long; constants become
+typed IR constants. IDE discovery and compilation share an explicitly configured
+snapshot. Nominal host object types remain unsupported pending assignment checks.
+[ADR 0020](decisions/0020-explicit-host-reference-snapshots.md) adds no dependency,
+IR version or host invocation ABI; [the stage log](m1-host-references.md) records
+remaining work and execution evidence.

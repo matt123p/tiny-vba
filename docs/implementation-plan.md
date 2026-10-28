@@ -37,10 +37,11 @@ Owner: tiny-vba generic language/foreign contracts; forks supply Office metadata
 and actual objects. Start with M1.1's contract and an independently authored
 typed-declaration proof.
 
-- **M1.1:** Specify and implement host-supplied type namespaces, references and
-  constant binding so declarations such as `As Worksheet` and `As Excel.Range`
-  compile unchanged. Preserve Object/Variant late binding and explicit
-  missing-reference diagnostics. Keep Office names out of the shared engine.
+- **M1.1:** Implement nominal host object type identity and assignment validation
+  so declarations such as `As Worksheet` and `As Excel.Range` compile and execute
+  unchanged against registered types. Cover parameters/ByRef, returns, arrays,
+  host results and debugger edits. Preserve Object/Variant late binding and
+  explicit missing-reference errors; keep Office names out of the shared engine.
 - **M1.2:** Implement default Get/Let/Set and parameterized Item dispatch,
   including chained applications, named/omitted arguments, ByRef obligations,
   return types and exact errors. Retain actual member applications.

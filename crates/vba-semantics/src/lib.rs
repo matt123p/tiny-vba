@@ -207,7 +207,11 @@ fn push<T>(v: &mut Vec<T>, item: T, span: Span) -> Result<()> {
     v.push(item);
     Ok(())
 }
-fn kind(ty: Option<&ast::Name>, name: &ast::Name) -> Result<ScalarKind> {
+fn kind(
+    ty: Option<&ast::Name>,
+    name: &ast::Name,
+    references: &vba_foreign::ReferenceSet,
+) -> Result<ScalarKind> {
     if name
         .spelling
         .chars()
@@ -219,10 +223,22 @@ fn kind(ty: Option<&ast::Name>, name: &ast::Name) -> Result<ScalarKind> {
     let Some(ty) = ty else {
         return Ok(ScalarKind::Variant);
     };
-    ScalarKind::ALL
+    if let Some(kind) = ScalarKind::ALL
         .into_iter()
         .find(|k| format!("{k:?}").eq_ignore_ascii_case(&ty.spelling))
-        .ok_or_else(|| unsupported("declared type", ty.span))
+    {
+        return Ok(kind);
+    }
+    references
+        .declared_kind(&ty.spelling)
+        .map_err(|d| d.at(ty.span))?
+        .ok_or_else(|| {
+            Diagnostic::new(
+                "VBA0132",
+                format!("declared type not defined: {}", ty.spelling),
+            )
+            .at(ty.span)
+        })
 }
 // Logical binding payload is bounded independently of the verifier. Fixed 256-byte node
 // charges cover owned AST/bound-node cells; UTF-16 buffers and source/token copies add payload.
@@ -390,6 +406,19 @@ pub fn bind_with_imports(
     entry: &str,
     imports: &[vba_foreign::Import],
 ) -> Result<BoundProgram> {
+    bind_with_references(
+        parsed,
+        entry,
+        imports,
+        &vba_foreign::ReferenceSet::default(),
+    )
+}
+pub fn bind_with_references(
+    parsed: &[ast::ParseResult],
+    entry: &str,
+    imports: &[vba_foreign::Import],
+    references: &vba_foreign::ReferenceSet,
+) -> Result<BoundProgram> {
     vba_foreign::validate_imports(imports)?;
     if parsed.is_empty() || parsed.len() > 256 {
         return Err(Diagnostic::new("VBA0111", "source count limit"));
@@ -445,14 +474,17 @@ pub fn bind_with_imports(
             if !declaration_names.insert(declaration.name.key()) {
                 return Err(err("duplicate module declaration", declaration.span));
             }
-            kind(None, &declaration.name)?;
+            kind(None, &declaration.name, references)?;
             let Some(value) = declaration.constant.as_ref() else {
                 continue;
             };
-            let value = literal(value)?;
+            let value = literal(value, references, Some(&constants))?;
             let value = if declaration.ty.is_some() {
-                vba_runtime::bind(kind(declaration.ty.as_ref(), &declaration.name)?, &value)
-                    .map_err(|_| err("invalid typed constant", declaration.span))?
+                vba_runtime::bind(
+                    kind(declaration.ty.as_ref(), &declaration.name, references)?,
+                    &value,
+                )
+                .map_err(|_| err("invalid typed constant", declaration.span))?
             } else {
                 value
             };
@@ -462,7 +494,7 @@ pub fn bind_with_imports(
             }
         }
         for procedure in &module.procedures {
-            kind(None, &procedure.name)?;
+            kind(None, &procedure.name, references)?;
             if signatures.len() >= MAX_PROCEDURES {
                 return Err(limit(procedure.span));
             }
@@ -482,7 +514,7 @@ pub fn bind_with_imports(
                 return Err(limit(procedure.span));
             }
             for (position, parameter) in procedure.parameters.iter().enumerate() {
-                let element = kind(parameter.ty.as_ref(), &parameter.name)?;
+                let element = kind(parameter.ty.as_ref(), &parameter.name, references)?;
                 if parameter.param_array
                     && (!parameter.array
                         || element != ScalarKind::Variant
@@ -516,7 +548,7 @@ pub fn bind_with_imports(
                 }
                 let default = if parameter.optional {
                     let value = if let Some(value) = &parameter.default {
-                        literal(value)?
+                        literal(value, references, Some(&constants))?
                     } else if kind == ScalarKind::Variant {
                         Value::Missing
                     } else {
@@ -545,7 +577,11 @@ pub fn bind_with_imports(
                 )?;
             }
             let result_kind = if procedure.kind == ast::ProcedureKind::Function {
-                Some(kind(procedure.result_type.as_ref(), &procedure.name)?)
+                Some(kind(
+                    procedure.result_type.as_ref(),
+                    &procedure.name,
+                    references,
+                )?)
             } else {
                 None
             };
@@ -649,6 +685,7 @@ pub fn bind_with_imports(
                 })
                 .unwrap_or(0),
             imports,
+            references,
             root_slots: BTreeMap::new(),
             loop_depth: 0,
         };
@@ -683,7 +720,7 @@ pub fn bind_with_imports(
             if declaration.constant.is_some() || local_names.contains(&declaration.name.key()) {
                 continue;
             }
-            let element = kind(declaration.ty.as_ref(), &declaration.name)?;
+            let element = kind(declaration.ty.as_ref(), &declaration.name, references)?;
             binder.local(
                 &declaration.name.spelling,
                 if declaration.dimensions.is_some() {
@@ -769,6 +806,7 @@ struct Binder<'a> {
     explicit: bool,
     base: u8,
     imports: &'a [vba_foreign::Import],
+    references: &'a vba_foreign::ReferenceSet,
     root_slots: BTreeMap<String, usize>,
     loop_depth: usize,
 }
@@ -812,21 +850,24 @@ impl Binder<'_> {
                 ast::StatementKind::Declare(declarations) => {
                     for d in declarations {
                         if let Some(expr) = &d.constant {
-                            kind(None, &d.name)?;
+                            kind(None, &d.name, self.references)?;
 
                             if !names.insert(d.name.key()) {
                                 return Err(err("duplicate local constant", d.span));
                             }
-                            let value = literal(expr)?;
+                            let value = literal(expr, self.references, Some(&self.symbols))?;
                             let value = if d.ty.is_some() {
-                                vba_runtime::bind(kind(d.ty.as_ref(), &d.name)?, &value)
-                                    .map_err(|_| err("invalid typed constant", d.span))?
+                                vba_runtime::bind(
+                                    kind(d.ty.as_ref(), &d.name, self.references)?,
+                                    &value,
+                                )
+                                .map_err(|_| err("invalid typed constant", d.span))?
                             } else {
                                 value
                             };
                             self.symbols.insert(d.name.key(), Symbol::Constant(value));
                         } else {
-                            let element = kind(d.ty.as_ref(), &d.name)?;
+                            let element = kind(d.ty.as_ref(), &d.name, self.references)?;
                             self.local(
                                 &d.name.spelling,
                                 if d.dimensions.is_some() {
@@ -893,6 +934,14 @@ impl Binder<'_> {
         if self.constant_names.contains(&name.key()) {
             return Err(unsupported("cross-module constant lookup", name.span));
         }
+        if let Some(value) = self
+            .references
+            .constant(&name.spelling)
+            .map_err(|d| d.at(name.span))?
+        {
+            self.budget.charge(256 + payload(value), name.span)?;
+            return Ok(Symbol::Constant(value.clone()));
+        }
         if self.explicit {
             return Err(err(format!("undeclared name {}", name.spelling), name.span));
         }
@@ -907,7 +956,7 @@ impl Binder<'_> {
         if self.locals.len() >= MAX_SLOTS {
             return Err(limit(name.span));
         }
-        kind(None, name)?;
+        kind(None, name, self.references)?;
         let index = self.locals.len();
         push(
             &mut self.locals,
@@ -1187,6 +1236,30 @@ impl Binder<'_> {
         kind: ForeignKind,
         extra: Option<&ast::Expr>,
     ) -> Result<Expr> {
+        if let Some(mut path) = reference_path(target)
+            && let Some(root) = path.split('.').next()
+            && !self.symbols.contains_key(&root.to_ascii_lowercase())
+            && !self
+                .lookup
+                .local
+                .contains_key(&(self.signature.module, root.to_ascii_lowercase()))
+            && !self.lookup.public.contains_key(&root.to_ascii_lowercase())
+            && !self
+                .imports
+                .iter()
+                .any(|i| i.name.eq_ignore_ascii_case(root))
+        {
+            path.push('.');
+            path.push_str(&member.spelling);
+            if self
+                .references
+                .constant(&path)
+                .map_err(|d| d.at(member.span))?
+                .is_some()
+            {
+                return Err(err("constant is not writable or callable", member.span));
+            }
+        }
         // A fixed-member alias owns the whole application. A root-object import must
         // instead bind the root and retain the requested member/kind/arguments.
         if let ast::ExprKind::Name(name) = &target.kind
@@ -1323,6 +1396,30 @@ impl Binder<'_> {
     }
     fn expr(&mut self, expr: &ast::Expr) -> Result<Expr> {
         self.budget.charge(256, expr.span)?;
+        if let Some(path) = reference_path(expr)
+            && path.contains('.')
+            && let Some(root) = path.split('.').next()
+            && !self.symbols.contains_key(&root.to_ascii_lowercase())
+            && !self
+                .lookup
+                .local
+                .contains_key(&(self.signature.module, root.to_ascii_lowercase()))
+            && !self.lookup.public.contains_key(&root.to_ascii_lowercase())
+            && !self
+                .imports
+                .iter()
+                .any(|i| i.name.eq_ignore_ascii_case(root))
+            && let Some(value) = self
+                .references
+                .constant(&path)
+                .map_err(|d| d.at(expr.span))?
+        {
+            self.budget.charge(256 + payload(value), expr.span)?;
+            return Ok(Expr {
+                span: expr.span,
+                kind: ExprKind::Constant(value.clone()),
+            });
+        }
         let bound = match &expr.kind {
             ast::ExprKind::Name(name) => {
                 if !self.symbols.contains_key(&name.key())
@@ -1507,7 +1604,7 @@ impl Binder<'_> {
                 }
                 return self.foreign(target, name, &[], ForeignKind::Get, None);
             }
-            _ => ExprKind::Constant(literal(expr)?),
+            _ => ExprKind::Constant(literal(expr, self.references, Some(&self.symbols))?),
         };
         Ok(Expr {
             span: expr.span,
@@ -1531,13 +1628,17 @@ impl Binder<'_> {
                             {
                                 Value::Integer(i16::from(self.base))
                             } else {
-                                literal(lower)?
+                                literal(lower, self.references, Some(&self.symbols))?
                             },
                         ),
                     },
                     Expr {
                         span: upper.span,
-                        kind: ExprKind::Constant(literal(upper)?),
+                        kind: ExprKind::Constant(literal(
+                            upper,
+                            self.references,
+                            Some(&self.symbols),
+                        )?),
                     },
                 ),
                 lower.span,
@@ -1635,7 +1736,7 @@ impl Binder<'_> {
                     .and_then(|l| l.array)
                     .ok_or_else(|| err("ReDim requires declared array", name.span))?;
                 if let Some(ty) = ty
-                    && kind(Some(ty), name)? != element
+                    && kind(Some(ty), name, self.references)? != element
                 {
                     return Err(err("ReDim element type change", ty.span));
                 }
@@ -1872,7 +1973,7 @@ impl Binder<'_> {
                 }
                 // IR 1 first loop slice: positive literal step only; never guess sign/coercion.
                 let step = if let Some(step) = &loop_.step {
-                    let value = literal(step)?;
+                    let value = literal(step, self.references, Some(&self.symbols))?;
                     if !matches!(value,Value::Integer(v) if v>0)
                         && !matches!(value,Value::Long(v) if v>0)
                     {
@@ -1918,16 +2019,64 @@ impl Binder<'_> {
         Ok(Statement { site, kind: bound })
     }
 }
-fn literal(expr: &ast::Expr) -> Result<Value> {
+fn reference_path(expr: &ast::Expr) -> Option<String> {
+    let mut parts = Vec::new();
+    let mut current = expr;
+    loop {
+        if parts.len() >= 3 {
+            return None;
+        }
+        match &current.kind {
+            ast::ExprKind::Name(name) => {
+                parts.push(name.spelling.as_str());
+                break;
+            }
+            ast::ExprKind::Member { target, name } => {
+                parts.push(name.spelling.as_str());
+                current = target;
+            }
+            _ => return None,
+        }
+    }
+    parts.reverse();
+    Some(parts.join("."))
+}
+fn literal(
+    expr: &ast::Expr,
+    references: &vba_foreign::ReferenceSet,
+    symbols: Option<&BTreeMap<String, Symbol>>,
+) -> Result<Value> {
+    if let Some(path) = reference_path(expr) {
+        let root = path
+            .split('.')
+            .next()
+            .unwrap_or_default()
+            .to_ascii_lowercase();
+        if let Some(symbol) = symbols.and_then(|s| s.get(&root)) {
+            if !path.contains('.')
+                && let Symbol::Constant(value) = symbol
+            {
+                return Ok(value.clone());
+            }
+            return Err(err("constant expression requires a constant", expr.span));
+        }
+        if let Some(value) = references.constant(&path).map_err(|d| d.at(expr.span))? {
+            return Ok(value.clone());
+        }
+    }
     Ok(match &expr.kind {
-        ast::ExprKind::Parenthesized(value) => return literal(value),
+        ast::ExprKind::Parenthesized(value) => return literal(value, references, symbols),
         ast::ExprKind::Unary { op, value } => {
-            return vba_runtime::unary(op, &literal(value)?)
+            return vba_runtime::unary(op, &literal(value, references, symbols)?)
                 .map_err(|_| err("invalid constant expression", expr.span));
         }
         ast::ExprKind::Binary { op, left, right } => {
-            return vba_runtime::binary(op, &literal(left)?, &literal(right)?)
-                .map_err(|_| err("invalid constant expression", expr.span));
+            return vba_runtime::binary(
+                op,
+                &literal(left, references, symbols)?,
+                &literal(right, references, symbols)?,
+            )
+            .map_err(|_| err("invalid constant expression", expr.span));
         }
         ast::ExprKind::Number(raw) => {
             let (digits, suffix) = if raw.ends_with('%') || raw.ends_with('&') {

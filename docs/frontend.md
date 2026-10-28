@@ -49,7 +49,8 @@ headers are not executable statement sites. IDs are snapshot-local, not stable a
 | Expressions | Partial: literals (including True/False/Empty/Null/Nothing), names, parentheses, unary +/−/Not, arithmetic/comparison/logical operators, member access and application |
 | Calls | Partial: explicit Call, implicit calls, expression applications, named and omitted argument syntax; preserve parenthesized arguments for later ByRef binding |
 | Statements | Partial: Let/Set/implicit assignment, multiline If/ElseIf/Else, single-line If with colon lists, numeric For/To/Step/Next, Exit Sub/Function/For and Stop |
-| Later grammar | Not implemented: arrays/ReDim, For Each, Do/While, Select Case, With, labels/GoTo/GoSub, On Error/Resume, Property procedures, Type/Enum, Static/ParamArray, As New, qualified/fixed-length types, conditional compilation, date/bracketed/non-ASCII identifiers, designer blocks, file/DLL/event statements |
+| Later grammar (historical first-slice limits; see extensions below) | For Each, Do/While, Select Case, With, Property procedures, Type/Enum, As New, fixed-length types, conditional compilation, date/bracketed/non-ASCII identifiers, designer blocks, file/DLL/event statements remain unsupported |
+| Qualified declared types (new M1.1) | One library qualifier, e.g. `As HostLib.Mode`; original source span retained including whitespace. Binder requires an explicitly registered type; parsing does not imply nominal object support |
 | Semantic checks | Not implemented: scope/name/type resolution, argument legality, Option enforcement, matching Next variable, Exit context, constant evaluation, host member validity |
 
 No binding is implied for a parsed type name or a named/omitted/Optional argument.

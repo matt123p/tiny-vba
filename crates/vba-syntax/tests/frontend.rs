@@ -10,6 +10,30 @@ fn function(expression: &str) -> String {
 }
 
 #[test]
+fn qualified_declared_types_keep_exact_unicode_crlf_spans() -> Result<(), Box<dyn Error>> {
+    let file = source(
+        "' λ\r\nFunction Answer(ByVal item As HostLib . Mode) As HostLib.Mode\r\nDim value As HostLib.Mode\r\nEnd Function\r\n",
+    )?;
+    let parsed = parse(&file, ModuleKind::Standard)?;
+    assert!(parsed.syntax_valid(), "{:?}", parsed.diagnostics);
+    let proc = parsed.module.procedures.first().ok_or("procedure")?;
+    let ty = proc
+        .parameters
+        .first()
+        .ok_or("parameter")?
+        .ty
+        .as_ref()
+        .ok_or("type")?;
+    assert_eq!(ty.spelling, "HostLib.Mode");
+    assert_eq!(file.slice(ty.span)?, "HostLib . Mode");
+    assert_eq!(
+        proc.result_type.as_ref().ok_or("result")?.spelling,
+        "HostLib.Mode"
+    );
+    Ok(())
+}
+
+#[test]
 fn lossless_tokens_continuations_comments_and_crlf() -> Result<(), Box<dyn Error>> {
     let text = "' café 😀\r\nOption Explicit\r\nSub Demo()\r\nRem a comment\r\nx = 1 + _\r\n 2: y = \"a\"\"b\" ' trailing\r\nEnd Sub\r\n";
     let file = source(text)?;

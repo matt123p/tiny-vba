@@ -278,6 +278,7 @@ pub struct Ide {
     controller: Controller,
     session: Option<Session>,
     imports: Vec<Import>,
+    reference_bindings: vba_foreign::ReferenceSet,
     roots: BTreeMap<String, ObjectRef>,
     requests: Vec<HostRequest>,
     temporary_breakpoint: Option<StatementId>,
@@ -316,6 +317,7 @@ impl Ide {
             controller: Controller::new(),
             session: None,
             imports: vec![],
+            reference_bindings: vba_foreign::ReferenceSet::default(),
             roots: BTreeMap::new(),
             requests: vec![],
             temporary_breakpoint: None,
@@ -600,6 +602,7 @@ impl Ide {
                 revision: format!("ide-{}", self.revision),
                 capabilities: vba_vm::capabilities(),
                 imports: self.imports.clone(),
+                references: self.reference_bindings.clone(),
                 ..Default::default()
             },
         )

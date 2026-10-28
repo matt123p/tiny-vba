@@ -22,6 +22,50 @@ pub struct ReferenceInfo {
 }
 
 impl Ide {
+    /// Configure executable enum/constant bindings explicitly, without a loader.
+    /// UI discovery is derived from the same snapshot; reset before replacement.
+    pub fn configure_reference_bindings(
+        &mut self,
+        bindings: vba_foreign::ReferenceSet,
+    ) -> Result<()> {
+        if self.session.is_some() {
+            return Err(error("reset before changing executable references"));
+        }
+        let references = bindings
+            .libraries()
+            .iter()
+            .map(|library| ReferenceInfo {
+                name: library.name.clone(),
+                version: library.version.clone(),
+                available: library.available,
+                help_url: None,
+            })
+            .collect();
+        let constants = bindings
+            .libraries()
+            .iter()
+            .filter(|library| library.available)
+            .flat_map(|library| {
+                library.constants.iter().map(|constant| ConstantInfo {
+                    library: library.name.clone(),
+                    name: format!(
+                        "{}.{}{}",
+                        library.name,
+                        constant
+                            .module
+                            .as_ref()
+                            .map_or(String::new(), |m| format!("{m}.")),
+                        constant.name
+                    ),
+                    value: constant.value.clone(),
+                })
+            })
+            .collect();
+        self.references = references;
+        self.constants = constants;
+        self.reference_bindings = bindings;
+        Ok(())
+    }
     pub(crate) fn receiver_type(&self, receiver: &str) -> Option<String> {
         if receiver.len() > 1024 {
             return None;
@@ -176,7 +220,7 @@ impl Ide {
         self.constants = constants;
         Ok(())
     }
-    /// Metadata discovery only: executable host constants/types are owned by M15 binding.
+    /// Discovery includes declarative metadata and explicitly configured executable references.
     pub fn list_constants(&self, prefix: &str) -> Vec<String> {
         let mut names = self.constant_names();
         names.extend(self.constants.iter().map(|c| c.name.clone()));

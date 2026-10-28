@@ -81,6 +81,7 @@ impl Ide {
                 revision: format!("immediate-{}", self.revision),
                 capabilities: vba_vm::capabilities(),
                 imports: self.imports.clone(),
+                references: self.reference_bindings.clone(),
                 ..Default::default()
             },
         )?;

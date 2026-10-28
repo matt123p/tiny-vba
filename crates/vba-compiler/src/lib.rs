@@ -23,6 +23,7 @@ fn push<T>(v: &mut Vec<T>, item: T) -> Result<()> {
 }
 #[derive(Clone, Debug)]
 pub struct CompileOptions {
+    pub references: vba_foreign::ReferenceSet,
     pub imports: Vec<vba_foreign::Import>,
     pub entry: String,
     pub revision: String,
@@ -32,6 +33,7 @@ pub struct CompileOptions {
 impl Default for CompileOptions {
     fn default() -> Self {
         Self {
+            references: vba_foreign::ReferenceSet::default(),
             imports: Vec::new(),
             entry: "Answer".into(),
             revision: "source-1".into(),
@@ -59,7 +61,12 @@ pub fn compile_modules(
     {
         return Err(error("invalid entry/revision/profile identifier"));
     }
-    let program = bound::bind_with_imports(modules, &options.entry, &options.imports)?;
+    let program = bound::bind_with_references(
+        modules,
+        &options.entry,
+        &options.imports,
+        &options.references,
+    )?;
     let mut sources = Vec::new();
     for module in &program.modules {
         let module_name = module

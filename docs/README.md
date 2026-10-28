@@ -75,6 +75,8 @@ and controlled native/WASI acceptance.
 - [ADR 0018: classic tools and debugger policy](decisions/0018-m10-classic-tools-and-debugger-policy.md)
 - [Remaining UI/host scope: standard Office forms and integration](ui/post-m8-roadmap.md)
 - [ADR 0019: remaining plan scope and numbering](decisions/0019-remaining-plan-scope.md)
+- [New M1 host-reference implementation log](m1-host-references.md)
+- [ADR 0020: explicit host reference snapshots](decisions/0020-explicit-host-reference-snapshots.md)
 - [Run, embed and reproduce visual evidence](ui/embedding.md)
 - [Acceptance and broader-spec feature status](ui/m8-acceptance.md)
 - [M8 completion audit: corrections, regression coverage and verification](ui/m8-completion-audit.md)

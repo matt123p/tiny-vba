@@ -117,6 +117,8 @@ fn run() -> Result<(), Box<dyn Error>> {
                     "embedding",
                     "--test",
                     "inspection",
+                    "--test",
+                    "references",
                     "--locked",
                     "--target",
                     "wasm32-wasip1",

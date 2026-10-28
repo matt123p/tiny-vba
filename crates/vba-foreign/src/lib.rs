@@ -1,5 +1,9 @@
 //! Owned, host-neutral M0 invocation/suspension prototype. No Office catalogue or ambient IO.
 #![forbid(unsafe_code)]
+mod references;
+pub use references::{
+    ReferenceConstant, ReferenceLibrary, ReferenceSet, ReferenceType, ReferenceTypeKind,
+};
 use vba_diagnostics::Diagnostic;
 use vba_values::{Location, Locations, ObjectRef, Value};
 

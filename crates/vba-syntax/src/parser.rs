@@ -221,9 +221,15 @@ impl Parser<'_> {
         if self.at("New") {
             return Err(self.unsupported("As New"));
         }
-        let name = self.name()?;
-        if self.eat(".") || self.at("*") || self.at("(") {
-            return Err(self.unsupported("qualified, fixed-length or array type"));
+        let mut name = self.name()?;
+        if self.eat(".") {
+            let member = self.name()?;
+            name.spelling.push('.');
+            name.spelling.push_str(&member.spelling);
+            name.span = self.source.span(name.span.start(), member.span.end())?;
+        }
+        if self.at(".") || self.at("*") || self.at("(") {
+            return Err(self.unsupported("deeply qualified, fixed-length or array type"));
         }
         Ok(Some(name))
     }

@@ -5,6 +5,14 @@ description: Design or review tiny-vba generic foreign calls, host references, B
 
 # Host and import boundaries
 
+New M1.1 reference binding uses the immutable, validated `ReferenceSet` contract in
+[ADR 0020](../../../docs/decisions/0020-explicit-host-reference-snapshots.md).
+Pass explicit snapshots through compiler/IDE configuration; never load a library
+or activate COM implicitly. Enum types bind to Long and constants to typed IR.
+Nominal host object descriptors remain unsupported until assignment/lifetime checks
+are enforced. Do not erase them to Object or infer default-member support from
+metadata. See the staged M1 log and retain existing host identity/cancel checks.
+
 Read [architecture ownership](../../../docs/architecture.md),
 [scope ADR](../../../docs/decisions/0001-repository-scope.md) and
 [UI ownership amendment](../../../docs/decisions/0002-editor-debugger-ui.md).

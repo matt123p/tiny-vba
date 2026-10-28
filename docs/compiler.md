@@ -4,6 +4,15 @@ IR 1/2 remain supported. Array parameter/layout metadata, ParamArray packing and
 capture are checked before execution. The historical M2/M4-first-slice restrictions below are
 superseded only by those explicitly documented additions.
 
+New M1.1 additionally supports qualified declared-type syntax and explicit
+`CompileOptions.references` / `bind_with_references` snapshots. Registered host
+enum types bind to Long; typed reference constants resolve in expressions,
+constant declarations, defaults and bounds. Source symbols retain precedence.
+Missing/undefined types and references fail explicitly. Nominal host object types
+remain unsupported; they are not aliases for Object. See
+[the exact profile](m1-host-references.md) and
+[ADR 0020](decisions/0020-explicit-host-reference-snapshots.md).
+
 # M2 binding and verified bytecode
 
 Updated for [M4 / IR 2](m4-language.md), adopted by [ADR 0011](decisions/0011-m4-language-extension.md).
