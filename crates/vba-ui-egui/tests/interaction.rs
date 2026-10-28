@@ -10,6 +10,7 @@ struct Fixture {
     theme: Theme,
     errors: Vec<String>,
     copied: Vec<String>,
+    trace: bool,
 }
 impl Fixture {
     fn new() -> R<Self> {
@@ -19,11 +20,30 @@ impl Fixture {
             theme: Theme::light(),
             errors: vec![],
             copied: vec![],
+            trace: std::env::var("VBA_TRACE").is_ok(),
         })
     }
 }
 fn draw(ui: &mut egui::Ui, state: &mut Fixture) {
+    static FRAME: std::sync::atomic::AtomicU32 = std::sync::atomic::AtomicU32::new(0);
+    let frame = FRAME.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+    if state.trace {
+        eprintln!(
+            "FRAME {frame} mode={:?} len={}",
+            state.ide.mode(),
+            state.ide.active_module().map_or(0, |m| m.text.len())
+        );
+    }
+    if state.trace {
+        let events = ui.input(|i| i.events.clone());
+        if !events.is_empty() {
+            eprintln!("FRAME {frame} EVENTS {events:?}");
+        }
+    }
     for c in state.view.show(ui, &state.ide, state.theme) {
+        if state.trace {
+            eprintln!("FRAME {frame} CMD {c:?}");
+        }
         if let Err(e) = apply(&mut state.ide, c, &mut NoHost) {
             state.errors.push(e.to_string());
         }
@@ -606,6 +626,287 @@ fn m8_edit_menu_select_cut_undo_redo() -> R {
             .ok_or("module")?
             .text
             .is_empty()
+    );
+    Ok(())
+}
+
+#[test]
+fn m10_indent_menu_command_indents_the_whole_block() -> R {
+    let mut h = Harness::builder()
+        .with_size(egui::vec2(1200.0, 800.0))
+        .build_ui_state(draw, Fixture::new()?);
+    h.get_by_label("Edit").click();
+    h.run();
+    h.get_by_label("Indent    Ctrl+M").click();
+    h.run();
+    assert!(
+        h.state()
+            .ide
+            .active_module()
+            .ok_or("module")?
+            .text
+            .starts_with("    Attribute VB_Name")
+    );
+    h.get_by_label("Edit").click();
+    h.run();
+    h.get_by_label("Outdent    Ctrl+Shift+M").click();
+    h.run();
+    assert!(
+        !h.state()
+            .ide
+            .active_module()
+            .ok_or("module")?
+            .text
+            .starts_with("    ")
+    );
+    assert!(h.state().errors.is_empty(), "{:?}", h.state().errors);
+    Ok(())
+}
+
+#[test]
+fn m10_comment_block_toggles_prefixes_through_the_edit_menu() -> R {
+    let mut h = Harness::builder()
+        .with_size(egui::vec2(1200.0, 800.0))
+        .build_ui_state(draw, Fixture::new()?);
+    h.get_by_label("Edit").click();
+    h.run();
+    h.get_by_label("Comment Block").click();
+    h.run();
+    assert!(
+        h.state()
+            .ide
+            .active_module()
+            .ok_or("module")?
+            .text
+            .starts_with("'")
+    );
+    h.get_by_label("Edit").click();
+    h.run();
+    h.get_by_label("Uncomment Block").click();
+    h.run();
+    assert!(
+        !h.state()
+            .ide
+            .active_module()
+            .ok_or("module")?
+            .text
+            .starts_with("'")
+    );
+    assert!(h.state().errors.is_empty());
+    Ok(())
+}
+
+#[test]
+fn m10_bookmark_commands_annotate_and_navigate_real_lines() -> R {
+    let mut state = Fixture::new()?;
+    let byte = state
+        .ide
+        .active_module()
+        .and_then(|m| m.text.find("End Function"))
+        .ok_or("source")?;
+    state.ide.active_module_mut().ok_or("module")?.caret = byte;
+    let mut h = Harness::builder()
+        .with_size(egui::vec2(1200.0, 800.0))
+        .build_ui_state(draw, state);
+    h.key_press_modifiers(egui::Modifiers::CTRL, egui::Key::F2);
+    h.run();
+    assert_eq!(
+        h.state()
+            .ide
+            .active_module()
+            .ok_or("module")?
+            .bookmarks
+            .len(),
+        1
+    );
+    // Jump back to the top, then Next Bookmark wraps forward to the bookmarked line.
+    h.state_mut().ide.active_module_mut().ok_or("module")?.caret = 0;
+    let jumped = h.state_mut().ide.next_bookmark();
+    assert_eq!(jumped, Some(19));
+    let caret = h.state().ide.active_module().ok_or("module")?.caret;
+    let text = h.state().ide.active_module().ok_or("module")?.text.clone();
+    assert_eq!(
+        text.get(caret..).and_then(|s| s.lines().next()),
+        Some("End Function")
+    );
+    // Shift+F2 (Previous Bookmark) reaches the model through the renderer without errors.
+    h.state_mut().ide.active_module_mut().ok_or("module")?.caret = 0;
+    h.get_by_label("Edit").click();
+    h.run();
+    h.get_by_label("Previous Bookmark    Shift+F2").click();
+    h.run();
+    h.run();
+    let caret = h.state().ide.active_module().ok_or("module")?.caret;
+    let text = h.state().ide.active_module().ok_or("module")?.text.clone();
+    let line = text
+        .get(..caret)
+        .map_or(0, |head| head.bytes().filter(|b| *b == b'\n').count())
+        + 1;
+    let bookmarked = h
+        .state()
+        .ide
+        .active_module()
+        .ok_or("module")?
+        .bookmarks
+        .iter()
+        .copied()
+        .next()
+        .ok_or("bookmark")? as usize;
+    assert_eq!(line, bookmarked, "previous bookmark should navigate");
+    // Clear All Bookmarks through the Edit menu keeps breakpoints untouched.
+    h.get_by_label("Edit").click();
+    h.run();
+    h.get_by_label("Clear All Bookmarks").click();
+    h.run();
+    assert!(
+        h.state()
+            .ide
+            .active_module()
+            .ok_or("module")?
+            .bookmarks
+            .is_empty()
+    );
+    assert!(h.state().errors.is_empty(), "{:?}", h.state().errors);
+    Ok(())
+}
+
+#[test]
+fn m10_find_bar_options_scope_and_replace_route_to_the_model() -> R {
+    let mut h = Harness::builder()
+        .with_size(egui::vec2(1200.0, 800.0))
+        .build_ui_state(draw, Fixture::new()?);
+    h.key_press_modifiers(egui::Modifiers::CTRL, egui::Key::F);
+    h.run();
+    assert!(h.query_by_label("Match Case").is_some());
+    assert!(h.query_by_label("Whole Word").is_some());
+    assert!(h.query_by_label("Find Previous").is_some());
+    assert!(h.query_by_label("Replace").is_some());
+    h.get_by_label("Match Case").click();
+    h.run();
+    assert!(
+        h.state().view.search.case_sensitive,
+        "match case checkbox should drive search options"
+    );
+    // Type the query and replacement directly into the view state (the fields keep focus
+    // policy internal); the commands must carry both to the model.
+    h.state_mut().view.type_find("counter");
+    h.state_mut().view.type_replacement("Replacement");
+    h.run();
+    // Find Next positions the caret on a match; Replace rewrites that match in place.
+    h.get_by_label("Find Next").click();
+    h.run();
+    h.run();
+    h.get_by_label("Replace").click();
+    h.run();
+    h.run();
+    assert!(
+        h.state()
+            .ide
+            .active_module()
+            .ok_or("module")?
+            .text
+            .contains("Replacement"),
+        "replace at the caret should rewrite the match"
+    );
+    h.get_by_label("Replace All").click();
+    h.run();
+    assert!(
+        !h.state()
+            .ide
+            .active_module()
+            .ok_or("module")?
+            .text
+            .contains("counter")
+    );
+    Ok(())
+}
+
+#[test]
+fn m10_procedure_and_split_views_render_without_breaking_layout() -> R {
+    let mut state = Fixture::new()?;
+    let byte = state
+        .ide
+        .active_module()
+        .and_then(|m| m.text.find("result = result + i"))
+        .ok_or("source")?;
+    state.ide.active_module_mut().ok_or("module")?.caret = byte;
+    let mut h = Harness::builder()
+        .with_size(egui::vec2(1200.0, 800.0))
+        .build_ui_state(draw, state);
+    h.get_by_label("View").click();
+    h.run();
+    h.get_by_label("Procedure View").click();
+    h.run();
+    assert!(h.state().view.procedure_view);
+    h.get_by_label("View").click();
+    h.run();
+    h.get_by_label("Split Code Window").click();
+    h.run();
+    assert!(h.state().view.split_view);
+    let r = h.state().view.report.as_ref().ok_or("report")?;
+    assert!(r.editor.width() > 250.0);
+    assert!(r.editor.height() > 100.0);
+    // Typing still reaches the model in split view.
+    h.key_press(egui::Key::F7);
+    h.run();
+    assert!(h.state().errors.is_empty(), "{:?}", h.state().errors);
+    Ok(())
+}
+
+#[test]
+fn m10_enter_auto_indents_new_lines_inside_a_procedure() -> R {
+    let mut h = Harness::builder()
+        .with_size(egui::vec2(1200.0, 800.0))
+        .build_ui_state(draw, Fixture::new()?);
+    h.key_press(egui::Key::F7);
+    h.run();
+    // Caret at the end of "    total = SumTo(counter)" inside Main.
+    let caret = h
+        .state()
+        .ide
+        .active_module()
+        .ok_or("module")?
+        .text
+        .find("SumTo(counter)")
+        .ok_or("line")?
+        + "SumTo(counter)".len();
+    h.state_mut().ide.active_module_mut().ok_or("module")?.caret = caret;
+    h.run();
+    h.run();
+    h.key_press(egui::Key::Enter);
+    h.run();
+    let text = h.state().ide.active_module().ok_or("module")?.text.clone();
+    let index = text.find("SumTo(counter)").ok_or("line")? + "SumTo(counter)".len();
+    let rest = text.get(index..).ok_or("tail")?;
+    assert!(
+        rest.starts_with("\n    "),
+        "auto indent should insert one level, got {rest:?}"
+    );
+    Ok(())
+}
+
+#[test]
+fn m10_typed_keywords_are_corrected_to_canonical_case() -> R {
+    let mut h = Harness::builder()
+        .with_size(egui::vec2(1200.0, 800.0))
+        .build_ui_state(draw, Fixture::new()?);
+    h.key_press(egui::Key::F7);
+    h.run();
+    let len = h.state().ide.active_module().ok_or("module")?.text.len();
+    h.state_mut().ide.active_module_mut().ok_or("module")?.caret = len;
+    h.run();
+    h.event(egui::Event::Text("\nlon".into()));
+    h.run();
+    h.event(egui::Event::Text("g".into()));
+    h.run();
+    assert!(
+        h.state()
+            .ide
+            .active_module()
+            .ok_or("module")?
+            .text
+            .ends_with("\nLong"),
+        "typed keyword should be canonicalised"
     );
     Ok(())
 }

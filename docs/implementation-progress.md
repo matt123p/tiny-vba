@@ -4,6 +4,22 @@ Updated 2026-10-27. Current stage: **M8 complete for the defined standalone/embe
 profile remains m5-host-v1 with verified IR 1/2/3/4. M8-A1–A3 and the reported code-assistance defects are corrected and verified. M9 is next. Real
 workbook integration, event order and package/trust/preservation evidence remain fork-owned.
 
+
+## M10 editing aids — feature branch checkpoint (2026-10-28)
+
+On `feature/m10-editing-aids`, stashed tracked/untracked editor work, fast-forwarded from
+`origin/main` through `612c4a4`, then restored it without conflicts. This checkpoint preserves
+partial M10 work: block indent/comment operations, automatic indentation/keyword case,
+bookmarks, scoped/case/whole-word search and replacement, and procedure/split views. It does
+not mark M10 complete or change main's accepted M8 baseline.
+
+Applied formatting and mechanical lint fixes. `cargo xtask wasm` and `cargo xtask wasm-run`
+pass, including the 17 editing-model tests. `cargo xtask ci` passes formatting and strict
+Clippy, then fails the existing `m8_edit_menu_select_cut_undo_redo` regression: 27 of 28 UI
+interaction tests pass, including all seven new M10 interaction tests. The next step is to
+repair that Undo/Redo regression and rerun complete UI/native/browser acceptance before merge.
+The pre-pull stash is retained as a backup; this checkpoint is published to the feature branch.
+
 ## M8 completion corrections
 
 The latest user request makes working IntelliSense and syntax feedback part of M8. Added public

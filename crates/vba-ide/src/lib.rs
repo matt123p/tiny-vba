@@ -2,8 +2,13 @@
 //! This layer never opens files, dialogs, network connections or Office documents.
 #![forbid(unsafe_code)]
 mod code_aids;
+mod editing;
 mod evaluate;
 pub use code_aids::{completion_prefix, editor_byte, editor_text, line_starts, source_byte};
+pub use editing::{
+    EditorOptions, SearchOptions, SearchScope, block_delta, canonical_keyword, find_range,
+    find_range_backwards,
+};
 pub use evaluate::{display_value, type_name};
 use std::collections::{BTreeMap, BTreeSet};
 use vba_compiler::{CompileOptions, compile_modules};
@@ -31,6 +36,8 @@ pub struct Procedure {
     pub signature: String,
     pub public: bool,
     pub start: usize,
+    /// Byte end of the whole procedure; bounds procedure-scope search and views.
+    pub end: usize,
     pub line: usize,
 }
 #[derive(Clone, Debug)]
@@ -43,6 +50,12 @@ pub struct Module {
     pub saved_revision: u64,
     saved_text: String,
     pub breakpoints: BTreeSet<u32>,
+    /// One-based bookmarked lines; presentation-only anchors, never source text.
+    pub bookmarks: BTreeSet<u32>,
+    /// Automatic indentation for newly created lines (project-level flag mirror).
+    pub auto_indent: bool,
+    /// Canonical keyword case correction while typing (project-level flag mirror).
+    pub case_keywords: bool,
     pub procedures: Vec<Procedure>,
     pub syntax_diagnostics: Vec<Diagnostic>,
     symbols: Vec<code_aids::Symbol>,
@@ -99,6 +112,7 @@ impl Module {
                             .unwrap_or_default()
                             .into(),
                         start,
+                        end: p.span.end() as usize,
                         line: self.line_at(start),
                     }
                 })
@@ -248,6 +262,10 @@ pub struct Ide {
     pub catalog: Vec<ApiMember>,
     pub selected_frame: usize,
     pub break_on_errors: bool,
+    /// Editor behaviour owned by the model: tab width, auto indent and keyword case.
+    pub editor_options: EditorOptions,
+    /// Scope remembered from the last search for Find Next/Previous.
+    editor_scope: SearchScope,
     next_source: u64,
     revision: u64,
     stale: bool,
@@ -277,6 +295,8 @@ impl Ide {
             catalog: vec![],
             selected_frame: 0,
             break_on_errors: false,
+            editor_options: EditorOptions::default(),
+            editor_scope: SearchScope::Module,
             next_source: 1,
             revision: 0,
             stale: false,
@@ -359,6 +379,9 @@ impl Ide {
             saved_revision: 0,
             saved_text: text.into(),
             breakpoints: BTreeSet::new(),
+            bookmarks: BTreeSet::new(),
+            auto_indent: self.editor_options.auto_indent,
+            case_keywords: self.editor_options.case_keywords,
             procedures: vec![],
             syntax_diagnostics: vec![],
             symbols: vec![],
@@ -404,6 +427,7 @@ impl Ide {
         let module = self
             .active_module_mut()
             .ok_or_else(|| error("no active module"))?;
+        let old_text = module.text.clone();
         module.text = text;
         module.revision = module
             .revision
@@ -412,6 +436,7 @@ impl Ide {
         module.caret = module.caret.min(module.text.len());
         let had_breakpoints = !module.breakpoints.is_empty();
         module.breakpoints.clear();
+        Module::reanchor_bookmarks(&old_text, &module.text, &mut module.bookmarks);
         module.refresh();
         if had_breakpoints {
             self.message("Source changed: breakpoints cleared; set them against the new revision.");
@@ -634,6 +659,7 @@ impl Ide {
                 self.toggle_breakpoint_at(byte)?;
             }
             Action::ClearBreakpoints => {
+                // Breakpoint clearing never touches user bookmarks (UI specification section 9).
                 for m in &mut self.modules {
                     m.breakpoints.clear();
                 }
