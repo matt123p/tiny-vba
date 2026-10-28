@@ -30,7 +30,13 @@ impl Host for TestHost {
     fn identity(&self) -> u64 {
         GOOD.host
     }
-    fn invoke(&mut self, _: HostCall) -> Reply {
+    fn invoke(&mut self, call: HostCall) -> Reply {
+        if call.member.eq_ignore_ascii_case("Value") {
+            return Reply::Complete(vba_foreign::Completion {
+                value: Value::Long(7),
+                writes: vec![],
+            });
+        }
         Reply::Error(ForeignError {
             number: 5,
             description: "unexpected dispatch".into(),
@@ -72,7 +78,13 @@ fn ide_edits_and_isolated_scalar_array_calls_keep_nominal_identity() -> R {
         [("root".into(), GOOD), ("bad".into(), WRONG)]
             .into_iter()
             .collect(),
-        vec![],
+        vec![vba_ide::ApiMember {
+            library: "HostLib".into(),
+            owner: "Item".into(),
+            name: "Value".into(),
+            signature: "Property Get Value() As Long".into(),
+            supported: true,
+        }],
     )?;
     ide.configure_type_resolver(Some(Arc::new(Types)))?;
     ide.toggle_breakpoint_at(source.find("Debug.Print").ok_or("breakpoint")?)?;
@@ -84,6 +96,11 @@ fn ide_edits_and_isolated_scalar_array_calls_keep_nominal_identity() -> R {
         ide.tick(&mut TestHost)?;
     }
     assert_eq!(ide.mode(), Mode::Break);
+    assert_eq!(ide.completions("item.V"), vec!["Value"]);
+    assert_eq!(
+        ide.quick_info("item.Value").as_deref(),
+        Some("Property Get Value() As Long")
+    );
     assert!(ide.edit_local("item", "other").is_err());
     assert_eq!(ide.evaluate("item")?, Value::Object(GOOD));
     let policy = EvaluationPolicy {
@@ -100,5 +117,40 @@ fn ide_edits_and_isolated_scalar_array_calls_keep_nominal_identity() -> R {
     assert_eq!(ide.evaluate("items(0)")?, Value::Object(GOOD));
     assert!(ide.configure_type_resolver(None).is_err());
     assert_eq!(ide.mode(), Mode::Break);
+    Ok(())
+}
+
+#[test]
+fn qualified_catalog_owners_do_not_guess_between_same_named_library_types() -> R {
+    let source = "Sub Main()\nDim item As HostLib.Item\nEnd Sub";
+    let mut ide = Ide::new();
+    let id = ide.add_module("Main.bas", source)?;
+    ide.navigate(id, source.find("Dim item").ok_or("caret")? + 8)?;
+    ide.configure_reference_bindings(ReferenceSet::new(
+        ["HostLib", "OtherLib"]
+            .into_iter()
+            .map(|name| ReferenceLibrary {
+                name: name.into(),
+                version: "1".into(),
+                available: true,
+                types: vec![ReferenceType {
+                    name: "Item".into(),
+                    kind: ReferenceTypeKind::Object,
+                }],
+                constants: vec![],
+            })
+            .collect(),
+    )?)?;
+    let member = |owner: &str| vba_ide::ApiMember {
+        library: "Unresolved display label".into(),
+        owner: owner.into(),
+        name: "Value".into(),
+        signature: "Property Get Value() As Long".into(),
+        supported: true,
+    };
+    ide.configure_host(vec![], Default::default(), vec![member("Item")])?;
+    assert!(ide.completions("item.V").is_empty());
+    ide.configure_host(vec![], Default::default(), vec![member("HostLib.Item")])?;
+    assert_eq!(ide.completions("item.V"), vec!["Value"]);
     Ok(())
 }

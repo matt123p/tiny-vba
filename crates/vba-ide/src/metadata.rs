@@ -22,6 +22,66 @@ pub struct ReferenceInfo {
 }
 
 impl Ide {
+    pub(crate) fn catalog_owner_matches(&self, item: &crate::ApiMember, declared: &str) -> bool {
+        if let Ok(Some(ty)) = self.reference_bindings.object_type(declared) {
+            if item
+                .owner
+                .eq_ignore_ascii_case(&format!("{}.{}", ty.library(), ty.name()))
+            {
+                return true;
+            }
+            if !item.owner.eq_ignore_ascii_case(ty.name()) {
+                return false;
+            }
+            if item.library.eq_ignore_ascii_case(ty.library()) {
+                return true;
+            }
+            return self
+                .reference_bindings
+                .libraries()
+                .iter()
+                .filter(|r| r.available)
+                .flat_map(|r| &r.types)
+                .filter(|t| {
+                    t.kind == vba_foreign::ReferenceTypeKind::Object
+                        && t.name.eq_ignore_ascii_case(ty.name())
+                })
+                .count()
+                == 1;
+        }
+        item.owner.eq_ignore_ascii_case(declared)
+    }
+    fn catalog_type(&self, declared: String) -> String {
+        if self
+            .catalog
+            .iter()
+            .any(|m| m.supported && m.owner.eq_ignore_ascii_case(&declared))
+        {
+            return declared;
+        }
+        if let Ok(Some(ty)) = self.reference_bindings.object_type(&declared) {
+            let count = self
+                .reference_bindings
+                .libraries()
+                .iter()
+                .filter(|r| r.available)
+                .flat_map(|r| &r.types)
+                .filter(|t| {
+                    t.kind == vba_foreign::ReferenceTypeKind::Object
+                        && t.name.eq_ignore_ascii_case(ty.name())
+                })
+                .count();
+            if count == 1
+                && let Some(member) = self
+                    .catalog
+                    .iter()
+                    .find(|m| m.supported && m.owner.eq_ignore_ascii_case(ty.name()))
+            {
+                return member.owner.clone();
+            }
+        }
+        declared
+    }
     /// Borrow the host's existing object model for bounded, read-only type checks.
     pub fn configure_type_resolver(
         &mut self,
@@ -83,7 +143,7 @@ impl Ide {
         }
         let mut parts = receiver.split('.');
         let root = parts.next()?;
-        let mut ty = self
+        let ty = self
             .source_completions()
             .into_iter()
             .find(|(name, _)| name.eq_ignore_ascii_case(root))
@@ -94,20 +154,21 @@ impl Ide {
                     .find(|item| item.supported && item.owner.eq_ignore_ascii_case(root))
                     .map(|item| item.owner.clone())
             })?;
+        let mut ty = self.catalog_type(ty);
         for (depth, part) in parts.enumerate() {
             if depth >= 32 {
                 return None;
             }
             let member = self.catalog.iter().find(|item| {
                 item.supported
-                    && item.owner.eq_ignore_ascii_case(&ty)
+                    && self.catalog_owner_matches(item, &ty)
                     && item.name.eq_ignore_ascii_case(part)
             })?;
             let words = member.signature.split_whitespace().collect::<Vec<_>>();
             let at = words
                 .iter()
                 .rposition(|word| word.eq_ignore_ascii_case("As"))?;
-            ty = words.get(at + 1)?.trim_matches(['(', ')']).to_string();
+            ty = self.catalog_type(words.get(at + 1)?.trim_matches(['(', ')']).to_string());
         }
         Some(ty)
     }
@@ -295,10 +356,7 @@ impl Ide {
             .find(|item| {
                 item.supported
                     && item.name.eq_ignore_ascii_case(member)
-                    && (item.owner.eq_ignore_ascii_case(owner)
-                        || ty
-                            .as_ref()
-                            .is_some_and(|ty| item.owner.eq_ignore_ascii_case(ty)))
+                    && self.catalog_owner_matches(item, ty.as_deref().unwrap_or(owner))
             })
             .map(|item| item.signature.clone())
     }

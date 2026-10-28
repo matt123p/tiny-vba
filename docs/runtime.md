@@ -1,11 +1,11 @@
 # M3/M4 runtime and debugger
 
-Implemented 2026-10-26. The current consumer is `m5-host-v1`, using verified IR 1/2/3/4.
+Implemented 2026-10-26, extended by new M1.1. The current consumer is `m5-host-v1`, using verified IR 1/2/3/4/5.
 The [M4 language contract](m4-language.md) and [ADR 0011](decisions/0011-m4-language-extension.md)
 define scalar coercions, arrays, arguments, persistent state, builtins and VBA handlers.
 [ADR 0013](decisions/0013-m5-host-contract.md) adds the versioned native host protocol and hidden
 host-root imports. The headless debugger and generic host protocol retain their M3 lifecycle
-contracts. Visual IDE, DAP and Office objects remain later milestones.
+contracts. The visual IDE and optional DAP are implemented; Office objects remain fork-owned.
 
 ```sh
 cargo run -p vba-cli -- run examples/pure-vba/Arithmetic.bas
@@ -220,4 +220,3 @@ debugger edits share checks. Handles include host/object/generation; wrong types
 fail with 13 and stale handles with 91. Query work/payload is budgeted; no Office
 object definitions, COM loader or duplicate registry are introduced. See
 [M1 acceptance](m1-host-references.md) for exact tests and remaining stages.
-

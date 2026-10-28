@@ -1270,10 +1270,7 @@ impl Ide {
                     names.insert("Print".into());
                 }
                 for item in &self.catalog {
-                    if (item.owner.eq_ignore_ascii_case(owner)
-                        || receiver_type
-                            .as_ref()
-                            .is_some_and(|ty| item.owner.eq_ignore_ascii_case(ty)))
+                    if self.catalog_owner_matches(item, receiver_type.as_deref().unwrap_or(owner))
                         && item.supported
                         && item
                             .name
