@@ -1,7 +1,7 @@
 # Plan of action
 
-Updated 2026-10-27. This plan builds the interpreter and editor/debugger UI here; document/Office integration stays external.
-The user-requested GridCraft M14 baseline is now underway in the fork; follow the
+Updated 2026-10-28. This plan builds the interpreter and editor/debugger UI here; document/Office integration stays external.
+The GridCraft M14 baseline and exposed-profile audit are implemented in the fork; follow the
 [staged integration work log](gridcraft-integration.md) to resume or verify it.
 Setup and the documented M0–M3 subsets are complete. The detailed [bytecode/VM specification](bytecode-vm-specification.md)
 and [ADR 0004](decisions/0004-bytecode-vm-contract.md) are written before frontend work continues.
@@ -31,6 +31,120 @@ remain M9 work.
 | M12 — native Craft extensions and enhancements — planned | Versioned extension API/manager, opt-in non-Microsoft editor features and Python translation preview | Capability/unload/isolation, preview/undo and supported-subset conversion tests; Classic mode works with extensions disabled; [scope](ui/post-m8-roadmap.md#m12--native-craft-extensions-and-non-microsoft-enhancements) |
 | M13 — optional Copilot-style assistance — planned | Opt-in inline/chat assistance, provider/privacy policy, source-aware previews and approved retrieval | Permission/offline/injection/cancellation/undo/shortcut tests; no implicit execution; [scope](ui/post-m8-roadmap.md#m13--optional-copilot-style-assistance) |
 | M14 — host integration acceptance — GridCraft baseline implemented; broader cross-repository scope planned | Shared GridCraft UI and bounded workbook adapter implemented; WordCraft, broader events/forms/signatures remain planned | [GridCraft baseline evidence and limits](gridcraft-integration.md); [broader scope](ui/post-m8-roadmap.md#m14--gridcraft-and-wordcraft-integration-acceptance) |
+| M15 — host types, default members and collections — planned | Generic host type/reference/constant binding, default-member dispatch and enumeration; fork supplies Excel metadata and collections | Unchanged typed declarations and collection/default-property source execute in GridCraft; generic native/WASM tests remain host-neutral |
+| M16 — Excel range and worksheet coverage — planned, fork-owned | Lightweight references separate from materialization; Cells/Rows/Columns/Item, relative and named ranges, navigation | Unchanged authored range workflows pass with bounds, protection, undo/recalc and native/WASM checks |
+| M17 — Excel identity, values and member semantics — planned | Stable host identities, active versus code-owner roots, Value/Value2, Address, formatting and application settings | Exact typed results, signatures, side effects and lifetime behavior match the declared Excel profile; no success stubs |
+| M18 — document modules, events and Range-aware UDFs — planned | Reuse M11 language/class prerequisites and M7 callbacks; fork supplies codenames, event ordering, controls and UDF context | Authored unchanged workbook/worksheet handlers and Range-aware Functions run, pause/resume and clean up safely |
+| M19 — unchanged-workbook and package acceptance — planned | Reviewed licensed workbook suite, load/compile/run/save reporting, controls/package preservation and separately reviewed VBA writeback | Per-workbook source identity, exact effects/results/events and package evidence; no general compatibility claim from subset tests |
+
+## Excel source-compatibility milestones (M15–M19)
+
+These milestones allocate the remaining work from the 2026-10-28
+[GridCraft audit](https://github.com/matt123p/gridcraft/blob/97123e580deb309329668a994ebc6004030e1a86/docs/vba-excel-compatibility.md).
+All are **planned, not implemented**. M14.10 already corrected member ownership,
+two-endpoint Worksheet.Range, ownership links and Range.Row/Column/Count; those
+fixes remain delivered. M14 is the host-integration umbrella; M15–M19 make its
+remaining Excel compatibility work independently implementable and testable.
+WordCraft acceptance remains in M14 and is not implied by Excel results.
+
+### M15 — Host types, default members and collections
+
+Owner: tiny-vba generic language/foreign contracts; GridCraft Excel metadata and objects.
+Depends on M5/M7 and the audited M14 baseline; coordinate metadata UI with M10.
+
+- **M15.1:** Specify and implement host-supplied type namespaces, reference and
+  constant binding so declarations such as `As Worksheet` and `As Excel.Range`
+  compile unchanged. Preserve Object/Variant late binding and explicit missing-reference
+  diagnostics; no Excel names or dependencies enter the shared engine.
+- **M15.2:** Implement default Get/Let/Set and parameterized Item dispatch,
+  including fixed-member import chaining, named/omitted arguments, ByRef
+  obligations, return types and exact errors. Do not discard member applications.
+- **M15.3:** Add bounded host collection enumeration and the language constructs
+  needed by selected unchanged collection workflows. GridCraft supplies actual
+  Worksheets/Sheets collections, Count/Item and supported sheet kinds.
+
+Acceptance: generic fake-host regressions plus fork tests for typed declarations,
+`Worksheets.Count`, indexed/default Item and collection loops; exact values,
+argument/error behavior, stale handles and cancellation in native and actual WASM.
+
+### M16 — Excel range and worksheet coverage
+
+Owner: GridCraft; tiny-vba changes only for generic mechanisms proven necessary.
+Depends on M15 for typed/default-member/collection source acceptance.
+
+- **M16.1:** Separate range-reference construction from cell materialization
+  budgets. Implement Cells zero/one/two-index forms and column letters, Rows,
+  Columns, CountLarge and Item, with Excel argument names and coercion rules.
+- **M16.2:** Implement relative Range.Range, Offset/Resize, local/qualified and
+  named references, and explicit multi-area behavior. Preserve sheet ownership
+  and checked arithmetic without allocating whole-sheet cell arrays.
+- **M16.3:** Add UsedRange, End and Find/navigation workflows; route structural
+  edits through native engine commands, including protection and undo/recalc.
+
+Acceptance: authored unchanged source covers common last-row, iteration,
+relative/named range and boundary workflows; exact addresses/types, overflow/errors,
+resource refusals and mutation atomicity pass natively and in WASM.
+
+### M17 — Excel identity, values and member semantics
+
+Owner: GridCraft document identity, conversion and command layers; shared VBA
+coercion stays in tiny-vba. Depends on M15 and applicable M16 reference support.
+
+- **M17.1:** Supply stable worksheet identities and dynamic roots; distinguish
+  ThisWorkbook from ActiveWorkbook and support active sheet/cell/selection without
+  retargeting stale handles after sheet rename/reorder or document switching.
+- **M17.2:** Match Value versus Value2 Date/Currency behavior, typed errors,
+  scalar/array assignment and formula/text conversion. Complete Address's optional
+  arguments and supported A1/R1C1, relative and external forms.
+- **M17.3:** Implement required formatting objects, application settings and
+  calculation/member signatures with real engine behavior. Catalogue completion
+  must describe actual support; unsupported operations retain explicit failures.
+
+Acceptance: exact value tags, array bounds, signatures/named arguments, owner
+identity, selection and calculation side effects; document/sheet lifecycle and
+undo/protection regressions. Record public documentation versus observed evidence.
+
+### M18 — Document modules, events and Range-aware UDFs
+
+Owner: tiny-vba reusable class/document semantics under M11 and callback lifecycle
+under M7; GridCraft document bindings, events, controls and calculation context.
+Depends on those prerequisites and relevant M15–M17 capabilities; do not duplicate M11.
+
+- **M18.1:** Execute supported workbook/worksheet modules with code-name roots,
+  correct signatures and code-owner context while keeping import inert.
+- **M18.2:** Deliver Workbook_Open/Worksheet_Change and selected document/control
+  events with defined ordering, EnableEvents, reentrancy/recursion budgets,
+  cancellation and partial-side-effect policy. Connect M11 forms where required;
+  arbitrary ActiveX/COM remains a separately reviewed capability.
+- **M18.3:** Add Range/reference-aware UDF arguments and Caller/Volatile/context
+  behavior, persistent state and recalculation rules where supported; enforce the
+  declared UDF mutation policy without silently substituting value arrays.
+
+Acceptance: authored unchanged event and UDF source executes against real
+GridCraft state; pause/inspect/resume, exactly-once dispatch, reset/close/trust
+revocation and calculation dependencies pass. No untrusted automatic open execution.
+
+### M19 — Unchanged-workbook and package acceptance
+
+Owner: GridCraft acceptance/package layer, coordinated with tiny-vba M9 evidence
+and source-import contracts. Depends on the capabilities required by each specimen,
+normally M15–M18 and M11 for forms; optional extensions/AI are not prerequisites.
+
+- **M19.1:** Curate licensed, reviewed workbooks with declared language/object/
+  reference/control requirements and independently established expected results.
+  Use public documentation and permitted observations, never proprietary code or
+  unlicensed fixtures. Keep candidate/unrun material separate from executable cases.
+- **M19.2:** Report load, compile, run and save separately for unchanged source;
+  compare source identity, exact typed values/errors, effects/events and package
+  relationships/payloads. Cover controls/forms, trust and lifecycle explicitly.
+- **M19.3:** Design binary project writeback and signature preservation/invalidation
+  as a separate reviewed contract before implementation. Original-byte preservation
+  is not edited-source writeback; no protection/P-code bypass or unrestricted add-ins.
+
+Acceptance: per-workbook feature/profile/version and evidence records with PASS,
+MISMATCH, UNSUPPORTED and NOT_RUN distinguished. Run both repositories' required
+CI/WASM gates and actual fork workflows. Publish remaining incompatibilities;
+subset success never establishes universal Excel compatibility.
 
 ## Post-M8 scope allocation
 
@@ -77,6 +191,11 @@ M3 replacement-session isolation correction under ADR 0008.
    extensions/translation and M13 optional AI according to their dependency gates. M14 tracks
    fork-owned integration and can progress independently of optional extensions/AI. See the
    [post-M8 roadmap](ui/post-m8-roadmap.md) for the authoritative deferred scope.
+
+6. For unchanged Excel source, start M15.1's generic host-type contract and typed
+   declaration proof, then M15.2/M15.3. Progress through M16–M19 by their dependencies;
+   keep the [integration work log](gridcraft-integration.md) current at each stage.
+   This compatibility track can advance independently of optional M12/M13 work.
 
 ## Measurement and decisions
 
