@@ -280,10 +280,14 @@ fn heading(ui: &mut egui::Ui, label: &str, theme: Theme) {
     ui.label(RichText::new(label).strong().color(theme.text));
     ui.separator();
 }
-fn window_theme(ui:&mut egui::Ui,theme:Theme) {
-    *ui.visuals_mut()=if theme.dark {egui::Visuals::dark()} else {egui::Visuals::light()};
-    ui.visuals_mut().override_text_color=Some(theme.text);
-    ui.visuals_mut().extreme_bg_color=theme.editor;
+fn window_theme(ui: &mut egui::Ui, theme: Theme) {
+    *ui.visuals_mut() = if theme.dark {
+        egui::Visuals::dark()
+    } else {
+        egui::Visuals::light()
+    };
+    ui.visuals_mut().override_text_color = Some(theme.text);
+    ui.visuals_mut().extreme_bg_color = theme.editor;
 }
 fn text_field(ui: &mut egui::Ui, text: &mut String, label: &str) -> egui::Response {
     ui.add(TextEdit::singleline(text).hint_text(label))
@@ -720,14 +724,52 @@ if response.double_clicked(){self.focus_editor=true;}response.context_menu(|ui|{
         });
     }
     fn shortcuts(&mut self, ctx: &egui::Context, ide: &Ide, commands: &mut Vec<Command>) {
-        if ctx.input_mut(|i|i.consume_key(egui::Modifiers::CTRL|egui::Modifiers::SHIFT,egui::Key::M)) {self.edit_operation=Some(EditOperation::Block(vba_ide::BlockEdit::Outdent));}
-        if ctx.input_mut(|i|i.consume_key(egui::Modifiers::CTRL,egui::Key::M)) {self.edit_operation=Some(EditOperation::Block(vba_ide::BlockEdit::Indent));}
-        if ctx.input_mut(|i|i.consume_key(egui::Modifiers::SHIFT,egui::Key::F2)) {commands.push(Command::Definition(ide.word_at_caret()));self.navigate=true;}
-        if ctx.input_mut(|i|i.consume_key(egui::Modifiers::CTRL|egui::Modifiers::SHIFT,egui::Key::F2)) {commands.push(Command::NavigateBack);self.navigate=true;}
-        if ctx.input_mut(|i|i.consume_key(egui::Modifiers::SHIFT,egui::Key::F9)) && ide.mode()==Mode::Break {self.quick_watch=true;self.watch=ide.word_at_caret();}
-        if ctx.input_mut(|i|i.consume_key(egui::Modifiers::CTRL|egui::Modifiers::SHIFT,egui::Key::J)) {self.constants_open=true;}
-        if ctx.input_mut(|i|i.consume_key(egui::Modifiers::CTRL|egui::Modifiers::SHIFT,egui::Key::I)) {self.info=Some(ide.signature_help().unwrap_or_else(||"No parameter metadata at the caret".into()));}
-        if ctx.input_mut(|i|i.consume_key(egui::Modifiers::CTRL,egui::Key::I)) {self.info=Some(ide.quick_info(&ide.word_at_caret()).unwrap_or_else(||"No metadata for this symbol".into()));}
+        if ctx.input_mut(|i| {
+            i.consume_key(egui::Modifiers::CTRL | egui::Modifiers::SHIFT, egui::Key::M)
+        }) {
+            self.edit_operation = Some(EditOperation::Block(vba_ide::BlockEdit::Outdent));
+        }
+        if ctx.input_mut(|i| i.consume_key(egui::Modifiers::CTRL, egui::Key::M)) {
+            self.edit_operation = Some(EditOperation::Block(vba_ide::BlockEdit::Indent));
+        }
+        if ctx.input_mut(|i| i.consume_key(egui::Modifiers::SHIFT, egui::Key::F2)) {
+            commands.push(Command::Definition(ide.word_at_caret()));
+            self.navigate = true;
+        }
+        if ctx.input_mut(|i| {
+            i.consume_key(
+                egui::Modifiers::CTRL | egui::Modifiers::SHIFT,
+                egui::Key::F2,
+            )
+        }) {
+            commands.push(Command::NavigateBack);
+            self.navigate = true;
+        }
+        if ctx.input_mut(|i| i.consume_key(egui::Modifiers::SHIFT, egui::Key::F9))
+            && ide.mode() == Mode::Break
+        {
+            self.quick_watch = true;
+            self.watch = ide.word_at_caret();
+        }
+        if ctx.input_mut(|i| {
+            i.consume_key(egui::Modifiers::CTRL | egui::Modifiers::SHIFT, egui::Key::J)
+        }) {
+            self.constants_open = true;
+        }
+        if ctx.input_mut(|i| {
+            i.consume_key(egui::Modifiers::CTRL | egui::Modifiers::SHIFT, egui::Key::I)
+        }) {
+            self.info = Some(
+                ide.signature_help()
+                    .unwrap_or_else(|| "No parameter metadata at the caret".into()),
+            );
+        }
+        if ctx.input_mut(|i| i.consume_key(egui::Modifiers::CTRL, egui::Key::I)) {
+            self.info = Some(
+                ide.quick_info(&ide.word_at_caret())
+                    .unwrap_or_else(|| "No metadata for this symbol".into()),
+            );
+        }
         let bindings = [
             (egui::Modifiers::NONE, egui::Key::F5, Action::Run),
             (
@@ -1573,7 +1615,7 @@ if response.double_clicked(){self.focus_editor=true;}response.context_menu(|ui|{
                 .open(&mut open)
                 .frame(frame)
                 .show(ctx, |ui| {
-                    window_theme(ui,theme);
+                    window_theme(ui, theme);
                     text_field(ui, &mut self.watch, "Quick Watch expression");
                     match ide.evaluate(&self.watch) {
                         Ok(value) => {
@@ -1603,7 +1645,7 @@ if response.double_clicked(){self.focus_editor=true;}response.context_menu(|ui|{
                 .open(&mut open)
                 .frame(frame)
                 .show(ctx, |ui| {
-                    window_theme(ui,theme);
+                    window_theme(ui, theme);
                     ui.monospace(info);
                 });
             if !open {
@@ -1615,7 +1657,7 @@ if response.double_clicked(){self.focus_editor=true;}response.context_menu(|ui|{
             .open(&mut self.references_open)
             .frame(frame)
             .show(ctx, |ui| {
-                window_theme(ui,theme);
+                window_theme(ui, theme);
                 ui.label(
                     "Metadata supplied by the host; this dialog never loads native libraries.",
                 );
@@ -1650,7 +1692,7 @@ if response.double_clicked(){self.focus_editor=true;}response.context_menu(|ui|{
                 .id(scope.with("rename.module"))
                 .collapsible(false)
                 .show(ctx, |ui| {
-                    window_theme(ui,theme);
+                    window_theme(ui, theme);
                     text_field(ui, name, "Module name");
                     if ui.button("Rename").clicked() {
                         commands.push(Command::RenameModule(*source, name.clone()));
@@ -1670,7 +1712,7 @@ if response.double_clicked(){self.focus_editor=true;}response.context_menu(|ui|{
                 .id(scope.with("remove.module"))
                 .collapsible(false)
                 .show(ctx, |ui| {
-                    window_theme(ui,theme);
+                    window_theme(ui, theme);
                     ui.label(
                         "Export source before removing it. Cancelling export keeps the module.",
                     );
