@@ -1,8 +1,15 @@
 # Implementation progress
 
-Updated 2026-10-27. Current stage: **M8 complete for the defined standalone/embeddable scope**. The runtime
+Updated 2026-10-28. Current stage: **M8 complete for the defined standalone/embeddable scope**. The runtime
 profile remains m5-host-v1 with verified IR 1/2/3/4. M8-A1–A3 and the reported code-assistance defects are corrected and verified. M9 is next. Real
 workbook integration, event order and package/trust/preservation evidence remain fork-owned.
+
+The GridCraft M14 baseline and M14.10 object-model audit are recorded in the
+[integration work log](gridcraft-integration.md). Remaining Excel compatibility
+fixes now have planned milestones **M15–M19** in the
+[implementation plan](implementation-plan.md#excel-source-compatibility-milestones-m15m19),
+with owners, numbered subtasks, dependencies and acceptance gates. Next on that
+track is M15.1 host type binding; this planning update adds no runtime capability.
 
 ## M8 completion corrections
 
@@ -40,6 +47,14 @@ log provenance. Resolve that CI gate as well. The earlier completion record belo
 the correction record above supersedes this historical failure state.
 
 ## GridCraft integration — selected spreadsheet profile complete
+
+The 2026-10-28 desktop-window correction is complete in GridCraft `a3f77434`:
+separate native `vba-window` and embedded `vba` presentations share one project/VM;
+Excel-style Developer/View/Macro Edit routes replace permanent launch buttons.
+Full GridCraft CI (2,553 tests), optional window UI (1,150 tests), both feature
+lint/build paths and browser fallback pass. Native Windows windows and original
+snapshots were inspected. The [work log](gridcraft-integration.md) records exact
+evidence and remaining platform limits. Shared tiny-vba code is unchanged.
 
 GridCraft commit `b496325b` adds the requested editor/toolbar/menu/keyboard launch,
 assigned worksheet shapes and worksheet-callable Functions. Its full gate passes

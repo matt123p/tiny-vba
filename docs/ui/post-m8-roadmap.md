@@ -1,6 +1,6 @@
 # Post-M8 UI and extension milestones
 
-Updated 2026-10-27 on explicit user direction. All milestones below are **planned, not implemented**.
+Updated 2026-10-28 on explicit user direction. M10–M13 and broader M14 acceptance below are **planned**; GridCraft's bounded M14 baseline is implemented.
 M8 remains the delivered embeddable editor/debugger baseline recorded in
 [its acceptance report](m8-acceptance.md). M9 remains conformance and release of the supported
 baseline; its release gate does not imply completion of later UI features.
@@ -111,6 +111,11 @@ parallel with later UI milestones. Form-specific workflows additionally depend o
 The user authorized the GridCraft baseline on 2026-10-27; its implementation and
 fork-owned evidence are recorded in [the integration work log](../gridcraft-integration.md).
 Broader event, form, signature and WordCraft acceptance below remains planned.
+The [implementation plan's M15–M19 milestones](../implementation-plan.md#excel-source-compatibility-milestones-m15m19)
+break down the audited Excel source-compatibility gaps with subtasks, dependencies
+and acceptance gates. M18 reuses M11 class/document prerequisites; M19 supplies
+the Excel workbook/package acceptance evidence. They do not duplicate the form
+designer scope or imply WordCraft acceptance.
 
 - Embed the same UI in both applications with real document projects, themes, fonts, shortcuts,
   source save/return routing, catalogue metadata and host event signatures.
