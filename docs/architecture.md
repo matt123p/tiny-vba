@@ -146,10 +146,12 @@ no compiler, VM or host edge exists. [ADR 0014](decisions/0014-m6-project-decodi
 licences, portability, source identity semantics and work limits. External requirements are
 pinned in tools/architecture.json separately from the unchanged 16-node workspace DAG.
 
-## Post-M8 scope ownership
+## Remaining scope ownership
 
-[M10–M14](ui/post-m8-roadmap.md) allocate implemented classic editor/debugger work (M10),
-form/class support (M11), native extensions and translation (M12), optional AI (M13), and host
-integration acceptance (M14). Extension/provider facilities stay above toolkit-independent engine
-layers; Office models, trust and document persistence remain fork-owned. This allocation adds no
-packages, dependencies or runtime capabilities to the implemented DAG.
+The [remaining plan](implementation-plan.md) uses new M1–M8 numbering; earlier
+architecture and ADR milestone IDs above are historical. M1/M2 own generic host
+types and shared class/form contracts; Office objects, event ordering, trust and
+document persistence remain fork-owned in M3–M7. M8 owns final conformance/release.
+Third-party ActiveX/OLE controls not supplied with Office applications are excluded.
+Native extensions/translation and AI assistance are removed from planned scope.
+[ADR 0019](decisions/0019-remaining-plan-scope.md) changes no implemented DAG/API.

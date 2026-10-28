@@ -1,5 +1,9 @@
 # M10 implementation, acceptance and work log
 
+Historical milestone IDs are retained in this acceptance record. Future work
+uses the [renumbered remaining plan](../implementation-plan.md); see its
+[mapping](../implementation-progress.md#plan-renumbering--2026-10-28).
+
 Started 2026-10-28 on `feat/m10-classic-editor-completion` from `eaafa8c`.
 User request: complete M8 and M10. M8's corrected baseline is already implemented;
 rerun its regressions rather than relabeling planned M10 work as delivered.

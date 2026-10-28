@@ -148,5 +148,5 @@ upstream-reported build/OS/date, selection, license, numerical evidence limits a
 
 Owning tests additionally cover whole-array aliases, ParamArray, Option Base and qualified Array,
 source-order reference capture, stale locations, host/debugger type checks, malformed IR and
-legacy capability refusal. No fresh local Office observation is claimed. M9 extends oracle coverage;
+legacy capability refusal. No fresh local Office observation is claimed. New M8 in the remaining plan extends oracle coverage;
 unselected external specimens remain NOT_RUN.

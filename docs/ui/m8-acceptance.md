@@ -1,5 +1,9 @@
 # M8 acceptance and compatibility status
 
+Historical acceptance record. Future allocations below are superseded by the
+[remaining plan](../implementation-plan.md) and its
+[numbering map](../implementation-progress.md#plan-renumbering--2026-10-28).
+
 **Audit status: M8 complete for the defined standalone/embeddable scope; product corrections and local/remote acceptance pass.** See
 [the completion audit](m8-completion-audit.md) for historical failures and their permanent regressions.
 

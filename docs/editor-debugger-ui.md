@@ -88,8 +88,10 @@ Steps 1–4 belong to tiny-vba; step 5 belongs to the Gridcraft integration. A C
 alone does not satisfy the visual UI acceptance gate. The implemented packages and reviewed DAG
 now cover native/web panels, explicit command routing and real VM-backed test harnesses. The
 acceptance report records verified local results and limitations; fork workbook integration and
-full C0/C1 coverage of the newer product specification are assigned to
-[M10–M14 milestones](ui/post-m8-roadmap.md). M10's implemented profile and safety boundaries are recorded in [its acceptance map](ui/m10-implementation.md). Working word/member completion, project
-signature help and live parser feedback are M8. Advanced classic completion is M10; forms/class
-support is M11, native extensions and translation M12, optional Copilot-style assistance M13, and fork
-integration acceptance M14. M8 remains the delivered baseline.
+applicable remaining C0/C1 coverage are assigned in the
+[remaining plan](implementation-plan.md) and [UI scope index](ui/post-m8-roadmap.md).
+Historical M10's implemented profile and boundaries remain in
+[its acceptance map](ui/m10-implementation.md). New M2 owns classes/standard Office
+forms; M5 owns Excel events/UDFs; M6/M7 own remaining host/package acceptance.
+Third-party ActiveX/OLE controls not supplied with Office applications are out of
+scope. Native extensions, translation and AI assistance are removed from the plan.

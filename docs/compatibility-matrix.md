@@ -33,12 +33,14 @@ Updated 2026-10-27. Stage: M4 external acceptance complete; M5–M7 in-repo cont
 | Native / WASM execution | Implemented M3 smoke | cargo xtask wasm-run; identical typed results, pause/edit/host counts and cancellation |
 | Replacement-session isolation | Implemented M3 correction | recycled-client-ID regression in VM tests and native/WASI smoke; [ADR 0008](decisions/0008-vm-instance-isolation.md) |
 | MS-OVBA source decoding | Implemented M6 bounded profile | [Import contract](project-import.md), [ADR 0014](decisions/0014-m6-project-decoding.md), 14 native/WASI tests; controlled authored projects only; package/trust/preservation gates stay fork-owned |
-| Oracle comparison / executable scenario runner | M4 runner implemented for self-authored fixtures; oracle comparison not implemented | `conformance run` (20 PASS / 0 UNSUPPORTED); M9 owns oracle goldens |
+| Oracle comparison / executable scenario runner | Historical M4 runner and reviewed oracle cases implemented; further acquisition remains planned | See current external acceptance below; new M8 owns expanded conformance |
 | Fuzzing | Not implemented | APIs required before targets |
 | Excel/Word APIs and OOXML round-trip | External ownership | Gridcraft/Wordcraft forks |
 | GridCraft Excel.v1 baseline | Fork-owned implementation | Native and JavaScript/WASM workbook tests, shared editor/control/source IO tests, inspected native snapshots; [scope/evidence](gridcraft-integration.md). Broader events, WordCraft, signatures/forms remain planned |
-| Classes and UserForms | Planned M11; currently unsupported | [Form/class milestone and gate](ui/post-m8-roadmap.md#m11--classdocument-support-and-userform-editor) |
-| COM, DLLs, P-code and binary source writing | Outside current scope | Separate reviewed design required; native Craft extensions in M12 do not imply binary VBE compatibility |
+| Classes and standard Office UserForms | Planned new M2; currently unsupported | [Form/class milestone and gate](implementation-plan.md#m2--classdocument-semantics-and-standard-office-userforms) |
+| Third-party ActiveX/OLE controls not supplied with Office | Out of scope for now | No loading, execution, designer or acceptance work scheduled |
+| Arbitrary COM/DLL execution, P-code and binary add-ins | Outside current scope | Standard Office control support does not imply unrestricted binary compatibility |
+| Binary VBA source writing/signature handling | Planned reviewed contract in new M7 | Original-byte preservation is not edited-source writeback |
 
 M3 execution evidence is restricted to its explicit tests/examples and runtime matrix. It does not establish
 workbook/Office compatibility, physical-device fidelity or unselected external corpus pass rates; self-authored
@@ -50,13 +52,14 @@ M0 assertions are 20 PASS / 0 UNSUPPORTED and external corpus execution remains 
 authored scenarios and 153 reviewed ReflexGrid cases PASS. The latter carry upstream-reported
 Microsoft Excel Mac evidence with exact source hashes and raw results, not a new Office run.
 Whole-array/ParamArray/Option Base/named-cell argument tests and IR 3 version/metadata refusal
-checks pass. Unselected external cases retain NOT_RUN; future oracle acquisition stays in M9.
+checks pass. Unselected external cases retain NOT_RUN; future oracle acquisition belongs to new M8.
 
-## Planned UI and extension milestones
+## Remaining scope
 
-The [post-M8 roadmap](ui/post-m8-roadmap.md) records implemented M10 classic editor,
-code aids, advanced debugger and DAP, with their explicit safety profile. Deferred work is M11 class/document runtime and forms; M12 native Craft
-extensions, non-Microsoft enhancements and Python translation preview; M13 optional Copilot-style
-assistance; M14 fork-owned host integration acceptance. M11 onward remains planned scope, not new
-compatibility passes. Existing unavailable/unsupported statuses remain until their milestone gates
-have execution evidence. Binary VBE add-ins and arbitrary ActiveX/COM are not implicitly supported.
+The [remaining plan](implementation-plan.md) uses new M1–M8 numbers; implemented
+milestones elsewhere in this matrix retain their historical IDs. See the
+[mapping](implementation-progress.md#plan-renumbering--2026-10-28) to distinguish them.
+The [UI scope index](ui/post-m8-roadmap.md) assigns shared classes/standard Office
+forms to M2 and remaining host/package acceptance to M6/M7. Extensions/translation
+and AI assistance are removed from the plan. Planned work is not a compatibility
+pass; unsupported statuses require actual execution evidence before changing.

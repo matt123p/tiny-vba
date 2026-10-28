@@ -5,6 +5,11 @@ description: Design or review tiny-vba crate boundaries, public APIs, dependenci
 
 # Architecture decisions
 
+The remaining plan now uses new M1–M8 numbers under ADR 0019. Implemented contract
+IDs in this skill and earlier ADRs are historical; use the progress mapping when
+planning future work. Office-supplied standard controls remain in scope, third-party
+ActiveX/OLE controls do not. Native extensions/translation and AI are not scheduled.
+
 Read [architecture](../../../docs/architecture.md), the [actual dependency graph](../../../tools/architecture.json),
 [ADR 0001](../../../docs/decisions/0001-repository-scope.md) and
 [ADR 0002](../../../docs/decisions/0002-editor-debugger-ui.md).

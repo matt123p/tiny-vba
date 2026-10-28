@@ -1,15 +1,44 @@
 # Implementation progress
 
-Updated 2026-10-28. Current stage: **M10 implemented for the documented classic-editor/debugger profile**, preserving the corrected M8 baseline. The runtime
-profile remains m5-host-v1 with verified IR 1/2/3/4. M8-A1–A3 and the reported code-assistance defects are corrected and verified. M9 conformance/release and M11 UI work remain separate. Real
-workbook integration, event order and package/trust/preservation evidence remain fork-owned.
+Updated 2026-10-28. The classic-editor/debugger profile is implemented; its
+historical milestone is M10. Runtime remains m5-host-v1 with verified IR 1/2/3/4.
+The [remaining plan](implementation-plan.md) now uses **M1–M8** for future work.
+Next: **M1.1**, generic host-type contract and typed-declaration proof. Real
+Office objects, document events, trust and packaging remain fork-owned.
 
-The GridCraft M14 baseline and M14.10 object-model audit are recorded in the
-[integration work log](gridcraft-integration.md). Remaining Excel compatibility
-fixes now have planned milestones **M15–M19** in the
-[implementation plan](implementation-plan.md#excel-source-compatibility-milestones-m15m19),
-with owners, numbered subtasks, dependencies and acceptance gates. Next on that
-track is M15.1 host type binding; this planning update adds no runtime capability.
+## Plan renumbering — 2026-10-28
+
+On user direction, removed completed work from the plan, removed old M12/M13
+(native extensions/translation and AI assistance), and excluded third-party
+ActiveX/OLE controls not supplied with Office applications. Standard Office
+UserForms/controls remain in scope. No product capability or runtime contract
+changes in this documentation update; [ADR 0019](decisions/0019-remaining-plan-scope.md)
+records the scope and ordering decision.
+
+| Current remaining milestone | Previous milestone / scope |
+|---|---|
+| M1 — host types/default members/collections | Old M15 |
+| M2 — classes/document semantics/standard Office UserForms | Old M11, narrowed control scope |
+| M3 — range/worksheet coverage | Old M16 |
+| M4 — identity/values/member semantics | Old M17 |
+| M5 — document events/Range-aware UDFs | Old M18 |
+| M6 — remaining host integration | Unfinished old M14, including WordCraft |
+| M7 — unchanged-document/package acceptance | Old M19 plus Word document package acceptance |
+| M8 — expanded conformance/hardening/release | Old M9, release after feature acceptance |
+
+Existing reports/ADRs and the historical entries below retain their old IDs.
+Completed setup and old M0–M8/M10 evidence remain here and in their acceptance
+reports; they are not new tasks under the reused numbers. The completed GridCraft
+baseline and old M14.10 audit remain in [the integration log](gridcraft-integration.md).
+Dependencies now put shared type/class contracts before consumers, range behavior
+before dependent events/UDFs, host integration before package acceptance, and
+release last. Conformance/fuzz/performance work runs throughout, not only at release.
+
+Validation for this documentation-only revision: contiguous M1–M8 headings/table
+and subtasks, removed scopes absent from the active plan, 274 local Markdown
+links checked, and `git diff --check` pass. Required `cargo xtask ci` (277 workspace
+tests), `cargo xtask wasm` and `cargo xtask wasm-run` (95 actual WASI tests) pass.
+No new product behavior, Office observation or corpus execution is claimed.
 
 ## M10 completion
 

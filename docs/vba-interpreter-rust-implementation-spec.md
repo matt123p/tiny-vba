@@ -1,5 +1,8 @@
 # Rust VBA Interpreter for ArtCraft — Architecture and Implementation Specification
 
+Historical supplied proposal. Its milestone schedule is superseded by the
+[remaining implementation plan](implementation-plan.md); it is not a second active plan.
+
 > **Status:** Proposed implementation specification / agent hand-off  
 > **Date:** 26 October 2026  
 > **Primary target:** Microsoft Excel VBA inside GridCraft (`.xlsm`)  

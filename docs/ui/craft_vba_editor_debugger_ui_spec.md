@@ -1,5 +1,11 @@
 # Craft* VBA Editor and Debugger — Public-Source UI Compatibility Specification
 
+Scope update, 2026-10-28: the [remaining plan](../implementation-plan.md) takes
+precedence over this earlier proposal. Native extensions/translation and AI
+assistance are removed from scheduled scope. Third-party ActiveX/OLE controls
+not supplied with Office are excluded; standard Office controls remain in scope.
+The P0–P8 phases below are reference groupings, not the current task sequence.
+
 **Document version:** 1.0<br>
 **Research date:** 27 October 2026<br>
 **Primary target:** The classic Microsoft Visual Basic Editor (VBE) integrated into **Windows desktop Excel**, as the familiar user-facing model for **GridCraft**.<br>
@@ -242,8 +248,9 @@ Populate using the **VBA symbol database**, built-in language/library metadata, 
 
 ### 3.8 UserForm designer and Toolbox — C1
 
-**Planned allocation: M11.** Form/class runtime and designer work belong to tiny-vba; Office-host
-form persistence and integration acceptance are coordinated under M14. See [the roadmap](post-m8-roadmap.md).
+**Current allocation: new M2.** Form/class runtime and standard Office control
+designer work belong to tiny-vba; host persistence/integration belongs to new
+M6/M7. Third-party ActiveX/OLE controls are excluded. See [the scope index](post-m8-roadmap.md).
 
 The UserForm window is a visual design canvas with a grid, drag/resize handles, selection, form properties and event handling [S19]. `View → Toolbox` (or Standard toolbar Toolbox) displays the control palette when a form is active; controls are placed by drawing on the form [S20].
 
@@ -615,9 +622,8 @@ Each executable IR statement needs: `project_id`, `module_id`, stable `source_sp
 
 ## 9. Optional Copilot-style improvements — X, not historic VBE
 
-**Planned allocation:** AI assistance is **M13**, built on the **M12** native extension/capability
-boundary. Non-AI enhancement and Python translation preview are M12. These features are outside
-the delivered M8 baseline; see [the post-M8 roadmap](post-m8-roadmap.md).
+**Removed from current scope.** The following AI/extension proposal is retained
+as historical reference only; it is not scheduled work. See [the scope index](post-m8-roadmap.md).
 
 **Key distinction:** Traditional VBE documented **IntelliSense** is deterministic local completion/parameter help [S10, S23, S33]. Copilot-style *multi-token prediction, natural-language code authoring and chat* are **new Craft* features**; they should not be portrayed as controls that exist in the legacy VBA editor. The Microsoft Learn UI inventory does not establish a built-in Copilot interface for classic VBE.
 
@@ -788,12 +794,11 @@ Per user/host: pane placement/visibility, window split, editor colours/font, tab
 ### Repository milestone allocation (2026-10-27)
 
 The completed M8 repository gate covers the baseline in [its acceptance record](m8-acceptance.md).
-Remaining requirements below are assigned to [the post-M8 roadmap](post-m8-roadmap.md): **M10**
-classic editor/debugger completion, **M11** class/form runtime and UserForm designer, **M12** native
-Craft extensions/non-Microsoft enhancements and translation preview, **M13** optional Copilot-style
-assistance, and **M14** fork-owned Gridcraft/Wordcraft integration acceptance. All are planned;
-the P0–P8 phases below are product-requirement groupings, not additional M8 commitments. The roadmap
-maps these phases and acceptance scenarios to owners, dependencies and completion evidence.
+Current remaining allocations are in the [scope index](post-m8-roadmap.md) and
+[implementation plan](../implementation-plan.md). Their new M1–M8 numbering
+supersedes the original sequence. The P0–P8 phases below are historical
+product-requirement groupings; removed extensions/AI and third-party controls
+must not be treated as outstanding acceptance requirements.
 
 ### 13.1 Ordered delivery plan
 
@@ -927,9 +932,9 @@ Craft* may claim **“familiar VBA editor UI”** after the C0 flows pass. It ma
 
 Added 2026-10-27 following the reported broken IntelliSense and syntax-error highlighting.
 This section makes functional word/member completion and live syntax feedback part of M8.
-M10 retains advanced reference-library/class resolution, List Constants and navigation refinements;
-forms, non-Microsoft extensions and optional AI remain M11–M14 as allocated in
-[the roadmap](post-m8-roadmap.md). These examples are independently authored tests of public behavior,
+Historical M10 covers classic code aids; remaining host type binding is new M1
+and classes/standard Office forms are new M2. Extensions and AI are removed from
+the [current scope](post-m8-roadmap.md). These examples are independently authored tests of public behavior,
 not copied Microsoft sample programs or observations from an installed Office build.
 
 ### Public behavior references

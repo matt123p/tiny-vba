@@ -1,15 +1,16 @@
 # GridCraft integration work log
 
-## Numbered compatibility implementation stages (2026-10-28, planned)
+## Remaining compatibility stages (2026-10-28)
 
 The audit's remaining fixes are allocated in the
-[implementation plan](implementation-plan.md#excel-source-compatibility-milestones-m15m19):
-M15 host types/default members/collections; M16 range/worksheet coverage;
-M17 identity/value/member semantics; M18 document modules/events/Range-aware UDFs;
-M19 unchanged-workbook/package acceptance. Each has numbered subtasks, owners,
-dependencies and acceptance gates. M14.10 remains the completed audit/fix stage;
-M15–M19 are planned and do not imply that unchanged Excel workbooks already work.
-Next implementation task: M15.1, generic host-type contract and typed declaration proof.
+[remaining plan](implementation-plan.md): new M1 host types/default members/
+collections, M2 shared classes/standard Office forms, M3 range/worksheet coverage,
+M4 identity/value/member semantics, M5 document events/Range-aware UDFs, M6 remaining
+host integration, M7 document/package acceptance and M8 conformance/release.
+See the [old-to-new mapping](implementation-progress.md#plan-renumbering--2026-10-28).
+The completed audit/fix stage below retains its historical M14.10 identity.
+Planned stages do not imply unchanged Excel workbooks already work.
+Next task: **M1.1**, generic host-type contract and typed-declaration proof.
 
 ## Excel object-model audit (2026-10-28, complete for the exposed profile)
 

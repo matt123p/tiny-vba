@@ -14,9 +14,12 @@ Microsoft Excel Mac oracle expectations; this is inherited evidence, not a new l
 See [the acceptance report](docs/m4-oracle-report.md) and [language scope](docs/m4-language.md).
 [M6 project import](docs/project-import.md) extracts bounded source/metadata without execution.
 The [native/web graphical editor and CLI debugger](docs/ui/embedding.md) are implemented, with
-[corrected M8 completion audit](docs/ui/m8-completion-audit.md). DAP and
-remaining classic features, forms, native extensions/translation, optional AI and Office integration
-are assigned to [planned M10–M14 milestones](docs/ui/post-m8-roadmap.md).
+[corrected M8 completion audit](docs/ui/m8-completion-audit.md) and
+[classic tools/DAP acceptance](docs/ui/m10-implementation.md).
+The [remaining plan](docs/implementation-plan.md) uses new M1–M8 numbering for
+host/language compatibility, standard Office forms, document integration and release.
+Historical reports retain their original milestone IDs; see the
+[numbering map](docs/implementation-progress.md#plan-renumbering--2026-10-28).
 
 
 The Excel/Word compatibility layers, Office metadata and application adapters belong in the

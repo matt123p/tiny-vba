@@ -30,7 +30,8 @@ Conditional evaluation is read-only and bounded. Set Next Statement supports
 verified straight-line current-frame checkpoints only. Immediate calls require
 an explicit policy and execute in an isolated child VM; host effects remain real.
 See [ADR 0018](decisions/0018-m10-classic-tools-and-debugger-policy.md) for exact
-bounds, refusals and stale-state rules. Class-specific error trapping remains M11.
+bounds, refusals and stale-state rules. Class-specific error trapping belongs to
+new M2 in the [remaining plan](implementation-plan.md).
 
 Run the external single-session stdio adapter with
 `cargo run -p vba-cli --features dap -- dap [source.bas]`. Launch may instead

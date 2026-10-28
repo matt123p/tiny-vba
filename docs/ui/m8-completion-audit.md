@@ -1,5 +1,8 @@
 # M8 completion audit — findings and corrections
 
+Historical audit. Its milestone IDs and future allocations predate the
+[remaining plan](../implementation-plan.md); use that plan for new work.
+
 Date: 2026-10-27. Audited implementation: `f4629598b7ce475f5fef4b478c5b6d93338877b6`.
 **Original result: three delivered-scope defects found. The correction re-audit below records fixes and current verification.**
 The M10–M14 feature allocation is unchanged; these are M8 corrections, not new deferred features.

@@ -77,12 +77,17 @@ M10's implemented classic tools, advanced debugging and optional DAP are defined
 literal scoped search, view selection/focus and explicit browser transfer. Set Next Statement
 supports verified straight-line checkpoints only; watch evaluation stays read-only; Immediate
 calls require explicit isolated-evaluation policy. Metadata does not imply library/type binding.
-Remaining scope belongs to [M11–M14](../../../docs/ui/post-m8-roadmap.md):
-M11 forms/class support, M12 native extensions and translation,
-M13 optional Copilot-style assistance, and M14 fork integration acceptance. Keep these planned
-capabilities separate from completed M8 evidence; do not silently expand M8 or duplicate fork code.
+The [remaining plan](../../../docs/implementation-plan.md) now uses new M1–M8
+numbering. Milestone IDs in the implemented contracts above are historical; see
+the [mapping](../../../docs/implementation-progress.md#plan-renumbering--2026-10-28).
+New M1 owns host type binding, M2 shared classes/standard Office forms, M5 Excel
+events/UDFs, and M6/M7 remaining host/package acceptance. Third-party ActiveX/OLE
+controls not supplied with Office are out of scope. Native extensions/translation
+and AI assistance are removed from planned scope; do not schedule them from the
+earlier supplied specification. Preserve fork ownership and existing UI evidence.
 
 The 2026-10-27 user correction includes working scoped word/member completion, source signature help
-and live red/underlined parser diagnostics in M8 (UI specification section 16). Keep advanced
-reference/class-library resolution and List Constants in M10. Preserve original CR/CRLF source
+and live red/underlined parser diagnostics in historical M8 (UI specification section 16).
+Declarative reference metadata/List Constants belong to the historical M10 implementation;
+executable external type/reference binding is new M1. Preserve original CR/CRLF source
 bytes through the editor view mapping and Static state across compatible same-host reruns until Reset.

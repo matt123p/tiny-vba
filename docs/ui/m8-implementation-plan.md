@@ -1,5 +1,9 @@
 # M8 implementation and verification plan
 
+Historical implementation record; this is not the active task plan. Later scope
+allocations below are superseded by the [remaining plan](../implementation-plan.md)
+and its [numbering map](../implementation-progress.md#plan-renumbering--2026-10-28).
+
 Started 2026-10-27. Input: the user-supplied
 [public-source UI specification](craft_vba_editor_debugger_ui_spec.md), the
 [repository UI contract](../editor-debugger-ui.md), and ADR 0002.
