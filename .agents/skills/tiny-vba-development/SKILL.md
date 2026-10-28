@@ -71,8 +71,14 @@ light/dark/narrow/scaled/host-theme/focus output. No downloaded reference eviden
 .cache/evidence/ is ignored and provenance/notices/pins are verified. Do not claim full C0/C1,
 Office event/workbook, Set Next Statement or unsafe evaluation support from standalone UI evidence.
 
-Remaining UI scope belongs to [planned M10–M14](../../../docs/ui/post-m8-roadmap.md): M10 advanced classic
-completion/advanced debugging/DAP, M11 forms/class support, M12 native extensions and translation,
+M10's implemented classic tools, advanced debugging and optional DAP are defined by
+[ADR 0018](../../../docs/decisions/0018-m10-classic-tools-and-debugger-policy.md) and the
+[acceptance map](../../../docs/ui/m10-implementation.md). Preserve shared bounded source history,
+literal scoped search, view selection/focus and explicit browser transfer. Set Next Statement
+supports verified straight-line checkpoints only; watch evaluation stays read-only; Immediate
+calls require explicit isolated-evaluation policy. Metadata does not imply library/type binding.
+Remaining scope belongs to [M11–M14](../../../docs/ui/post-m8-roadmap.md):
+M11 forms/class support, M12 native extensions and translation,
 M13 optional Copilot-style assistance, and M14 fork integration acceptance. Keep these planned
 capabilities separate from completed M8 evidence; do not silently expand M8 or duplicate fork code.
 

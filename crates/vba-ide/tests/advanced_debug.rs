@@ -131,3 +131,37 @@ fn immediate_calls_require_explicit_policy_and_keep_parent_locals_isolated() -> 
     assert_eq!(ide.mode(), Mode::Break);
     Ok(())
 }
+
+#[test]
+fn watch_context_follows_selected_frame_and_invalid_conditions_do_not_block_macros() -> R {
+    let source = "Sub Main()\nDim n As Long\nn=1\nOther\nEnd Sub\nSub Other()\nDim n As Long\nn=10\nDebug.Print n\nEnd Sub\n";
+    let mut ide = Ide::new();
+    let module = ide.add_module("Test.bas", source)?;
+    ide.add_watch_kind(
+        "n",
+        WatchKind::Expression,
+        Some(module),
+        Some("Main".into()),
+    )?;
+    ide.add_watch_kind("\"not numeric\"", WatchKind::BreakWhenTrue, None, None)?;
+    ide.toggle_breakpoint_at(source.find("Debug.Print").ok_or("line")?)?;
+    ide.dispatch(Action::Run, &mut NoHost)?;
+    drain(&mut ide)?;
+    assert_eq!(ide.mode(), Mode::Break);
+    assert_eq!(ide.evaluate("n")?, Value::Long(10));
+    assert_eq!(
+        ide.watches.first().ok_or("watch")?.result,
+        Err("Out of scope".into())
+    );
+    assert!(ide.watches.get(1).ok_or("condition")?.result.is_err());
+    ide.select_frame(1)?;
+    assert_eq!(
+        ide.watches.first().ok_or("watch")?.result,
+        Ok(Value::Long(1))
+    );
+    ide.watches.clear();
+    ide.dispatch(Action::Run, &mut NoHost)?;
+    drain(&mut ide)?;
+    assert_eq!(ide.mode(), Mode::Completed);
+    Ok(())
+}

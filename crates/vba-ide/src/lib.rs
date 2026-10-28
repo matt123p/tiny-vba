@@ -3,6 +3,9 @@
 #![forbid(unsafe_code)]
 mod code_aids;
 mod editing;
+mod history;
+mod search;
+pub use search::{FindOptions, FindScope, SearchMatch};
 mod immediate;
 mod metadata;
 pub use immediate::EvaluationPolicy;
@@ -20,7 +23,9 @@ pub use vba_foreign::{Host, Import};
 use vba_ir::VerifiedProgram;
 use vba_syntax::{ModuleKind, parse};
 pub use vba_values::{ObjectRef, ScalarKind, Value, VbaString};
-pub use vba_vm::{FrameSnapshot, Handle, HostBinding, NoHost, Outcome, Pause, ReturnValue};
+pub use vba_vm::{
+    FrameSnapshot, Handle, HostBinding, NoHost, Outcome, Pause, PauseReason, ReturnValue,
+};
 use vba_vm::{Limits, Session};
 pub type Result<T> = std::result::Result<T, Diagnostic>;
 pub const MAX_MODULES: usize = 64;
@@ -282,6 +287,10 @@ pub struct Ide {
     pub constants: Vec<ConstantInfo>,
     pub references: Vec<ReferenceInfo>,
     watch_evaluations: u64,
+    watch_budget_exhausted: bool,
+    undo_edits: Vec<history::EditState>,
+    redo_edits: Vec<history::EditState>,
+    replaying_edit: bool,
 }
 impl Default for Ide {
     fn default() -> Self {
@@ -316,6 +325,10 @@ impl Ide {
             constants: Vec::new(),
             references: Vec::new(),
             watch_evaluations: 0,
+            watch_budget_exhausted: false,
+            undo_edits: Vec::new(),
+            redo_edits: Vec::new(),
+            replaying_edit: false,
         }
     }
     pub fn demo() -> Result<Self> {
@@ -431,6 +444,42 @@ impl Ide {
         {
             return Err(error("source budget exceeded"));
         }
+        let source = old.id;
+        let edit = editing::SourceEditMap::new(&old.text, &text);
+        let lines = line_starts(&text).collect::<Vec<_>>();
+        let bookmarks = self
+            .bookmarks
+            .iter()
+            .filter(|(id, _)| *id == source.0)
+            .filter_map(|(_, at)| {
+                let byte = edit.position(*at)?;
+                if byte > text.len() {
+                    return None;
+                }
+                lines
+                    .get(
+                        lines
+                            .partition_point(|line| *line <= byte)
+                            .saturating_sub(1),
+                    )
+                    .copied()
+                    .map(|at| (source.0, at))
+            })
+            .collect::<Vec<_>>();
+        let navigation = self
+            .navigation
+            .iter()
+            .filter_map(|(id, at)| {
+                if *id != source {
+                    Some((*id, *at))
+                } else {
+                    edit.position(*at)
+                        .filter(|at| text.is_char_boundary(*at))
+                        .map(|at| (*id, at))
+                }
+            })
+            .collect::<Vec<_>>();
+        self.record_edit()?;
         let module = self
             .active_module_mut()
             .ok_or_else(|| error("no active module"))?;
@@ -446,9 +495,9 @@ impl Ide {
         if had_breakpoints {
             self.message("Source changed: breakpoints cleared; set them against the new revision.");
         }
-        let source = self.active_module().map(|m| m.id.0);
-        self.bookmarks.retain(|(id, _)| Some(*id) != source);
-        self.navigation.retain(|(id, _)| Some(id.0) != source);
+        self.bookmarks.retain(|(id, _)| *id != source.0);
+        self.bookmarks.extend(bookmarks);
+        self.navigation = navigation;
         self.diagnostics.clear();
         self.changed()
     }
@@ -576,6 +625,7 @@ impl Ide {
         session.set_break_on_error(self.break_on_errors);
         self.controller = Controller::new();
         self.watch_evaluations = 0;
+        self.watch_budget_exhausted = false;
         for watch in &mut self.watches {
             watch.previous = None;
         }
@@ -740,14 +790,20 @@ impl Ide {
                 if view.visible {
                     let procedure=session.program().program().procedures.get(view.procedure.0 as usize).map(|p|p.name.as_str());
                     for watch in &mut self.watches {
-                        if matches!(watch.kind,WatchKind::Expression) || watch.module.is_some_and(|id|id!=view.span.source())
+                        if self.watch_budget_exhausted || matches!(watch.kind,WatchKind::Expression) || watch.module.is_some_and(|id|id!=view.span.source())
                             || watch.procedure.as_ref().is_some_and(|name| procedure.is_none_or(|p| !p.eq_ignore_ascii_case(name))) { continue; }
                         self.watch_evaluations=self.watch_evaluations.saturating_add(1);
-                        if self.watch_evaluations>100_000 { return Err(error("conditional watch evaluation budget exceeded; reset or remove watch")); }
-                        let result=evaluate::evaluate(&watch.expression,&|name|session.read_checkpoint_local(view,name));
+                        if self.watch_evaluations>100_000 {
+                            self.watch_budget_exhausted=true;
+                            self.diagnostics.push(error("Conditional watches disabled after their evaluation budget; reset to re-enable them."));
+                            stop=true;break;
+                        }
+                        let result=evaluate::evaluate(&watch.expression,&|name|session.read_checkpoint_local(view,name)).and_then(|value| {
+                            if value.payload_bytes()>65_536 {Err(error("watch payload limit; inspect a specific element"))} else {Ok(value)}
+                        });
                         if let Ok(value)=&result {
                             let compared=if matches!(watch.kind,WatchKind::BreakWhenTrue) {
-                                vba_runtime::condition(value).map(Value::Boolean).map_err(|e|error(&format!("{e:?}")))?
+                                match vba_runtime::condition(value) {Ok(value)=>Value::Boolean(value),Err(e)=>{watch.result=Err(format!("{e:?}"));continue;}}
                             } else { value.clone() };
                             let previous=watch.previous.as_ref().filter(|(frame,_)|*frame==view.frame).map(|(_,value)|value);
                             stop |= match watch.kind { WatchKind::Expression=>false, WatchKind::BreakWhenChanged=>previous.is_some_and(|old|old!=&compared), WatchKind::BreakWhenTrue=>compared==Value::Boolean(true) && previous!=Some(&Value::Boolean(true)) };
@@ -933,10 +989,38 @@ impl Ide {
         Ok(())
     }
     pub fn refresh_watches(&mut self) {
+        let stop = self.execution();
         let results = self
             .watches
             .iter()
-            .map(|w| self.evaluate(&w.expression).map_err(|d| d.message))
+            .map(|w| {
+                if self.watch_budget_exhausted && w.kind != WatchKind::Expression {
+                    return Err(
+                        "Conditional watch evaluation budget exhausted; reset to re-enable".into(),
+                    );
+                }
+                if w.module
+                    .is_some_and(|id| stop.as_ref().is_none_or(|s| s.source != id))
+                    || w.procedure.as_ref().is_some_and(|name| {
+                        stop.as_ref()
+                            .is_none_or(|s| !s.procedure.eq_ignore_ascii_case(name))
+                    })
+                {
+                    return Err("Out of scope".into());
+                }
+                self.evaluate(&w.expression)
+                    .and_then(|value| {
+                        if value.payload_bytes() > 65_536 {
+                            Err(error("watch payload limit; inspect a specific element"))
+                        } else if w.kind == WatchKind::BreakWhenTrue {
+                            vba_runtime::condition(&value).map_err(|e| error(&format!("{e:?}")))?;
+                            Ok(value)
+                        } else {
+                            Ok(value)
+                        }
+                    })
+                    .map_err(|d| d.message)
+            })
             .collect::<Vec<_>>();
         for (watch, result) in self.watches.iter_mut().zip(results) {
             watch.result = result;
@@ -952,9 +1036,12 @@ impl Ide {
         Ok(())
     }
     pub fn execution(&self) -> Option<StopLocation> {
+        self.frame_location(self.selected_frame)
+    }
+    pub fn frame_location(&self, index: usize) -> Option<StopLocation> {
         let session = self.session.as_ref()?;
         let pause = self.pause()?;
-        let frame = pause.frames.get(self.selected_frame)?;
+        let frame = pause.frames.get(index)?;
         let span = frame
             .span
             .or_else(|| pause.checkpoint.as_ref().map(|c| c.span))?;
@@ -1164,11 +1251,7 @@ impl Ide {
         let mut names = BTreeSet::new();
         if prefix.contains('.') {
             if let Some((owner, member)) = prefix.rsplit_once('.') {
-                let receiver_type = self
-                    .source_completions()
-                    .into_iter()
-                    .find(|(name, _)| name.eq_ignore_ascii_case(owner))
-                    .and_then(|(_, ty)| ty);
+                let receiver_type = self.receiver_type(owner);
                 if owner.eq_ignore_ascii_case("Debug")
                     && "print".starts_with(&member.to_ascii_lowercase())
                 {
@@ -1332,4 +1415,40 @@ pub fn syntax_spans(text: &str) -> Vec<(std::ops::Range<usize>, SyntaxClass)> {
             )
         })
         .collect()
+}
+
+#[cfg(test)]
+mod watch_budget_tests {
+    use super::*;
+    #[test]
+    fn exhausted_watch_budget_pauses_once_and_continues_with_visible_disabled_status() -> Result<()>
+    {
+        let mut ide = Ide::new();
+        ide.add_module("Test.bas", "Sub Main()\nDebug.Print 1\nEnd Sub\n")?;
+        ide.add_watch_kind("False", WatchKind::BreakWhenTrue, None, None)?;
+        ide.dispatch(Action::Run, &mut NoHost)?;
+        ide.watch_evaluations = 100_000;
+        ide.tick(&mut NoHost)?;
+        assert_eq!(ide.mode(), Mode::Break);
+        assert!(
+            ide.diagnostics
+                .iter()
+                .any(|d| d.message.contains("disabled"))
+        );
+        assert!(ide.watches.first().is_some_and(|w| {
+            w.result
+                .as_ref()
+                .is_err_and(|message| message.contains("budget"))
+        }));
+        ide.dispatch(Action::Run, &mut NoHost)?;
+        for _ in 0..10 {
+            ide.tick(&mut NoHost)?;
+            if ide.mode() == Mode::Completed {
+                break;
+            }
+        }
+        assert_eq!(ide.mode(), Mode::Completed);
+        assert_eq!(ide.output(), vec!["1"]);
+        Ok(())
+    }
 }

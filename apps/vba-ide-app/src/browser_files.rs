@@ -2,13 +2,14 @@
 use std::{cell::RefCell, rc::Rc};
 use wasm_bindgen::{JsCast, JsValue, closure::Closure};
 type ImportResult = Result<(String, String), String>;
+type ImportInput = (
+    web_sys::HtmlInputElement,
+    Closure<dyn FnMut(web_sys::Event)>,
+);
 #[derive(Default)]
 pub struct BrowserFiles {
     result: Rc<RefCell<Option<ImportResult>>>,
-    input: Option<(
-        web_sys::HtmlInputElement,
-        Closure<dyn FnMut(web_sys::Event)>,
-    )>,
+    input: Option<ImportInput>,
     urls: Vec<String>,
 }
 impl BrowserFiles {

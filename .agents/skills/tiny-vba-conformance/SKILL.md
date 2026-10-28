@@ -66,7 +66,9 @@ storage, one-visit checkpoint permits, saved fault PCs, generation checks and no
 Use vba-runtime for operations/edits. VM host dispatch must use checked precommit return/writeback
 validation and explicit per-site permissions; foreign aliases remain unsupported. Run cargo xtask ci,
 wasm and wasm-run (native plus actual WASI execution). Runtime example results do not mark unrun M0
-or external scenario assertions PASS. Graphical UI, DAP and VBA error-handler semantics remain later work.
+or external scenario assertions PASS. M8/M10 graphical UI and optional DAP have authored interaction,
+native/browser and protocol evidence in the M10 acceptance map. These are not fresh Office oracle
+observations or Excel workbook compatibility proof. Current handlers belong to the M4 profile.
 
 [ADR 0010](../../../docs/decisions/0010-m4-profile-and-verification-hardening.md) publishes
 m4-scalars-v1; do not silently expand m3-core-v1. Keep failure classifications and nonzero

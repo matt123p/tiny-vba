@@ -1,6 +1,6 @@
 # Debugger design contract
 
-Status: M3 headless VM/controller implemented, 2026-10-26. See [runtime APIs, tests and limitations](runtime.md). M8 now supplies [the reusable graphical editor/debugger and CLI](ui/embedding.md); DAP remains optional/unimplemented.
+Status: M3 headless VM/controller implemented, extended by M8 UI and M10 advanced debugging (2026-10-28). See [runtime APIs](runtime.md), [embedding](ui/embedding.md) and [M10 acceptance](ui/m10-implementation.md).
 
 The reusable graphical editor/debugger and standalone IDE belong in tiny-vba. They are required
 product work under [ADR 0002](decisions/0002-editor-debugger-ui.md) and the
@@ -21,5 +21,22 @@ M3 must prove pause/edit/resume without restarting the procedure or repeating ho
 nested calls and loops. Do not keep mutable host borrows across pauses. Default watch inspection must
 not invoke arbitrary Property Get/functions with side effects or bypass capability checks.
 
-DAP comes later and must publish supported capabilities honestly. Disconnect/cancel/stale objects and
+DAP is optional and publishes supported capabilities explicitly. Disconnect/cancel/stale objects and
 host close during pause require explicit lifecycle outcomes, with no retained document locks.
+
+M10 adds Quick Watch, context-scoped conditional/change watches, local array
+index inspection/typed element edits and runtime error-trapping controls.
+Conditional evaluation is read-only and bounded. Set Next Statement supports
+verified straight-line current-frame checkpoints only. Immediate calls require
+an explicit policy and execute in an isolated child VM; host effects remain real.
+See [ADR 0018](decisions/0018-m10-classic-tools-and-debugger-policy.md) for exact
+bounds, refusals and stale-state rules. Class-specific error trapping remains M11.
+
+Run the external single-session stdio adapter with
+`cargo run -p vba-cli --features dap -- dap [source.bas]`. Launch may instead
+supply explicit `sourceCode`; no ambient project discovery occurs. Supported
+requests include initialize/launch/configurationDone, source breakpoints,
+stack/scopes/variables, safe evaluate/setVariable, continue/step/pause, source,
+all-errors filtering and disconnect/terminate. Unsupported breakpoint conditions,
+hit counts and log points are unverified. Framing and real subprocess lifecycle
+tests live in `crates/vba-dap/tests/protocol.rs` and `apps/vba-cli/tests/dap.rs`.

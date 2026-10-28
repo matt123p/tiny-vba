@@ -31,17 +31,17 @@ See the [M2 compiler contract](compiler.md) for supported source, API and struct
 | vba-foreign | Generic host call/result/wait protocol; protocol version 1 and validated source imports | diagnostics, values |
 | vba-vm | Frames, instruction pointer, budgets, inspection hooks; host-root binding and protocol checks | diagnostics, ir, values, runtime, foreign |
 | vba-debug | Breakpoint/step/inspection controller | diagnostics, vm |
-| vba-dap | Planned M10 DAP adapter; current scaffold | debug |
+| vba-dap | Optional bounded M10 Debug Adapter Protocol frontend | ide, serde_json (=1.0.154) |
 | vba-project | Bounded read-only MS-OVBA source/project decoder | diagnostics, cfb (=0.14.0), encoding_rs (=0.8.42) |
 | vba-testkit | Deterministic generic foreign host, trace support and bounded embedding driver | debug, diagnostics, foreign, ir, values, vm |
 | vba-conformance | Scenario validation, typed expectations and M4 outcome judgment; comparison/reports later | diagnostics, testkit, values, vm |
-| vba-cli | Source parsing, compilation/disassembly/execution and fixture validation | conformance, diagnostics, syntax, compiler, ir, values, vm |
+| vba-cli | Source parsing, compilation/disassembly/execution, fixture validation and optional DAP stdio | conformance, diagnostics, syntax, compiler, ir, values, vm; dap optional |
 | vba-ide | Toolkit-independent source buffers, commands, compiler/debug-session orchestration and safe watches | compiler, debug, diagnostics, foreign, ir, runtime, syntax, values, vm |
 | vba-ui-egui | Reusable Classic editor/debugger rendering; explicit commands and scoped theme/IDs | ide, egui |
-| vba-ide-app | Native/browser shell, source IO, preferences and capture harness | ide, ui-egui, eframe; image native-only, wasm-bindgen/futures/web-sys browser-only |
+| vba-ide-app | Native/browser shell, source IO, preferences and capture harness | ide, ui-egui, eframe; image native-only, js-sys/wasm-bindgen/futures/web-sys browser-only |
 | xtask | Maintenance/build/render commands | none |
 
-Some dependencies still reserve boundaries. DAP remains a scaffold; project implements [M6 source decoding](project-import.md). Runtime, VM and debug implement the [M3 contract](runtime.md); semantics/compiler/IR implement M2 with generic member lowering added at M3.
+DAP implements the [M10 policy](decisions/0018-m10-classic-tools-and-debugger-policy.md) above the headless IDE. Project implements [M6 source decoding](project-import.md). Runtime, VM and debug implement the [M3 contract](runtime.md); semantics/compiler/IR implement M2 with generic member lowering added at M3.
 Syntax implements the bounded lexer/parser described in [frontend](frontend.md) and
 [ADR 0005](decisions/0005-m1-frontend.md); its only dependency remains diagnostics.
 Diagnostics, values, foreign, testkit and conformance implement the bounded M0 contracts in
@@ -75,7 +75,7 @@ A generic foreign-host double here proves interpreter mechanics; an Office-shape
 
 Use synchronous native Rust calls for ordinary host work. Release mutable host borrows before callbacks,
 pause or yield. Budget execution and allocations. The VM never calls DAP or the UI and never performs ambient IO.
-Inspection hooks and statement safe points belong to VM; debug controls them, DAP wraps debug.
+Inspection hooks and statement safe points belong to VM; debug controls them. DAP wraps the IDE orchestration, which uses debug and VM through native APIs.
 
 ## Files and portability
 
@@ -148,7 +148,7 @@ pinned in tools/architecture.json separately from the unchanged 16-node workspac
 
 ## Post-M8 scope ownership
 
-[Planned M10–M14](ui/post-m8-roadmap.md) allocate remaining classic editor/debugger work (M10),
+[M10–M14](ui/post-m8-roadmap.md) allocate implemented classic editor/debugger work (M10),
 form/class support (M11), native extensions and translation (M12), optional AI (M13), and host
 integration acceptance (M14). Extension/provider facilities stay above toolkit-independent engine
 layers; Office models, trust and document persistence remain fork-owned. This allocation adds no

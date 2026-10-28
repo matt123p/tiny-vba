@@ -87,3 +87,40 @@ fn enter_formatting_preserves_strings_comments_and_inherits_indent() -> R {
     assert!(ide.format_after_newline(text, 1, true, true).is_err());
     Ok(())
 }
+
+#[test]
+fn chained_receiver_metadata_resolves_without_evaluation() -> R {
+    let mut ide = Ide::new();
+    ide.add_module(
+        "Test.bas",
+        "Sub Main()\nDim doc As Document\ndoc.Child.Value\nEnd Sub\n",
+    )?;
+    ide.active_module_mut().ok_or("module")?.caret = 45;
+    ide.configure_host(
+        vec![],
+        Default::default(),
+        vec![
+            vba_ide::ApiMember {
+                library: "Authored".into(),
+                owner: "Document".into(),
+                name: "Child".into(),
+                signature: "Property Get Child() As Node".into(),
+                supported: true,
+            },
+            vba_ide::ApiMember {
+                library: "Authored".into(),
+                owner: "Node".into(),
+                name: "Value".into(),
+                signature: "Property Get Value() As Long".into(),
+                supported: true,
+            },
+        ],
+    )?;
+    assert_eq!(ide.completions("doc.Child.V"), vec!["Value"]);
+    assert_eq!(
+        ide.quick_info("doc.Child.Value").as_deref(),
+        Some("Property Get Value() As Long")
+    );
+    assert!(ide.completions("unknown.Child.").is_empty());
+    Ok(())
+}

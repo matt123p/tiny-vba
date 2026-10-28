@@ -105,7 +105,13 @@ fn initialize_break_inspect_edit_step_resume_and_disconnect() -> R {
         json!({"frameId":frame,"expression":"Dangerous()"}),
     ));
     success(&send(&mut adapter, "next", json!({"threadId":1})));
-    drain(&mut adapter);
+    let stepped = drain(&mut adapter);
+    assert!(
+        stepped.iter().any(
+            |event| event.get("event").and_then(Json::as_str) == Some("stopped")
+                && event.pointer("/body/reason").and_then(Json::as_str) == Some("step")
+        )
+    );
     failed(&send(
         &mut adapter,
         "variables",
@@ -164,5 +170,35 @@ fn running_loop_can_pause_and_disconnect_without_restarting() -> R {
     assert_eq!(adapter.ide.mode(), Mode::Break);
     success(&send(&mut adapter, "disconnect", json!({})));
     assert_eq!(adapter.ide.mode(), Mode::Design);
+    Ok(())
+}
+
+#[test]
+fn stop_on_entry_and_unsupported_breakpoint_options_are_honest() -> R {
+    let mut adapter = Adapter::new(Ide::new());
+    success(&send(&mut adapter, "initialize", json!({})));
+    success(&send(
+        &mut adapter,
+        "launch",
+        json!({"sourceCode":"Sub Main()\nDebug.Print 1\nEnd Sub\n","stopOnEntry":true}),
+    ));
+    let requested = send(
+        &mut adapter,
+        "setBreakpoints",
+        json!({"source":{"path":"Module1.bas"},"breakpoints":[{"line":2,"condition":"False"}]}),
+    );
+    assert_eq!(
+        success(&requested).pointer("/breakpoints/0/verified"),
+        Some(&Json::Bool(false))
+    );
+    success(&send(&mut adapter, "configurationDone", json!({})));
+    let events = drain(&mut adapter);
+    assert!(
+        events
+            .iter()
+            .any(|event| event.pointer("/body/reason").and_then(Json::as_str) == Some("entry"))
+    );
+    assert!(adapter.ide.output().is_empty());
+    success(&send(&mut adapter, "disconnect", json!({})));
     Ok(())
 }

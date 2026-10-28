@@ -22,6 +22,40 @@ pub struct ReferenceInfo {
 }
 
 impl Ide {
+    pub(crate) fn receiver_type(&self, receiver: &str) -> Option<String> {
+        if receiver.len() > 1024 {
+            return None;
+        }
+        let mut parts = receiver.split('.');
+        let root = parts.next()?;
+        let mut ty = self
+            .source_completions()
+            .into_iter()
+            .find(|(name, _)| name.eq_ignore_ascii_case(root))
+            .and_then(|(_, ty)| ty)
+            .or_else(|| {
+                self.catalog
+                    .iter()
+                    .find(|item| item.supported && item.owner.eq_ignore_ascii_case(root))
+                    .map(|item| item.owner.clone())
+            })?;
+        for (depth, part) in parts.enumerate() {
+            if depth >= 32 {
+                return None;
+            }
+            let member = self.catalog.iter().find(|item| {
+                item.supported
+                    && item.owner.eq_ignore_ascii_case(&ty)
+                    && item.name.eq_ignore_ascii_case(part)
+            })?;
+            let words = member.signature.split_whitespace().collect::<Vec<_>>();
+            let at = words
+                .iter()
+                .rposition(|word| word.eq_ignore_ascii_case("As"))?;
+            ty = words.get(at + 1)?.trim_matches(['(', ')']).to_string();
+        }
+        Some(ty)
+    }
     pub fn parameter_info(&self) -> Option<ParameterInfo> {
         let m = self.active_module()?;
         let line = m.text.get(m.line_start(m.line_at(m.caret))..m.caret)?;
@@ -200,11 +234,7 @@ impl Ide {
             ));
         }
         let (owner, member) = name.rsplit_once('.')?;
-        let ty = self
-            .source_completions()
-            .into_iter()
-            .find(|(n, _)| n.eq_ignore_ascii_case(owner))
-            .and_then(|(_, ty)| ty);
+        let ty = self.receiver_type(owner);
         self.catalog
             .iter()
             .find(|item| {

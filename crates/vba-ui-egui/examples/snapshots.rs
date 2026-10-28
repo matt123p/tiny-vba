@@ -70,6 +70,38 @@ fn main() -> Result<(), Box<dyn Error>> {
             1.0,
             Pane::Locals,
         ),
+        (
+            "m10-light-split",
+            Theme::light(),
+            1400.0,
+            1000.0,
+            1.0,
+            Pane::Locals,
+        ),
+        (
+            "m10-dark-procedure",
+            Theme::dark(),
+            1200.0,
+            900.0,
+            1.0,
+            Pane::Watches,
+        ),
+        (
+            "m10-narrow-split",
+            Theme::light(),
+            640.0,
+            900.0,
+            1.25,
+            Pane::Watches,
+        ),
+        (
+            "m10-dark-options",
+            Theme::dark(),
+            1200.0,
+            900.0,
+            1.0,
+            Pane::Locals,
+        ),
     ] {
         let mut ide = Ide::demo()?;
         let byte = ide
@@ -92,6 +124,11 @@ fn main() -> Result<(), Box<dyn Error>> {
         let mut view = EditorUi::default();
         view.pane = pane;
         view.object_browser = name == "dark-object-browser";
+        view.split_view = name == "m10-light-split" || name == "m10-narrow-split";
+        view.procedure_view = name == "m10-dark-procedure";
+        view.options_open = name == "m10-dark-options";
+        view.project_right = name == "m10-light-split";
+        view.debugger_right = name == "m10-light-split";
         let state = Fixture { ide, view, theme };
         let mut harness = Harness::builder()
             .with_size(egui::vec2(width, height))

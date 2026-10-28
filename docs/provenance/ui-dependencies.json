@@ -8,6 +8,8 @@
     "winit": "0.30.13, Apache-2.0; matching reviewed public fork",
     "image": "0.25.10, MIT OR Apache-2.0; native screenshot encoding only",
     "wasm-bindgen / wasm-bindgen-futures / web-sys": "0.2.126 / 0.4.76 / 0.3.103, MIT OR Apache-2.0; browser glue",
+    "js-sys": "0.3.103, MIT OR Apache-2.0; explicit browser File/Blob source transfer",
+    "serde_json": "1.0.154, MIT OR Apache-2.0; optional DAP JSON only; no native host/debugger serialization",
     "playwright": "1.64.1, Apache-2.0; optional maintenance-only browser harness"
   },
   "fonts": "egui bundled Hack, Ubuntu Light and framework icon font; unmodified licensed dependencies. No Office/VBE fonts or artwork extracted. Fonts remain in upstream dependency packages; only required redistributable notices are copied here.",

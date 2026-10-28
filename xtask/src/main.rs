@@ -47,13 +47,17 @@ fn run() -> Result<(), Box<dyn Error>> {
                     "clippy",
                     "--workspace",
                     "--all-targets",
+                    "--all-features",
                     "--locked",
                     "--",
                     "-D",
                     "warnings",
                 ],
             )?;
-            command("cargo", &["test", "--workspace", "--locked"])?;
+            command(
+                "cargo",
+                &["test", "--workspace", "--all-features", "--locked"],
+            )?;
             command(python(), &["tools/check_repository.py"])?;
         }
         Some("wasm-run") => {
@@ -111,6 +115,8 @@ fn run() -> Result<(), Box<dyn Error>> {
                     "callbacks",
                     "--test",
                     "embedding",
+                    "--test",
+                    "inspection",
                     "--locked",
                     "--target",
                     "wasm32-wasip1",
@@ -124,6 +130,8 @@ fn run() -> Result<(), Box<dyn Error>> {
                     "test",
                     "-p",
                     "vba-ide",
+                    "-p",
+                    "vba-dap",
                     "--locked",
                     "--target",
                     "wasm32-wasip1",

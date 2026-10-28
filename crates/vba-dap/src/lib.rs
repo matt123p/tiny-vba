@@ -16,6 +16,8 @@ pub struct Adapter {
     references: BTreeMap<i64, (Handle, usize)>,
     output_count: usize,
     last_mode: Mode,
+    next_stop_reason: &'static str,
+    stop_on_entry: bool,
 }
 impl Adapter {
     pub fn new(ide: Ide) -> Self {
@@ -30,6 +32,8 @@ impl Adapter {
             references: BTreeMap::new(),
             output_count: 0,
             last_mode: Mode::Design,
+            next_stop_reason: "breakpoint",
+            stop_on_entry: false,
         }
     }
     fn message(&mut self, mut value: Json) -> Json {
@@ -43,8 +47,15 @@ impl Adapter {
         self.message(json!({"type":"event","event":event,"body":body}))
     }
     fn reference(&mut self, index: usize) -> Result<i64> {
-        self.ide.select_frame(index).map_err(|d| d.to_string())?;
-        let handle = self.ide.handle().map_err(|d| d.to_string())?;
+        if self.ide.mode() != Mode::Break {
+            return Err("inspection requires current break mode".into());
+        }
+        let pause = self.ide.pause().ok_or("inspection requires pause")?;
+        let frame = pause.frames.get(index).ok_or("unknown stack frame")?;
+        let handle = Handle {
+            frame: frame.id,
+            ..pause.handle
+        };
         if self.references.len() >= 4096 || self.next_reference >= i64::from(i32::MAX) {
             return Err("inspection reference limit".into());
         }
@@ -163,6 +174,10 @@ impl Adapter {
                     self.ide.entry = entry.into();
                 }
                 self.launched = true;
+                self.stop_on_entry = args
+                    .get("stopOnEntry")
+                    .and_then(Json::as_bool)
+                    .unwrap_or(false);
                 Ok(json!({}))
             }
             "configurationDone" => {
@@ -170,9 +185,21 @@ impl Adapter {
                     return Err("launch/configuration sequence required".into());
                 }
                 self.ide
-                    .dispatch(Action::Run, host)
+                    .dispatch(
+                        if self.stop_on_entry {
+                            Action::StepInto
+                        } else {
+                            Action::Run
+                        },
+                        host,
+                    )
                     .map_err(|d| d.to_string())?;
                 self.configured = true;
+                self.next_stop_reason = if self.stop_on_entry {
+                    "entry"
+                } else {
+                    "breakpoint"
+                };
                 self.last_mode = self.ide.mode();
                 Ok(json!({}))
             }
@@ -209,6 +236,13 @@ impl Adapter {
                 let mut result = Vec::new();
                 let mut seen = std::collections::BTreeSet::new();
                 for requested in requests {
+                    if ["condition", "hitCondition", "logMessage"]
+                        .iter()
+                        .any(|key| requested.get(*key).is_some())
+                    {
+                        result.push(json!({"verified":false,"message":"conditional, hit-count and log breakpoints are not supported"}));
+                        continue;
+                    }
                     let line = requested
                         .get("line")
                         .and_then(Json::as_u64)
@@ -237,7 +271,10 @@ impl Adapter {
                 let mut result = Vec::new();
                 for (index, _) in frames.iter().enumerate() {
                     let id = self.reference(index)?;
-                    let stop = self.ide.execution().ok_or("frame source unavailable")?;
+                    let stop = self
+                        .ide
+                        .frame_location(index)
+                        .ok_or("frame source unavailable")?;
                     let module = self
                         .ide
                         .modules
@@ -295,6 +332,11 @@ impl Adapter {
             }
             "continue" | "next" | "stepIn" | "stepOut" | "pause" => {
                 self.check_thread(args)?;
+                self.next_stop_reason = match command {
+                    "next" | "stepIn" | "stepOut" => "step",
+                    "pause" => "pause",
+                    _ => "breakpoint",
+                };
                 self.ide
                     .dispatch(
                         match command {
@@ -378,9 +420,25 @@ impl Adapter {
         if mode != self.last_mode {
             self.references.clear();
             if mode == Mode::Break {
+                let reason = if self
+                    .ide
+                    .pause()
+                    .is_some_and(|p| p.reason == vba_ide::PauseReason::Fault)
+                {
+                    "exception"
+                } else if self.ide.execution().is_some_and(|s| {
+                    self.ide
+                        .modules
+                        .iter()
+                        .any(|m| m.id == s.source && m.breakpoints.contains(&s.span.start()))
+                }) {
+                    "breakpoint"
+                } else {
+                    self.next_stop_reason
+                };
                 messages.push(self.event(
                     "stopped",
-                    json!({"reason":"breakpoint","threadId":1,"allThreadsStopped":true}),
+                    json!({"reason":reason,"threadId":1,"allThreadsStopped":true}),
                 ));
             }
             if matches!(mode, Mode::Completed | Mode::Failed) {

@@ -18,9 +18,9 @@ do not add documentation-only graph nodes or put reusable lowering inside the CL
 
 - Syntax preserves source; semantics binds names/calls; IR verifies bytecode; runtime centralizes
   language rules; VM owns explicit execution state. Keep these separable and testable headlessly.
-- VM inspection hooks support vba-debug; debug controls VM; optional DAP wraps debug. Never reverse
+- VM inspection hooks support vba-debug; debug controls VM; optional DAP wraps the headless IDE. Never reverse
   those dependencies or put egui/DAP types into the VM.
-- This repository owns reusable editor/debugger panels and the standalone IDE. Planned vba-ide
+- This repository owns reusable editor/debugger panels and the standalone IDE. Implemented vba-ide
   holds toolkit-independent state/actions, vba-ui-egui renders them and the app owns its shell.
   UI packages are optional for headless consumers; the visual product remains a required deliverable.
 - Office catalogues, document storage, undo/recalc, OOXML and application bridges stay in the forks.
@@ -67,7 +67,8 @@ storage, one-visit checkpoint permits, saved fault PCs, generation checks and no
 Use vba-runtime for operations/edits. VM host dispatch must use checked precommit return/writeback
 validation and explicit per-site permissions; foreign aliases remain unsupported. Run cargo xtask ci,
 wasm and wasm-run (native plus actual WASI execution). Runtime example results do not mark unrun M0
-or external scenario assertions PASS. Graphical UI, DAP and VBA error-handler semantics remain later work.
+or external scenario assertions PASS. M8/M10 graphical UI and optional DAP are implemented above
+the headless engine; use ADR 0018 for their policy. Current handlers belong to the M4 profile.
 
 [ADR 0008](../../../docs/decisions/0008-vm-instance-isolation.md) distinguishes the caller's routing
 label from the non-reused SessionInstance. Key handles, locations, breakpoints and stepping by the

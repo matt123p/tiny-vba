@@ -1,6 +1,6 @@
 # Post-M8 UI and extension milestones
 
-Updated 2026-10-28 on explicit user direction. M10–M13 and broader M14 acceptance below are **planned**; GridCraft's bounded M14 baseline is implemented.
+Updated 2026-10-28 on explicit user direction. M10's documented profile is **implemented**; M11–M13 and broader M14 acceptance remain **planned**. GridCraft's bounded M14 baseline is implemented.
 M8 remains the delivered embeddable editor/debugger baseline recorded in
 [its acceptance report](m8-acceptance.md). M9 remains conformance and release of the supported
 baseline; its release gate does not imply completion of later UI features.
@@ -15,6 +15,10 @@ without waiting for optional extensions or AI.
 ## M10 — Classic editor, code aids and advanced debugger
 
 Owner: tiny-vba editor/model/compiler/debugger layers. Depends on M8 and the applicable M9 baseline.
+
+Delivered profile and exact evidence: [M10 acceptance map](m10-implementation.md)
+and [ADR 0018](../decisions/0018-m10-classic-tools-and-debugger-policy.md).
+The requirements below identify the scope, not unrestricted Office parity.
 
 - Complete remaining classic editing/project workflows: whole-block indent/comment commands, automatic indentation/case correction, split and procedure-only code views,
   docking and toolbar customisation, validated module renaming, export-before-remove, bookmarks,

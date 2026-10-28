@@ -1,6 +1,44 @@
 //! Bounded source transformations and project navigation, independent of egui/IO.
 use crate::{HostRequest, Ide, Result, SourceId, error, line_starts};
 use std::ops::Range;
+pub(crate) struct SourceEditMap {
+    start: usize,
+    old_end: usize,
+    new_end: usize,
+}
+impl SourceEditMap {
+    pub(crate) fn new(old: &str, new: &str) -> Self {
+        let start = old
+            .chars()
+            .zip(new.chars())
+            .take_while(|(a, b)| a == b)
+            .map(|(c, _)| c.len_utf8())
+            .sum();
+        let suffix = old
+            .get(start..)
+            .unwrap_or_default()
+            .chars()
+            .rev()
+            .zip(new.get(start..).unwrap_or_default().chars().rev())
+            .take_while(|(a, b)| a == b)
+            .map(|(c, _)| c.len_utf8())
+            .sum::<usize>();
+        Self {
+            start,
+            old_end: old.len() - suffix,
+            new_end: new.len() - suffix,
+        }
+    }
+    pub(crate) fn position(&self, at: usize) -> Option<usize> {
+        if at < self.start {
+            Some(at)
+        } else if at >= self.old_end {
+            self.new_end.checked_add(at - self.old_end)
+        } else {
+            None
+        }
+    }
+}
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum BlockEdit {
@@ -321,6 +359,8 @@ impl Ide {
             ));
         }
         self.modules.remove(index);
+        self.undo_edits.retain(|state| state.id != id);
+        self.redo_edits.retain(|state| state.id != id);
         self.active = self.active.min(self.modules.len().saturating_sub(1));
         self.bookmarks.retain(|(source, _)| *source != id.0);
         self.navigation.retain(|(source, _)| *source != id);

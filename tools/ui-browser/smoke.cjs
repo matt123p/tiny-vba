@@ -38,6 +38,12 @@ const assert = require('node:assert/strict');
           await page.keyboard.press('Escape');
           await page.keyboard.press('Enter');
           expected += '\n';
+          const indent = lines[i].match(/^[ \t]*/)[0];
+          await page.waitForFunction(value => document.querySelector('#vba-source').textContent === value, expected + indent);
+          if (indent) {
+            await page.keyboard.press('Shift+Home');
+            await page.keyboard.press('Backspace');
+          }
           await page.waitForFunction(value => document.querySelector('#vba-source').textContent === value, expected);
         }
       }
@@ -98,7 +104,34 @@ const assert = require('node:assert/strict');
     await typeSource('Sub Main()\nDim counter As Long\ncounter = 3\nEnd Sub\n');
     await page.waitForFunction(() => document.querySelector('#vba-feedback').textContent === 'Syntax OK');
     assert.deepEqual(errors, []);
-    console.log('BROWSER_UI_PASS: F8/F5 debugger; typed member completion and output 8; real clipboard copy/cut/paste; live syntax error/correction; no page errors');
+    await page.keyboard.press('Control+e');
+    await settle();
+    await page.waitForTimeout(250);
+    await page.screenshot({path:path.join(report,'m10-browser-files.png')});
+    const exported = await page.locator('#vba-source').textContent();
+    const downloading=page.waitForEvent('download');
+    await page.locator('#vba-canvas').click({position:{x:90,y:140}});
+    const downloaded=await downloading;
+    const chunks=[];for await(const chunk of await downloaded.createReadStream()) chunks.push(chunk);
+    assert.equal(Buffer.concat(chunks).toString('utf8'),exported);
+    assert.equal(downloaded.suggestedFilename(),'Module1.bas');
+    await page.locator('#vba-canvas').click({position:{x:75,y:406}});
+    await settle();
+    await page.locator('#vba-canvas').click({position:{x:17,y:15}});
+    await settle();await page.waitForTimeout(250);
+    await page.screenshot({path:path.join(report,'m10-browser-file-menu.png')});
+    await page.locator('#vba-canvas').click({position:{x:70,y:66}});
+    await settle();await page.waitForTimeout(250);
+    const choosing=page.waitForEvent('filechooser');
+    await page.locator('#vba-canvas').click({position:{x:100,y:140}});
+    const uploaded="' λ\r\nSub Main()\r\nDebug.Print 11\r\nEnd Sub\r\n";
+    await (await choosing).setFiles({name:'AuthoredUpload.bas',mimeType:'text/plain',buffer:Buffer.from(uploaded,'utf8')});
+    await page.waitForFunction(value=>document.querySelector('#vba-source').textContent===value,uploaded);
+    assert.notEqual(await page.locator('#vba-status').textContent(),'Running');
+    assert.doesNotMatch(await page.locator('#vba-output').textContent(),/11/);
+    await page.screenshot({path:path.join(report,'m10-browser-upload.png')});
+    assert.deepEqual(errors,[]);
+    console.log('BROWSER_UI_PASS: F8/F5 debugger; completion/output; clipboard; syntax recovery; exact UTF-8 download and Unicode/CRLF file upload without execution; no page errors');
   } finally {
     if (browser) await browser.close();
     await new Promise(resolve => server.close(resolve));

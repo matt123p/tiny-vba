@@ -10,6 +10,7 @@ cargo run -p vba-ide-app
 cargo run -p vba-ide-app -- --open examples/pure-vba/Arithmetic.bas
 cargo run -p vba-ide-app -- --dark
 cargo run -p vba-cli -- debug examples/pure-vba/Arithmetic.bas --entry Answer
+cargo run -p vba-cli --features dap -- dap examples/pure-vba/Arithmetic.bas
 ```
 
 The demo starts with `Main`. F9 toggles a statement breakpoint, F5 runs/continues, F8 steps into,
@@ -125,7 +126,7 @@ The standalone page's hidden source mirror and live feedback status are harness 
 do not introduce web APIs into the embeddable model/panels. All images stay ignored under `reports/ui/`.
 See specification section 16 and the provenance manifest for public reference examples/cache hashes.
 
-## Ordinary editor commands
+## Ordinary editor commands — historical M8 baseline
 
 | Operation | M8 support and verification |
 |---|---|
@@ -141,3 +142,31 @@ Selection and undo/redo survive temporary Edit-menu focus. Escape cancels comple
 source focus; accepting completion and immediately typing within the same rendered frame preserves
 the new text. These interaction details have permanent regressions rather than relying on the
 presence of toolkit keyboard bindings alone.
+
+## M10 classic tools
+
+[M10 acceptance](m10-implementation.md) and [ADR 0018](../decisions/0018-m10-classic-tools-and-debugger-policy.md)
+supersede the historical M8 limitations above. Edit now offers selected-line
+indent/outdent/comment, shared source Undo/Redo across all views, literal scoped
+Find/Replace (module/procedure/project, direction, case, whole word), Enter
+indentation/case correction, definitions and constants. F3/Shift+F3 repeat Find;
+Ctrl+M indents in source and imports when Project Explorer owns focus.
+
+View supplies procedure-only/split views, bookmarks/history, pane placement and
+toolbar visibility/order. File supplies validated rename and explicit removal
+choices. Options/preferences retain layout and editing settings, not source or
+evaluation permission. Native file IO remains shell-owned. Browser Source File
+offers an explicit `.bas` chooser and real UTF-8 download; import does not run
+code and downloading does not acknowledge a successful save or clear dirty state.
+
+Quick Watch (Shift+F9), conditional/change watch contexts, array-index inspection
+and typed local edits use native IDE commands. Set Next Statement (Ctrl+F9)
+supports verified straight-line current-frame checkpoints. Immediate function
+calls are off by default; opting in permits isolated bounded execution with real
+host effects, not shared paused-project mutation. Reference/constant metadata
+enriches Quick/Parameter Info and Object Browser without loading libraries.
+
+DAP is optional: `--features dap` enables the CLI stdio adapter and JSON dependency.
+It is not used by the native or embedded egui debugger. It accepts an explicitly
+preloaded source or launch `sourceCode`; unknown/unsupported requests fail clearly.
+Host effect policy, source/pause identity and lifecycle checks remain in the IDE.

@@ -27,7 +27,8 @@ Updated 2026-10-27. Stage: M4 external acceptance complete; M5–M7 in-repo cont
 | Versioned native host protocol and source imports (M5) | Implemented M5 contract | `vba_foreign::check_protocol` refuses foreign protocol versions before dispatch (crates/vba-foreign/tests/protocol.rs); `Import`/`validate_imports` bound names to hidden IR 4 host-root slots (crates/vba-compiler/tests/compiler.rs); missing/mismatched/stale roots refuse launch or surface host error 91 without a second write (crates/vba-vm/tests/host.rs, tests/embedding.rs); [ADR 0013](decisions/0013-m5-host-contract.md) |
 | Reusable bridge driver for forks (M5) | Implemented generic proof | vba-testkit `run_to_boundary`/`statement`; vba-vm/tests/embedding.rs proves break/edit/resume over an imported root with exactly one dispatch. Real workbook FillCells, undo/recalc and permissions stay fork-owned |
 | Bounded generic callbacks, static reset, lifecycle cleanup (M7) | Implemented M7 contract | `schedule_callback`/`run_next_callback`/`reset_state`/`rebind_roots` with native/WASI drain, budget, non-reentrancy, permanent closure and entry-restart tests in crates/vba-vm/tests/callbacks.rs; [ADR 0015](decisions/0015-m7-callbacks-and-lifecycle.md); fork-owned event order stays in the forks |
-| Breakpoints, stepping, local inspect/edit/resume | Headless API plus M8 native/web UI and CLI | VM/controller tests plus model, keyboard/pointer, embedding and native/browser capture evidence; DAP remains unavailable |
+| Breakpoints, stepping, local inspect/edit/resume | Headless API plus M8/M10 native/web UI and optional DAP | VM/controller/model and real UI/process tests; [M10 map](ui/m10-implementation.md) |
+| Classic editing, metadata code aids and advanced debugging | Implemented M10 profile | Shared source Undo, scoped literal search, split/procedure editing, browser transfer, read-only watches, local arrays, restricted relocation and opt-in isolated calls; [limits/evidence](ui/m10-implementation.md) |
 | Classic editor/debugger panels | Implemented M8 repository gate | [Surface matrix and explicit broader-spec limitations](ui/m8-acceptance.md); independent host themes, source/inspection lifetimes and bounded execution |
 | Native / WASM execution | Implemented M3 smoke | cargo xtask wasm-run; identical typed results, pause/edit/host counts and cancellation |
 | Replacement-session isolation | Implemented M3 correction | recycled-client-ID regression in VM tests and native/WASI smoke; [ADR 0008](decisions/0008-vm-instance-isolation.md) |
@@ -53,9 +54,9 @@ checks pass. Unselected external cases retain NOT_RUN; future oracle acquisition
 
 ## Planned UI and extension milestones
 
-Deferred UI work is allocated in [the post-M8 roadmap](ui/post-m8-roadmap.md): M10 classic editor,
-code aids, advanced debugger and DAP; M11 class/document runtime and forms; M12 native Craft
+The [post-M8 roadmap](ui/post-m8-roadmap.md) records implemented M10 classic editor,
+code aids, advanced debugger and DAP, with their explicit safety profile. Deferred work is M11 class/document runtime and forms; M12 native Craft
 extensions, non-Microsoft enhancements and Python translation preview; M13 optional Copilot-style
-assistance; M14 fork-owned host integration acceptance. These entries are planned scope, not new
+assistance; M14 fork-owned host integration acceptance. M11 onward remains planned scope, not new
 compatibility passes. Existing unavailable/unsupported statuses remain until their milestone gates
 have execution evidence. Binary VBE add-ins and arbitrary ActiveX/COM are not implicitly supported.

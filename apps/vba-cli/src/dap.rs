@@ -21,17 +21,19 @@ pub fn serve(path: Option<&str>) -> Result<(), Box<dyn std::error::Error>> {
     let mut adapter = Adapter::new(ide);
     let (sender, receiver) = mpsc::sync_channel(16);
     // Input thread owns stdin until EOF/process exit; it never sees IDE/host state.
-    std::thread::spawn(move || {
-        let input = std::io::stdin();
-        let mut reader = input.lock();
-        loop {
-            let result = transport::read(&mut reader).map_err(|e| e.to_string());
-            let done = !matches!(&result, Ok(Some(_)));
-            if sender.send(result).is_err() || done {
-                break;
+    std::thread::Builder::new()
+        .name("vba-dap-input".into())
+        .spawn(move || {
+            let input = std::io::stdin();
+            let mut reader = input.lock();
+            loop {
+                let result = transport::read(&mut reader).map_err(|e| e.to_string());
+                let done = !matches!(&result, Ok(Some(_)));
+                if sender.send(result).is_err() || done {
+                    break;
+                }
             }
-        }
-    });
+        })?;
     let stdout = std::io::stdout();
     let mut writer = stdout.lock();
     while !adapter.disconnected() {

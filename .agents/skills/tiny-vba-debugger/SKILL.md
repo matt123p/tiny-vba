@@ -26,7 +26,8 @@ The M3 headless VM/controller subset is now implemented; the runtime contract re
   Validate supported local edits using shared language rules before changing execution state.
 - Watches default to read-only inspection. Property Get, default members and functions may cause
   effects; report unsupported/unsafe evaluation rather than silently executing them. Evaluation
-  must obey the same capabilities as macros. Immediate execution is a later explicit-policy feature.
+  must obey the same capabilities as macros. M10 Immediate calls require explicit policy and an
+  isolated bounded child VM; real host effects must remain visible and permission-checked.
 - Editing paused source marks compiled code stale. Require stop/recompile/restart for changed code;
   do not imply live code replacement. Keep diagnostics and execution highlights version-correct.
 - Bound execution slices and output batches so UI repaint, pause and cancellation remain responsive.
@@ -46,7 +47,8 @@ storage, one-visit checkpoint permits, saved fault PCs, generation checks and no
 Use vba-runtime for operations/edits. VM host dispatch must use checked precommit return/writeback
 validation and explicit per-site permissions; foreign aliases remain unsupported. Run cargo xtask ci,
 wasm and wasm-run (native plus actual WASI execution). Runtime example results do not mark unrun M0
-or external scenario assertions PASS. Graphical UI, DAP and VBA error-handler semantics remain later work.
+or external scenario assertions PASS. M8/M10 implement the graphical UI and optional DAP;
+current handler semantics are defined by the M4 runtime profile.
 
 [ADR 0008](../../../docs/decisions/0008-vm-instance-isolation.md) distinguishes the caller's routing
 label from the non-reused SessionInstance. Key handles, locations, breakpoints and stepping by the
@@ -79,3 +81,10 @@ CI/WASM gates for affected UI changes. Keep accessibility checks enabled; render
 light/dark/narrow/scaled/host-theme/focus output. No downloaded reference evidence enters Git:
 .cache/evidence/ is ignored and provenance/notices/pins are verified. Do not claim full C0/C1,
 Office event/workbook, Set Next Statement or unsafe evaluation support from standalone UI evidence.
+
+M10 is implemented under [ADR 0018](../../../docs/decisions/0018-m10-classic-tools-and-debugger-policy.md).
+Use the [acceptance map](../../../docs/ui/m10-implementation.md) for exact restrictions.
+Checkpoint inspection must reject foreign/stale/permitted visits; conditional watches are read-only
+and visibly disable on budget exhaustion. Relocation rejects branches/handlers/faults/ancestor frames
+and invalidates the old pause without execution. DAP wraps vba-ide, not a second session controller;
+JSON is optional transport only. Run native/WASI protocol tests and CLI subprocess lifecycle tests.

@@ -1,7 +1,7 @@
 # Implementation progress
 
-Updated 2026-10-28. Current stage: **M8 complete for the defined standalone/embeddable scope**. The runtime
-profile remains m5-host-v1 with verified IR 1/2/3/4. M8-A1–A3 and the reported code-assistance defects are corrected and verified. M9 is next. Real
+Updated 2026-10-28. Current stage: **M10 implemented for the documented classic-editor/debugger profile**, preserving the corrected M8 baseline. The runtime
+profile remains m5-host-v1 with verified IR 1/2/3/4. M8-A1–A3 and the reported code-assistance defects are corrected and verified. M9 conformance/release and M11 UI work remain separate. Real
 workbook integration, event order and package/trust/preservation evidence remain fork-owned.
 
 The GridCraft M14 baseline and M14.10 object-model audit are recorded in the
@@ -10,6 +10,25 @@ fixes now have planned milestones **M15–M19** in the
 [implementation plan](implementation-plan.md#excel-source-compatibility-milestones-m15m19),
 with owners, numbered subtasks, dependencies and acceptance gates. Next on that
 track is M15.1 host type binding; this planning update adds no runtime capability.
+
+## M10 completion
+
+Preserved the user's `8dd37dc` checkpoint and completed the work on
+`feat/m10-completion`. Added shared bounded source history across views, scoped
+literal search, stable bookmark/navigation anchors, procedure/split editing,
+classic project commands, preferences/docking/toolbars and browser file transfer.
+Metadata-backed constants, Quick/Parameter Info, definition/help navigation and
+Object Browser use source/host catalogues without loading libraries.
+
+Quick Watch, scoped conditional/change watches, typed local array edits, trapping
+controls, verified straight-line Set Next Statement and explicitly opted-in
+isolated Immediate calls have positive, refusal and lifecycle regressions.
+Optional DAP runs above the IDE with bounded stdio framing and real subprocess
+acceptance. [ADR 0018](decisions/0018-m10-classic-tools-and-debugger-policy.md)
+records the contracts; the [M10 report](ui/m10-implementation.md) maps every stage
+to tests, final commands and limitations. No GridCraft changes or new Office
+oracle observations are included. Next UI milestone: M11's class/document
+prerequisite contract, before enabling a form designer Run command.
 
 ## M8 completion corrections
 

@@ -76,7 +76,7 @@ impl App {
                 }
             }
             if let Some(actions) = storage.get_string("vba.toolbar") {
-                self.view.toolbar_actions = [
+                let allowed = [
                     Action::Save,
                     Action::Run,
                     Action::Pause,
@@ -84,10 +84,15 @@ impl App {
                     Action::StepInto,
                     Action::StepOver,
                     Action::StepOut,
-                ]
-                .into_iter()
-                .filter(|action| actions.split(',').take(16).any(|id| id == action.id()))
-                .collect();
+                ];
+                self.view.toolbar_actions.clear();
+                for id in actions.split(',').take(16) {
+                    if let Some(action) = allowed.iter().find(|a| a.id() == id).copied()
+                        && !self.view.toolbar_actions.contains(&action)
+                    {
+                        self.view.toolbar_actions.push(action);
+                    }
+                }
             }
         }
     }

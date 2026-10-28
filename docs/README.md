@@ -67,7 +67,9 @@ and controlled native/WASI acceptance.
 
 - [User-supplied public-source UI specification](ui/craft_vba_editor_debugger_ui_spec.md)
 - [Implementation plan](ui/m8-implementation-plan.md), [ADR 0016](decisions/0016-m8-embeddable-editor.md)
-- [Planned M10–M14 milestones: classic completion, forms, native extensions, AI and host acceptance](ui/post-m8-roadmap.md)
+- [M10 implementation and acceptance map](ui/m10-implementation.md)
+- [ADR 0018: classic tools and debugger policy](decisions/0018-m10-classic-tools-and-debugger-policy.md)
+- [M10–M14 milestones: classic completion, forms, native extensions, AI and host acceptance](ui/post-m8-roadmap.md)
 - [Run, embed and reproduce visual evidence](ui/embedding.md)
 - [Acceptance and broader-spec feature status](ui/m8-acceptance.md)
 - [M8 completion audit: corrections, regression coverage and verification](ui/m8-completion-audit.md)

@@ -76,3 +76,41 @@ fn bookmarks_wrap_and_history_survives_module_rename_but_not_source_edits() -> R
     assert!(ide.navigate(one, usize::MAX).is_err());
     Ok(())
 }
+
+#[test]
+fn source_history_is_bounded_and_redo_clears_after_a_new_edit() -> R {
+    let mut ide = Ide::new();
+    ide.add_module("Test.bas", "")?;
+    for n in 0..300 {
+        ide.set_text(format!("' revision {n}\r\n"))?;
+    }
+    let mut count = 0;
+    while ide.can_undo_edit() {
+        ide.undo_edit()?;
+        count += 1;
+    }
+    assert_eq!(count, 256);
+    assert!(ide.can_redo_edit());
+    ide.set_text("' new λ\r\n".into())?;
+    assert!(!ide.can_redo_edit());
+    ide.undo_edit()?;
+    ide.redo_edit()?;
+    assert_eq!(ide.active_module().ok_or("module")?.text, "' new λ\r\n");
+    Ok(())
+}
+
+#[test]
+fn bookmarks_follow_unchanged_lines_through_edits_and_undo() -> R {
+    let mut ide = Ide::new();
+    let text = "Sub Main()\r\nDebug.Print 1\r\nEnd Sub\r\n";
+    let id = ide.add_module("Test.bas", text)?;
+    let at = text.find("Debug.Print").ok_or("line")?;
+    ide.navigate(id, at)?;
+    ide.toggle_bookmark()?;
+    let prefix = "' λ\r\n";
+    ide.set_text(format!("{prefix}{text}"))?;
+    assert_eq!(ide.bookmarks(), vec![(id, at + prefix.len())]);
+    ide.undo_edit()?;
+    assert_eq!(ide.bookmarks(), vec![(id, at)]);
+    Ok(())
+}

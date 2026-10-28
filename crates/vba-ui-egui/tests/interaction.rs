@@ -321,6 +321,36 @@ fn m8_find_next_advances_and_wraps() -> R {
     assert_eq!(positions.first(), positions.get(3));
     Ok(())
 }
+#[test]
+fn m10_find_selects_the_literal_match_and_f3_reverses_direction() -> R {
+    let mut h = editor_at_end("Sub Main()\nDim counter As Long\ncounter = 1\nEnd Sub\n")?;
+    h.key_press_modifiers(egui::Modifiers::CTRL, egui::Key::F);
+    h.run();
+    h.event(egui::Event::Text("counter".into()));
+    h.run();
+    h.get_by_label("Match Case").click();
+    h.get_by_label("Whole Word").click();
+    h.run();
+    h.get_by_label("Find Next").click();
+    h.run();
+    let first = h.state().ide.active_module().ok_or("module")?.caret;
+    h.key_press(egui::Key::F3);
+    h.run();
+    assert!(h.state().ide.active_module().ok_or("module")?.caret > first);
+    h.key_press_modifiers(egui::Modifiers::SHIFT, egui::Key::F3);
+    h.run();
+    assert_eq!(h.state().ide.active_module().ok_or("module")?.caret, first);
+    h.key_press(egui::Key::F7);
+    h.run();
+    h.event(egui::Event::Copy);
+    h.run();
+    assert!(
+        h.state().copied.iter().any(|text| text == "counter"),
+        "{:?}",
+        h.state().copied
+    );
+    Ok(())
+}
 fn editor_at_end(source: &str) -> R<egui_kittest::Harness<'static, Fixture>> {
     let mut fixture = Fixture::new()?;
     fixture.ide.set_text(source.into())?;
@@ -331,6 +361,269 @@ fn editor_at_end(source: &str) -> R<egui_kittest::Harness<'static, Fixture>> {
     h.key_press(egui::Key::F7);
     h.run();
     Ok(h)
+}
+
+#[test]
+fn m10_block_commands_use_the_selected_lines_and_remain_undoable() -> R {
+    let original = "Sub Main()\n  Dim count As Long\nEnd Sub\n";
+    let mut h = editor_at_end(original)?;
+    h.key_press_modifiers(
+        egui::Modifiers::CTRL | egui::Modifiers::COMMAND,
+        egui::Key::A,
+    );
+    h.run();
+    h.get_by_label("Edit").click();
+    h.run();
+    h.get_by_label("Indent    Ctrl+M").click();
+    h.run();
+    assert_eq!(
+        h.state().ide.active_module().ok_or("module")?.text,
+        "    Sub Main()\n      Dim count As Long\n    End Sub\n"
+    );
+    h.get_by_label("Edit").click();
+    h.run();
+    h.get_by_label("Undo    Ctrl+Z").click();
+    h.run();
+    assert_eq!(
+        h.state().ide.active_module().ok_or("module")?.text,
+        original
+    );
+    assert!(h.state().errors.is_empty(), "{:?}", h.state().errors);
+    Ok(())
+}
+
+#[test]
+fn m10_procedure_view_edits_only_its_original_source_range() -> R {
+    let original = "' π\r\nSub Main()\r\nDebug.Print 1\r\nEnd Sub\r\nSub Other()\r\nDebug.Print 2\r\nEnd Sub\r\n";
+    let mut fixture = Fixture::new()?;
+    fixture.ide.set_text(original.into())?;
+    fixture.view.procedure_view = true;
+    let mut h = Harness::builder()
+        .with_size(egui::vec2(1200.0, 800.0))
+        .build_ui_state(draw, fixture);
+    h.run();
+    h.get_by_label("Procedure source editor").click();
+    h.key_press_modifiers(
+        egui::Modifiers::CTRL | egui::Modifiers::COMMAND,
+        egui::Key::A,
+    );
+    h.event(egui::Event::Text(
+        "Sub Main()\nDebug.Print 7\nEnd Sub".into(),
+    ));
+    h.run();
+    let text = &h.state().ide.active_module().ok_or("module")?.text;
+    assert!(
+        text.starts_with("' π\r\nSub Main()\r\nDebug.Print 7\r\nEnd Sub"),
+        "{text:?}"
+    );
+    assert!(
+        text.ends_with("Sub Other()\r\nDebug.Print 2\r\nEnd Sub\r\n"),
+        "{text:?}"
+    );
+    assert!(h.state().errors.is_empty(), "{:?}", h.state().errors);
+    Ok(())
+}
+
+#[test]
+fn m10_split_and_docking_have_distinct_editors_and_usable_layout() -> R {
+    let mut fixture = Fixture::new()?;
+    fixture.view.split_view = true;
+    fixture.view.project_right = true;
+    fixture.view.debugger_right = true;
+    let mut h = Harness::builder()
+        .with_size(egui::vec2(1400.0, 1000.0))
+        .build_ui_state(draw, fixture);
+    h.run();
+    assert!(
+        h.query_by_label("VBA source editor — F9 breakpoint, F8 step, Ctrl+F find")
+            .is_some()
+    );
+    assert!(h.query_by_label("Split procedure source editor").is_some());
+    let report = h.state().view.report.as_ref().ok_or("layout")?;
+    assert!(
+        report.editor.width() > 200.0 && report.editor.height() > 200.0,
+        "{report:?}"
+    );
+    assert!(h.state().errors.is_empty());
+    Ok(())
+}
+
+#[test]
+fn m10_enter_inherits_indent_and_case_without_touching_strings() -> R {
+    let mut h = editor_at_end("    debug.print \"debug\"")?;
+    h.key_press(egui::Key::Escape);
+    h.key_press(egui::Key::Enter);
+    h.run();
+    assert_eq!(
+        h.state().ide.active_module().ok_or("module")?.text,
+        "    Debug.Print \"debug\"\n    "
+    );
+    assert!(h.state().errors.is_empty(), "{:?}", h.state().errors);
+    Ok(())
+}
+
+#[test]
+fn m10_procedure_block_edits_and_cross_view_undo_share_one_buffer() -> R {
+    let original = "Sub Main()\n  Dim count As Long\nEnd Sub\nSub Other()\nEnd Sub\n";
+    let mut fixture = Fixture::new()?;
+    fixture.ide.set_text(original.into())?;
+    fixture.view.procedure_view = true;
+    let mut h = Harness::builder()
+        .with_size(egui::vec2(1200.0, 800.0))
+        .build_ui_state(draw, fixture);
+    h.run();
+    h.get_by_label("Procedure source editor").click();
+    h.run();
+    h.key_press_modifiers(
+        egui::Modifiers::CTRL | egui::Modifiers::COMMAND,
+        egui::Key::A,
+    );
+    h.run();
+    h.key_press_modifiers(egui::Modifiers::CTRL, egui::Key::M);
+    h.run();
+    let indented = "    Sub Main()\n      Dim count As Long\n    End Sub\nSub Other()\nEnd Sub\n";
+    assert_eq!(
+        h.state().ide.active_module().ok_or("module")?.text,
+        indented
+    );
+    h.key_press_modifiers(egui::Modifiers::CTRL | egui::Modifiers::SHIFT, egui::Key::M);
+    h.run();
+    assert_eq!(
+        h.state().ide.active_module().ok_or("module")?.text,
+        original
+    );
+    h.get_by_label("Edit").click();
+    h.run();
+    h.get_by_label("Undo    Ctrl+Z").click();
+    h.run();
+    assert_eq!(
+        h.state().ide.active_module().ok_or("module")?.text,
+        indented
+    );
+    h.state_mut().view.procedure_view = false;
+    h.key_press(egui::Key::F7);
+    h.run();
+    h.key_press_modifiers(
+        egui::Modifiers::CTRL | egui::Modifiers::COMMAND,
+        egui::Key::Z,
+    );
+    h.run();
+    assert_eq!(
+        h.state().ide.active_module().ok_or("module")?.text,
+        original
+    );
+    assert!(h.state().errors.is_empty(), "{:?}", h.state().errors);
+    Ok(())
+}
+
+#[test]
+fn m10_procedure_completion_and_menu_copy_use_the_focused_view() -> R {
+    let source = "Sub Main()\n    Debug\nEnd Sub\nSub Other()\nEnd Sub\n";
+    let mut fixture = Fixture::new()?;
+    fixture.ide.set_text(source.into())?;
+    fixture.ide.active_module_mut().ok_or("module")?.caret =
+        source.find("Debug").ok_or("caret")? + 5;
+    fixture.view.procedure_view = true;
+    let mut h = Harness::builder()
+        .with_size(egui::vec2(1200.0, 800.0))
+        .build_ui_state(draw, fixture);
+    h.key_press(egui::Key::F7);
+    h.run();
+    h.event(egui::Event::Text(".".into()));
+    h.run();
+    assert!(h.query_by_label("Print").is_some());
+    h.key_press(egui::Key::Enter);
+    h.event(egui::Event::Text(" 7".into()));
+    h.run();
+    assert!(
+        h.state()
+            .ide
+            .active_module()
+            .ok_or("module")?
+            .text
+            .contains("Debug.Print 7")
+    );
+    h.get_by_label("Edit").click();
+    h.run();
+    h.get_by_label("Select All    Ctrl+A").click();
+    h.run();
+    h.get_by_label("Edit").click();
+    h.run();
+    h.get_by_label("Copy    Ctrl+C").click();
+    h.run();
+    assert!(
+        h.state()
+            .copied
+            .iter()
+            .any(|text| text.contains("Debug.Print 7") && !text.contains("Other")),
+        "copied: {:?}",
+        h.state().copied
+    );
+    assert!(h.state().errors.is_empty(), "{:?}", h.state().errors);
+    Ok(())
+}
+
+#[test]
+fn m10_list_constants_inserts_an_executable_project_constant() -> R {
+    let source = "Const Flag As Long=4\nSub Main()\nDim n As Long\nn=\nDebug.Print n\nEnd Sub\n";
+    let mut fixture = Fixture::new()?;
+    fixture.ide.set_text(source.into())?;
+    fixture.ide.active_module_mut().ok_or("module")?.caret =
+        source.find("n=\n").ok_or("caret")? + 2;
+    let mut h = Harness::builder()
+        .with_size(egui::vec2(1200.0, 800.0))
+        .build_ui_state(draw, fixture);
+    h.key_press(egui::Key::F7);
+    h.run();
+    h.key_press_modifiers(egui::Modifiers::CTRL | egui::Modifiers::SHIFT, egui::Key::J);
+    h.run();
+    h.get_by_label("Flag").click();
+    h.run();
+    assert!(
+        h.state()
+            .ide
+            .active_module()
+            .ok_or("module")?
+            .text
+            .contains("n=Flag\n")
+    );
+    h.key_press(egui::Key::F5);
+    h.run();
+    assert_eq!(h.state().ide.mode(), Mode::Completed);
+    assert!(h.state().ide.output().iter().any(|s| s.trim() == "4"));
+    assert!(h.state().errors.is_empty());
+    Ok(())
+}
+
+#[test]
+fn m10_quick_watch_inspects_and_promotes_a_real_paused_expression() -> R {
+    let mut fixture = Fixture::new()?;
+    fixture.ide.dispatch(Action::StepInto, &mut NoHost)?;
+    let mut h = Harness::builder()
+        .with_size(egui::vec2(1200.0, 800.0))
+        .build_ui_state(draw, fixture);
+    h.run();
+    assert_eq!(h.state().ide.mode(), Mode::Break);
+    h.key_press_modifiers(egui::Modifiers::SHIFT, egui::Key::F9);
+    h.run();
+    h.get_by_label("Quick Watch expression").click();
+    h.run();
+    h.key_press_modifiers(
+        egui::Modifiers::CTRL | egui::Modifiers::COMMAND,
+        egui::Key::A,
+    );
+    h.event(egui::Event::Text("counter + 2".into()));
+    h.run();
+    assert!(h.query_by_label("Long: 2").is_some());
+    h.get_by_label("Add to Watches").click();
+    h.run();
+    assert_eq!(
+        h.state().ide.watches.first().ok_or("watch")?.result,
+        Ok(vba_ide::Value::Long(2))
+    );
+    assert_eq!(h.state().ide.mode(), Mode::Break);
+    assert!(h.state().errors.is_empty());
+    Ok(())
 }
 #[test]
 fn m8_typed_dot_completion_keeps_receiver_and_accepts_enter() -> R {

@@ -13,6 +13,8 @@ pub enum Command {
     Action(Action),
     Text(String),
     ReplaceAll(String, String),
+    ReplaceWith(String, String, vba_ide::FindOptions),
+    ReplaceOne(String, String, vba_ide::FindOptions),
     Caret(usize),
     SelectModule(usize),
     AddModule,
@@ -30,9 +32,12 @@ pub enum Command {
     NavigateBack,
     Navigate(SourceId, usize),
     Report(String),
+    UndoEdit,
+    RedoEdit,
     SetNextStatement,
     BreakOnErrors(bool),
     AddWatchKind(String, vba_ide::WatchKind),
+    AddWatchContext(String, vba_ide::WatchKind, Option<SourceId>, Option<String>),
     Definition(String),
     IsolatedImmediate(String),
 }
@@ -51,6 +56,40 @@ pub fn apply(
         Command::Text(text) => ide.set_text(text),
         Command::ReplaceAll(query, replacement) => {
             ide.replace_all(&query, &replacement).map(|_| ())
+        }
+        Command::ReplaceWith(query, replacement, options) => {
+            let count = ide.replace_with(&query, &replacement, options)?;
+            ide.message(format!("Replaced {count} occurrences."));
+            Ok(())
+        }
+        Command::ReplaceOne(query, replacement, options) => {
+            if let Some(found) = ide.find_with(&query, options, false, false)? {
+                ide.navigate(found.source, found.range.start)?;
+                let module = ide
+                    .active_module()
+                    .ok_or_else(|| vba_ide::Diagnostic::new("VBA_IDE", "no module"))?;
+                if module
+                    .text
+                    .len()
+                    .saturating_sub(found.range.len())
+                    .saturating_add(replacement.len())
+                    > vba_ide::SourceFile::MAX_BYTES
+                {
+                    return Err(vba_ide::Diagnostic::new(
+                        "VBA_IDE",
+                        "replacement exceeds source budget",
+                    ));
+                }
+                let mut text = module.text.clone();
+                text.replace_range(found.range.clone(), &replacement);
+                ide.set_text(text)?;
+                if let Some(m) = ide.active_module_mut() {
+                    m.caret = found.range.start + replacement.len();
+                }
+            } else {
+                ide.message("Text was not found.");
+            }
+            Ok(())
         }
         Command::Caret(byte) => {
             if let Some(m) = ide.active_module_mut() {
@@ -99,6 +138,8 @@ pub fn apply(
             ide.message(message);
             Ok(())
         }
+        Command::UndoEdit => ide.undo_edit(),
+        Command::RedoEdit => ide.redo_edit(),
         Command::SetNextStatement => ide.set_next_statement(),
         Command::BreakOnErrors(enabled) => {
             ide.set_break_on_errors(enabled);
@@ -106,6 +147,9 @@ pub fn apply(
         }
         Command::AddWatchKind(expression, kind) => {
             ide.add_watch_kind(&expression, kind, None, None)
+        }
+        Command::AddWatchContext(expression, kind, module, procedure) => {
+            ide.add_watch_kind(&expression, kind, module, procedure)
         }
         Command::Definition(name) => ide.go_to_definition(&name),
         Command::IsolatedImmediate(text) => {
@@ -162,16 +206,19 @@ pub struct EditorUi {
     pub font_size: f32,
     pub report: Option<LayoutReport>,
     find: String,
+    find_options: vba_ide::FindOptions,
     replace: String,
     watch: String,
     immediate: String,
     local_edit: Option<(String, String)>,
     browser_search: String,
+    browser_library: String,
     completion: bool,
     completion_prefix: String,
     completion_selected: usize,
     completion_anchor: egui::Pos2,
     last_find: Option<(String, SourceId, usize)>,
+    pending_find: Option<vba_ide::SearchMatch>,
     edit_operation: Option<EditOperation>,
     source_selection: Option<(SourceId, egui::text::CCursorRange)>,
     edit_menu_open: bool,
@@ -180,6 +227,7 @@ pub struct EditorUi {
         egui::util::undoer::Undoer<(egui::text::CCursorRange, String)>,
     )>,
     focus_editor: bool,
+    focus_project: bool,
     focus_find: bool,
     focus_pane: bool,
     navigate: bool,
@@ -194,6 +242,8 @@ pub struct EditorUi {
     remove_module: Option<SourceId>,
     pub tab_width: usize,
     watch_kind: vba_ide::WatchKind,
+    watch_module: Option<SourceId>,
+    watch_procedure: Option<String>,
     quick_watch: bool,
     info: Option<String>,
     references_open: bool,
@@ -207,6 +257,10 @@ pub struct EditorUi {
     pub project_right: bool,
     pub debugger_right: bool,
     pub toolbar_actions: Vec<Action>,
+    editing_view: Option<egui::Id>,
+    procedure_bytes_selection: Option<(SourceId, std::ops::Range<usize>)>,
+    pending_procedure_selection: Option<(SourceId, u64, std::ops::Range<usize>, bool)>,
+    procedure_focus_split: bool,
 }
 impl Default for EditorUi {
     fn default() -> Self {
@@ -220,21 +274,25 @@ impl Default for EditorUi {
             font_size: 14.0,
             report: None,
             find: String::new(),
+            find_options: Default::default(),
             replace: String::new(),
             watch: String::new(),
             immediate: String::new(),
             local_edit: None,
             browser_search: String::new(),
+            browser_library: String::new(),
             completion: false,
             completion_prefix: String::new(),
             completion_selected: 0,
             completion_anchor: egui::Pos2::ZERO,
             last_find: None,
+            pending_find: None,
             edit_operation: None,
             source_selection: None,
             edit_menu_open: false,
             menu_history: None,
             focus_editor: false,
+            focus_project: false,
             focus_find: false,
             focus_pane: false,
             navigate: false,
@@ -252,6 +310,8 @@ impl Default for EditorUi {
             remove_module: None,
             tab_width: 4,
             watch_kind: vba_ide::WatchKind::Expression,
+            watch_module: None,
+            watch_procedure: None,
             quick_watch: false,
             info: None,
             references_open: false,
@@ -273,6 +333,10 @@ impl Default for EditorUi {
                 Action::StepOver,
                 Action::StepOut,
             ],
+            editing_view: None,
+            procedure_bytes_selection: None,
+            pending_procedure_selection: None,
+            procedure_focus_split: false,
         }
     }
 }
@@ -280,13 +344,17 @@ fn heading(ui: &mut egui::Ui, label: &str, theme: Theme) {
     ui.label(RichText::new(label).strong().color(theme.text));
     ui.separator();
 }
-fn window_theme(ui:&mut egui::Ui,theme:Theme) {
-    *ui.visuals_mut()=if theme.dark {egui::Visuals::dark()} else {egui::Visuals::light()};
-    ui.visuals_mut().override_text_color=Some(theme.text);
-    ui.visuals_mut().extreme_bg_color=theme.editor;
+fn window_theme(ui: &mut egui::Ui, theme: Theme) {
+    *ui.visuals_mut() = if theme.dark {
+        egui::Visuals::dark()
+    } else {
+        egui::Visuals::light()
+    };
+    ui.visuals_mut().override_text_color = Some(theme.text);
+    ui.visuals_mut().extreme_bg_color = theme.editor;
 }
 fn text_field(ui: &mut egui::Ui, text: &mut String, label: &str) -> egui::Response {
-    ui.add(TextEdit::singleline(text).hint_text(label))
+    ui.add(TextEdit::singleline(text).hint_text(label).char_limit(1024))
         .on_hover_text(label)
 }
 impl EditorUi {
@@ -316,8 +384,8 @@ impl EditorUi {
             egui::Panel::top("vba.menu").frame(egui::Frame::new().fill(theme.chrome).inner_margin(5)).show(ui,|ui|{
                 egui::MenuBar::new().ui(ui,|ui|self.menus(ui,ide,&mut commands));
                 ui.separator();ui.horizontal_wrapped(|ui|{
-                    for (action,glyph) in [(Action::Save,"Save"),(Action::Run,"Run"),(Action::Pause,"Break"),(Action::Reset,"Reset"),(Action::StepInto,"Into"),(Action::StepOver,"Over"),(Action::StepOut,"Out")] {
-                        if !self.toolbar_actions.contains(&action) {continue;}
+                    for action in self.toolbar_actions.iter().copied().take(16) {
+                        let glyph=match action{Action::Save=>"Save",Action::Run=>"Run",Action::Pause=>"Break",Action::Reset=>"Reset",Action::StepInto=>"Into",Action::StepOver=>"Over",Action::StepOut=>"Out",_=>action.label()};
                         let label=format!("{}  {}",match action{Action::Run=>">",Action::Pause=>"||",Action::Reset=>"[]",Action::Save=>"M",_=>"->"},glyph);
                         if ui.add_enabled(ide.enabled(action),egui::Button::new(label)).on_hover_text(format!("{} ({})",action.label(),action.shortcut())).clicked(){commands.push(Command::Action(action));}
                     }
@@ -340,14 +408,15 @@ impl EditorUi {
                     egui::ScrollArea::vertical().id_salt("project.tree").max_height((ui.available_height()-190.0).max(90.0)).show(ui,|ui|{
                         egui::CollapsingHeader::new(&ide.title).default_open(true).show(ui,|ui|{
                             egui::CollapsingHeader::new("Modules").default_open(true).show(ui,|ui|{
-                                for (i,m) in ide.modules.iter().enumerate(){let response=ui.selectable_label(ide.active==i,format!("M {}{}",m.name,if m.dirty(){" *"}else{""}));if response.clicked(){commands.push(Command::SelectModule(i));self.navigate=true;}
+                                for (i,m) in ide.modules.iter().enumerate(){let response=ui.selectable_label(ide.active==i,format!("M {}{}",m.name,if m.dirty(){" *"}else{""}));if self.focus_project && ide.active==i {response.request_focus();self.focus_project=false;}
+if response.clicked(){commands.push(Command::SelectModule(i));self.navigate=true;}
 if response.double_clicked(){self.focus_editor=true;}response.context_menu(|ui|{if ui.button("View Code").clicked(){commands.push(Command::SelectModule(i));self.focus_editor=true;ui.close();}self.action_button(ui,ide,Action::Export,&mut commands);});}
                             });
                         });
                     });
                     if ui.button("Insert Module").clicked(){commands.push(Command::AddModule);}
                     ui.separator();
-                    if self.properties_visible {heading(ui,"Properties Window",theme);ui.horizontal(|ui|{ui.selectable_label(true,"Alphabetic").on_hover_text("Alphabetic properties");ui.add_enabled(false,egui::Button::new("Categorized")).on_hover_text("Only module metadata is available");});if let Some(m)=ide.active_module(){egui::Grid::new("properties").striped(true).show(ui,|ui|{ui.label("(Name)");ui.label(&m.name);ui.end_row();ui.label("Type");ui.label("Standard module");ui.end_row();ui.label("Status");ui.label(if m.dirty(){"Modified"}else{"Saved"});ui.end_row();});ui.label(RichText::new("Module metadata is read-only.").small().color(theme.muted));}}
+                    if self.properties_visible {heading(ui,"Properties Window",theme);ui.horizontal(|ui|{ui.selectable_label(true,"Alphabetic").on_hover_text("Alphabetic properties");ui.add_enabled(false,egui::Button::new("Categorized")).on_hover_text("Only module metadata is available");});if let Some(m)=ide.active_module(){egui::Grid::new("properties").striped(true).show(ui,|ui|{ui.label("(Name)");if ui.button(&m.name).on_hover_text("Rename module").clicked(){self.rename_module=Some((m.id,m.name.clone()));}ui.end_row();ui.label("Type");ui.label("Standard module");ui.end_row();ui.label("Status");ui.label(if m.dirty(){"Modified"}else{"Saved"});ui.end_row();});ui.label(RichText::new("Select (Name) to rename the module.").small().color(theme.muted));}}
                 });project_rect=Some(p.response.rect);
             }
             let right=self.debugger_right && ui.available_width()>700.0;
@@ -378,6 +447,28 @@ if response.double_clicked(){self.focus_editor=true;}response.context_menu(|ui|{
         self.windows(ui, ide, &mut commands, theme);
         commands
     }
+    fn find_occurrence(&mut self, ide: &Ide, commands: &mut Vec<Command>, backwards: bool) {
+        if self.find.is_empty() {
+            self.find_open = true;
+            self.focus_find = true;
+            return;
+        }
+        let repeat = ide.active_module().is_some_and(|m| {
+            self.last_find.as_ref().is_some_and(|(query, id, byte)| {
+                query == &self.find && *id == m.id && *byte == m.caret
+            })
+        });
+        match ide.find_with(&self.find, self.find_options, repeat, backwards) {
+            Ok(Some(found)) => {
+                self.last_find = Some((self.find.clone(), found.source, found.range.start));
+                commands.push(Command::Navigate(found.source, found.range.start));
+                self.pending_find = Some(found);
+                self.navigate = true;
+            }
+            Ok(None) => commands.push(Command::Report("Text was not found.".into())),
+            Err(d) => commands.push(Command::Report(d.to_string())),
+        }
+    }
     fn find_bar(&mut self, ui: &mut egui::Ui, ide: &Ide, commands: &mut Vec<Command>) {
         ui.horizontal_wrapped(|ui| {
             let response = text_field(ui, &mut self.find, "Find text");
@@ -386,38 +477,47 @@ if response.double_clicked(){self.focus_editor=true;}response.context_menu(|ui|{
                 self.focus_find = false;
             }
             text_field(ui, &mut self.replace, "Replace with");
-            if ui.button("Find Next").clicked()
-                && !self.find.is_empty()
-                && let Some(m) = ide.active_module()
-                && let Some(byte) = m
-                    .text
-                    .get(
-                        if self.last_find.as_ref().is_some_and(|(q, id, byte)| {
-                            q == &self.find && *id == m.id && *byte == m.caret
-                        }) {
-                            m.caret.saturating_add(self.find.len()).min(m.text.len())
-                        } else {
-                            m.caret.min(m.text.len())
-                        }..,
-                    )
-                    .and_then(|s| s.find(&self.find))
-                    .map(|i| {
-                        i + if self.last_find.as_ref().is_some_and(|(q, id, byte)| {
-                            q == &self.find && *id == m.id && *byte == m.caret
-                        }) {
-                            m.caret.saturating_add(self.find.len()).min(m.text.len())
-                        } else {
-                            m.caret
-                        }
-                    })
-                    .or_else(|| m.text.find(&self.find))
-            {
-                self.last_find = Some((self.find.clone(), m.id, byte));
-                commands.push(Command::Caret(byte));
+            if ui.button("Find Next").clicked() {
+                self.find_occurrence(ide, commands, false);
+            }
+            if ui.button("Find Previous").clicked() {
+                self.find_occurrence(ide, commands, true);
+            }
+            let previous = self.find_options.scope;
+            egui::ComboBox::new("find.scope", "Search scope")
+                .selected_text(format!("{:?}", self.find_options.scope))
+                .show_ui(ui, |ui| {
+                    for (scope, label) in [
+                        (vba_ide::FindScope::Module, "Current Module"),
+                        (vba_ide::FindScope::Procedure, "Current Procedure"),
+                        (vba_ide::FindScope::Project, "Current Project"),
+                    ] {
+                        ui.selectable_value(&mut self.find_options.scope, scope, label);
+                    }
+                });
+            let case_changed = ui
+                .checkbox(&mut self.find_options.match_case, "Match Case")
+                .changed();
+            let word_changed = ui
+                .checkbox(&mut self.find_options.whole_word, "Whole Word")
+                .changed();
+            if previous != self.find_options.scope || case_changed || word_changed {
+                self.last_find = None;
+            }
+            if ui.button("Replace").clicked() && !self.find.is_empty() {
+                commands.push(Command::ReplaceOne(
+                    self.find.clone(),
+                    self.replace.clone(),
+                    self.find_options,
+                ));
                 self.navigate = true;
             }
             if ui.button("Replace All").clicked() && !self.find.is_empty() {
-                commands.push(Command::ReplaceAll(self.find.clone(), self.replace.clone()));
+                commands.push(Command::ReplaceWith(
+                    self.find.clone(),
+                    self.replace.clone(),
+                    self.find_options,
+                ));
             }
             if ui.small_button("Close Find").clicked() {
                 self.find_open = false;
@@ -498,7 +598,19 @@ if response.double_clicked(){self.focus_editor=true;}response.context_menu(|ui|{
                         .on_hover_text("Use Ctrl+V / Cmd+V or the browser paste command");
                 }
                 if response.clicked() {
-                    self.edit_operation = Some(operation);
+                    match operation {
+                        EditOperation::Undo => {
+                            commands.push(Command::UndoEdit);
+                            self.navigate = true;
+                            self.focus_editor = true;
+                        }
+                        EditOperation::Redo => {
+                            commands.push(Command::RedoEdit);
+                            self.navigate = true;
+                            self.focus_editor = true;
+                        }
+                        _ => self.edit_operation = Some(operation),
+                    }
                     self.completion = false;
                     ui.close();
                 }
@@ -514,7 +626,9 @@ if response.double_clicked(){self.focus_editor=true;}response.context_menu(|ui|{
                     .add_enabled(ide.active_module().is_some(), egui::Button::new(label))
                     .clicked()
                 {
-                    self.edit_operation = Some(EditOperation::Block(operation));
+                    if !self.queue_procedure_block(ide, operation, commands) {
+                        self.edit_operation = Some(EditOperation::Block(operation));
+                    }
                     self.completion = false;
                     ui.close();
                 }
@@ -713,6 +827,7 @@ if response.double_clicked(){self.focus_editor=true;}response.context_menu(|ui|{
             }
         });
         ui.menu_button("Help", |ui| {
+            ui.hyperlink_to("VBA Language Reference","https://learn.microsoft.com/en-us/office/vba/language/reference/user-interface-help/visual-basic-user-interface-help");
             ui.label("Craft VBA Editor • independently authored");
             ui.label("F5 Run • F8 Step • F9 Breakpoint");
             ui.label("Safe watches never invoke host properties or functions.");
@@ -720,14 +835,93 @@ if response.double_clicked(){self.focus_editor=true;}response.context_menu(|ui|{
         });
     }
     fn shortcuts(&mut self, ctx: &egui::Context, ide: &Ide, commands: &mut Vec<Command>) {
-        if ctx.input_mut(|i|i.consume_key(egui::Modifiers::CTRL|egui::Modifiers::SHIFT,egui::Key::M)) {self.edit_operation=Some(EditOperation::Block(vba_ide::BlockEdit::Outdent));}
-        if ctx.input_mut(|i|i.consume_key(egui::Modifiers::CTRL,egui::Key::M)) {self.edit_operation=Some(EditOperation::Block(vba_ide::BlockEdit::Indent));}
-        if ctx.input_mut(|i|i.consume_key(egui::Modifiers::SHIFT,egui::Key::F2)) {commands.push(Command::Definition(ide.word_at_caret()));self.navigate=true;}
-        if ctx.input_mut(|i|i.consume_key(egui::Modifiers::CTRL|egui::Modifiers::SHIFT,egui::Key::F2)) {commands.push(Command::NavigateBack);self.navigate=true;}
-        if ctx.input_mut(|i|i.consume_key(egui::Modifiers::SHIFT,egui::Key::F9)) && ide.mode()==Mode::Break {self.quick_watch=true;self.watch=ide.word_at_caret();}
-        if ctx.input_mut(|i|i.consume_key(egui::Modifiers::CTRL|egui::Modifiers::SHIFT,egui::Key::J)) {self.constants_open=true;}
-        if ctx.input_mut(|i|i.consume_key(egui::Modifiers::CTRL|egui::Modifiers::SHIFT,egui::Key::I)) {self.info=Some(ide.signature_help().unwrap_or_else(||"No parameter metadata at the caret".into()));}
-        if ctx.input_mut(|i|i.consume_key(egui::Modifiers::CTRL,egui::Key::I)) {self.info=Some(ide.quick_info(&ide.word_at_caret()).unwrap_or_else(||"No metadata for this symbol".into()));}
+        if ctx.input_mut(|i| i.consume_key(egui::Modifiers::SHIFT, egui::Key::F3)) {
+            self.find_occurrence(ide, commands, true);
+        }
+        if ctx.input_mut(|i| i.consume_key(egui::Modifiers::NONE, egui::Key::F3)) {
+            self.find_occurrence(ide, commands, false);
+        }
+        if self
+            .editing_view
+            .is_some_and(|id| ctx.memory(|memory| memory.has_focus(id)))
+        {
+            if ctx.input_mut(|i| {
+                i.consume_key(
+                    egui::Modifiers::COMMAND | egui::Modifiers::SHIFT,
+                    egui::Key::Z,
+                )
+            }) && ide.can_redo_edit()
+            {
+                commands.push(Command::RedoEdit);
+                self.navigate = true;
+            }
+            if ctx.input_mut(|i| i.consume_key(egui::Modifiers::COMMAND, egui::Key::Z))
+                && ide.can_undo_edit()
+            {
+                commands.push(Command::UndoEdit);
+                self.navigate = true;
+            }
+            if ctx.input_mut(|i| i.consume_key(egui::Modifiers::COMMAND, egui::Key::Y))
+                && ide.can_redo_edit()
+            {
+                commands.push(Command::RedoEdit);
+                self.navigate = true;
+            }
+        }
+        if ctx.input_mut(|i| {
+            i.consume_key(egui::Modifiers::CTRL | egui::Modifiers::SHIFT, egui::Key::M)
+        }) && !self.queue_procedure_block(ide, vba_ide::BlockEdit::Outdent, commands)
+        {
+            self.edit_operation = Some(EditOperation::Block(vba_ide::BlockEdit::Outdent));
+        }
+        if ctx.input_mut(|i| i.consume_key(egui::Modifiers::CTRL, egui::Key::M)) {
+            if !self
+                .editing_view
+                .is_some_and(|id| ctx.memory(|memory| memory.has_focus(id)))
+            {
+                commands.push(Command::Action(Action::Import));
+            } else if !self.queue_procedure_block(ide, vba_ide::BlockEdit::Indent, commands) {
+                self.edit_operation = Some(EditOperation::Block(vba_ide::BlockEdit::Indent));
+            }
+        }
+        if ctx.input_mut(|i| i.consume_key(egui::Modifiers::SHIFT, egui::Key::F2)) {
+            commands.push(Command::Definition(ide.word_at_caret()));
+            self.navigate = true;
+        }
+        if ctx.input_mut(|i| {
+            i.consume_key(
+                egui::Modifiers::CTRL | egui::Modifiers::SHIFT,
+                egui::Key::F2,
+            )
+        }) {
+            commands.push(Command::NavigateBack);
+            self.navigate = true;
+        }
+        if ctx.input_mut(|i| i.consume_key(egui::Modifiers::SHIFT, egui::Key::F9))
+            && ide.mode() == Mode::Break
+        {
+            self.quick_watch = true;
+            self.watch = ide.word_at_caret();
+        }
+        if ctx.input_mut(|i| {
+            i.consume_key(egui::Modifiers::CTRL | egui::Modifiers::SHIFT, egui::Key::J)
+        }) {
+            self.constants_open = true;
+        }
+        if ctx.input_mut(|i| {
+            i.consume_key(egui::Modifiers::CTRL | egui::Modifiers::SHIFT, egui::Key::I)
+        }) {
+            self.info = Some(
+                ide.signature_help()
+                    .unwrap_or_else(|| "No parameter metadata at the caret".into()),
+            );
+        }
+        if ctx.input_mut(|i| i.consume_key(egui::Modifiers::CTRL, egui::Key::I)) {
+            self.info = Some(
+                ide.quick_info(&ide.word_at_caret())
+                    .unwrap_or_else(|| "No metadata for this symbol".into()),
+            );
+        }
         let bindings = [
             (egui::Modifiers::NONE, egui::Key::F5, Action::Run),
             (
@@ -751,6 +945,16 @@ if response.double_clicked(){self.focus_editor=true;}response.context_menu(|ui|{
             (egui::Modifiers::CTRL, egui::Key::E, Action::Export),
             (egui::Modifiers::ALT, egui::Key::F11, Action::ReturnToHost),
         ];
+        if ctx.input_mut(|i| i.consume_key(egui::Modifiers::CTRL, egui::Key::F9))
+            && ide.mode() == Mode::Break
+        {
+            commands.push(Command::SetNextStatement);
+            self.navigate = true;
+        }
+        if ctx.input_mut(|i| i.consume_key(egui::Modifiers::NONE, egui::Key::F1)) {
+            self.references_open = true;
+            self.info = ide.quick_info(&ide.word_at_caret());
+        }
         for (modifiers, key, action) in bindings {
             if ctx.input_mut(|i| i.consume_key(modifiers, key)) && ide.enabled(action) {
                 commands.push(Command::Action(action));
@@ -769,6 +973,7 @@ if response.double_clicked(){self.focus_editor=true;}response.context_menu(|ui|{
         }
         if ctx.input_mut(|i| i.consume_key(egui::Modifiers::CTRL, egui::Key::R)) {
             self.project_visible = true;
+            self.focus_project = true;
         }
         if ctx.input_mut(|i| i.consume_key(egui::Modifiers::NONE, egui::Key::F4)) {
             self.project_visible = true;
@@ -779,7 +984,6 @@ if response.double_clicked(){self.focus_editor=true;}response.context_menu(|ui|{
         }
         if ctx.input_mut(|i| i.consume_key(egui::Modifiers::NONE, egui::Key::F7)) {
             self.focus_editor = true;
-            self.navigate = true;
         }
         if ctx.input_mut(|i| {
             i.consume_key(egui::Modifiers::CTRL, egui::Key::F)
@@ -926,13 +1130,15 @@ if response.double_clicked(){self.focus_editor=true;}response.context_menu(|ui|{
                         .scope
                         .unwrap_or(ui.scope_id())
                         .with(("vba.source", m.id.0));
-                    if self.edit_operation.is_some()
+                    let edit_here = self.editing_view.is_none_or(|target| target == id);
+                    if edit_here
+                        && self.edit_operation.is_some()
                         && (!ui.ctx().memory(|mem| mem.owns_ime_events(id))
                             || ui.ctx().input(|i| i.pointer.any_released()))
                     {
                         ui.ctx().memory_mut(|mem| mem.request_focus(id));
                         ui.ctx().request_repaint();
-                    } else if let Some(operation) = self.edit_operation.take() {
+                    } else if edit_here && let Some(operation) = self.edit_operation.take() {
                         if let Some((source, selection)) = self.source_selection
                             && source == m.id
                             && let Some(mut state) =
@@ -1150,8 +1356,9 @@ if response.double_clicked(){self.focus_editor=true;}response.context_menu(|ui|{
                     };
                     let navigate = self.navigate || self.last_source != Some(m.id);
                     if navigate {
-                        if let Some(mut state) = egui::text_edit::TextEditState::load(ui.ctx(), id)
                         {
+                            let mut state = egui::text_edit::TextEditState::load(ui.ctx(), id)
+                                .unwrap_or_default();
                             let index = text
                                 .get(..vba_ide::editor_byte(&m.text, m.caret))
                                 .map_or(0, |s| s.chars().count());
@@ -1160,12 +1367,32 @@ if response.double_clicked(){self.focus_editor=true;}response.context_menu(|ui|{
                                 .set_char_range(Some(egui::text::CCursorRange::one(
                                     egui::text::CCursor::new(index),
                                 )));
+                            if self.pending_find.as_ref().is_some_and(|found| {
+                                found.source == m.id && found.range.start == m.caret
+                            }) && let Some(found) = self.pending_find.take()
+                            {
+                                self.focus_editor = true;
+                                let end = text
+                                    .get(..vba_ide::editor_byte(&m.text, found.range.end))
+                                    .map_or(index, |s| s.chars().count());
+                                state
+                                    .cursor
+                                    .set_char_range(Some(egui::text::CCursorRange::two(
+                                        egui::text::CCursor::new(end),
+                                        egui::text::CCursor::new(index),
+                                    )));
+                            }
                             state.store(ui.ctx(), id);
                         }
-                        self.navigate = false;
+                        self.navigate = self.pending_find.is_some();
                         self.last_source = Some(m.id);
                     }
+                    if self.focus_editor {
+                        ui.ctx().memory_mut(|memory| memory.request_focus(id));
+                        self.focus_editor = false;
+                    }
                     let output = TextEdit::multiline(&mut text)
+                        .hint_text("VBA source editor")
                         .id(id)
                         .font(font.clone())
                         .code_editor()
@@ -1186,9 +1413,8 @@ if response.double_clicked(){self.focus_editor=true;}response.context_menu(|ui|{
                         .response
                         .clone()
                         .on_hover_text("VBA source editor — F9 breakpoint, F8 step, Ctrl+F find");
-                    if self.focus_editor {
-                        output.response.request_focus();
-                        self.focus_editor = false;
+                    if output.response.has_focus() {
+                        self.editing_view = Some(id);
                     }
                     let mut caret = output
                         .cursor_range
@@ -1339,9 +1565,11 @@ if response.double_clicked(){self.focus_editor=true;}response.context_menu(|ui|{
                 ui.horizontal(|ui| {
                     text_field(ui, &mut self.watch, "Watch expression");
                     if ui.button("Add Watch").clicked() {
-                        commands.push(Command::AddWatchKind(
+                        commands.push(Command::AddWatchContext(
                             std::mem::take(&mut self.watch),
                             self.watch_kind,
+                            self.watch_module,
+                            self.watch_procedure.clone(),
                         ));
                     }
                 });
@@ -1362,6 +1590,43 @@ if response.double_clicked(){self.focus_editor=true;}response.context_menu(|ui|{
                             ui.selectable_value(&mut self.watch_kind, kind, label);
                         }
                     });
+                let old_module = self.watch_module;
+                egui::ComboBox::new("watch.module", "Watch module")
+                    .selected_text(
+                        self.watch_module
+                            .and_then(|id| ide.modules.iter().find(|m| m.id == id))
+                            .map_or("All Modules", |m| m.name.as_str()),
+                    )
+                    .show_ui(ui, |ui| {
+                        ui.selectable_value(&mut self.watch_module, None, "All Modules");
+                        for m in &ide.modules {
+                            ui.selectable_value(&mut self.watch_module, Some(m.id), &m.name);
+                        }
+                    });
+                if old_module != self.watch_module {
+                    self.watch_procedure = None;
+                }
+                egui::ComboBox::new("watch.procedure", "Watch procedure")
+                    .selected_text(self.watch_procedure.as_deref().unwrap_or("All Procedures"))
+                    .show_ui(ui, |ui| {
+                        ui.selectable_value(&mut self.watch_procedure, None, "All Procedures");
+                        for m in &ide.modules {
+                            if self.watch_module.is_none_or(|id| id == m.id) {
+                                for p in &m.procedures {
+                                    if ui
+                                        .selectable_label(
+                                            self.watch_procedure.as_ref() == Some(&p.name),
+                                            format!("{}.{}", m.name, p.name),
+                                        )
+                                        .clicked()
+                                    {
+                                        self.watch_module = Some(m.id);
+                                        self.watch_procedure = Some(p.name.clone());
+                                    }
+                                }
+                            }
+                        }
+                    });
                 egui::Grid::new("watches.grid")
                     .striped(true)
                     .show(ui, |ui| {
@@ -1379,10 +1644,13 @@ if response.double_clicked(){self.focus_editor=true;}response.context_menu(|ui|{
                                     .unwrap_or_else(|s| s.clone()),
                             );
                             ui.label(w.result.as_ref().map_or("-", vba_ide::type_name));
-                            ui.label(
-                                ide.execution()
-                                    .map_or("Out of scope".into(), |s| s.procedure),
-                            );
+                            ui.label(format!(
+                                "{} / {}",
+                                w.module
+                                    .and_then(|id| ide.modules.iter().find(|m| m.id == id))
+                                    .map_or("All Modules", |m| m.name.as_str()),
+                                w.procedure.as_deref().unwrap_or("All Procedures")
+                            ));
                             if ui.small_button(format!("Delete watch {}", i + 1)).clicked() {
                                 commands.push(Command::DeleteWatch(i));
                             }
@@ -1478,6 +1746,41 @@ if response.double_clicked(){self.focus_editor=true;}response.context_menu(|ui|{
                 ui.visuals_mut().override_text_color = Some(theme.text);
                 ui.visuals_mut().extreme_bg_color = theme.editor;
                 ui.label("<All Libraries> — project symbols and supplied host catalogue");
+                let libraries = ide
+                    .catalog
+                    .iter()
+                    .map(|item| item.library.clone())
+                    .chain(ide.constants.iter().map(|item| item.library.clone()))
+                    .chain(ide.references.iter().map(|item| item.name.clone()))
+                    .collect::<std::collections::BTreeSet<_>>();
+                egui::ComboBox::new("browser.library", "Library filter")
+                    .selected_text(if self.browser_library.is_empty() {
+                        "All Libraries"
+                    } else {
+                        &self.browser_library
+                    })
+                    .show_ui(ui, |ui| {
+                        ui.selectable_value(
+                            &mut self.browser_library,
+                            String::new(),
+                            "All Libraries",
+                        );
+                        ui.selectable_value(&mut self.browser_library, "Project".into(), "Project");
+                        for library in libraries {
+                            ui.selectable_value(
+                                &mut self.browser_library,
+                                library.clone(),
+                                library,
+                            );
+                        }
+                    });
+                for reference in &ide.references {
+                    if self.browser_library == reference.name
+                        && let Some(url) = &reference.help_url
+                    {
+                        ui.hyperlink_to("Library Help", url);
+                    }
+                }
                 text_field(ui, &mut self.browser_search, "Search symbols");
                 ui.separator();
                 egui::ScrollArea::both().show(ui, |ui| {
@@ -1500,6 +1803,10 @@ if response.double_clicked(){self.focus_editor=true;}response.context_menu(|ui|{
                         ui.strong("Member / signature");
                         ui.end_row();
                         for m in &ide.modules {
+                            if !self.browser_library.is_empty() && self.browser_library != "Project"
+                            {
+                                continue;
+                            }
                             for p in &m.procedures {
                                 if p.name
                                     .to_ascii_lowercase()
@@ -1507,12 +1814,7 @@ if response.double_clicked(){self.focus_editor=true;}response.context_menu(|ui|{
                                 {
                                     ui.label(&m.name);
                                     if ui.selectable_label(false, &p.signature).clicked() {
-                                        if let Some(index) =
-                                            ide.modules.iter().position(|x| x.id == m.id)
-                                        {
-                                            commands.push(Command::SelectModule(index));
-                                            commands.push(Command::Caret(p.start));
-                                        }
+                                        commands.push(Command::Navigate(m.id, p.start));
                                         self.navigate = true;
                                     }
                                     ui.end_row();
@@ -1520,6 +1822,11 @@ if response.double_clicked(){self.focus_editor=true;}response.context_menu(|ui|{
                             }
                         }
                         for item in &ide.catalog {
+                            if !self.browser_library.is_empty()
+                                && self.browser_library != item.library
+                            {
+                                continue;
+                            }
                             if item
                                 .name
                                 .to_ascii_lowercase()
@@ -1530,6 +1837,23 @@ if response.double_clicked(){self.focus_editor=true;}response.context_menu(|ui|{
                                     "{}{}",
                                     item.signature,
                                     if item.supported { "" } else { " [unsupported]" }
+                                ));
+                                ui.end_row();
+                            }
+                        }
+                        for item in &ide.constants {
+                            if (self.browser_library.is_empty()
+                                || self.browser_library == item.library)
+                                && item
+                                    .name
+                                    .to_ascii_lowercase()
+                                    .contains(&self.browser_search.to_ascii_lowercase())
+                            {
+                                ui.label(&item.library);
+                                ui.label(format!(
+                                    "Const {} = {}",
+                                    item.name,
+                                    display_value(&item.value)
                                 ));
                                 ui.end_row();
                             }
@@ -1560,6 +1884,12 @@ if response.double_clicked(){self.focus_editor=true;}response.context_menu(|ui|{
                         let mut selected=self.toolbar_actions.contains(&action);
                         if ui.checkbox(&mut selected,action.label()).changed() {self.toolbar_actions.retain(|a|*a!=action);if selected {self.toolbar_actions.push(action);}}
                     }
+                    let actions=self.toolbar_actions.iter().copied().take(16).collect::<Vec<_>>();
+                    for (index,action) in actions.iter().enumerate() {ui.horizontal(|ui| {
+                        ui.label(action.label());
+                        if ui.add_enabled(index>0,egui::Button::new(format!("Move {} up",action.label()))).clicked() {self.toolbar_actions.swap(index,index-1);}
+                        if ui.add_enabled(index+1<actions.len(),egui::Button::new(format!("Move {} down",action.label()))).clicked() {self.toolbar_actions.swap(index,index+1);}
+                    });}
                 });
                 ui.label("Monospace font is inherited from the host.");
                 let mut trap=ide.break_on_errors;
@@ -1573,7 +1903,7 @@ if response.double_clicked(){self.focus_editor=true;}response.context_menu(|ui|{
                 .open(&mut open)
                 .frame(frame)
                 .show(ctx, |ui| {
-                    window_theme(ui,theme);
+                    window_theme(ui, theme);
                     text_field(ui, &mut self.watch, "Quick Watch expression");
                     match ide.evaluate(&self.watch) {
                         Ok(value) => {
@@ -1603,7 +1933,7 @@ if response.double_clicked(){self.focus_editor=true;}response.context_menu(|ui|{
                 .open(&mut open)
                 .frame(frame)
                 .show(ctx, |ui| {
-                    window_theme(ui,theme);
+                    window_theme(ui, theme);
                     ui.monospace(info);
                 });
             if !open {
@@ -1615,7 +1945,7 @@ if response.double_clicked(){self.focus_editor=true;}response.context_menu(|ui|{
             .open(&mut self.references_open)
             .frame(frame)
             .show(ctx, |ui| {
-                window_theme(ui,theme);
+                window_theme(ui, theme);
                 ui.label(
                     "Metadata supplied by the host; this dialog never loads native libraries.",
                 );
@@ -1638,19 +1968,28 @@ if response.double_clicked(){self.focus_editor=true;}response.context_menu(|ui|{
                     ui.label("No external reference metadata supplied.");
                 }
             });
-        egui::Window::new("List Constants").id(scope.with("constants")).open(&mut self.constants_open).frame(frame).show(ctx,|ui| {
+        let mut insert_constant = None;
+        egui::Window::new(RichText::new("List Constants").color(theme.text)).id(scope.with("constants")).open(&mut self.constants_open).frame(frame).show(ctx,|ui| {
             window_theme(ui,theme);
             text_field(ui,&mut self.browser_search,"Constant prefix");
-            egui::ScrollArea::vertical().max_height(300.0).show(ui,|ui| {for name in ide.list_constants(&self.browser_search) { if ui.selectable_label(false,&name).clicked() { ui.ctx().copy_text(name); } }});
-            ui.label("Select to copy a name. Host constant metadata does not grant execution capabilities.");
+            egui::ScrollArea::vertical().max_height(300.0).show(ui,|ui| {for name in ide.list_constants(&self.browser_search) { if ui.selectable_label(false,&name).clicked() { insert_constant=Some(name); } }});
+            ui.label("Select to insert a name. Host constant metadata does not grant execution capabilities.");
         });
+        if let Some(name) = insert_constant {
+            self.completion_prefix = ide
+                .active_module()
+                .map(|m| vba_ide::completion_prefix(&m.text, m.caret).0.to_owned())
+                .unwrap_or_default();
+            self.accept_completion(ide, &name, commands);
+            self.constants_open = false;
+        }
         if let Some((source, name)) = &mut self.rename_module {
             let mut done = false;
             egui::Window::new("Rename Module")
                 .id(scope.with("rename.module"))
                 .collapsible(false)
                 .show(ctx, |ui| {
-                    window_theme(ui,theme);
+                    window_theme(ui, theme);
                     text_field(ui, name, "Module name");
                     if ui.button("Rename").clicked() {
                         commands.push(Command::RenameModule(*source, name.clone()));
@@ -1670,7 +2009,7 @@ if response.double_clicked(){self.focus_editor=true;}response.context_menu(|ui|{
                 .id(scope.with("remove.module"))
                 .collapsible(false)
                 .show(ctx, |ui| {
-                    window_theme(ui,theme);
+                    window_theme(ui, theme);
                     ui.label(
                         "Export source before removing it. Cancelling export keeps the module.",
                     );

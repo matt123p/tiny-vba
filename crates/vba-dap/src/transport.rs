@@ -12,7 +12,7 @@ pub fn read(reader: &mut impl BufRead) -> io::Result<Option<Json>> {
             return Ok(None);
         }
         total = total.saturating_add(count);
-        if count == 0 || total > 4096 || !line.ends_with("\r\n") {
+        if count == 0 || total > 4096 || !line.is_ascii() || !line.ends_with("\r\n") {
             return Err(io::Error::new(
                 io::ErrorKind::InvalidData,
                 "invalid/big DAP header",
