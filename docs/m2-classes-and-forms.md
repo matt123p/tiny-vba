@@ -41,6 +41,32 @@ Original implementation and synthetic tests only. Public documentation is not
 a fresh Office oracle observation. Unsupported resources must fail explicitly;
 no binary VBA project writeback is implied by form source export.
 
+## Completion audit after feature merges (2026-10-29)
+
+Audited merged main `cadc744`. **M2 is incomplete.** Merging all feature
+histories did not supply the missing designer, form runtime or persistence.
+
+| Acceptance requirement | Evidence and outstanding work |
+|---|---|
+| M2.1 class/document execution, lifecycle, events and error modes | 23 VM class tests and three IDE class/controller tests pass. Static project-member binding/visibility and external field ByRef acceptance remain open. |
+| M2.2 interactive form designer | Six headless form-model tests pass. `vba-ui-egui` does not mount `FormDesigner`; Toolbox, Insert UserForm and Format commands remain unavailable. Drag/resize, visual Properties, keyboard/accessibility and rendered form acceptance are missing. |
+| M2.3 generated handlers and real form run/debug | Generic instance callbacks pause/edit/resume, but no form control-to-handler generation or runtime/modal lifecycle connects the design model to those callbacks. |
+| M2.4 reviewed form persistence and round trips | No form source/resource codec, host persistence interface or saved/reopened form round-trip fixtures exist. |
+
+Fresh verification at the audited revision:
+
+- `cargo test -p vba-ide --test forms --test classes --locked`: PASS, nine tests.
+- `cargo test -p vba-vm --test classes --locked`: PASS, 23 tests.
+- The preceding merge validation at the same product tree passed `cargo xtask ci`
+  (349 workspace tests), `cargo xtask wasm` and `cargo xtask wasm-run`
+  (162 actual WASI tests). These gates do not establish missing form acceptance.
+
+M3 has not started. Under the current remaining plan, Excel range/worksheet M3
+is GridCraft-owned; tiny-vba only supplies necessary generic mechanisms. The
+previous repository-only scope must be resolved before changing GridCraft.
+Next implementation task remains mounting the existing shared model in the
+reusable egui designer, with real command routing and interaction tests.
+
 ## Runtime foundation
 
 IR 7 (`project-classes-v7`) adds checked class/field/method descriptors, native

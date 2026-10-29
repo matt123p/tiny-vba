@@ -7,6 +7,18 @@ The [remaining plan](implementation-plan.md) retains stable **M2–M8** task IDs
 Current: **M2.1/M2.2**, class/document runtime and the headless form design model. Office objects, document events,
 trust and packaging remain fork-owned.
 
+## M2 completion audit after feature merges (2026-10-29)
+
+Merged main `cadc744` is **not M2-complete**. The
+[M2 acceptance audit](m2-classes-and-forms.md#completion-audit-after-feature-merges-2026-10-29)
+confirms the missing visual designer, signed form handlers/runtime and form
+source/resource persistence/round trips. Static project-member/field ByRef
+acceptance also remains open. Fresh targeted verification passes nine IDE
+class/form tests and 23 VM class tests. The merge's full CI and WASM gates
+pass but do not demonstrate those absent acceptance surfaces. M3 has not begun;
+it is GridCraft-owned under the remaining plan. Next: mount the headless form
+model in the shared egui designer and verify its interactions.
+
 ## M2.1 runtime checkpoint (2026-10-29; M2 remains incomplete)
 
 tiny-vba main was fast-forwarded and pushed to `2ee181d` as requested; GridCraft
