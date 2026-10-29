@@ -1,7 +1,8 @@
 # Remaining implementation plan
 
-Updated 2026-10-29. This plan contains **remaining work only**, using stable M4–M8 IDs
-in implementation order after completed M1 and the [selected M2 profile](m2-acceptance.md). Completed work and the old-to-new milestone mapping
+Updated 2026-10-29. This plan contains **remaining work only**, using stable M5–M8 IDs
+in implementation order after completed M1, the [selected M2 profile](m2-acceptance.md),
+and the [M3/M4 host profiles](m3-m4-host-acceptance.md). Completed work and the old-to-new milestone mapping
 belong in [implementation progress](implementation-progress.md#plan-renumbering--2026-10-28).
 Historical reports and ADRs retain their original milestone numbers; use this
 document's numbers for new work.
@@ -16,7 +17,6 @@ separate and native host dispatch in Rust.
 
 | Milestone | Remaining work | Prerequisites |
 |---|---|---|
-| M4 | Publish/pin the implemented identity/value/member prerequisite and close acceptance | Implemented M1–M3; explicit feature-branch push approval |
 | M5 | Document modules, events and Range-aware UDFs | M2–M4 capabilities required by each workflow |
 | M6 | Remaining GridCraft and WordCraft integration | M1; M2–M5 for corresponding form/event/Excel workflows |
 | M7 | Unchanged-document and package acceptance | Applicable M1–M6 capabilities and explicit writeback design |
@@ -24,29 +24,11 @@ separate and native host dispatch in Rust.
 
 Implement shared language foundations before consumers, range references before
 range-dependent value/event behavior, and runtime semantics before form events.
-M1/M2 shared prerequisites are implemented for their declared profiles. WordCraft's
+M1–M4 are complete for their declared profiles. WordCraft's
 object-model work in M6 can proceed alongside Excel work; its document/form events
 consume the shared M2 contract.
 Build tests and collect lawful evidence throughout every milestone. M8 is the
 final release gate, not a reason to postpone fuzzing, benchmarks or regression tests.
-
-## M4 — Excel identity, values and member semantics: publication gate
-
-M3.1–M3.3 and the M4.1–M4.3 code are implemented and audited in GridCraft.
-The [completion/acceptance record](m3-m4-host-acceptance.md) records exact behavior,
-validation and remaining profile limits. Completed implementation tasks belong in
-[progress](implementation-progress.md); M5–M8 IDs remain unchanged.
-
-Remaining: publish tiny-vba feature branch `feat/m4-getter-alias-dispatch`
-(commit `22cc845e5ee74a1bcd15eec32cdb8a8f18d316f8`), pin that immutable revision
-in GridCraft and remove its temporary local development override. Automatic
-approval review rejected the push because external repository export was not
-explicitly authorized. Approval has been requested; it is not inferred from
-elapsed time. No main-branch merge is required.
-
-Acceptance closes only after the immutable dependency resolves and the recorded
-native/WASM checks pass without the temporary override. Local implementation
-success does not mark this publication gate complete.
 
 ## M5 — Document modules, events and Range-aware UDFs
 

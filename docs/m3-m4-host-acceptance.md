@@ -10,7 +10,7 @@ The old tiny-vba progress status was stale. The owning detailed contract is
 GridCraft `docs/vba-m3-ranges-and-worksheets.md`; tests are its
 `crates/vba/tests/ranges.rs` and `crates/engine/tests/structure.rs`.
 
-M4.1–M4.3 code is implemented locally. GridCraft's
+M4.1–M4.3 are complete for the declared profile. GridCraft's
 `docs/vba-m4-identity-values-and-members.md` defines stable sheet tokens and
 workbook-qualified handles, code-owner versus dynamic active roots, scoped consent
 and undo, exact Value/Value2 Date/Currency paths, bounded arrays/error fill,
@@ -47,11 +47,18 @@ Unselected formatting/settings and M5 document events remain explicit refusals;
 ScreenUpdating/EnableEvents are not success-returning placeholders. External
 structural edits/undo invalidate saved range coordinates rather than retargeting.
 
-## Remaining publication gate
+## Publication and immutable dependency acceptance
 
-Automatic approval review rejected the feature-branch push because repository
-export to the external Git remote was not explicitly authorized. Approval has
-been requested. The safe local validation override is temporary; it is not a
-shipping dependency pin. After approval, publish the prerequisite, update all
-GridCraft tiny-vba revisions consistently and remove the override. Verify immutable
-resolution before moving M4 out of the remaining plan. Main branches are unchanged.
+The prerequisite feature branch `feat/m4-getter-alias-dispatch` is published.
+GridCraft pins every shared dependency to
+`22cc845e5ee74a1bcd15eec32cdb8a8f18d316f8`; all 13 lockfile packages resolve to
+that Git revision. The temporary path override is removed, and unrelated locked
+packages are unchanged. Final native/WASM/full-CI/window acceptance uses the
+published Git source. M3/M4 are complete for their declared profiles and are
+removed from the remaining plan; M5 is next. Main branches are unchanged.
+
+Final owning GridCraft commit: `f320728dddefa8dd584b1f83c00f77d684ac708f` on
+`feat/m3-ranges-and-worksheets`. Pinned acceptance passes 58 native and 58
+JavaScript/WASM adapter tests, 1,150 optional-window tests and all ten CI gates
+(2,593 test/doctest results). The commit includes code, regressions, dependency
+pins and the owning architecture/compatibility/acceptance documentation.

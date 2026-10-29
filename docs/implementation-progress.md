@@ -2,12 +2,12 @@
 
 Updated 2026-10-29. The classic-editor/debugger profile is implemented; its
 historical milestone is M10. Runtime remains m5-host-v1 with verified IR 1/2/3/4/5/6/7.
-The [remaining plan](implementation-plan.md) retains stable **M3–M8** task IDs.
-**M1 and M2 are complete for their declared profiles.** Office objects,
-document events, trust and packaging remain fork-owned. M3 is implemented and audited in GridCraft. M4 code is implemented locally; its
-shared dependency publication/pin remains pending explicit push approval.
+The [remaining plan](implementation-plan.md) retains stable **M5–M8** task IDs.
+**M1–M4 are complete for their declared profiles.** Office objects,
+document events, trust and packaging remain fork-owned. M3/M4 are implemented and audited in GridCraft, with a published immutable
+tiny-vba dependency and no development path override.
 
-## M3 completion audit / M4 implementation (2026-10-29)
+## M3/M4 completion — range, identity, values and members (2026-10-29)
 
 The [self-contained acceptance record](m3-m4-host-acceptance.md) closes the stale
 “M3 not started” status: GridCraft already contained M3.1 range/materialization
@@ -35,12 +35,16 @@ M4 workflows), with native structural/style acceptance and full gates recorded i
 the acceptance report. No fresh Office oracle observation is claimed. Profiles
 retain explicit unsupported operations, resource limits and broader M5–M8 gates.
 
-M4 is not yet publication-complete: automatic approval review rejected pushing
-`feat/m4-getter-alias-dispatch` to origin as an external export without explicit
-authorization. Approval is pending. GridCraft validation uses a temporary local
-checkout override; the final immutable dependency pin must replace it after the
-approved push. Next smallest task: publish/pin that prerequisite and close M4's
-remaining gate, then M5.1 document-module/code-owner execution.
+The shared prerequisite branch `feat/m4-getter-alias-dispatch` is published.
+GridCraft pins all 13 shared packages to immutable tiny-vba
+`22cc845e5ee74a1bcd15eec32cdb8a8f18d316f8`; its lockfile contains Git sources,
+no local path override, and no unrelated dependency updates. Final pinned
+native/WASM/full-CI/window checks close the acceptance gate, as recorded in the
+acceptance report. GridCraft’s integrated implementation is committed as `f320728d`.
+Both repositories retain their separate ownership and commits.
+M3 and M4 are removed from the remaining plan without renumbering M5–M8.
+Next smallest task: **M5.1** document-module/code-name execution with code-owner
+context, while keeping source import inert.
 
 ## M2 completion — selected classes and standard forms (2026-10-29)
 

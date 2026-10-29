@@ -66,6 +66,6 @@ forms to M2 and remaining host/package acceptance to M6/M7. Extensions/translati
 and AI assistance are removed from the plan. Planned work is not a compatibility
 pass; unsupported statuses require actual execution evidence before changing.
 
-Current host M3 is audited and M4 code is implemented in GridCraft; shared
-prerequisite publication remains pending explicit push approval. See the
+Current host M3/M4 are complete for their declared GridCraft profiles, using
+the published immutable shared dependency without development path overrides. See the
 [M3/M4 acceptance record](m3-m4-host-acceptance.md) for exact profiles/evidence.
