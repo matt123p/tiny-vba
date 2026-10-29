@@ -1,6 +1,6 @@
 # Compatibility matrix
 
-Updated 2026-10-27. Stage: M4 external acceptance complete; M5–M7 in-repo contracts and M8 standalone/embeddable UI gate implemented. **The documented m5-host-v1 consumer, including M3 control, M4 scalar widths and IR 4 host roots, has execution evidence; the 44 authored and 153 reviewed fixtures remain asserted 197 PASS / 0 UNSUPPORTED.**
+Updated 2026-10-29. Stage: M4 external acceptance complete; M5–M7 in-repo contracts and M8 standalone/embeddable UI gate implemented. **The documented m5-host-v1 consumer, including M3 control, M4 scalar widths and IR 4 host roots, has execution evidence; the 44 authored and 153 reviewed fixtures remain asserted 197 PASS / 0 UNSUPPORTED.**
 
 | Dimension | Status | Evidence / next gate |
 | Imported object member dispatch | Implemented binder correction, including getter aliases | ADR 0017/0025; vba-vm/tests/embedding.rs preserves actual Get/Call/Let/Set, named arguments and returned object targets |
@@ -65,3 +65,7 @@ The [UI scope index](ui/post-m8-roadmap.md) assigns shared classes/standard Offi
 forms to M2 and remaining host/package acceptance to M6/M7. Extensions/translation
 and AI assistance are removed from the plan. Planned work is not a compatibility
 pass; unsupported statuses require actual execution evidence before changing.
+
+Current host M3 is audited and M4 code is implemented in GridCraft; shared
+prerequisite publication remains pending explicit push approval. See the
+[M3/M4 acceptance record](m3-m4-host-acceptance.md) for exact profiles/evidence.

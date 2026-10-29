@@ -92,3 +92,6 @@ ignored under `reports/ui/`. Neither is required for the ordinary offline test s
 
 - [M2 selected class/form acceptance and exchange format](m2-acceptance.md)
 - [ADR 0024: standard form execution and exchange](decisions/0024-standard-form-execution-and-exchange.md)
+
+[M3/M4 fork acceptance and publication status](m3-m4-host-acceptance.md) records
+the current host milestones separately from historical language milestone IDs.

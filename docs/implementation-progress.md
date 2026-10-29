@@ -4,20 +4,43 @@ Updated 2026-10-29. The classic-editor/debugger profile is implemented; its
 historical milestone is M10. Runtime remains m5-host-v1 with verified IR 1/2/3/4/5/6/7.
 The [remaining plan](implementation-plan.md) retains stable **M3–M8** task IDs.
 **M1 and M2 are complete for their declared profiles.** Office objects,
-document events, trust and packaging remain fork-owned. M3 is being audited against GridCraft’s existing implementation; M4 acceptance is in progress.
+document events, trust and packaging remain fork-owned. M3 is implemented and audited in GridCraft. M4 code is implemented locally; its
+shared dependency publication/pin remains pending explicit push approval.
 
-## M3 audit / M4 shared prerequisite (2026-10-29)
+## M3 completion audit / M4 implementation (2026-10-29)
 
-GridCraft already contains M3.1–M3.3 range/navigation/native structural work.
-The initial native audit passes 48 adapter tests and two structural engine tests.
-Final cross-repository acceptance and documentation are being completed with M4;
-this checkpoint does not claim those final gates have passed.
+The [self-contained acceptance record](m3-m4-host-acceptance.md) closes the stale
+“M3 not started” status: GridCraft already contained M3.1 range/materialization
+separation, M3.2 relative/named/multi-area references and M3.3 navigation/search/
+native structural commands. The audit retains independently authored source,
+negative/resource tests and native engine undo/protection/recalculation evidence.
 
-[ADR 0025](decisions/0025-getter-alias-member-dispatch.md) corrects imported property
-getter chaining. A generic two-object regression checks fresh getter resolution,
-exact targets/Get/Call/Let intent and named arguments, retaining method shortcuts.
-The 19-crate DAG, native protocol and IR versions are unchanged. Excel definitions,
-identity, conversions and workbook effects stay in GridCraft.
+M4.1 now supplies stable sheet/document ownership, concrete captured handles and
+fresh active workbook/sheet/cell/selection roots, cross-document scoped targets,
+per-target consent and per-document undo groups. M4.2 implements Date/Currency
+Value versus Value2 reads/writes, array lower bounds/cropping/CVErr fill, General
+versus Text input conversion and optional Address A1/R1C1/relative/external forms.
+M4.3 supplies live selected formatting, protected rename, real application
+calculation/settings and truthful supported/unsupported metadata.
+
+[ADR 0025](decisions/0025-getter-alias-member-dispatch.md), committed as `22cc845`,
+is the only shared language change. The generic two-object regression checks
+fresh getter resolution, exact targets/Get/Call/Let intent and named arguments,
+retaining method shortcuts. Tiny-vba CI passes **375 tests**, headless WASM
+compilation passes, and **181 actual WASI tests** pass. The 19-crate DAG, native
+protocol and IR versions are unchanged. Office names/state remain fork-owned.
+
+GridCraft's current authored native adapter suite passes **58 tests** (ten new
+M4 workflows), with native structural/style acceptance and full gates recorded in
+the acceptance report. No fresh Office oracle observation is claimed. Profiles
+retain explicit unsupported operations, resource limits and broader M5–M8 gates.
+
+M4 is not yet publication-complete: automatic approval review rejected pushing
+`feat/m4-getter-alias-dispatch` to origin as an external export without explicit
+authorization. Approval is pending. GridCraft validation uses a temporary local
+checkout override; the final immutable dependency pin must replace it after the
+approved push. Next smallest task: publish/pin that prerequisite and close M4's
+remaining gate, then M5.1 document-module/code-owner execution.
 
 ## M2 completion — selected classes and standard forms (2026-10-29)
 

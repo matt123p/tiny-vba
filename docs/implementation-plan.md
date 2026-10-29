@@ -1,6 +1,6 @@
 # Remaining implementation plan
 
-Updated 2026-10-29. This plan contains **remaining work only**, using stable M3–M8 IDs
+Updated 2026-10-29. This plan contains **remaining work only**, using stable M4–M8 IDs
 in implementation order after completed M1 and the [selected M2 profile](m2-acceptance.md). Completed work and the old-to-new milestone mapping
 belong in [implementation progress](implementation-progress.md#plan-renumbering--2026-10-28).
 Historical reports and ADRs retain their original milestone numbers; use this
@@ -16,8 +16,7 @@ separate and native host dispatch in Rust.
 
 | Milestone | Remaining work | Prerequisites |
 |---|---|---|
-| M3 | Excel range and worksheet coverage | M1 |
-| M4 | Excel identity, values and member semantics | M1 and applicable M3 reference behavior |
+| M4 | Publish/pin the implemented identity/value/member prerequisite and close acceptance | Implemented M1–M3; explicit feature-branch push approval |
 | M5 | Document modules, events and Range-aware UDFs | M2–M4 capabilities required by each workflow |
 | M6 | Remaining GridCraft and WordCraft integration | M1; M2–M5 for corresponding form/event/Excel workflows |
 | M7 | Unchanged-document and package acceptance | Applicable M1–M6 capabilities and explicit writeback design |
@@ -31,42 +30,23 @@ consume the shared M2 contract.
 Build tests and collect lawful evidence throughout every milestone. M8 is the
 final release gate, not a reason to postpone fuzzing, benchmarks or regression tests.
 
-## M3 — Excel range and worksheet coverage
+## M4 — Excel identity, values and member semantics: publication gate
 
-Owner: GridCraft; tiny-vba changes only for necessary generic mechanisms.
-Depends on M1 typed/default-member/collection support.
+M3.1–M3.3 and the M4.1–M4.3 code are implemented and audited in GridCraft.
+The [completion/acceptance record](m3-m4-host-acceptance.md) records exact behavior,
+validation and remaining profile limits. Completed implementation tasks belong in
+[progress](implementation-progress.md); M5–M8 IDs remain unchanged.
 
-- **M3.1:** Separate range-reference construction from cell materialization
-  budgets. Implement Cells zero/one/two-index forms and column letters, Rows,
-  Columns, CountLarge and Item with Excel argument names and coercion rules.
-- **M3.2:** Implement relative Range.Range, Offset/Resize, local/qualified and named
-  references, and explicit multi-area behavior. Preserve sheet ownership and
-  checked arithmetic without allocating whole-sheet cell arrays.
-- **M3.3:** Add UsedRange, End and Find/navigation workflows. Route structural
-  edits through native engine commands with protection and undo/recalculation.
+Remaining: publish tiny-vba feature branch `feat/m4-getter-alias-dispatch`
+(commit `22cc845e5ee74a1bcd15eec32cdb8a8f18d316f8`), pin that immutable revision
+in GridCraft and remove its temporary local development override. Automatic
+approval review rejected the push because external repository export was not
+explicitly authorized. Approval has been requested; it is not inferred from
+elapsed time. No main-branch merge is required.
 
-Acceptance: unchanged authored source covers last-row, iteration, relative/named
-range and boundary workflows. Verify addresses/types, overflow/errors, resource
-refusals and mutation atomicity natively and in WASM.
-
-## M4 — Excel identity, values and member semantics
-
-Owner: GridCraft identity/conversion/commands; shared VBA coercion stays in
-tiny-vba. Depends on M1 and relevant M3 reference behavior.
-
-- **M4.1:** Supply stable worksheet identities and dynamic roots. Distinguish
-  ThisWorkbook from ActiveWorkbook and support active sheet/cell/selection without
-  retargeting stale handles after rename/reorder or document switching.
-- **M4.2:** Match Value versus Value2 Date/Currency behavior, typed errors,
-  scalar/array assignment and formula/text conversion. Complete Address optional
-  arguments and supported A1/R1C1, relative and external forms.
-- **M4.3:** Implement required formatting objects, application settings and
-  calculation/member signatures with real engine behavior. Catalogue completion
-  must describe actual support; unsupported operations fail explicitly.
-
-Acceptance: compare exact value tags, array bounds, signatures/named arguments,
-owner identity, selection and calculation effects. Test document/sheet lifetime,
-undo and protection. Distinguish public documentation from observed evidence.
+Acceptance closes only after the immutable dependency resolves and the recorded
+native/WASM checks pass without the temporary override. Local implementation
+success does not mark this publication gate complete.
 
 ## M5 — Document modules, events and Range-aware UDFs
 
