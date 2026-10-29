@@ -89,3 +89,9 @@ orders synchronous sink frames by connection assignment and preserves canonical
 ByRef, saved connections, pause/resume and fault/reset cleanup. The editor inserts
 real classes and exposes all three trapping modes. Forms remain pending; use the
 staged record and do not infer full M2 acceptance from this checkpoint.
+
+M2.2 now has a bounded headless `vba_ide::forms` model with atomic layout/
+Properties edits, tab/z-order, grouping, zoom and content-based saved history.
+Mount that model in the reusable UI; do not create a second designer state in
+the application shell or mix runtime values with design/reset state. The visual
+designer, actual form Run/event wiring and persistence are still pending.

@@ -25,3 +25,9 @@ Standard Office control names and reusable form UI belong to tiny-vba under
 the existing ownership decision. Excel/Word objects, document roots/events,
 trust, engine effects and package persistence remain fork-owned. Third-party
 ActiveX/OLE loading and arbitrary native activation remain excluded.
+
+The M2.2 headless model is owned by vba-ide (`forms`), with no new crate or
+normal dependency edge. Design documents and bounded content history are separate
+from VM invocation/project state. Candidate edits validate before commit; public
+snapshots are data contracts, not binary Office form resources. Visual designer,
+source/resource persistence and actual form runtime remain pending.

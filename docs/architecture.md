@@ -186,3 +186,8 @@ state is separate from the foreign host's existing object store. Snapshots carry
 owned native state and rebind receiving-session handles. Normal lifecycle code
 is interpreted; reset/cancel cleanup is inert. No new shipping crate/dependency
 edge is added. Form designer/event-language work remains staged separately.
+
+M2.2's `vba-ide::forms` model is toolkit/IO-free and owns bounded standard-control
+design data, selection and atomic layout/history commands. It contains no Office
+application objects, runtime control activation or persistence IO. Its document
+is independent of VM Reset. Shared egui designer/runtime integration remains pending.

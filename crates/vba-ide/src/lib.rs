@@ -3,6 +3,7 @@
 #![forbid(unsafe_code)]
 mod code_aids;
 mod editing;
+pub mod forms;
 mod history;
 mod search;
 pub use search::{FindOptions, FindScope, SearchMatch};

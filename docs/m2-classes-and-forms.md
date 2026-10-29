@@ -13,7 +13,7 @@ M3 has not been started; it follows completion of the requested M2 work.
 | M2.1 class/property syntax and project-local type binding | Implemented for the runtime profile below |
 | M2.1 verified instances, methods, fields, lifecycle and debugger execution | Implemented and exercised natively/WASI |
 | M2.1 document instance/event contracts and class error modes | Document state, declared events, callbacks and three UI error modes implemented; static member binding remains |
-| M2.2 standard-control model and interactive designer | Pending |
+| M2.2 standard-control model and interactive designer | Headless model implemented; visual designer pending |
 | M2.3 signed handlers and actual form event execution/debugging | Pending |
 | M2.4 source/resources, persistence boundaries and round trips | Pending |
 | Class checkpoint native/WASM/native UI/browser acceptance | Passed; full form acceptance pending |
@@ -127,8 +127,47 @@ edit/debug/clipboard/file-transfer workflow, not an unimplemented form designer.
 
 Checkpoint validation: `cargo xtask ci` PASS (343 workspace tests),
 `cargo xtask wasm` PASS and `cargo xtask wasm-run` PASS (156 actual WASI tests).
-`cargo xtask ui` PASS (99 tests and 18 original renders), `ui-native` PASS,
+`cargo xtask ui` PASS (99 tests and 17 original renders), `ui-native` PASS,
 `web` PASS and Chromium `tools/ui-browser/smoke.cjs` PASS with no page errors.
 Native/browser pause images and class light/dark/Options renders were inspected.
 Tests ran with Rust 1.99.1 and bundled Node 24.22.1. External candidate corpora
 remain unexecuted; no fresh Office oracle is claimed.
+
+## M2.2 headless design model (2026-10-29)
+
+`vba_ide::forms` owns a bounded, toolkit/IO-free Form/Control document and
+FormDesigner edit state. Label, TextBox and CommandButton have stable non-recycled
+IDs, names, captions/text, points-based finite geometry, visibility/enabled state
+and independent paint/tab order. Names are checked with the existing parser.
+The selected design profile limits a document to 128 controls and 2 MiB, individual
+text to 16 KiB, captions to 1 KiB and history to 128 entries/8 MiB. These are
+explicit resource limits, not claims about Office limits.
+
+Edits validate complete candidates before committing identity, document or history.
+The model supports grouped selection, delete/Properties replacement, snap/grid,
+move/resize, six reference-control alignments, grid alignment, equal spacing,
+centering, same size, grouping/ungrouping and front/back. Tab order is independent
+of z-order. Zoom (10–400 percent), selection and grid settings are view state.
+Dirty state compares saved design content, so undo back to saved content clears
+it. Stable IDs survive undo without reuse. Runtime Reset has no ownership of
+this design document.
+
+Six original headless workflows cover transforms, tab/paint order, groups,
+atomic invalid edits, resource refusal, identity and saved-content history.
+There is no visual canvas, Toolbox/Properties wiring, source handler generation,
+form Run action or persistence format yet. This module does not complete M2.2.
+Next: mount this model in the shared egui designer and connect selection, drag/
+resize, Properties, keyboard, Format and tab-order commands before M2.3 runtime.
+
+Public behavior references: [UserForm window](https://learn.microsoft.com/office/vba/language/reference/user-interface-help/userform-window),
+[UserForm toolbar](https://learn.microsoft.com/office/vba/language/reference/user-interface-help/userform-command-bar),
+[Format menu](https://learn.microsoft.com/office/vba/language/reference/user-interface-help/format-menu),
+[Tab Order](https://learn.microsoft.com/office/vba/language/reference/user-interface-help/tab-order-dialog-box),
+and [points-based geometry](https://learn.microsoft.com/office/vba/language/reference/user-interface-help/height-width-properties).
+No reference artwork or implementation code was copied.
+
+Form-model checkpoint validation: `cargo xtask ci` PASS (349 workspace tests),
+`cargo xtask wasm` PASS and `cargo xtask wasm-run` PASS (162 actual WASI tests).
+The six new form workflows run natively and under WASI. The previously inspected
+UI/native/browser evidence above belongs to the class/editor checkpoint; no form
+canvas render or interactive form-runtime acceptance is claimed.

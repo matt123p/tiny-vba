@@ -4,7 +4,7 @@ Updated 2026-10-29. The classic-editor/debugger profile is implemented; its
 historical milestone is M10. Runtime remains m5-host-v1 with verified IR 1/2/3/4/5/6/7.
 The [remaining plan](implementation-plan.md) retains stable **M2–M8** task IDs.
 **M1.x is complete** for the declared registered-type/default/collection profile.
-Current: **M2.1**, class/document runtime and event-language work. Office objects, document events,
+Current: **M2.1/M2.2**, class/document runtime and the headless form design model. Office objects, document events,
 trust and packaging remain fork-owned.
 
 ## M2.1 runtime checkpoint (2026-10-29; M2 remains incomplete)
@@ -22,7 +22,13 @@ The editor now inserts class modules, distinguishes component kinds and exposes
 all three error-trapping modes. Source events preserve connection ordering,
 canonical ByRef, pause/resume, state restore and handler-fault cleanup.
 
-M2 is not complete: static member/field ByRef review, form model/
+The toolkit/IO-free `vba_ide::forms` model now supplies selected standard controls,
+atomic layout/Properties edits, groups, independent tab/z-order, zoom and bounded
+history, with six headless workflow tests. It is not connected to a visual designer.
+After this model increment, mandatory CI passes 349 workspace tests, headless
+WASM compilation passes and WASI passes 162 actual tests.
+
+M2 is not complete: static member/field ByRef review, visual form
 designer, handler generation, full form runtime/modal lifecycle and form source/
 resource round trips still need implementation and acceptance. Checkpoint validation: 343 workspace tests and 156 actual WASI tests pass;
 mandatory CI/WASM plus UI, native capture, web build and Chromium smoke pass.
