@@ -30,7 +30,9 @@ pub const IR3_VERSION: u32 = 3;
 pub const IR4_VERSION: u32 = 4;
 pub const IR5_VERSION: u32 = 5;
 pub const IR6_VERSION: u32 = 6;
-pub const FEATURES: [&str; 19] = [
+pub const IR7_VERSION: u32 = 7;
+pub const FEATURES: [&str; 20] = [
+    "project-classes-v7",
     "default-members-v6",
     "enumeration-v6",
     "nominal-objects-v5",
@@ -59,6 +61,7 @@ pub enum UnaryOp {
 }
 #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
 pub enum BinaryOp {
+    Is,
     Add,
     Subtract,
     Multiply,
@@ -79,7 +82,8 @@ pub enum BinaryOp {
     Eqv,
     Imp,
 }
-pub const BINARY_OPS: [BinaryOp; 19] = [
+pub const BINARY_OPS: [BinaryOp; 20] = [
+    BinaryOp::Is,
     BinaryOp::Add,
     BinaryOp::Subtract,
     BinaryOp::Multiply,
@@ -102,6 +106,8 @@ pub const BINARY_OPS: [BinaryOp; 19] = [
 ];
 #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
 pub enum Opcode {
+    DefaultInstance,
+    NewInstance,
     EnumerationInit,
     EnumerationNext,
     EnumerationEnd,
@@ -134,7 +140,9 @@ pub enum Opcode {
     Stop,
     Return,
 }
-pub const OPCODES: [Opcode; 31] = [
+pub const OPCODES: [Opcode; 33] = [
+    Opcode::DefaultInstance,
+    Opcode::NewInstance,
     Opcode::EnumerationInit,
     Opcode::EnumerationNext,
     Opcode::EnumerationEnd,
@@ -175,6 +183,8 @@ pub enum AssignmentKind {
 }
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum Instruction {
+    DefaultInstance(SourceIndex),
+    NewInstance(SourceIndex),
     EnumerationInit {
         state: LocalSlot,
         source: Option<LocalSlot>,
@@ -242,6 +252,8 @@ pub enum Instruction {
 impl Instruction {
     pub fn opcode(&self) -> Opcode {
         match self {
+            Self::NewInstance(_) => Opcode::NewInstance,
+            Self::DefaultInstance(_) => Opcode::DefaultInstance,
             Self::EnumerationInit { .. } => Opcode::EnumerationInit,
             Self::EnumerationNext { .. } => Opcode::EnumerationNext,
             Self::EnumerationEnd(_) => Opcode::EnumerationEnd,
@@ -288,6 +300,8 @@ pub enum ParameterMode {
 }
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum SlotRole {
+    Receiver,
+    InstanceField(u32),
     HostRoot,
     ScratchReference,
     Persistent(u32),
@@ -307,6 +321,7 @@ pub struct Local {
 }
 #[derive(Clone, Debug)]
 pub struct Parameter {
+    pub default: Option<Value>,
     pub array: Option<ScalarKind>,
     pub name: String,
     pub kind: ScalarKind,
@@ -404,7 +419,36 @@ pub struct LaunchSignature {
     pub arguments: Vec<ScalarKind>,
 }
 #[derive(Clone, Debug)]
+pub struct ClassField {
+    pub with_events: bool,
+    pub name: String,
+    pub kind: ScalarKind,
+    pub nominal: Option<vba_values::NominalType>,
+    pub array: Option<ScalarKind>,
+    pub bounds: Vec<(i32, i32)>,
+    pub public: bool,
+}
+#[derive(Clone, Debug)]
+pub struct ClassMethod {
+    pub name: String,
+    pub kind: ForeignKind,
+    pub procedure: ProcedureId,
+    pub public: bool,
+}
+#[derive(Clone, Debug)]
+pub struct Class {
+    pub events: Vec<ProcedureId>,
+    pub document: bool,
+    pub predeclared: bool,
+    pub default_member: Option<String>,
+    pub source: SourceIndex,
+    pub name: String,
+    pub fields: Vec<ClassField>,
+    pub methods: Vec<ClassMethod>,
+}
+#[derive(Clone, Debug)]
 pub struct Program {
+    pub classes: Vec<Class>,
     pub nominal_locals: Vec<NominalLocal>,
     pub ir_version: u32,
     pub required_features: BTreeSet<String>,
@@ -495,8 +539,18 @@ impl Capabilities {
         caps
     }
     pub fn ir6_structural() -> Self {
+        let mut caps = Self::ir7_structural();
+        caps.profile = "ir6-structural".into();
+        caps.ir_versions.remove(&IR7_VERSION);
+        caps.features.remove("project-classes-v7");
+        caps.instructions.remove(&Opcode::NewInstance);
+        caps.instructions.remove(&Opcode::DefaultInstance);
+        caps.binary.remove(&BinaryOp::Is);
+        caps
+    }
+    pub fn ir7_structural() -> Self {
         Self {
-            profile: "ir6-structural".into(),
+            profile: "ir7-structural".into(),
             ir_versions: BTreeSet::from([
                 IR_VERSION,
                 IR2_VERSION,
@@ -504,6 +558,7 @@ impl Capabilities {
                 IR4_VERSION,
                 IR5_VERSION,
                 IR6_VERSION,
+                IR7_VERSION,
             ]),
             features: FEATURES.iter().map(|s| (*s).into()).collect(),
             instructions: OPCODES.into_iter().collect(),

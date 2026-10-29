@@ -122,6 +122,19 @@ pub fn unary(op: &str, value: &Value) -> Result<Value> {
     }
 }
 pub fn binary(op: &str, left: &Value, right: &Value) -> Result<Value> {
+    if op == "is" {
+        return match (left, right) {
+            (Value::Object(a), Value::Object(b)) => Ok(Value::Boolean(a == b)),
+            (Value::Nothing, Value::Nothing) => Ok(Value::Boolean(true)),
+            (Value::Nothing, Value::Object(_)) | (Value::Object(_), Value::Nothing) => {
+                Ok(Value::Boolean(false))
+            }
+            _ => Err(Error::Vba {
+                number: 13,
+                message: "Object references required for Is".into(),
+            }),
+        };
+    }
     if (matches!(left, Value::Currency(_)) || matches!(right, Value::Currency(_)))
         && matches!(op, "+" | "-")
         && !matches!(left, Value::Date(_))

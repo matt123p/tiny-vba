@@ -37,7 +37,7 @@ impl Default for CompileOptions {
             imports: Vec::new(),
             entry: "Answer".into(),
             revision: "source-1".into(),
-            capabilities: ir::Capabilities::ir6_structural(),
+            capabilities: ir::Capabilities::ir7_structural(),
             limits: ir::VerifyLimits::default(),
         }
     }
@@ -133,7 +133,13 @@ pub fn compile_modules(
                 builder.feature("array-layout-v3");
             }
             builder.allocation.charge(256)?;
-            let role = if local.host_root {
+            let role = if local.receiver {
+                builder.feature("project-classes-v7");
+                ir::SlotRole::Receiver
+            } else if let Some(field) = local.field {
+                builder.feature("project-classes-v7");
+                ir::SlotRole::InstanceField(field)
+            } else if local.host_root {
                 builder.feature("host-roots-v4");
                 ir::SlotRole::HostRoot
             } else if let Some(key) = &local.persistent {
@@ -165,7 +171,7 @@ pub fn compile_modules(
                     } else {
                         Some(local.span)
                     },
-                    visible: !local.result && !local.host_root,
+                    visible: !local.result && !local.host_root && !local.receiver,
                 },
             )?;
         }
@@ -220,9 +226,74 @@ pub fn compile_modules(
             }
         }
     }
+    let mut classes = Vec::new();
+    for class in &program.classes {
+        features.insert("project-classes-v7".into());
+        classes.push(ir::Class {
+            events: program
+                .procedures
+                .iter()
+                .enumerate()
+                .filter(|(_, p)| p.signature.module == class.module && p.signature.event)
+                .map(|(i, _)| idx(i).map(ir::ProcedureId))
+                .collect::<Result<Vec<_>>>()?,
+            document: class.document,
+            predeclared: class.predeclared,
+            default_member: program.modules.get(class.module).and_then(|m| {
+                m.attributes.iter().find_map(|a| {
+                    if a.path
+                        .get(1)
+                        .is_some_and(|n| n.spelling.eq_ignore_ascii_case("VB_UserMemId"))
+                        && matches!(&a.value.kind,ast::ExprKind::Number(n) if n=="0")
+                    {
+                        a.path.first().map(|n| n.spelling.clone())
+                    } else {
+                        None
+                    }
+                })
+            }),
+            source: ir::SourceIndex(idx(class.module)?),
+            name: class.name.clone(),
+            fields: class
+                .fields
+                .iter()
+                .map(|f| ir::ClassField {
+                    with_events: f.with_events,
+                    name: f.name.clone(),
+                    kind: f.kind,
+                    nominal: f.nominal.clone(),
+                    array: f.array,
+                    bounds: f.bounds.clone(),
+                    public: f.public,
+                })
+                .collect(),
+            methods: program
+                .procedures
+                .iter()
+                .enumerate()
+                .filter(|(_, p)| p.signature.module == class.module && !p.signature.event)
+                .map(|(i, p)| {
+                    Ok(ir::ClassMethod {
+                        name: p.signature.name.clone(),
+                        kind: match p.signature.property {
+                            Some(ast::PropertyKind::Get) => ir::ForeignKind::Get,
+                            Some(ast::PropertyKind::Let) => ir::ForeignKind::Let,
+                            Some(ast::PropertyKind::Set) => ir::ForeignKind::Set,
+                            None => ir::ForeignKind::Call,
+                        },
+                        procedure: ir::ProcedureId(idx(i)?),
+                        public: p.signature.visibility != ast::Visibility::Private,
+                    })
+                })
+                .collect::<Result<Vec<_>>>()?,
+        });
+    }
     let mut ir = ir::Program {
+        classes,
         nominal_locals,
-        ir_version: if features.iter().any(|f| f.ends_with("-v6")) {
+        ir_version: if features.iter().any(|f| f.ends_with("-v7")) {
+            ir::IR7_VERSION
+        } else if features.iter().any(|f| f.ends_with("-v6")) {
             ir::IR6_VERSION
         } else if features.iter().any(|f| f.ends_with("-v5")) {
             ir::IR5_VERSION
@@ -719,10 +790,9 @@ impl Builder<'_> {
             let mode = if let Some(value) = &arg.value {
                 if arg.reference
                     && let bound::ExprKind::Local(slot) = value.kind
-                    && self
-                        .locals
-                        .get(slot)
-                        .is_some_and(|l| l.role != ir::SlotRole::HostRoot)
+                    && self.locals.get(slot).is_some_and(|l| {
+                        !matches!(l.role, ir::SlotRole::HostRoot | ir::SlotRole::Receiver)
+                    })
                 {
                     self.emit(block, ir::Instruction::RefLocal(ir::LocalSlot(idx(slot)?)))?;
                     ir::ArgumentMode::Reference
@@ -752,7 +822,7 @@ impl Builder<'_> {
             && self
                 .locals
                 .get(slot)
-                .is_some_and(|l| l.role != ir::SlotRole::HostRoot)
+                .is_some_and(|l| !matches!(l.role, ir::SlotRole::HostRoot | ir::SlotRole::Receiver))
         {
             self.emit(block, ir::Instruction::RefLocal(ir::LocalSlot(idx(slot)?)))?;
             push(
@@ -849,6 +919,20 @@ impl Builder<'_> {
     }
     fn expr(&mut self, block: usize, expr: &bound::Expr) -> Result<()> {
         match &expr.kind {
+            bound::ExprKind::DefaultInstance(class) => {
+                self.feature("project-classes-v7");
+                self.emit(
+                    block,
+                    ir::Instruction::DefaultInstance(ir::SourceIndex(idx(*class)?)),
+                )
+            }
+            bound::ExprKind::New(class) => {
+                self.feature("project-classes-v7");
+                self.emit(
+                    block,
+                    ir::Instruction::NewInstance(ir::SourceIndex(idx(*class)?)),
+                )
+            }
             bound::ExprKind::Element {
                 slot,
                 indices,
@@ -923,6 +1007,10 @@ impl Builder<'_> {
     fn binary(&mut self, block: usize, op: &str, span: Span) -> Result<()> {
         self.feature("integer-long-ops");
         let op = match op {
+            "is" => {
+                self.feature("project-classes-v7");
+                ir::BinaryOp::Is
+            }
             "+" => ir::BinaryOp::Add,
             "-" => ir::BinaryOp::Subtract,
             "*" => ir::BinaryOp::Multiply,
@@ -1511,7 +1599,15 @@ impl Builder<'_> {
         let signature = &procedure.signature;
         Ok(ir::Procedure {
             source: ir::SourceIndex(idx(signature.module)?),
-            name: signature.name.clone(),
+            name: if signature.event {
+                format!("Event {}", signature.name)
+            } else {
+                signature
+                    .property
+                    .as_ref()
+                    .map(|kind| format!("Property {kind:?} {}", signature.name))
+                    .unwrap_or_else(|| signature.name.clone())
+            },
             declaration: signature.span,
             end_statement: procedure.end.id,
             kind: if signature.kind == ast::ProcedureKind::Sub {
@@ -1523,6 +1619,16 @@ impl Builder<'_> {
                 .parameters
                 .iter()
                 .map(|p| ir::Parameter {
+                    default: if self
+                        .program
+                        .modules
+                        .get(signature.module)
+                        .is_some_and(|m| m.kind != ast::ModuleKind::Standard)
+                    {
+                        p.default.clone()
+                    } else {
+                        None
+                    },
                     array: p.array,
                     name: p.name.clone(),
                     kind: p.kind,
@@ -1531,7 +1637,12 @@ impl Builder<'_> {
                     } else {
                         ir::ParameterMode::ByRef
                     },
-                    required: true,
+                    required: !p.optional
+                        || self
+                            .program
+                            .modules
+                            .get(signature.module)
+                            .is_none_or(|m| m.kind == ast::ModuleKind::Standard),
                 })
                 .collect(),
             locals: self.locals,

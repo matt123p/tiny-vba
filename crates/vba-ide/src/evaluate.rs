@@ -100,6 +100,9 @@ fn evaluate_ast(
     }
     let eval = |e| evaluate_ast(e, lookup, depth + 1);
     match &expr.kind {
+        ExprKind::New(_) => Err(error(
+            "object construction is not allowed in safe evaluation",
+        )),
         ExprKind::Name(name) => lookup(&name.spelling),
         ExprKind::Number(text) => {
             if let Ok(n) = text.parse::<i16>() {

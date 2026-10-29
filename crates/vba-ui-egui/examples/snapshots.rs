@@ -15,6 +15,22 @@ fn main() -> Result<(), Box<dyn Error>> {
     std::fs::create_dir_all(&root)?;
     for (name, theme, width, height, scale, pane) in [
         (
+            "m2-class-light",
+            Theme::light(),
+            1200.0,
+            800.0,
+            1.0,
+            Pane::Locals,
+        ),
+        (
+            "m2-class-dark",
+            Theme::dark(),
+            1200.0,
+            800.0,
+            1.0,
+            Pane::Locals,
+        ),
+        (
             "light-paused",
             Theme::light(),
             1200.0,
@@ -103,15 +119,48 @@ fn main() -> Result<(), Box<dyn Error>> {
             Pane::Locals,
         ),
     ] {
-        let mut ide = Ide::demo()?;
+        let class_fixture = name.starts_with("m2-class-");
+        let mut ide = if class_fixture {
+            let mut ide = Ide::new();
+            ide.add_module(
+                "Main.bas",
+                "Public component As Counter\nSub Main()\nSet component=New Counter\nEnd Sub",
+            )?;
+            ide.add_module("Counter.cls","Private total As Long\nPrivate Sub Pressed()\ntotal=total+1\nDebug.Print total\nEnd Sub")?;
+            ide
+        } else {
+            Ide::demo()?
+        };
         let byte = ide
             .active_module()
-            .and_then(|m| m.text.find("total = SumTo"))
+            .and_then(|m| {
+                m.text.find(if class_fixture {
+                    "Debug.Print"
+                } else {
+                    "total = SumTo"
+                })
+            })
             .ok_or("demo source")?;
         ide.toggle_breakpoint_at(byte)?;
-        ide.add_watch("counter")?;
-        ide.add_watch("counter + 2")?;
+        ide.add_watch(if class_fixture { "total" } else { "counter" })?;
+        ide.add_watch(if class_fixture {
+            "total + 2"
+        } else {
+            "counter + 2"
+        })?;
+        if class_fixture {
+            ide.select_module(0)?;
+        }
         ide.dispatch(Action::Run, &mut NoHost)?;
+        if class_fixture {
+            for _ in 0..100 {
+                ide.tick(&mut NoHost)?;
+                if ide.mode() == Mode::Completed {
+                    break;
+                }
+            }
+            ide.dispatch_instance_event("component", "Pressed", vec![], &mut NoHost)?;
+        }
         for _ in 0..100 {
             ide.tick(&mut NoHost)?;
             if ide.mode() == Mode::Break {

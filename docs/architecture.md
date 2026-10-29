@@ -176,3 +176,13 @@ vba-foreign carries native arguments and bounded snapshot replies. The existing
 crate DAG is unchanged. Hosts exclusively own default-member selection, collection
 objects, signatures, ordering, lifetimes and document effects. No Office object
 definition, registry, package IO or application dependency enters tiny-vba.
+
+## Project classes (M2 foundation / ADR 0023)
+
+Project classes use a VM-owned heap whose fields are ordinary canonical locations.
+Verified IR 7 descriptors define source ownership, nominal identity, fields and
+methods; native calls run on the same frames/controller as other VBA. Native
+state is separate from the foreign host's existing object store. Snapshots carry
+owned native state and rebind receiving-session handles. Normal lifecycle code
+is interpreted; reset/cancel cleanup is inert. No new shipping crate/dependency
+edge is added. Form designer/event-language work remains staged separately.

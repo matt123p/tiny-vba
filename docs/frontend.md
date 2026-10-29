@@ -93,3 +93,20 @@ The parser preserves For Each ... In ... Next (optional matching control), inclu
 nested loops and Exit For. Binding requires Variant/Object collection controls,
 Variant native-array controls and distinct nested control variables. Other loop
 constructs are unchanged. See [M1 implementation](m1-defaults-and-collections.md).
+
+## M2 class syntax increment
+
+Explicit Class/Document module kinds preserve component identity. Property Get,
+Let and Set keep their accessor kind and source spans; New and Exit Property
+are parsed without rewriting source. Me binds to a read-only receiver. This is
+a runtime foundation, not complete M2/UserForm support; see the staged record.
+
+M2's IR 7 source-event increment supports public/default Event declarations and
+scalar project-typed WithEvents fields in class/document modules. RaiseEvent uses
+verified required signatures and synchronous ordinary frames, preserves connection
+order and canonical ByRef across sinks, and retains queued receivers through
+pause/resume. State transfer remaps objects and preserves subscription ordering.
+Unknown events, mismatched handler signatures, Optional/ParamArray/named/omitted
+event arguments and foreign WithEvents mutation are refused. Editor Options
+exposes all-error, class-module and unhandled-error trapping. Forms remain pending;
+see docs/m2-classes-and-forms.md for exact checkpoint and remaining work.

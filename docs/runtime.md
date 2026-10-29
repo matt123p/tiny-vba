@@ -1,6 +1,6 @@
 # M3/M4 runtime and debugger
 
-Implemented 2026-10-26, extended by new M1.1. The current consumer is `m5-host-v1`, using verified IR 1/2/3/4/5/6.
+Implemented 2026-10-26, extended by new M1.1. The current consumer is `m5-host-v1`, using verified IR 1/2/3/4/5/6/7.
 The [M4 language contract](m4-language.md) and [ADR 0011](decisions/0011-m4-language-extension.md)
 define scalar coercions, arrays, arguments, persistent state, builtins and VBA handlers.
 [ADR 0013](decisions/0013-m5-host-contract.md) adds the versioned native host protocol and hidden
@@ -248,3 +248,38 @@ Source-region bounds release cursors when jumping outside the loop; active
 error handlers retain them until Resume. Exit/return/unwind/reset/cancel drops
 owned snapshots; no additional external iterator tokens or document locks exist.
 Paused element edits use canonical element locations and retain nominal checks.
+
+## M2 native class runtime foundation
+
+Class-enabled IR 7 programs own a bounded instance heap (up to 1,024 instances,
+sharing canonical location/payload/instruction limits) and reserve host identity
+zero for native instances. Non-class programs preserve legacy host-zero behavior.
+Native nominal checks query this heap directly; external resolvers cannot supply
+project instances. Fields alias ordinary locations, and methods/accessors use
+ordinary frames, checkpoints, handlers and source inspection. No Office store
+or additional interpreter is introduced.
+
+Initialize and normal last-reference Terminate execute VBA. References in live
+frames, native fields, persistent slots, queued callbacks and pending results
+retain instances; cycles remain retained. Work is bounded by instance_work.
+Abnormal cancel/disconnect/reset releases data without invoking user finalizers.
+Project snapshots validate and stage state, then rebind handles to the receiving
+session generation. Predeclared/document instances retain lazy project state;
+external Office base objects/events remain the embedding's responsibility.
+
+Explicit instance callbacks reuse the existing queue. start_next_callback leaves
+execution to normal bounded inspected slices; run_next_callback remains a headless
+convenience. The IDE event route retains watches, stepping and edit/resume.
+set_break_in_class_modules pauses before an unhandled fault leaves its class.
+Safe evaluation cannot construct objects or invoke properties. Full M2 remains
+in progress; the [implementation record](m2-classes-and-forms.md) lists gaps.
+
+M2's IR 7 source-event increment supports public/default Event declarations and
+scalar project-typed WithEvents fields in class/document modules. RaiseEvent uses
+verified required signatures and synchronous ordinary frames, preserves connection
+order and canonical ByRef across sinks, and retains queued receivers through
+pause/resume. State transfer remaps objects and preserves subscription ordering.
+Unknown events, mismatched handler signatures, Optional/ParamArray/named/omitted
+event arguments and foreign WithEvents mutation are refused. Editor Options
+exposes all-error, class-module and unhandled-error trapping. Forms remain pending;
+see docs/m2-classes-and-forms.md for exact checkpoint and remaining work.

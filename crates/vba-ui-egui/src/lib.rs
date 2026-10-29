@@ -18,6 +18,7 @@ pub enum Command {
     Caret(usize),
     SelectModule(usize),
     AddModule,
+    AddClass,
     AddWatch(String),
     DeleteWatch(usize),
     SelectFrame(usize),
@@ -36,6 +37,7 @@ pub enum Command {
     RedoEdit,
     SetNextStatement,
     BreakOnErrors(bool),
+    BreakInClassModules(bool),
     AddWatchKind(String, vba_ide::WatchKind),
     AddWatchContext(String, vba_ide::WatchKind, Option<SourceId>, Option<String>),
     Definition(String),
@@ -98,9 +100,13 @@ pub fn apply(
             Ok(())
         }
         Command::SelectModule(i) => ide.select_module(i),
-        Command::AddModule => {
+        kind @ (Command::AddModule | Command::AddClass) => {
             for n in 1..=vba_ide::MAX_MODULES {
-                let name = format!("Module{n}.bas");
+                let name = if matches!(kind, Command::AddClass) {
+                    format!("Class{n}.cls")
+                } else {
+                    format!("Module{n}.bas")
+                };
                 if !ide
                     .modules
                     .iter()
@@ -143,6 +149,10 @@ pub fn apply(
         Command::SetNextStatement => ide.set_next_statement(),
         Command::BreakOnErrors(enabled) => {
             ide.set_break_on_errors(enabled);
+            Ok(())
+        }
+        Command::BreakInClassModules(enabled) => {
+            ide.set_break_in_class_modules(enabled);
             Ok(())
         }
         Command::AddWatchKind(expression, kind) => {
@@ -407,16 +417,18 @@ impl EditorUi {
                     ui.horizontal(|ui|{if ui.small_button("View Code").on_hover_text("View Code (F7)").clicked(){self.focus_editor=true;self.navigate=true;}ui.add_enabled(false,egui::Button::new("View Object")).on_hover_text("An object/form designer requires a host adapter");});
                     egui::ScrollArea::vertical().id_salt("project.tree").max_height((ui.available_height()-190.0).max(90.0)).show(ui,|ui|{
                         egui::CollapsingHeader::new(&ide.title).default_open(true).show(ui,|ui|{
-                            egui::CollapsingHeader::new("Modules").default_open(true).show(ui,|ui|{
-                                for (i,m) in ide.modules.iter().enumerate(){let response=ui.selectable_label(ide.active==i,format!("M {}{}",m.name,if m.dirty(){" *"}else{""}));if self.focus_project && ide.active==i {response.request_focus();self.focus_project=false;}
+                            for (kind, label, glyph) in [(vba_ide::ModuleKind::Standard,"Modules","M"),(vba_ide::ModuleKind::Class,"Class Modules","C"),(vba_ide::ModuleKind::Document,"Document Modules","D")] {
+if ide.modules.iter().any(|m|m.kind==kind) {
+egui::CollapsingHeader::new(label).default_open(true).show(ui,|ui|{
+                                for (i,m) in ide.modules.iter().enumerate().filter(|(_,m)|m.kind==kind){let response=ui.selectable_label(ide.active==i,format!("{glyph} {}{}",m.name,if m.dirty(){" *"}else{""}));if self.focus_project && ide.active==i {response.request_focus();self.focus_project=false;}
 if response.clicked(){commands.push(Command::SelectModule(i));self.navigate=true;}
 if response.double_clicked(){self.focus_editor=true;}response.context_menu(|ui|{if ui.button("View Code").clicked(){commands.push(Command::SelectModule(i));self.focus_editor=true;ui.close();}self.action_button(ui,ide,Action::Export,&mut commands);});}
-                            });
+                            });}}
                         });
                     });
                     if ui.button("Insert Module").clicked(){commands.push(Command::AddModule);}
                     ui.separator();
-                    if self.properties_visible {heading(ui,"Properties Window",theme);ui.horizontal(|ui|{ui.selectable_label(true,"Alphabetic").on_hover_text("Alphabetic properties");ui.add_enabled(false,egui::Button::new("Categorized")).on_hover_text("Only module metadata is available");});if let Some(m)=ide.active_module(){egui::Grid::new("properties").striped(true).show(ui,|ui|{ui.label("(Name)");if ui.button(&m.name).on_hover_text("Rename module").clicked(){self.rename_module=Some((m.id,m.name.clone()));}ui.end_row();ui.label("Type");ui.label("Standard module");ui.end_row();ui.label("Status");ui.label(if m.dirty(){"Modified"}else{"Saved"});ui.end_row();});ui.label(RichText::new("Select (Name) to rename the module.").small().color(theme.muted));}}
+                    if self.properties_visible {heading(ui,"Properties Window",theme);ui.horizontal(|ui|{ui.selectable_label(true,"Alphabetic").on_hover_text("Alphabetic properties");ui.add_enabled(false,egui::Button::new("Categorized")).on_hover_text("Only module metadata is available");});if let Some(m)=ide.active_module(){egui::Grid::new("properties").striped(true).show(ui,|ui|{ui.label("(Name)");if ui.button(&m.name).on_hover_text("Rename module").clicked(){self.rename_module=Some((m.id,m.name.clone()));}ui.end_row();ui.label("Type");ui.label(match m.kind {vba_ide::ModuleKind::Standard=>"Standard module",vba_ide::ModuleKind::Class=>"Class module",vba_ide::ModuleKind::Document=>"Document module"});ui.end_row();ui.label("Status");ui.label(if m.dirty(){"Modified"}else{"Saved"});ui.end_row();});ui.label(RichText::new("Select (Name) to rename the module.").small().color(theme.muted));}}
                 });project_rect=Some(p.response.rect);
             }
             let right=self.debugger_right && ui.available_width()>700.0;
@@ -726,11 +738,10 @@ if response.double_clicked(){self.focus_editor=true;}response.context_menu(|ui|{
                 commands.push(Command::AddModule);
                 ui.close();
             }
-            Self::unavailable(
-                ui,
-                "Class Module",
-                "Class execution is not supported by the current compiler profile",
-            );
+            if ui.button("Class Module").clicked() {
+                commands.push(Command::AddClass);
+                ui.close();
+            }
             Self::unavailable(
                 ui,
                 "UserForm",
@@ -1875,26 +1886,85 @@ if response.double_clicked(){self.focus_editor=true;}response.context_menu(|ui|{
                 ui.visuals_mut().extreme_bg_color = theme.editor;
                 ui.add(egui::Slider::new(&mut self.font_size, 11.0..=22.0).text("Code font size"));
                 ui.add(egui::Slider::new(&mut self.tab_width, 1..=16).text("Tab width"));
-                ui.checkbox(&mut self.auto_indent,"Auto Indent");
-                ui.checkbox(&mut self.correct_case,"Auto Case Correction");
-                ui.checkbox(&mut self.project_right,"Dock Project Explorer on right");
-                ui.checkbox(&mut self.debugger_right,"Dock debugger on right (bottom on narrow views)");
-                ui.collapsing("Toolbar Customization",|ui| {
-                    for action in [Action::Save,Action::Run,Action::Pause,Action::Reset,Action::StepInto,Action::StepOver,Action::StepOut] {
-                        let mut selected=self.toolbar_actions.contains(&action);
-                        if ui.checkbox(&mut selected,action.label()).changed() {self.toolbar_actions.retain(|a|*a!=action);if selected {self.toolbar_actions.push(action);}}
+                ui.checkbox(&mut self.auto_indent, "Auto Indent");
+                ui.checkbox(&mut self.correct_case, "Auto Case Correction");
+                ui.checkbox(&mut self.project_right, "Dock Project Explorer on right");
+                ui.checkbox(
+                    &mut self.debugger_right,
+                    "Dock debugger on right (bottom on narrow views)",
+                );
+                ui.collapsing("Toolbar Customization", |ui| {
+                    for action in [
+                        Action::Save,
+                        Action::Run,
+                        Action::Pause,
+                        Action::Reset,
+                        Action::StepInto,
+                        Action::StepOver,
+                        Action::StepOut,
+                    ] {
+                        let mut selected = self.toolbar_actions.contains(&action);
+                        if ui.checkbox(&mut selected, action.label()).changed() {
+                            self.toolbar_actions.retain(|a| *a != action);
+                            if selected {
+                                self.toolbar_actions.push(action);
+                            }
+                        }
                     }
-                    let actions=self.toolbar_actions.iter().copied().take(16).collect::<Vec<_>>();
-                    for (index,action) in actions.iter().enumerate() {ui.horizontal(|ui| {
-                        ui.label(action.label());
-                        if ui.add_enabled(index>0,egui::Button::new(format!("Move {} up",action.label()))).clicked() {self.toolbar_actions.swap(index,index-1);}
-                        if ui.add_enabled(index+1<actions.len(),egui::Button::new(format!("Move {} down",action.label()))).clicked() {self.toolbar_actions.swap(index,index+1);}
-                    });}
+                    let actions = self
+                        .toolbar_actions
+                        .iter()
+                        .copied()
+                        .take(16)
+                        .collect::<Vec<_>>();
+                    for (index, action) in actions.iter().enumerate() {
+                        ui.horizontal(|ui| {
+                            ui.label(action.label());
+                            if ui
+                                .add_enabled(
+                                    index > 0,
+                                    egui::Button::new(format!("Move {} up", action.label())),
+                                )
+                                .clicked()
+                            {
+                                self.toolbar_actions.swap(index, index - 1);
+                            }
+                            if ui
+                                .add_enabled(
+                                    index + 1 < actions.len(),
+                                    egui::Button::new(format!("Move {} down", action.label())),
+                                )
+                                .clicked()
+                            {
+                                self.toolbar_actions.swap(index, index + 1);
+                            }
+                        });
+                    }
                 });
                 ui.label("Monospace font is inherited from the host.");
-                let mut trap=ide.break_on_errors;
-                if ui.checkbox(&mut trap,"Break on all errors (including handled errors)").changed() { commands.push(Command::BreakOnErrors(trap)); }
-                ui.label("Unchecked: stop only on unhandled errors. Class-specific trapping belongs to class support.");
+                ui.label("Error Trapping");
+                if ui
+                    .radio(ide.break_on_errors, "Break on All Errors")
+                    .clicked()
+                {
+                    commands.push(Command::BreakOnErrors(true));
+                }
+                if ui
+                    .radio(ide.break_in_class_modules, "Break in Class Module")
+                    .clicked()
+                {
+                    commands.push(Command::BreakInClassModules(true));
+                }
+                if ui
+                    .radio(
+                        !ide.break_on_errors && !ide.break_in_class_modules,
+                        "Break on Unhandled Errors",
+                    )
+                    .clicked()
+                {
+                    commands.push(Command::BreakOnErrors(false));
+                    commands.push(Command::BreakInClassModules(false));
+                }
             });
         if self.quick_watch {
             let mut open = true;

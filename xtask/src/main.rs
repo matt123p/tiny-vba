@@ -123,6 +123,8 @@ fn run() -> Result<(), Box<dyn Error>> {
                     "nominal",
                     "--test",
                     "defaults_collections",
+                    "--test",
+                    "classes",
                     "--locked",
                     "--target",
                     "wasm32-wasip1",

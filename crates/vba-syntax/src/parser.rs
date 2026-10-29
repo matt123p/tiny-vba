@@ -258,7 +258,7 @@ impl Parser<'_> {
     }
     fn item(&mut self, module: &mut Module) -> PResult<()> {
         if self.at("VERSION") {
-            if module.kind != ModuleKind::Class || self.pos != 0 {
+            if module.kind == ModuleKind::Standard || self.pos != 0 {
                 return Err(self.error("VERSION is only supported at the start of a class export"));
             }
             self.bump();
@@ -332,7 +332,7 @@ impl Parser<'_> {
         }
         let declaration_start = self.token().span;
         let visibility = self.visibility();
-        if self.at("Sub") || self.at("Function") {
+        if self.at("Sub") || self.at("Function") || self.at("Property") || self.at("Event") {
             let procedure = self.procedure(visibility, declaration_start)?;
             module.procedures.push(procedure);
             return Ok(());
@@ -370,6 +370,10 @@ impl Parser<'_> {
     ) -> PResult<Vec<Declaration>> {
         let mut result = Vec::new();
         loop {
+            let with_events = self.eat("WithEvents");
+            if with_events && constant {
+                return Err(self.error("WithEvents cannot declare a constant"));
+            }
             let name = self.name()?;
             let start = name.span;
             let dimensions = if self.eat("(") {
@@ -385,6 +389,7 @@ impl Parser<'_> {
                 None
             };
             result.push(Declaration {
+                with_events,
                 dimensions,
                 persistent: false,
                 name,
@@ -424,15 +429,35 @@ impl Parser<'_> {
     }
     fn procedure(&mut self, visibility: Visibility, declaration_start: Span) -> PResult<Procedure> {
         let token = self.bump();
-        let kind = if token.text(self.source)?.eq_ignore_ascii_case("Sub") {
+        let event = token.text(self.source)?.eq_ignore_ascii_case("Event");
+        let property = if token.text(self.source)?.eq_ignore_ascii_case("Property") {
+            Some(if self.eat("Get") {
+                PropertyKind::Get
+            } else if self.eat("Let") {
+                PropertyKind::Let
+            } else if self.eat("Set") {
+                PropertyKind::Set
+            } else {
+                return Err(self.error("expected Get, Let or Set"));
+            })
+        } else {
+            None
+        };
+        let kind = if event
+            || token.text(self.source)?.eq_ignore_ascii_case("Sub")
+            || matches!(property, Some(PropertyKind::Let | PropertyKind::Set))
+        {
             ProcedureKind::Sub
         } else {
             ProcedureKind::Function
         };
         let name = self.name()?;
-        self.require("(")?;
+        let parenthesized = self.eat("(");
+        if !parenthesized && !event {
+            return Err(self.error("expected ("));
+        }
         let mut parameters = Vec::new();
-        if !self.at(")") {
+        if parenthesized && !self.at(")") {
             loop {
                 let start = self.token().span;
                 let optional = self.eat("Optional");
@@ -469,16 +494,36 @@ impl Parser<'_> {
                 }
             }
         }
-        self.require(")")?;
+        if parenthesized {
+            self.require(")")?;
+        }
         let result_type = if kind == ProcedureKind::Function {
             self.ty()?
         } else {
             None
         };
         self.boundary()?;
+        if event {
+            let span = self.span(declaration_start)?;
+            let end = self.site(span)?;
+            return Ok(Procedure {
+                event,
+                property,
+                name,
+                kind,
+                visibility,
+                parameters,
+                result_type,
+                body: Vec::new(),
+                span,
+                end,
+            });
+        }
         let body = self.block()?;
         let end_start = self.require("End")?.span;
-        self.require(if kind == ProcedureKind::Sub {
+        self.require(if property.is_some() {
+            "Property"
+        } else if kind == ProcedureKind::Sub {
             "Sub"
         } else {
             "Function"
@@ -487,6 +532,8 @@ impl Parser<'_> {
         let span = self.span(declaration_start)?;
         self.boundary()?;
         Ok(Procedure {
+            event,
+            property,
             name,
             kind,
             visibility,
@@ -547,6 +594,19 @@ impl Parser<'_> {
             let label = self.text().to_ascii_lowercase();
             self.bump();
             StatementKind::Label(label)
+        } else if self.eat("RaiseEvent") {
+            let name = self.name()?;
+            let arguments = if self.eat("(") {
+                if self.at(")") {
+                    return Err(self.error("omit parentheses for an event without arguments"));
+                }
+                let arguments = self.arguments(true)?;
+                self.require(")")?;
+                arguments
+            } else {
+                Vec::new()
+            };
+            StatementKind::RaiseEvent { name, arguments }
         } else if self.eat("On") {
             self.require("Error")?;
             if self.eat("Resume") {
@@ -619,6 +679,8 @@ impl Parser<'_> {
                 ExitKind::Sub
             } else if self.eat("Function") {
                 ExitKind::Function
+            } else if self.eat("Property") {
+                ExitKind::Property
             } else if self.eat("For") {
                 ExitKind::For
             } else {
@@ -901,6 +963,19 @@ impl Parser<'_> {
             _ if self.eat("Empty") => ExprKind::Empty,
             _ if self.eat("Null") => ExprKind::Null,
             _ if self.eat("Nothing") => ExprKind::Nothing,
+            _ if self.eat("New") => {
+                let mut name = self.name()?;
+                if self.eat(".") {
+                    let member = self.name()?;
+                    name.spelling.push('.');
+                    name.spelling.push_str(&member.spelling);
+                    name.span = self.source.span(name.span.start(), member.span.end())?;
+                }
+                if self.at(".") {
+                    return Err(self.unsupported("deeply qualified class name"));
+                }
+                ExprKind::New(name)
+            }
             _ if self.eat("(") => {
                 let inner = self.expr(0)?;
                 self.require(")")?;

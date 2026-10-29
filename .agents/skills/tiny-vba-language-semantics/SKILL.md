@@ -104,3 +104,16 @@ ADR 0022 adds IR 6 generic default invocation/value contexts and bounded For Eac
 Read docs/m1-defaults-and-collections.md and the current compiler/runtime contract.
 Office defaults, collections and signatures remain fork-owned. Preserve safe
 watch evaluation, canonical array aliases, resize locks and wait/cancel semantics.
+
+M2 is in progress under ADR 0023 / docs/m2-classes-and-forms.md. IR 7 adds
+project-owned class fields/method frames, lazy document state, scoped native
+handles and class callback/debugger execution. Native fields use canonical
+locations; external Office objects remain fork-owned. Preserve legacy refusal,
+inert import/watch behavior, generation checks and abnormal cleanup. Do not
+enable a form designer Run action or mark M2 complete from class-core evidence.
+
+The M2 source-event increment verifies Event/WithEvents/RaiseEvent signatures,
+orders synchronous sink frames by connection assignment and preserves canonical
+ByRef, saved connections, pause/resume and fault/reset cleanup. The editor inserts
+real classes and exposes all three trapping modes. Forms remain pending; use the
+staged record and do not infer full M2 acceptance from this checkpoint.

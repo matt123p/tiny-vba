@@ -1,11 +1,32 @@
 # Implementation progress
 
-Updated 2026-10-28. The classic-editor/debugger profile is implemented; its
-historical milestone is M10. Runtime remains m5-host-v1 with verified IR 1/2/3/4/5/6.
+Updated 2026-10-29. The classic-editor/debugger profile is implemented; its
+historical milestone is M10. Runtime remains m5-host-v1 with verified IR 1/2/3/4/5/6/7.
 The [remaining plan](implementation-plan.md) retains stable **M2–M8** task IDs.
 **M1.x is complete** for the declared registered-type/default/collection profile.
-Next: **M2.1**, class/document runtime semantics. Office objects, document events,
+Current: **M2.1**, class/document runtime and event-language work. Office objects, document events,
 trust and packaging remain fork-owned.
+
+## M2.1 runtime checkpoint (2026-10-29; M2 remains incomplete)
+
+tiny-vba main was fast-forwarded and pushed to `2ee181d` as requested; GridCraft
+was not merged. New work is on `feat/m2-classes-and-forms`. [ADR 0023](decisions/0023-project-classes-and-forms.md)
+and the [staged implementation record](m2-classes-and-forms.md) document ownership,
+the working profile and outstanding acceptance. Class/property construction,
+canonical fields, lifecycle, identity, snapshots, lazy document state and actual
+instance callbacks and declared Event/WithEvents/RaiseEvent delivery execute through ordinary VM/controller frames. Class events
+pause/edit/resume through the IDE; safe watches stay inert. The existing 19-crate
+normal DAG and external object ownership are preserved.
+
+The editor now inserts class modules, distinguishes component kinds and exposes
+all three error-trapping modes. Source events preserve connection ordering,
+canonical ByRef, pause/resume, state restore and handler-fault cleanup.
+
+M2 is not complete: static member/field ByRef review, form model/
+designer, handler generation, full form runtime/modal lifecycle and form source/
+resource round trips still need implementation and acceptance. Checkpoint validation: 343 workspace tests and 156 actual WASI tests pass;
+mandatory CI/WASM plus UI, native capture, web build and Chromium smoke pass.
+No form Run action is enabled. M3 has not been started ahead of the requested M2 completion.
 
 ## New M1.2/M1.3 completion — defaults, iteration and real workbook acceptance
 

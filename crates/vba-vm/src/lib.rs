@@ -1,5 +1,7 @@
 //! M3 explicit-frame execution, single-use continuations and generation-checked inspection.
 #![forbid(unsafe_code)]
+mod classes;
+use classes::{ClassReturn, Instance};
 use std::{
     collections::{BTreeMap, BTreeSet, VecDeque},
     sync::atomic::{AtomicU32, Ordering},
@@ -12,7 +14,7 @@ use vba_values::{Location, Locations, ScalarKind, Value};
 type Result<T> = std::result::Result<T, Diagnostic>;
 pub const PROFILE: &str = runtime::PROFILE;
 pub fn capabilities() -> ir::Capabilities {
-    let mut c = ir::Capabilities::ir6_structural();
+    let mut c = ir::Capabilities::ir7_structural();
     c.profile = PROFILE.into();
 
     c
@@ -151,6 +153,7 @@ pub enum Outcome {
 }
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub struct Counters {
+    pub instance_work: u64,
     pub enumeration_work: u64,
     pub type_checks: u64,
     pub instructions: u64,
@@ -184,6 +187,9 @@ struct Enumeration {
     end: u32,
 }
 struct Frame {
+    events: std::collections::VecDeque<classes::Delivery>,
+    receiver: Option<vba_values::ObjectRef>,
+    class_return: Option<ClassReturn>,
     enumerations: BTreeMap<ir::LocalSlot, Enumeration>,
     captured: Vec<Option<Location>>,
     handler: Handler,
@@ -203,6 +209,7 @@ struct Visit {
 /// A host-requested callback into this project, delivered as a fresh top-level invocation
 /// after the current program reaches a terminal state (ADR 0015).
 struct ScheduledCallback {
+    receiver: Option<vba_values::ObjectRef>,
     procedure: ir::ProcedureId,
     arguments: Vec<Value>,
 }
@@ -210,11 +217,21 @@ struct ScheduledCallback {
 /// Explicit state transfer between invocations of the same compiled revision.
 #[derive(Clone)]
 pub struct ProjectState {
+    defaults: BTreeMap<ir::SourceIndex, vba_values::ObjectRef>,
+    native: Vec<classes::Snapshot>,
     revision: String,
     sources: Vec<(vba_diagnostics::SourceId, String)>,
     values: BTreeMap<u32, Value>,
 }
 pub struct Session {
+    default_instances: BTreeMap<ir::SourceIndex, vba_values::ObjectRef>,
+    pending_result: Option<ReturnValue>,
+    preserve_instances: bool,
+    break_in_class: bool,
+    instances: Vec<Instance>,
+    event_connections: BTreeMap<Location, u64>,
+    next_connection: u64,
+    next_receiver: Option<vba_values::ObjectRef>,
     nominal_declarations: BTreeMap<(ir::ProcedureId, ir::LocalSlot), vba_values::NominalType>,
     nominal_types: BTreeMap<Location, vba_values::NominalType>,
     type_resolver: Option<std::sync::Arc<dyn foreign::ObjectTypeResolver>>,
@@ -320,6 +337,9 @@ impl Session {
             return Err(command("launch argument count mismatch"));
         }
         if let Some(binding) = &binding {
+            if binding.identity == 0 && !p.classes.is_empty() {
+                return Err(command("class sessions reserve host identity zero"));
+            }
             if binding.roots.len() > 64 {
                 return Err(command("host root budget"));
             }
@@ -382,6 +402,14 @@ impl Session {
         }
         let instance = fresh_instance()?;
         let mut session = Self {
+            default_instances: BTreeMap::new(),
+            pending_result: None,
+            preserve_instances: false,
+            break_in_class: false,
+            instances: Vec::new(),
+            event_connections: BTreeMap::new(),
+            next_connection: 0,
+            next_receiver: None,
             nominal_declarations,
             nominal_types: BTreeMap::new(),
             type_resolver,
@@ -438,6 +466,8 @@ impl Session {
             values.insert(*key, self.store.read(*location)?.clone());
         }
         Ok(ProjectState {
+            defaults: self.default_instances.clone(),
+            native: self.snapshot_instances()?,
             revision: self.program.program().revision.clone(),
             sources: self
                 .program
@@ -466,8 +496,31 @@ impl Session {
         {
             return Err(command("project source mismatch"));
         }
+        let restored = self.prepare_instances(state.native)?;
+        let mut defaults = BTreeMap::new();
+        for (source, object) in state.defaults {
+            if !self
+                .program
+                .program()
+                .classes
+                .iter()
+                .any(|c| c.source == source && c.predeclared)
+            {
+                return Err(command("invalid saved document instance"));
+            }
+            let object = *restored
+                .mapping
+                .get(&(object.object, object.generation))
+                .ok_or_else(|| command("saved default instance unavailable"))?;
+            defaults.insert(source, object);
+        }
         let mut prepared = Vec::new();
         for (key, value) in state.values {
+            let value = if restored.instances.is_empty() {
+                value
+            } else {
+                classes::remap(value, &restored.mapping)?
+            };
             let kind = self
                 .program
                 .program()
@@ -496,6 +549,11 @@ impl Session {
             check_nominal(
                 nominal.as_ref(),
                 &value,
+                (
+                    restored.instances.as_slice(),
+                    self.instance,
+                    !self.program.program().classes.is_empty(),
+                ),
                 self.type_resolver.as_deref(),
                 self.binding.as_ref().map(|b| b.identity),
                 &mut self.counters.type_checks,
@@ -515,10 +573,28 @@ impl Session {
         if self
             .allocated_locations
             .checked_add(extra)
+            .and_then(|n| {
+                n.checked_add(
+                    restored
+                        .instances
+                        .iter()
+                        .map(|i| {
+                            self.program
+                                .program()
+                                .classes
+                                .iter()
+                                .find(|c| c.source == i.source)
+                                .map_or(0, |c| c.fields.len())
+                        })
+                        .sum::<usize>(),
+                )
+            })
             .is_none_or(|n| n > self.limits.locations.min(4096))
         {
             return Err(resource());
         }
+        self.install_instances(restored)?;
+        self.default_instances = defaults;
         for (key, kind, value, nominal) in prepared {
             if let Some(location) = self.persistent.get(&key).copied() {
                 self.write_value(location, value)?;
@@ -556,9 +632,28 @@ impl Session {
             .program()
             .procedures
             .iter()
-            .position(|p| p.name.eq_ignore_ascii_case(procedure))
+            .position(|p| {
+                p.name.eq_ignore_ascii_case(procedure)
+                    && !self
+                        .program
+                        .program()
+                        .classes
+                        .iter()
+                        .any(|c| c.source == p.source)
+            })
             .ok_or_else(|| command("unknown callback procedure"))?;
         let id = ir::ProcedureId(u32::try_from(id).map_err(|_| resource())?);
+        self.enqueue_callback(id, arguments, None)
+    }
+    fn enqueue_callback(
+        &mut self,
+        id: ir::ProcedureId,
+        arguments: Vec<Value>,
+        receiver: Option<vba_values::ObjectRef>,
+    ) -> Result<usize> {
+        if self.lifecycle_closed() || self.callbacks.len() >= self.limits.callbacks {
+            return Err(command("callback lifecycle/queue limit"));
+        }
         let parameters = self
             .program
             .program()
@@ -603,6 +698,11 @@ impl Session {
             check_nominal(
                 nominal,
                 &value,
+                (
+                    &self.instances,
+                    self.instance,
+                    !self.program.program().classes.is_empty(),
+                ),
                 self.type_resolver.as_deref(),
                 self.binding.as_ref().map(|b| b.identity),
                 &mut self.counters.type_checks,
@@ -625,12 +725,95 @@ impl Session {
             .try_reserve(1)
             .map_err(|_| command("callback queue limit"))?;
         self.callbacks.push_back(ScheduledCallback {
+            receiver,
             procedure: id,
             arguments: prepared,
         });
         Ok(self.callbacks.len())
     }
     /// Number of callbacks waiting for delivery.
+    pub fn schedule_instance_callback(
+        &mut self,
+        object: vba_values::ObjectRef,
+        member: &str,
+        arguments: Vec<Value>,
+    ) -> Result<usize> {
+        if member.len() > 128
+            || member.eq_ignore_ascii_case("Class_Initialize")
+            || member.eq_ignore_ascii_case("Class_Terminate")
+        {
+            return Err(command("invalid lifecycle callback"));
+        }
+        let source = self.instance_object(object)?.source;
+        let procedure = self
+            .program
+            .program()
+            .classes
+            .iter()
+            .find(|c| c.source == source)
+            .and_then(|c| {
+                c.methods.iter().find(|m| {
+                    m.name.eq_ignore_ascii_case(member) && m.kind == ir::ForeignKind::Call
+                })
+            })
+            .map(|m| m.procedure)
+            .ok_or_else(|| command("unknown instance event handler"))?;
+        if self
+            .program
+            .program()
+            .procedures
+            .get(procedure.0 as usize)
+            .is_none_or(|p| p.kind != ir::ProcedureKind::Sub)
+        {
+            return Err(command("event handler must be a Sub"));
+        }
+        self.enqueue_callback(procedure, arguments, Some(object))
+    }
+    pub fn project_object(&self, name: &str) -> Result<vba_values::ObjectRef> {
+        if name.len() > 128 {
+            return Err(command("project symbol limit"));
+        }
+        if let Some(object) = self
+            .program
+            .program()
+            .classes
+            .iter()
+            .find(|c| c.predeclared && c.name.eq_ignore_ascii_case(name))
+            .and_then(|c| self.default_instances.get(&c.source))
+            .copied()
+        {
+            self.instance_object(object)?;
+            return Ok(object);
+        }
+        let keys = self
+            .program
+            .program()
+            .procedures
+            .iter()
+            .flat_map(|p| &p.locals)
+            .filter(|l| l.name.eq_ignore_ascii_case(name))
+            .filter_map(|l| {
+                if let ir::SlotRole::Persistent(key) = l.role {
+                    Some(key)
+                } else {
+                    None
+                }
+            })
+            .collect::<BTreeSet<_>>();
+        if keys.len() != 1 {
+            return Err(command("unknown or ambiguous project object"));
+        }
+        let location = keys
+            .first()
+            .and_then(|key| self.persistent.get(key))
+            .copied()
+            .ok_or_else(|| command("project object not initialized"))?;
+        let Value::Object(object) = self.store.read(location)? else {
+            return Err(command("project object required"));
+        };
+        self.instance_object(*object)?;
+        Ok(*object)
+    }
     pub fn pending_callbacks(&self) -> usize {
         self.callbacks.len()
     }
@@ -687,12 +870,20 @@ impl Session {
         quota: u32,
         predicate: &mut impl FnMut(&CheckpointView) -> Result<bool>,
     ) -> Result<Outcome> {
+        if quota == 0 || quota > self.limits.slice {
+            return Err(command("invalid slice allowance"));
+        }
+        self.start_next_callback(host)?;
+        let mut outcome = self.run_slice(host, quota, predicate)?;
+        while outcome == Outcome::Yielded {
+            outcome = self.run_slice(host, quota, predicate)?;
+        }
+        Ok(outcome)
+    }
+    pub fn start_next_callback(&mut self, host: &mut impl Host) -> Result<()> {
         self.check_host(host)?;
         if self.lifecycle_closed() || self.stale {
             return Err(command("closed or stale session cannot deliver callbacks"));
-        }
-        if quota == 0 || quota > self.limits.slice {
-            return Err(command("invalid slice allowance"));
         }
         if !self.terminal() {
             return Err(command(
@@ -722,6 +913,10 @@ impl Session {
             return Err(invariant("callback delivery requires clean frames"));
         }
         let procedure = callback.procedure;
+        let receiver = callback.receiver;
+        if let Some(object) = receiver {
+            self.instance_object(object)?;
+        }
         for (index, value) in prepared.iter().enumerate() {
             let nominal = self.nominal_declarations.get(&(
                 procedure,
@@ -738,6 +933,11 @@ impl Session {
             check_nominal(
                 nominal,
                 value,
+                (
+                    &self.instances,
+                    self.instance,
+                    !self.program.program().classes.is_empty(),
+                ),
                 self.type_resolver.as_deref(),
                 self.binding.as_ref().map(|b| b.identity),
                 &mut self.counters.type_checks,
@@ -745,6 +945,7 @@ impl Session {
             )?;
         }
         self.callbacks.pop_front();
+        self.next_receiver = receiver;
         self.error = ErrorState::default();
         self.raised_source = None;
         if let Err(error) = self.push_frame(
@@ -753,7 +954,7 @@ impl Session {
         ) {
             // A frame allocation failure must not leave a half-created invocation behind.
             self.fail(error)?;
-            return Ok(self.state.clone());
+            return Ok(());
         }
         self.counters.callbacks_run = self
             .counters
@@ -763,11 +964,7 @@ impl Session {
         self.state = Outcome::Yielded;
         // One call delivers one callback to a boundary: soft quota yields continue inside this
         // delivery so a partially-run callback is never left in a non-terminal state.
-        let mut outcome = self.run_slice(host, quota, predicate)?;
-        while outcome == Outcome::Yielded {
-            outcome = self.run_slice(host, quota, predicate)?;
-        }
-        Ok(outcome)
+        Ok(())
     }
     /// Clear project state/output and prepare the original entry invocation again. Refused
     /// unless terminal and open; queued callbacks and lifetime work budgets are retained.
@@ -785,6 +982,24 @@ impl Session {
             self.nominal_types.remove(location);
         }
         self.persistent.clear();
+        for instance in &mut self.instances {
+            if instance.alive {
+                for location in &instance.fields {
+                    self.store.invalidate(*location)?;
+                    self.kinds.remove(location);
+                    self.nominal_types.remove(location);
+                    self.array_types.remove(location);
+                }
+                instance.alive = false;
+            }
+        }
+        self.instances.clear();
+        self.event_connections.clear();
+        self.next_connection = 0;
+        self.default_instances.clear();
+        self.callbacks.retain(|c| c.receiver.is_none());
+        self.next_receiver = None;
+        self.pending_result = None;
         self.output.clear();
         self.error = ErrorState::default();
         self.raised_source = None;
@@ -820,6 +1035,9 @@ impl Session {
     }
     pub fn counters(&self) -> Counters {
         self.counters
+    }
+    pub fn set_break_in_class_modules(&mut self, enabled: bool) {
+        self.break_in_class = enabled;
     }
     pub fn set_break_on_error(&mut self, enabled: bool) {
         self.break_on_error = enabled;
@@ -914,6 +1132,11 @@ impl Session {
         check_nominal(
             self.nominal_types.get(&location),
             value,
+            (
+                &self.instances,
+                self.instance,
+                !self.program.program().classes.is_empty(),
+            ),
             self.type_resolver.as_deref(),
             self.binding.as_ref().map(|b| b.identity),
             &mut self.counters.type_checks,
@@ -921,6 +1144,14 @@ impl Session {
         )
     }
     fn write_value(&mut self, location: Location, value: Value) -> Result<()> {
+        let values = if let Value::Array(array) = &value {
+            array.elements()
+        } else {
+            std::slice::from_ref(&value)
+        };
+        if values.iter().any(|value|matches!(value,Value::Object(object) if object.host==0 && self.instance_object(*object).is_ok_and(|i|i.terminating))) {
+            return Err(runtime_diagnostic(runtime::Error::Vba{number:91,message:"a terminating instance cannot be retained".into()}));
+        }
         if array_locked(
             &self.frames,
             location,
@@ -938,6 +1169,17 @@ impl Session {
             &value,
         )?;
         self.check_value(location, &value)?;
+        if self.event_connections.contains_key(&location) {
+            self.next_connection = self.next_connection.checked_add(1).ok_or_else(resource)?;
+            self.event_connections.insert(
+                location,
+                if matches!(value, Value::Nothing) {
+                    0
+                } else {
+                    self.next_connection
+                },
+            );
+        }
         self.store.write(location, value)
     }
     fn read_value(&mut self, location: Location) -> Result<Value> {
@@ -951,6 +1193,47 @@ impl Session {
         Ok(())
     }
     fn push_frame(&mut self, id: ir::ProcedureId, args: Vec<Operand>) -> Result<()> {
+        let source = self
+            .program
+            .program()
+            .procedures
+            .get(id.0 as usize)
+            .ok_or_else(|| invariant("callee"))?
+            .source;
+        let is_class = self
+            .program
+            .program()
+            .classes
+            .iter()
+            .any(|c| c.source == source);
+        let receiver = if is_class {
+            self.next_receiver.take().or_else(|| {
+                self.frames
+                    .last()
+                    .filter(|f| {
+                        self.program
+                            .program()
+                            .procedures
+                            .get(f.procedure.0 as usize)
+                            .is_some_and(|p| p.source == source)
+                    })
+                    .and_then(|f| f.receiver)
+            })
+        } else {
+            None
+        };
+        let instance_fields = if is_class {
+            self.instance_object(receiver.ok_or_else(|| {
+                runtime_diagnostic(runtime::Error::Vba {
+                    number: 91,
+                    message: "class procedure requires an instance".into(),
+                })
+            })?)?
+            .fields
+            .clone()
+        } else {
+            vec![]
+        };
         let proc = self
             .program
             .program()
@@ -961,7 +1244,7 @@ impl Session {
             return Err(resource());
         }
         let owned_count = proc.locals.iter().enumerate().filter(|(i, local)| {
-            !matches!(args.get(*i), Some(Operand::Reference(_)))
+            !matches!(local.role,ir::SlotRole::InstanceField(_)) && !matches!(args.get(*i), Some(Operand::Reference(_)))
                 && !matches!(local.role, ir::SlotRole::Persistent(key) if self.persistent.contains_key(&key))
         }).count();
         let count = self
@@ -1008,7 +1291,17 @@ impl Session {
             let expected = self
                 .nominal_declarations
                 .get(&(id, ir::LocalSlot(u32::try_from(i).map_err(|_| resource())?)));
-            let v = if local.role == ir::SlotRole::HostRoot {
+            let v = if let ir::SlotRole::InstanceField(field) = local.role {
+                Operand::Reference(
+                    *instance_fields
+                        .get(field as usize)
+                        .ok_or_else(|| invariant("instance field"))?,
+                )
+            } else if local.role == ir::SlotRole::Receiver {
+                Operand::Value(Value::Object(
+                    receiver.ok_or_else(|| invariant("receiver"))?,
+                ))
+            } else if local.role == ir::SlotRole::HostRoot {
                 let reference = self
                     .binding
                     .as_ref()
@@ -1079,6 +1372,11 @@ impl Session {
             check_nominal(
                 expected,
                 value,
+                (
+                    &self.instances,
+                    self.instance,
+                    !self.program.program().classes.is_empty(),
+                ),
                 self.type_resolver.as_deref(),
                 self.binding.as_ref().map(|b| b.identity),
                 &mut self.counters.type_checks,
@@ -1131,6 +1429,9 @@ impl Session {
         reserve(&mut captured, slots.len())?;
         captured.resize(slots.len(), None);
         self.frames.push(Frame {
+            events: std::collections::VecDeque::new(),
+            receiver,
+            class_return: None,
             enumerations: BTreeMap::new(),
             captured,
             handler: Handler::default(),
@@ -1483,17 +1784,34 @@ impl Session {
     fn cleanup(&mut self) {
         self.host_result_reference = None;
         self.argument_continuation = false;
+        let native_fields = if self.preserve_instances {
+            self.instances
+                .iter()
+                .filter(|i| i.alive)
+                .flat_map(|i| i.fields.iter().copied())
+                .collect::<BTreeSet<_>>()
+        } else {
+            BTreeSet::new()
+        };
         let persistent = &self.persistent;
         for location in self.kinds.keys() {
-            if !persistent.values().any(|l| l == location) {
+            if !persistent.values().any(|l| l == location) && !native_fields.contains(location) {
                 let _ = self.store.invalidate(*location);
             }
         }
         self.frames.clear();
-        self.kinds
-            .retain(|location, _| persistent.values().any(|l| l == location));
-        self.array_types
-            .retain(|location, _| persistent.values().any(|l| l == location));
+        if !self.preserve_instances {
+            self.default_instances.clear();
+            self.instances.clear();
+        }
+        self.pending_result = None;
+        self.next_receiver = None;
+        self.kinds.retain(|location, _| {
+            persistent.values().any(|l| l == location) || native_fields.contains(location)
+        });
+        self.array_types.retain(|location, _| {
+            persistent.values().any(|l| l == location) || native_fields.contains(location)
+        });
         self.visit = None;
         self.pending_fault = None;
         self.stack_capacity = 0;
@@ -1515,6 +1833,7 @@ impl Session {
         self.closed = true;
         self.callbacks.clear();
         if self.terminal() {
+            self.release_native_state()?;
             return Ok(());
         }
         self.foreign.cancel(host)?;
@@ -1527,6 +1846,7 @@ impl Session {
         self.closed = true;
         self.callbacks.clear();
         if self.terminal() {
+            self.release_native_state()?;
             return Ok(());
         }
         self.foreign.cancel(host)?;
@@ -1544,6 +1864,7 @@ impl Session {
         self.closed = true;
         self.callbacks.clear();
         if self.terminal() {
+            self.release_native_state()?;
             return Ok(());
         }
         self.foreign = foreign::Session::default();
@@ -1595,6 +1916,9 @@ impl Session {
             "VBA_RUNTIME_92" => (FailureKind::Runtime, Some(92)),
             "VBA_RUNTIME_94" => (FailureKind::Runtime, Some(94)),
             "VBA_RUNTIME_448" => (FailureKind::Runtime, Some(448)),
+            "VBA_RUNTIME_438" => (FailureKind::Runtime, Some(438)),
+            "VBA_RUNTIME_449" => (FailureKind::Runtime, Some(449)),
+            "VBA_RUNTIME_450" => (FailureKind::Runtime, Some(450)),
             "VBA0001" => (FailureKind::Unsupported, None),
             "VBA0031" | "VBA0003" => (FailureKind::ResourceLimit, None),
             "VBA0033" | "VBA0006" => (FailureKind::HostProtocol, None),
@@ -1605,7 +1929,33 @@ impl Session {
     fn deliver_failure(&mut self, failure: Failure) -> Result<()> {
         self.host_result_reference = None;
         self.argument_continuation = false;
-        if self.break_on_error && failure.kind == FailureKind::Runtime {
+        let class_fault = self.break_in_class
+            && self.frames.last().is_some_and(|frame| {
+                frame.receiver.is_some()
+                    && self
+                        .program
+                        .program()
+                        .procedures
+                        .get(frame.procedure.0 as usize)
+                        .is_some_and(|procedure| {
+                            self.frames
+                                .iter()
+                                .rev()
+                                .take_while(|candidate| {
+                                    self.program
+                                        .program()
+                                        .procedures
+                                        .get(candidate.procedure.0 as usize)
+                                        .is_some_and(|p| p.source == procedure.source)
+                                })
+                                .all(|candidate| {
+                                    candidate.handler.fault.is_some()
+                                        || candidate.handler.target.is_none()
+                                            && !candidate.handler.resume_next
+                                })
+                        })
+            });
+        if (self.break_on_error || class_fault) && failure.kind == FailureKind::Runtime {
             self.pending_fault = Some(failure);
             self.pause(PauseReason::Fault)?;
         } else {
@@ -1699,6 +2049,7 @@ impl Session {
                 }
                 let frame = self.top_mut()?;
                 frame.stack.clear();
+                frame.events.clear();
                 frame.pc = target;
                 if !handler.resume_next {
                     frame.handler.fault = Some(site);
@@ -1730,6 +2081,12 @@ impl Session {
             self.kinds.remove(&location);
             self.array_types.remove(&location);
             self.nominal_types.remove(&location);
+        }
+        if let Some(ClassReturn::Initialize(object) | ClassReturn::Terminate(object)) =
+            frame.class_return
+        {
+            self.default_instances.retain(|_, value| *value != object);
+            self.retire_instance(object)?;
         }
         Ok(())
     }
@@ -1766,12 +2123,50 @@ impl Session {
             if remaining == 0 {
                 break;
             }
+            if self.frames.is_empty() && self.pending_result.is_some() {
+                match self.settle_instances() {
+                    Ok(true) => continue,
+                    Err(e) => {
+                        self.fail(e)?;
+                        break;
+                    }
+                    Ok(false) => {}
+                }
+                let result = self
+                    .pending_result
+                    .take()
+                    .ok_or_else(|| invariant("terminal result"))?;
+                self.preserve_instances = true;
+                self.cleanup();
+                self.preserve_instances = false;
+                self.state = Outcome::Completed(result);
+                break;
+            }
+            if let Some(delivery) = self.top_mut()?.events.pop_front() {
+                self.next_receiver = Some(delivery.receiver);
+                if let Err(error) = self.push_frame(delivery.procedure, delivery.arguments) {
+                    self.fail(error)?;
+                    break;
+                }
+                self.top_mut()?.class_return = Some(ClassReturn::Event);
+                continue;
+            }
             let instruction = self
                 .proc()?
                 .code
                 .get(self.top()?.pc.0 as usize)
                 .cloned()
                 .ok_or_else(|| invariant("PC outside verified code"))?;
+            if matches!(instruction, I::Checkpoint(_)) && self.visit.is_none() {
+                match self.settle_instances() {
+                    Ok(true) => continue,
+                    Err(e) => {
+                        self.fail(e)?;
+                        break;
+                    }
+                    Ok(false) => {}
+                }
+            }
             if let I::Checkpoint(site) = instruction {
                 let span = self
                     .proc()?
@@ -1823,6 +2218,22 @@ impl Session {
     }
     fn dispatch(&mut self, host: &mut impl Host, instruction: I) -> Result<()> {
         match instruction {
+            I::DefaultInstance(source) => {
+                if let Some(object) = self.default_instances.get(&source).copied() {
+                    self.instance_object(object)?;
+                    self.push(Operand::Value(Value::Object(object)))?;
+                    self.advance()?;
+                } else {
+                    self.new_instance(source)?;
+                    let object = self
+                        .instances
+                        .last()
+                        .ok_or_else(|| invariant("default instance"))?
+                        .object;
+                    self.default_instances.insert(source, object);
+                }
+            }
+            I::NewInstance(class) => self.new_instance(class)?,
             I::EnumerationInit {
                 state,
                 source,
@@ -2273,6 +2684,17 @@ impl Session {
                     });
                 }
                 arguments.reverse();
+                if self
+                    .program
+                    .program()
+                    .classes
+                    .iter()
+                    .any(|c| c.events.contains(&procedure))
+                {
+                    self.raise_event(procedure, arguments)?;
+                    self.advance()?;
+                    return Ok(());
+                }
                 let callee = self
                     .program
                     .program()
@@ -2338,9 +2760,22 @@ impl Session {
                     self.array_types.remove(&location);
                     self.nominal_types.remove(&location);
                 }
-                if self.frames.is_empty() {
-                    self.cleanup();
-                    self.state = Outcome::Completed(result);
+                if let Some(disposition) = frame.class_return {
+                    match disposition {
+                        ClassReturn::Event => {}
+                        ClassReturn::Initialize(_) => {}
+                        ClassReturn::Terminate(object) => self.retire_instance(object)?,
+                        ClassReturn::Invoke { kind, reference } => self.finish_class_call(
+                            kind,
+                            reference,
+                            match result {
+                                ReturnValue::Function(v) => v,
+                                ReturnValue::Sub => Value::Empty,
+                            },
+                        )?,
+                    }
+                } else if self.frames.is_empty() {
+                    self.pending_result = Some(result);
                 } else if let ReturnValue::Function(value) = result {
                     self.push_prepaid(value)?;
                 }
@@ -2548,6 +2983,12 @@ impl Session {
             self.push_prepaid(value)?;
             return self.advance();
         }
+        if let Value::Object(object) = &target
+            && object.host == 0
+            && !self.program.program().classes.is_empty()
+        {
+            return self.invoke_class(*object, site, arguments);
+        }
         let Value::Object(target) = target else {
             return Err(runtime_diagnostic(runtime::Error::Vba {
                 number: if matches!(target, Value::Nothing) {
@@ -2558,6 +2999,15 @@ impl Session {
                 message: "Object required".into(),
             }));
         };
+        if references
+            .iter()
+            .any(|location| self.event_connections.contains_key(location))
+        {
+            return Err(runtime_diagnostic(runtime::Error::Vba {
+                number: 438,
+                message: "foreign ByRef mutation of WithEvents storage is unsupported".into(),
+            }));
+        }
         let binding = self
             .binding
             .as_ref()
@@ -2603,6 +3053,11 @@ impl Session {
         let frames = &self.frames;
         let kinds = &self.kinds;
         let nominal_types = &self.nominal_types;
+        let native = (
+            self.instances.as_slice(),
+            self.instance,
+            !self.program.program().classes.is_empty(),
+        );
         let resolver = self.type_resolver.as_deref();
         let host_identity = self.binding.as_ref().map(|b| b.identity);
         let enum_work = &mut self.counters.enumeration_work;
@@ -2637,6 +3092,7 @@ impl Session {
                     check_nominal(
                         nominal_types.get(&location),
                         &value,
+                        native,
                         resolver,
                         host_identity,
                         checks,
@@ -2656,6 +3112,7 @@ impl Session {
                 check_nominal(
                     nominal_types.get(&location),
                     v,
+                    native,
                     resolver,
                     host_identity,
                     checks,
@@ -2759,6 +3216,11 @@ impl Session {
         let frames = &self.frames;
         let kinds = &self.kinds;
         let nominal_types = &self.nominal_types;
+        let native = (
+            self.instances.as_slice(),
+            self.instance,
+            !self.program.program().classes.is_empty(),
+        );
         let resolver = self.type_resolver.as_deref();
         let host_identity = self.binding.as_ref().map(|b| b.identity);
         let enum_work = &mut self.counters.enumeration_work;
@@ -2793,6 +3255,7 @@ impl Session {
                     check_nominal(
                         nominal_types.get(&location),
                         &value,
+                        native,
                         resolver,
                         host_identity,
                         checks,
@@ -2812,6 +3275,7 @@ impl Session {
                 check_nominal(
                     nominal_types.get(&location),
                     v,
+                    native,
                     resolver,
                     host_identity,
                     checks,
@@ -2879,6 +3343,7 @@ fn check_array_identity(
 fn check_nominal(
     expected: Option<&vba_values::NominalType>,
     value: &Value,
+    native: (&[Instance], SessionInstance, bool),
     resolver: Option<&dyn foreign::ObjectTypeResolver>,
     host: Option<u64>,
     checks: &mut u64,
@@ -2907,10 +3372,41 @@ fn check_nominal(
         match value {
             Value::Nothing | Value::Empty => (),
             Value::Object(object) => {
+                if object.host == 0 && native.2 {
+                    let instance = object
+                        .object
+                        .checked_sub(1)
+                        .and_then(|index| usize::try_from(index).ok())
+                        .and_then(|index| native.0.get(index))
+                        .filter(|i| {
+                            i.alive
+                                && i.object == *object
+                                && object.generation == u64::from(native.1.0)
+                        })
+                        .ok_or_else(|| {
+                            runtime_diagnostic(runtime::Error::Vba {
+                                number: 91,
+                                message: "stale project instance".into(),
+                            })
+                        })?;
+                    if &instance.ty != expected {
+                        return Err(runtime_diagnostic(runtime::Error::Vba {
+                            number: 13,
+                            message: "project class type mismatch".into(),
+                        }));
+                    }
+                    continue;
+                }
                 if Some(object.host) != host {
                     return Err(runtime_diagnostic(runtime::Error::Vba {
                         number: 91,
                         message: "foreign or disconnected object".into(),
+                    }));
+                }
+                if native.2 && expected.library() == "vbaproject" {
+                    return Err(runtime_diagnostic(runtime::Error::Vba {
+                        number: 13,
+                        message: "a foreign object cannot impersonate a project class".into(),
                     }));
                 }
                 let resolver = resolver.ok_or_else(|| {
@@ -2984,6 +3480,9 @@ fn runtime_diagnostic(error: runtime::Error) -> Diagnostic {
                 91 => "VBA_RUNTIME_91",
                 94 => "VBA_RUNTIME_94",
                 448 => "VBA_RUNTIME_448",
+                438 => "VBA_RUNTIME_438",
+                449 => "VBA_RUNTIME_449",
+                450 => "VBA_RUNTIME_450",
                 _ => "VBA0030",
             },
             message,
@@ -2992,6 +3491,7 @@ fn runtime_diagnostic(error: runtime::Error) -> Diagnostic {
 }
 fn binary_name(op: ir::BinaryOp) -> &'static str {
     match op {
+        ir::BinaryOp::Is => "is",
         ir::BinaryOp::Add => "+",
         ir::BinaryOp::Subtract => "-",
         ir::BinaryOp::Multiply => "*",

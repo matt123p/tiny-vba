@@ -21,7 +21,8 @@ pub use vba_debug::Step;
 pub use vba_diagnostics::{Diagnostic, SourceFile, SourceId, Span, StatementId};
 pub use vba_foreign::{Host, Import};
 use vba_ir::VerifiedProgram;
-use vba_syntax::{ModuleKind, parse};
+pub use vba_syntax::ModuleKind;
+use vba_syntax::parse;
 pub use vba_values::{ObjectRef, ScalarKind, Value, VbaString};
 pub use vba_vm::{
     FrameSnapshot, Handle, HostBinding, NoHost, Outcome, Pause, PauseReason, ReturnValue,
@@ -47,6 +48,7 @@ pub struct Procedure {
 }
 #[derive(Clone, Debug)]
 pub struct Module {
+    pub kind: ModuleKind,
     pub id: SourceId,
     pub name: String,
     pub text: String,
@@ -86,7 +88,7 @@ impl Module {
         self.syntax_diagnostics.clear();
         self.symbols.clear();
         if let Ok(source) = self.source() {
-            let parsed = match parse(&source, ModuleKind::Standard) {
+            let parsed = match parse(&source, self.kind) {
                 Ok(parsed) => parsed,
                 Err(diagnostic) => {
                     self.syntax_diagnostics.push(diagnostic);
@@ -99,6 +101,7 @@ impl Module {
                 .module
                 .procedures
                 .iter()
+                .filter(|p| !p.event)
                 .map(|p| {
                     let start = p.span.start() as usize;
                     Procedure {
@@ -272,6 +275,7 @@ pub struct Ide {
     pub catalog: Vec<ApiMember>,
     pub selected_frame: usize,
     pub break_on_errors: bool,
+    pub break_in_class_modules: bool,
     next_source: u64,
     revision: u64,
     stale: bool,
@@ -312,6 +316,7 @@ impl Ide {
             catalog: vec![],
             selected_frame: 0,
             break_on_errors: false,
+            break_in_class_modules: false,
             next_source: 1,
             revision: 0,
             stale: false,
@@ -369,6 +374,22 @@ impl Ide {
         Ok(())
     }
     pub fn add_module(&mut self, name: &str, text: &str) -> Result<SourceId> {
+        self.add_module_with_kind(
+            name,
+            text,
+            if name.to_ascii_lowercase().ends_with(".cls") {
+                ModuleKind::Class
+            } else {
+                ModuleKind::Standard
+            },
+        )
+    }
+    pub fn add_module_with_kind(
+        &mut self,
+        name: &str,
+        text: &str,
+        kind: ModuleKind,
+    ) -> Result<SourceId> {
         if self.modules.len() >= MAX_MODULES
             || self
                 .modules
@@ -397,6 +418,7 @@ impl Ide {
             .checked_add(1)
             .ok_or_else(|| error("source identity exhausted"))?;
         let mut module = Module {
+            kind,
             id,
             name: name.into(),
             text: text.into(),
@@ -595,7 +617,7 @@ impl Ide {
     fn compile(&mut self) -> Result<VerifiedProgram> {
         let mut modules = Vec::new();
         for module in &self.modules {
-            modules.push(parse(&module.source()?, ModuleKind::Standard)?);
+            modules.push(parse(&module.source()?, module.kind)?);
         }
         compile_modules(
             &modules,
@@ -636,6 +658,7 @@ impl Ide {
             session.restore_project(previous.project_state()?)?;
         }
         session.set_break_on_error(self.break_on_errors);
+        session.set_break_in_class_modules(self.break_in_class_modules);
         self.controller = Controller::new();
         self.watch_evaluations = 0;
         self.watch_budget_exhausted = false;
@@ -779,6 +802,31 @@ impl Ide {
         self.stale = false;
         self.refresh_watches();
         Ok(())
+    }
+    pub fn dispatch_instance_event(
+        &mut self,
+        project_object: &str,
+        handler: &str,
+        arguments: Vec<Value>,
+        host: &mut impl Host,
+    ) -> Result<()> {
+        if self.session_host != Some(host.identity()) {
+            return Err(error("instance event host identity mismatch"));
+        }
+        if self.stale || !matches!(self.mode(), Mode::Completed) {
+            return Err(error(
+                "instance events require a completed current invocation",
+            ));
+        }
+        let session = self
+            .session
+            .as_mut()
+            .ok_or_else(|| error("no project session"))?;
+        let object = session.project_object(project_object)?;
+        session.schedule_instance_callback(object, handler, arguments)?;
+        session.start_next_callback(host)?;
+        self.selected_frame = 0;
+        self.tick(host)
     }
     pub fn tick(&mut self, host: &mut impl Host) -> Result<()> {
         if self.stale {
@@ -972,8 +1020,22 @@ impl Ide {
     }
     pub fn set_break_on_errors(&mut self, enabled: bool) {
         self.break_on_errors = enabled;
+        if enabled {
+            self.break_in_class_modules = false;
+        }
         if let Some(session) = &mut self.session {
             session.set_break_on_error(enabled);
+            session.set_break_in_class_modules(self.break_in_class_modules);
+        }
+    }
+    pub fn set_break_in_class_modules(&mut self, enabled: bool) {
+        self.break_in_class_modules = enabled;
+        if enabled {
+            self.break_on_errors = false;
+        }
+        if let Some(session) = &mut self.session {
+            session.set_break_on_error(self.break_on_errors);
+            session.set_break_in_class_modules(enabled);
         }
     }
     pub fn add_watch(&mut self, expression: &str) -> Result<()> {

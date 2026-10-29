@@ -80,6 +80,7 @@ fn base() -> TestResult<Program> {
         foreign: vec![],
     };
     Ok(Program {
+        classes: vec![],
         nominal_locals: vec![],
         ir_version: 1,
         required_features: BTreeSet::from(["scalar-core".into()]),
@@ -103,7 +104,9 @@ fn replace(p: &mut Program, pc: usize, instruction: Instruction) -> TestResult {
     Ok(())
 }
 fn check(p: Program) -> Result<VerifiedProgram, vba_diagnostics::Diagnostic> {
-    let caps = if p.ir_version == IR4_VERSION {
+    let caps = if p.ir_version == IR7_VERSION {
+        Capabilities::ir7_structural()
+    } else if p.ir_version == IR4_VERSION {
         Capabilities::ir4_structural()
     } else if p.ir_version == IR3_VERSION {
         Capabilities::ir3_structural()
@@ -294,6 +297,11 @@ fn feature_profile_version_opcode_operator_and_conversion_gates_are_checked() ->
 fn all_binary_and_unary_tags_and_stack_instructions_have_structural_evidence() -> TestResult {
     for op in BINARY_OPS {
         let mut p = base()?;
+        if op == BinaryOp::Is {
+            p.ir_version = IR7_VERSION;
+            p.profile = "ir7-structural".into();
+            p.required_features.insert("project-classes-v7".into());
+        }
         p.required_features.insert("integer-long-ops".into());
         let proc = proc_mut(&mut p)?;
         proc.code.splice(
@@ -345,6 +353,7 @@ fn direct() -> TestResult<Program> {
         end_statement: statement,
         kind: ProcedureKind::Sub,
         parameters: vec![Parameter {
+            default: None,
             array: None,
             name: "n".into(),
             kind: ScalarKind::Long,

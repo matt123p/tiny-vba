@@ -290,8 +290,24 @@ impl Ide {
         Ok((result, caret))
     }
     pub fn rename_module(&mut self, id: SourceId, name: &str) -> Result<()> {
-        let stem = name.strip_suffix(".bas").unwrap_or(name);
-        let name = format!("{stem}.bas");
+        let kind = self
+            .modules
+            .iter()
+            .find(|m| m.id == id)
+            .ok_or_else(|| error("unknown module"))?
+            .kind;
+        let stem = name
+            .strip_suffix(".bas")
+            .or_else(|| name.strip_suffix(".cls"))
+            .unwrap_or(name);
+        let name = format!(
+            "{stem}.{}",
+            if kind != vba_syntax::ModuleKind::Standard {
+                "cls"
+            } else {
+                "bas"
+            }
+        );
         if stem.is_empty()
             || name.len() > 128
             || !stem
@@ -317,7 +333,7 @@ impl Ide {
         if module.name == name {
             return Ok(());
         }
-        let parsed = vba_syntax::parse(&module.source()?, vba_syntax::ModuleKind::Standard)?;
+        let parsed = vba_syntax::parse(&module.source()?, module.kind)?;
         let mut text = module.text.clone();
         if let Some(attribute) = parsed.module.attributes.iter().find(|a| {
             a.path.len() == 1

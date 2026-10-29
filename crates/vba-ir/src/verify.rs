@@ -122,7 +122,13 @@ fn validate(
 ) -> Result<Vec<u32>> {
     if !matches!(
         p.ir_version,
-        IR_VERSION | IR2_VERSION | IR3_VERSION | IR4_VERSION | IR5_VERSION | IR6_VERSION
+        IR_VERSION
+            | IR2_VERSION
+            | IR3_VERSION
+            | IR4_VERSION
+            | IR5_VERSION
+            | IR6_VERSION
+            | IR7_VERSION
     ) || p.profile != caps.profile
         || !caps.ir_versions.contains(&p.ir_version)
     {
@@ -151,6 +157,191 @@ fn validate(
     budget.table(p.sources.len() + p.procedures.len() + p.constants.len())?;
     budget.text(&p.profile)?;
     budget.text(&p.revision)?;
+    bound(p.classes.len(), 256)?;
+    let mut class_sources = BTreeSet::new();
+    let mut class_names = BTreeSet::new();
+    for class in &p.classes {
+        if p.ir_version < IR7_VERSION
+            || !class_sources.insert(class.source)
+            || !class_names.insert(class.name.to_ascii_lowercase())
+            || p.sources.get(class.source.0 as usize).is_none()
+        {
+            return Err(invalid("class identity/source/version"));
+        }
+        feature(p, caps, "project-classes-v7")?;
+        name(&class.name)?;
+        bound(class.fields.len(), 4096)?;
+        bound(class.methods.len(), 4096)?;
+        bound(class.events.len(), 4096)?;
+        budget.table(class.fields.len() + class.methods.len() + class.events.len())?;
+        let mut events = BTreeSet::new();
+        for event in &class.events {
+            budget.table(class.methods.len())?;
+            let proc = p
+                .procedures
+                .get(event.0 as usize)
+                .ok_or_else(|| invalid("event procedure"))?;
+            if !events.insert(*event)
+                || proc.source != class.source
+                || proc.kind != ProcedureKind::Sub
+                || proc.name.strip_prefix("Event ").is_none()
+                || *event == p.entry
+                || class.methods.iter().any(|m| m.procedure == *event)
+                || proc.parameters.iter().any(|p| !p.required)
+            {
+                return Err(invalid("event declaration signature/ownership"));
+            }
+        }
+        let mut fields = BTreeSet::new();
+        let mut methods = BTreeSet::new();
+        for field in &class.fields {
+            if field.public && field.array.is_some() {
+                return Err(invalid("object module Public array"));
+            }
+            if field.with_events {
+                let ty = field
+                    .nominal
+                    .as_ref()
+                    .filter(|ty| {
+                        ty.library().eq_ignore_ascii_case("VBAProject") && ty.version() == "1"
+                    })
+                    .ok_or_else(|| invalid("WithEvents project type"))?;
+                if field.kind != ScalarKind::Object || field.array.is_some() {
+                    return Err(invalid("WithEvents scalar shape"));
+                }
+                let publisher = p
+                    .classes
+                    .iter()
+                    .find(|c| c.name.eq_ignore_ascii_case(ty.name()))
+                    .ok_or_else(|| invalid("WithEvents class"))?;
+                budget.table(p.classes.len())?;
+                budget.table(publisher.events.len())?;
+                for event in &publisher.events {
+                    let event_proc = p
+                        .procedures
+                        .get(event.0 as usize)
+                        .ok_or_else(|| invalid("event signature"))?;
+                    let event_name = event_proc
+                        .name
+                        .strip_prefix("Event ")
+                        .ok_or_else(|| invalid("event name"))?;
+                    let handler_name = format!("{}_{}", field.name, event_name);
+                    budget.table(class.methods.len())?;
+                    if let Some(handler) = class
+                        .methods
+                        .iter()
+                        .find(|m| m.name.eq_ignore_ascii_case(&handler_name))
+                    {
+                        let handler_proc = p
+                            .procedures
+                            .get(handler.procedure.0 as usize)
+                            .ok_or_else(|| invalid("handler procedure"))?;
+                        if handler.kind != ForeignKind::Call
+                            || handler_proc.kind != ProcedureKind::Sub
+                            || handler_proc.parameters.len() != event_proc.parameters.len()
+                        {
+                            return Err(invalid("event handler signature"));
+                        }
+                        for (index, (a, b)) in event_proc
+                            .parameters
+                            .iter()
+                            .zip(&handler_proc.parameters)
+                            .enumerate()
+                        {
+                            budget.table(
+                                p.nominal_locals.len().checked_mul(2).ok_or_else(resource)?,
+                            )?;
+                            let nominal = |procedure, slot| {
+                                p.nominal_locals
+                                    .iter()
+                                    .find(|n| n.procedure == procedure && n.slot == slot)
+                                    .map(|n| &n.ty)
+                            };
+                            if a.kind != b.kind
+                                || a.mode != b.mode
+                                || !b.required
+                                || a.array != b.array
+                                || nominal(*event, LocalSlot(index as u32))
+                                    != nominal(handler.procedure, LocalSlot(index as u32))
+                            {
+                                return Err(invalid("event handler parameter mismatch"));
+                            }
+                        }
+                    }
+                }
+            }
+            if !caps.declarations.contains(&field.kind)
+                || field
+                    .array
+                    .is_some_and(|kind| !caps.declarations.contains(&kind))
+            {
+                return Err(incompatible("unsupported class field kind"));
+            }
+            if field.array.is_some() && field.kind != ScalarKind::Variant {
+                return Err(invalid("class array field storage"));
+            }
+            name(&field.name)?;
+            budget.text(&field.name)?;
+            if !fields.insert(field.name.to_ascii_lowercase()) {
+                return Err(invalid("duplicate class field"));
+            }
+            if let Some(kind) = field.array {
+                vba_values::VbaArray::allocation_bytes(kind, &field.bounds)?;
+            } else if !field.bounds.is_empty() {
+                return Err(invalid("nonarray class field bounds"));
+            }
+            if field.nominal.is_some() && field.array.unwrap_or(field.kind) != ScalarKind::Object {
+                return Err(invalid("nominal class field kind"));
+            }
+        }
+        if let Some(member) = &class.default_member {
+            name(member)?;
+            budget.text(member)?;
+            if !class
+                .methods
+                .iter()
+                .any(|m| m.name.eq_ignore_ascii_case(member) && m.kind == ForeignKind::Get)
+            {
+                return Err(invalid("class default member"));
+            }
+        }
+        for method in &class.methods {
+            name(&method.name)?;
+            budget.text(&method.name)?;
+            let proc = p
+                .procedures
+                .get(method.procedure.0 as usize)
+                .ok_or_else(|| invalid("class procedure"))?;
+            if matches!(
+                method.name.to_ascii_lowercase().as_str(),
+                "class_initialize" | "class_terminate"
+            ) && (proc.kind != ProcedureKind::Sub
+                || !proc.parameters.is_empty()
+                || method.kind != ForeignKind::Call)
+            {
+                return Err(invalid("class lifecycle signature"));
+            }
+            if proc.source != class.source
+                || !methods.insert((
+                    method.name.to_ascii_lowercase(),
+                    format!("{:?}", method.kind),
+                ))
+                || !matches!(
+                    method.kind,
+                    ForeignKind::Call | ForeignKind::Get | ForeignKind::Let | ForeignKind::Set
+                )
+            {
+                return Err(invalid("class member ownership"));
+            }
+            if method.kind == ForeignKind::Get && proc.kind != ProcedureKind::Function
+                || matches!(method.kind, ForeignKind::Let | ForeignKind::Set)
+                    && (proc.kind != ProcedureKind::Sub
+                        || proc.parameters.last().is_none_or(|p| !p.required))
+            {
+                return Err(invalid("class accessor signature"));
+            }
+        }
+    }
     bound(p.nominal_locals.len(), 4096)?;
     if !p.nominal_locals.is_empty() {
         if p.ir_version < IR5_VERSION {
@@ -254,7 +445,7 @@ fn validate(
     let mut instruction_count = 0usize;
     let mut depths = reserve(p.procedures.len())?;
     let mut persistent_kinds = BTreeMap::new();
-    for proc in &p.procedures {
+    for (procedure_index, proc) in p.procedures.iter().enumerate() {
         name(&proc.name)?;
         budget.text(&proc.name)?;
         if !procedure_names.insert((proc.source, proc.name.to_ascii_lowercase())) {
@@ -319,9 +510,11 @@ fn validate(
             match local.span {
                 Some(s) => {
                     span(source, s)?;
-                    if !matches!(local.role, SlotRole::Persistent(_))
-                        && (s.start() < proc.declaration.start()
-                            || s.end() > proc.declaration.end())
+                    if !matches!(
+                        local.role,
+                        SlotRole::Persistent(_) | SlotRole::InstanceField(_)
+                    ) && (s.start() < proc.declaration.start()
+                        || s.end() > proc.declaration.end())
                     {
                         return Err(invalid("local declaration outside procedure"));
                     }
@@ -344,13 +537,29 @@ fn validate(
             }
         }
         for (i, param) in proc.parameters.iter().enumerate() {
+            if let Some(value) = &param.default {
+                if p.ir_version < IR7_VERSION || !p.classes.iter().any(|c| c.source == proc.source)
+                {
+                    return Err(invalid("class default metadata"));
+                }
+                value.validate()?;
+                if matches!(value, Value::Object(_) | Value::Array(_)) {
+                    return Err(invalid("class defaults must be literal scalar values"));
+                }
+                budget.charge(1, value.payload_bytes())?;
+                if !param.kind.accepts(value) && !matches!(value, Value::Missing) {
+                    return Err(invalid("class default kind"));
+                }
+            }
             name(&param.name)?;
             budget.text(&param.name)?;
             let local = proc
                 .locals
                 .get(i)
                 .ok_or_else(|| invalid("missing parameter slot"))?;
-            if !param.required
+            if (!param.required
+                && (p.ir_version < IR7_VERSION
+                    || !p.classes.iter().any(|c| c.source == proc.source)))
                 || local.role != SlotRole::Parameter(i as u32)
                 || local.kind != param.kind
                 || local.array != param.array
@@ -387,6 +596,31 @@ fn validate(
         }
         for (i, local) in proc.locals.iter().enumerate() {
             let role_valid = match local.role {
+                SlotRole::Receiver => {
+                    feature(p, caps, "project-classes-v7")?;
+                    p.ir_version >= IR7_VERSION
+                        && local.kind == ScalarKind::Object
+                        && local.array.is_none()
+                        && p.classes.iter().any(|c| c.source == proc.source)
+                        && i >= proc.parameters.len()
+                        && proc.result != Some(LocalSlot(i as u32))
+                }
+                SlotRole::InstanceField(field) => {
+                    feature(p, caps, "project-classes-v7")?;
+                    let field = p
+                        .classes
+                        .iter()
+                        .find(|c| c.source == proc.source)
+                        .and_then(|c| c.fields.get(field as usize))
+                        .ok_or_else(|| invalid("instance field slot"))?;
+                    p.ir_version >= IR7_VERSION
+                        && local.kind == field.kind
+                        && local.array == field.array
+                        && nominal_slots.get(&(procedure_index, i)).copied()
+                            == field.nominal.as_ref()
+                        && i >= proc.parameters.len()
+                        && proc.result != Some(LocalSlot(i as u32))
+                }
                 SlotRole::HostRoot => {
                     if p.ir_version < IR4_VERSION
                         || local.kind != ScalarKind::Object
@@ -697,6 +931,27 @@ fn procedure(
         }
         let active_id = active.ok_or_else(|| invalid("missing checkpoint"))?;
         match instruction {
+            Instruction::DefaultInstance(class) => {
+                feature(p, caps, "project-classes-v7")?;
+                if p.ir_version < IR7_VERSION
+                    || !p
+                        .classes
+                        .iter()
+                        .any(|c| c.source == *class && c.predeclared)
+                {
+                    return Err(invalid("default project instance"));
+                }
+                stack.push(Stack::Value);
+            }
+            Instruction::NewInstance(class) => {
+                feature(p, caps, "project-classes-v7")?;
+                if p.ir_version < IR7_VERSION
+                    || !p.classes.iter().any(|c| c.source == *class && !c.document)
+                {
+                    return Err(invalid("New class"));
+                }
+                stack.push(Stack::Value);
+            }
             Instruction::EnumerationInit {
                 state,
                 source,
@@ -941,7 +1196,7 @@ fn procedure(
                 if local.role == SlotRole::ScratchReference {
                     return Err(invalid("reference capture used as value slot"));
                 }
-                if local.role == SlotRole::HostRoot
+                if matches!(local.role, SlotRole::HostRoot | SlotRole::Receiver)
                     && matches!(instruction, Instruction::RefLocal(_))
                 {
                     return Err(invalid("host roots are read-only"));
@@ -998,6 +1253,12 @@ fn procedure(
                 stack.push(Stack::Value);
             }
             Instruction::Binary(op) => {
+                if *op == BinaryOp::Is {
+                    if p.ir_version < IR7_VERSION {
+                        return Err(invalid("object identity requires IR 7"));
+                    }
+                    feature(p, caps, "project-classes-v7")?;
+                }
                 feature(p, caps, "integer-long-ops")?;
                 if !caps.binary.contains(op) {
                     return Err(incompatible("unsupported binary operator"));
@@ -1010,6 +1271,12 @@ fn procedure(
                 procedure: callee_id,
                 site,
             } => {
+                if p.classes
+                    .iter()
+                    .any(|c| c.events.contains(callee_id) && c.source != proc.source)
+                {
+                    return Err(invalid("event can only be raised in its declaring class"));
+                }
                 feature(p, caps, "direct-calls")?;
                 let call = proc
                     .calls

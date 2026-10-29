@@ -3,6 +3,7 @@ use vba_diagnostics::{SourceFile, Span, StatementId};
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum ModuleKind {
+    Document,
     Standard,
     Class,
 }
@@ -53,7 +54,15 @@ pub enum ProcedureKind {
     Function,
 }
 #[derive(Clone, Debug)]
+pub enum PropertyKind {
+    Get,
+    Let,
+    Set,
+}
+#[derive(Clone, Debug)]
 pub struct Procedure {
+    pub event: bool,
+    pub property: Option<PropertyKind>,
     pub name: Name,
     pub kind: ProcedureKind,
     pub visibility: Visibility,
@@ -77,6 +86,7 @@ pub struct Parameter {
 }
 #[derive(Clone, Debug)]
 pub struct Declaration {
+    pub with_events: bool,
     pub dimensions: Option<Vec<(Expr, Expr)>>,
     pub persistent: bool,
     pub name: Name,
@@ -97,6 +107,10 @@ pub struct Statement {
 }
 #[derive(Clone, Debug)]
 pub enum StatementKind {
+    RaiseEvent {
+        name: Name,
+        arguments: Vec<Argument>,
+    },
     ReDim {
         name: Name,
         dimensions: Vec<(Expr, Expr)>,
@@ -145,6 +159,7 @@ pub struct IfArm {
 }
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum ExitKind {
+    Property,
     Sub,
     Function,
     For,
@@ -163,6 +178,7 @@ pub struct Expr {
 }
 #[derive(Clone, Debug)]
 pub enum ExprKind {
+    New(Name),
     Name(Name),
     Number(String),
     String(String),

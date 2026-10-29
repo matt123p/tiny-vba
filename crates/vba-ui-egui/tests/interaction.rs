@@ -73,6 +73,39 @@ fn menu_and_pane_names_are_discoverable() -> R {
     assert!(h.state().errors.is_empty());
     Ok(())
 }
+
+#[test]
+fn insert_class_and_error_trapping_options_use_real_editor_commands() -> R {
+    let mut h = Harness::builder()
+        .with_size(egui::vec2(1200.0, 1000.0))
+        .build_ui_state(draw, Fixture::new()?);
+    h.run();
+    h.get_by_label("Insert").click();
+    h.run();
+    h.get_by_label("Class Module").click();
+    h.run();
+    assert_eq!(
+        h.state().ide.active_module().ok_or("class")?.kind,
+        vba_ide::ModuleKind::Class
+    );
+    assert!(h.query_by_label("Class Modules").is_some());
+    h.get_by_label("Tools").click();
+    h.run();
+    h.get_by_label("Options...").click();
+    h.run();
+    h.get_by_label("Break in Class Module").click();
+    h.run();
+    assert!(h.state().ide.break_in_class_modules);
+    h.get_by_label("Break on All Errors").click();
+    h.run();
+    assert!(h.state().ide.break_on_errors);
+    assert!(!h.state().ide.break_in_class_modules);
+    h.get_by_label("Break on Unhandled Errors").click();
+    h.run();
+    assert!(!h.state().ide.break_on_errors && !h.state().ide.break_in_class_modules);
+    assert!(h.state().errors.is_empty(), "{:?}", h.state().errors);
+    Ok(())
+}
 #[test]
 fn f8_launches_real_debugger_and_f5_completes() -> R {
     let mut h = Harness::builder()

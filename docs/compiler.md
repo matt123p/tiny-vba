@@ -1,5 +1,5 @@
 Current compiler additions are in [the M4 language contract](m4-language.md) and
-[ADR 0012](decisions/0012-m4-oracle-acceptance.md); current default target is ir6-structural:
+[ADR 0012](decisions/0012-m4-oracle-acceptance.md); current default target is ir7-structural:
 IR 1/2 remain supported. Array parameter/layout metadata, ParamArray packing and named reference
 capture are checked before execution. The historical M2/M4-first-slice restrictions below are
 superseded only by those explicitly documented additions.
@@ -189,3 +189,26 @@ advance and cleanup instructions retain source/Next checkpoints. Native arrays
 use live element reads; host collection enumeration uses a bounded owned snapshot.
 See [implementation and evidence](m1-defaults-and-collections.md). Earlier
 historical restrictions on default/collection syntax above are superseded here.
+
+## M2 class foundation (in progress)
+
+IR 7 `project-classes-v7` adds explicitly parsed Class/Document components,
+project-local nominal types, New, Me, Get/Let/Set accessors, Exit Property,
+predeclared document state and Is identity without default-value conversion.
+Instance fields use verified storage roles; source/statement spans remain the
+original source. Getter/setter IR procedure identities are distinct while class
+member names remain unchanged. The project reference namespace is reserved only
+when actual project classes are present; class-free legacy embeddings retain
+their external reference/host identity behavior. See [scope and remaining work](m2-classes-and-forms.md).
+This addition does not imply form designer, foreign event subscriptions, As New,
+Friend/static member binding or Office document-event/package support.
+
+M2's IR 7 source-event increment supports public/default Event declarations and
+scalar project-typed WithEvents fields in class/document modules. RaiseEvent uses
+verified required signatures and synchronous ordinary frames, preserves connection
+order and canonical ByRef across sinks, and retains queued receivers through
+pause/resume. State transfer remaps objects and preserves subscription ordering.
+Unknown events, mismatched handler signatures, Optional/ParamArray/named/omitted
+event arguments and foreign WithEvents mutation are refused. Editor Options
+exposes all-error, class-module and unhandled-error trapping. Forms remain pending;
+see docs/m2-classes-and-forms.md for exact checkpoint and remaining work.

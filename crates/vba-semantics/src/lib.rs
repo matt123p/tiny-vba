@@ -8,7 +8,26 @@ type Result<T> = std::result::Result<T, Diagnostic>;
 const MAX_PROCEDURES: usize = 4096;
 const MAX_SLOTS: usize = 4096;
 #[derive(Clone, Debug)]
+pub struct ClassField {
+    pub with_events: bool,
+    pub name: String,
+    pub kind: ScalarKind,
+    pub nominal: Option<vba_values::NominalType>,
+    pub array: Option<ScalarKind>,
+    pub bounds: Vec<(i32, i32)>,
+    pub public: bool,
+}
+#[derive(Clone, Debug)]
+pub struct Class {
+    pub document: bool,
+    pub predeclared: bool,
+    pub module: usize,
+    pub name: String,
+    pub fields: Vec<ClassField>,
+}
+#[derive(Clone, Debug)]
 pub struct BoundProgram {
+    pub classes: Vec<Class>,
     pub modules: Vec<ast::Module>,
     pub procedures: Vec<BoundProcedure>,
     pub entry: usize,
@@ -27,6 +46,8 @@ pub struct BoundParameter {
 }
 #[derive(Clone, Debug)]
 pub struct BoundLocal {
+    pub field: Option<u32>,
+    pub receiver: bool,
     pub nominal: Option<vba_values::NominalType>,
     pub host_root: bool,
     pub persistent: Option<String>,
@@ -39,6 +60,8 @@ pub struct BoundLocal {
 }
 #[derive(Clone, Debug)]
 pub struct Signature {
+    pub event: bool,
+    pub property: Option<ast::PropertyKind>,
     pub nominal_result: Option<vba_values::NominalType>,
     pub module: usize,
     pub name: String,
@@ -83,6 +106,8 @@ pub struct ForeignArgument {
 }
 #[derive(Clone, Debug)]
 pub enum ExprKind {
+    DefaultInstance(usize),
+    New(usize),
     Element {
         slot: usize,
         indices: Vec<Expr>,
@@ -398,6 +423,13 @@ fn preflight(module: &ast::Module, budget: &mut Budget) -> Result<()> {
                     push(&mut pending, (Node::Expr(target), depth + 1), span)?;
                     push(&mut pending, (Node::Expr(value), depth + 1), span)?;
                 }
+                ast::StatementKind::RaiseEvent { arguments, .. } => {
+                    for arg in arguments {
+                        if let Some(e) = &arg.value {
+                            push(&mut pending, (Node::Expr(e), depth + 1), span)?;
+                        }
+                    }
+                }
                 ast::StatementKind::Call {
                     target, arguments, ..
                 } => {
@@ -470,6 +502,46 @@ pub fn bind_with_references(
     if parsed.is_empty() || parsed.len() > 256 {
         return Err(Diagnostic::new("VBA0111", "source count limit"));
     }
+    let mut libraries = references.libraries().to_vec();
+    let class_names = parsed
+        .iter()
+        .filter(|p| p.module.kind != ast::ModuleKind::Standard)
+        .map(|p| module_name(&p.module))
+        .collect::<Vec<_>>();
+    if !class_names.is_empty()
+        && libraries
+            .iter()
+            .any(|l| l.name.eq_ignore_ascii_case("VBAProject"))
+    {
+        return Err(Diagnostic::new(
+            "VBA0110",
+            "VBAProject is reserved for project-local classes",
+        ));
+    }
+    if !class_names.is_empty() {
+        libraries.insert(
+            0,
+            vba_foreign::ReferenceLibrary {
+                name: "VBAProject".into(),
+                version: "1".into(),
+                available: true,
+                types: class_names
+                    .iter()
+                    .map(|n| vba_foreign::ReferenceType {
+                        name: n.clone(),
+                        kind: vba_foreign::ReferenceTypeKind::Object,
+                    })
+                    .collect(),
+                constants: vec![],
+            },
+        );
+    }
+    let project_references = vba_foreign::ReferenceSet::new(libraries)?;
+    let references = &project_references;
+    let mut classes = Vec::new();
+    if parsed.is_empty() || parsed.len() > 256 {
+        return Err(Diagnostic::new("VBA0111", "source count limit"));
+    }
     let mut budget = Budget { bytes: 0, work: 0 };
     for result in parsed {
         preflight(&result.module, &mut budget)?;
@@ -500,9 +572,6 @@ pub fn bind_with_references(
                 source_span,
             ));
         }
-        if module.kind != ast::ModuleKind::Standard {
-            return Err(unsupported("class module binding", source_span));
-        }
         let mut constants = BTreeMap::new();
         let mut base_seen = false;
         for option in &module.options {
@@ -518,6 +587,29 @@ pub fn bind_with_references(
         }
         let mut declaration_names = BTreeSet::new();
         for declaration in &module.declarations {
+            if module.kind != ast::ModuleKind::Standard
+                && declaration.visibility == ast::Visibility::Public
+                && (declaration.constant.is_some() || declaration.dimensions.is_some())
+            {
+                return Err(err(
+                    "object modules cannot expose Public constants or arrays; use a property procedure",
+                    declaration.span,
+                ));
+            }
+            if declaration.with_events && module.kind == ast::ModuleKind::Standard {
+                return Err(err(
+                    "WithEvents requires a class or document module",
+                    declaration.span,
+                ));
+            }
+            if module.kind != ast::ModuleKind::Standard
+                && declaration.name.spelling.eq_ignore_ascii_case("Me")
+            {
+                return Err(err(
+                    "Me is reserved for the instance receiver",
+                    declaration.span,
+                ));
+            }
             if !declaration_names.insert(declaration.name.key()) {
                 return Err(err("duplicate module declaration", declaration.span));
             }
@@ -546,13 +638,114 @@ pub fn bind_with_references(
                 return Err(err("duplicate module declaration", declaration.span));
             }
         }
+        if module.kind != ast::ModuleKind::Standard {
+            let mut fields = Vec::new();
+            for d in &module.declarations {
+                if d.constant.is_some() {
+                    continue;
+                }
+                if fields.len() >= MAX_SLOTS {
+                    return Err(limit(d.span));
+                }
+                if d.name.spelling.eq_ignore_ascii_case("Me") {
+                    return Err(err("Me is reserved for the instance receiver", d.span));
+                }
+                budget.charge(1024 + d.name.spelling.len(), d.span)?;
+                if d.with_events
+                    && (d.dimensions.is_some()
+                        || nominal(d.ty.as_ref(), references)?
+                            .is_none_or(|ty| !ty.library().eq_ignore_ascii_case("VBAProject")))
+                {
+                    return Err(unsupported(
+                        "WithEvents requires a scalar project class",
+                        d.span,
+                    ));
+                }
+                let element = kind(d.ty.as_ref(), &d.name, references)?;
+                let mut bounds = Vec::new();
+                if let Some(dimensions) = &d.dimensions {
+                    for (lower, upper) in dimensions {
+                        let index = |e: &ast::Expr| -> Result<i32> {
+                            let v = literal(e, references, Some(&constants))?;
+                            let Value::Long(n) = vba_runtime::bind(ScalarKind::Long, &v)
+                                .map_err(|_| err("class array bound", e.span))?
+                            else {
+                                return Err(err("class array bound", e.span));
+                            };
+                            Ok(n)
+                        };
+                        let lower = if lower.span == upper.span
+                            && matches!(&lower.kind,ast::ExprKind::Number(n) if n=="0")
+                        {
+                            i32::from(
+                                module
+                                    .options
+                                    .iter()
+                                    .find_map(|o| {
+                                        if let ast::ModuleOption::Base { value, .. } = o {
+                                            Some(*value)
+                                        } else {
+                                            None
+                                        }
+                                    })
+                                    .unwrap_or(0),
+                            )
+                        } else {
+                            index(lower)?
+                        };
+                        bounds.push((lower, index(upper)?));
+                    }
+                }
+                fields.push(ClassField {
+                    with_events: d.with_events,
+                    name: d.name.spelling.clone(),
+                    kind: if d.dimensions.is_some() {
+                        ScalarKind::Variant
+                    } else {
+                        element
+                    },
+                    nominal: nominal(d.ty.as_ref(), references)?,
+                    array: d.dimensions.as_ref().map(|_| element),
+                    bounds,
+                    public: d.visibility == ast::Visibility::Public,
+                });
+            }
+            classes.push(Class {
+                document: module.kind == ast::ModuleKind::Document,
+                predeclared: module.kind == ast::ModuleKind::Document
+                    || module.attributes.iter().any(|a| {
+                        a.path
+                            .first()
+                            .is_some_and(|n| n.spelling.eq_ignore_ascii_case("VB_PredeclaredId"))
+                            && matches!(a.value.kind, ast::ExprKind::Boolean(true))
+                    }),
+                module: mi,
+                name: module_name(module),
+                fields,
+            });
+        }
         for procedure in &module.procedures {
+            if procedure.event
+                && (module.kind == ast::ModuleKind::Standard
+                    || procedure.visibility == ast::Visibility::Private
+                    || procedure
+                        .parameters
+                        .iter()
+                        .any(|p| p.optional || p.param_array))
+            {
+                return Err(err(
+                    "Event requires a class/document and required parameters",
+                    procedure.span,
+                ));
+            }
             kind(None, &procedure.name, references)?;
             if signatures.len() >= MAX_PROCEDURES {
                 return Err(limit(procedure.span));
             }
-            if !procedure_names.insert((mi, procedure.name.key()))
-                || declaration_names.contains(&procedure.name.key())
+            if !procedure_names.insert((
+                mi,
+                format!("{}:{:?}", procedure.name.key(), procedure.property),
+            )) || declaration_names.contains(&procedure.name.key())
             {
                 return Err(err(
                     "duplicate procedure/module symbol",
@@ -560,7 +753,29 @@ pub fn bind_with_references(
                 ));
             }
             if procedure.visibility == ast::Visibility::Friend {
-                return Err(unsupported("Friend outside class", procedure.span));
+                return Err(unsupported(
+                    "Friend requires project static member dispatch",
+                    procedure.span,
+                ));
+            }
+            if procedure.property.is_some() && module.kind == ast::ModuleKind::Standard {
+                return Err(unsupported(
+                    "standard-module property execution",
+                    procedure.span,
+                ));
+            }
+            if matches!(
+                procedure.property,
+                Some(ast::PropertyKind::Let | ast::PropertyKind::Set)
+            ) && procedure
+                .parameters
+                .last()
+                .is_none_or(|p| p.optional || p.param_array)
+            {
+                return Err(err(
+                    "property assignment requires a final required value parameter",
+                    procedure.span,
+                ));
             }
             let mut parameters = Vec::new();
             if procedure.parameters.len() > 256 {
@@ -642,6 +857,8 @@ pub fn bind_with_references(
             push(
                 &mut signatures,
                 Signature {
+                    event: procedure.event,
+                    property: procedure.property.clone(),
                     nominal_result: nominal(procedure.result_type.as_ref(), references)?,
                     module: mi,
                     name: procedure.name.spelling.clone(),
@@ -661,7 +878,12 @@ pub fn bind_with_references(
     let entries: Vec<_> = signatures
         .iter()
         .enumerate()
-        .filter(|(_, s)| s.name.eq_ignore_ascii_case(entry))
+        .filter(|(_, s)| {
+            s.name.eq_ignore_ascii_case(entry)
+                && parsed
+                    .get(s.module)
+                    .is_some_and(|p| p.module.kind == ast::ModuleKind::Standard)
+        })
         .map(|(i, _)| i)
         .collect();
     if entries.len() != 1 {
@@ -684,10 +906,22 @@ pub fn bind_with_references(
         public: BTreeMap::new(),
     };
     for (id, sig) in signatures.iter().enumerate() {
-        lookup
-            .local
-            .insert((sig.module, sig.name.to_ascii_lowercase()), id);
-        if sig.visibility != ast::Visibility::Private {
+        if sig.event {
+            continue;
+        }
+        if !matches!(
+            sig.property,
+            Some(ast::PropertyKind::Let | ast::PropertyKind::Set)
+        ) {
+            lookup
+                .local
+                .insert((sig.module, sig.name.to_ascii_lowercase()), id);
+        }
+        if sig.visibility != ast::Visibility::Private
+            && modules
+                .get(sig.module)
+                .is_some_and(|m| m.kind == ast::ModuleKind::Standard)
+        {
             lookup
                 .public
                 .entry(sig.name.to_ascii_lowercase())
@@ -744,6 +978,7 @@ pub fn bind_with_references(
             root_slots: BTreeMap::new(),
             loop_depth: 0,
             loop_controls: BTreeSet::new(),
+            classes: &classes,
         };
         let mut local_names = BTreeSet::new();
         for param in &sig.parameters {
@@ -781,6 +1016,21 @@ pub fn bind_with_references(
                 .ok_or_else(|| err("result local", sig.span))?
                 .nominal = sig.nominal_result.clone();
         }
+        if module.kind != ast::ModuleKind::Standard {
+            binder.local(
+                "Me",
+                ScalarKind::Object,
+                syntax.name.span,
+                false,
+                false,
+                &mut local_names,
+            )?;
+            binder
+                .locals
+                .last_mut()
+                .ok_or_else(|| err("receiver local", sig.span))?
+                .receiver = true;
+        }
         binder.collect(&syntax.body, &mut local_names)?;
         for declaration in &module.declarations {
             if declaration.constant.is_some() || local_names.contains(&declaration.name.key()) {
@@ -803,14 +1053,31 @@ pub fn bind_with_references(
                 .locals
                 .last_mut()
                 .ok_or_else(|| err("module local", declaration.span))?;
-            local.persistent = Some(format!("{}:module:{}", sig.module, declaration.name.key()));
+            if module.kind != ast::ModuleKind::Standard {
+                local.field = Some(
+                    u32::try_from(
+                        module
+                            .declarations
+                            .iter()
+                            .filter(|d| d.constant.is_none())
+                            .position(|d| d.name.key() == declaration.name.key())
+                            .ok_or_else(|| err("class field", declaration.span))?,
+                    )
+                    .map_err(|_| limit(declaration.span))?,
+                );
+            } else {
+                local.persistent =
+                    Some(format!("{}:module:{}", sig.module, declaration.name.key()));
+            }
             local.array = declaration.dimensions.as_ref().map(|_| element);
             local.nominal = nominal(declaration.ty.as_ref(), references)?;
         }
         let mut body = binder.block(&syntax.body)?;
         let mut initializers = Vec::new();
         for declaration in &module.declarations {
-            if let Some(dimensions) = &declaration.dimensions {
+            if let Some(dimensions) = &declaration.dimensions
+                && module.kind == ast::ModuleKind::Standard
+            {
                 let slot = binder.slot(&declaration.name)?;
                 let kind = binder
                     .locals
@@ -848,6 +1115,7 @@ pub fn bind_with_references(
         )?;
     }
     Ok(BoundProgram {
+        classes,
         modules,
         procedures,
         entry,
@@ -863,6 +1131,7 @@ struct Lookup {
     public: BTreeMap<String, Vec<usize>>,
 }
 struct Binder<'a> {
+    classes: &'a [Class],
     budget: &'a mut Budget,
     lookup: &'a Lookup,
     constant_names: &'a BTreeSet<String>,
@@ -900,6 +1169,8 @@ impl Binder<'_> {
         push(
             &mut self.locals,
             BoundLocal {
+                field: None,
+                receiver: false,
                 nominal: None,
                 host_root: false,
                 persistent: None,
@@ -918,6 +1189,9 @@ impl Binder<'_> {
             match &statement.kind {
                 ast::StatementKind::Declare(declarations) => {
                     for d in declarations {
+                        if d.with_events {
+                            return Err(err("WithEvents is module-level only", d.span));
+                        }
                         if let Some(expr) = &d.constant {
                             if nominal(d.ty.as_ref(), self.references)?.is_some() {
                                 return Err(err("object constant declaration is invalid", d.span));
@@ -1035,6 +1309,8 @@ impl Binder<'_> {
         push(
             &mut self.locals,
             BoundLocal {
+                field: None,
+                receiver: false,
                 nominal: None,
                 host_root: false,
                 persistent: None,
@@ -1400,7 +1676,11 @@ impl Binder<'_> {
             push(
                 &mut args,
                 ForeignArgument {
-                    reference: false,
+                    reference: !self.classes.is_empty()
+                        && matches!(
+                            arg.value.as_ref().map(|e| &e.kind),
+                            Some(ast::ExprKind::Name(_))
+                        ),
                     name: arg.name.as_ref().map(|n| n.spelling.clone()),
                     value: arg.value.as_ref().map(|e| self.expr(e)).transpose()?,
                 },
@@ -1498,7 +1778,9 @@ impl Binder<'_> {
             ExprKind::Local(slot) => self.locals.get(*slot).is_some_and(|l| {
                 l.array.is_none() && matches!(l.kind, ScalarKind::Object | ScalarKind::Variant)
             }),
-            ExprKind::Foreign { .. } | ExprKind::Element { .. } => true,
+            ExprKind::Foreign { .. } | ExprKind::Element { .. } | ExprKind::DefaultInstance(_) => {
+                true
+            }
             ExprKind::Call { procedure, .. } => self.signatures.get(*procedure).is_some_and(|s| {
                 matches!(s.result, Some(ScalarKind::Object | ScalarKind::Variant))
             }),
@@ -1534,6 +1816,8 @@ impl Binder<'_> {
             push(
                 &mut self.locals,
                 BoundLocal {
+                    field: None,
+                    receiver: false,
                     nominal: None,
                     host_root: true,
                     persistent: None,
@@ -1594,7 +1878,11 @@ impl Binder<'_> {
             push(
                 &mut arguments,
                 ForeignArgument {
-                    reference: false,
+                    reference: !self.classes.is_empty()
+                        && matches!(
+                            arg.value.as_ref().map(|e| &e.kind),
+                            Some(ast::ExprKind::Name(_))
+                        ),
                     name: arg.name.as_ref().map(|n| n.spelling.clone()),
                     value: arg.value.as_ref().map(|e| self.expr(e)).transpose()?,
                 },
@@ -1642,7 +1930,40 @@ impl Binder<'_> {
             });
         }
         let bound = match &expr.kind {
+            ast::ExprKind::New(name) => {
+                let class_name = if let Some((project, class)) = name.spelling.split_once('.') {
+                    if !project.eq_ignore_ascii_case("VBAProject") {
+                        return Err(err("New requires a project class", name.span));
+                    }
+                    class
+                } else {
+                    &name.spelling
+                };
+                let class = self
+                    .classes
+                    .iter()
+                    .find(|c| c.name.eq_ignore_ascii_case(class_name))
+                    .ok_or_else(|| err("New requires a project class", name.span))?;
+                if class.document {
+                    return Err(err(
+                        "document instances are host-owned and cannot be constructed with New",
+                        name.span,
+                    ));
+                }
+                ExprKind::New(class.module)
+            }
             ast::ExprKind::Name(name) => {
+                if !self.symbols.contains_key(&name.key())
+                    && let Some(class) = self
+                        .classes
+                        .iter()
+                        .find(|c| c.predeclared && c.name.eq_ignore_ascii_case(&name.spelling))
+                {
+                    return Ok(Expr {
+                        span: expr.span,
+                        kind: ExprKind::DefaultInstance(class.module),
+                    });
+                }
                 if !self.symbols.contains_key(&name.key())
                     && let Some(import) = self
                         .imports
@@ -1849,13 +2170,21 @@ impl Binder<'_> {
                 }
             }
             ast::ExprKind::Binary { op, left, right } => {
-                if ["is", "like"].contains(&op.as_str()) {
+                if op == "like" {
                     return Err(unsupported("Is/Like operator", expr.span));
                 }
                 ExprKind::Binary {
                     op: op.clone(),
-                    left: Box::new(self.value_expr(left)?),
-                    right: Box::new(self.value_expr(right)?),
+                    left: Box::new(if op == "is" {
+                        self.expr(left)?
+                    } else {
+                        self.value_expr(left)?
+                    }),
+                    right: Box::new(if op == "is" {
+                        self.expr(right)?
+                    } else {
+                        self.value_expr(right)?
+                    }),
                 }
             }
             ast::ExprKind::Member { target, name } => {
@@ -2183,6 +2512,9 @@ impl Binder<'_> {
                     });
                 }
                 let slot = self.slot(name)?;
+                if self.locals.get(slot).is_some_and(|l| l.receiver) {
+                    return Err(err("Me is read-only", name.span));
+                }
                 if *object
                     && self
                         .locals
@@ -2231,6 +2563,27 @@ impl Binder<'_> {
                         self.value_expr(value)?
                     },
                     object: *object,
+                }
+            }
+            ast::StatementKind::RaiseEvent { name, arguments } => {
+                let id = self
+                    .signatures
+                    .iter()
+                    .position(|s| {
+                        s.event
+                            && s.module == self.signature.module
+                            && s.name.eq_ignore_ascii_case(&name.spelling)
+                    })
+                    .ok_or_else(|| err("event not declared in this module", name.span))?;
+                if arguments
+                    .iter()
+                    .any(|a| a.name.is_some() || a.value.is_none())
+                {
+                    return Err(err("event arguments cannot be named or omitted", site.span));
+                }
+                StatementKind::Call {
+                    procedure: id,
+                    arguments: self.arguments(id, arguments, site.span)?,
                 }
             }
             ast::StatementKind::Call {
@@ -2448,6 +2801,7 @@ impl Binder<'_> {
             }
             ast::StatementKind::Exit(exit) => {
                 let valid = match exit {
+                    ast::ExitKind::Property => self.signature.property.is_some(),
                     ast::ExitKind::For => self.loop_depth > 0,
                     ast::ExitKind::Sub => self.signature.kind == ast::ProcedureKind::Sub,
                     ast::ExitKind::Function => self.signature.kind == ast::ProcedureKind::Function,
@@ -2461,6 +2815,37 @@ impl Binder<'_> {
         };
         Ok(Statement { site, kind: bound })
     }
+}
+pub fn module_name(module: &ast::Module) -> String {
+    module
+        .attributes
+        .iter()
+        .find_map(|a| {
+            if a.path
+                .first()
+                .is_some_and(|n| n.spelling.eq_ignore_ascii_case("VB_Name"))
+            {
+                if let ast::ExprKind::String(name) = &a.value.kind {
+                    Some(name.clone())
+                } else {
+                    None
+                }
+            } else {
+                None
+            }
+        })
+        .unwrap_or_else(|| {
+            module
+                .source
+                .name()
+                .rsplit(['/', '\\'])
+                .next()
+                .unwrap_or(module.source.name())
+                .split('.')
+                .next()
+                .unwrap_or(module.source.name())
+                .to_owned()
+        })
 }
 fn reference_path(expr: &ast::Expr) -> Option<String> {
     let mut parts = Vec::new();

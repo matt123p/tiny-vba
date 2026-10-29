@@ -3427,6 +3427,7 @@ dependencies = [
  "vba-foreign",
  "vba-ir",
  "vba-runtime",
+ "vba-syntax",
  "vba-testkit",
  "vba-values",
 ]
