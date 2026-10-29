@@ -1,6 +1,8 @@
 //! Embeddable Classic VBA editor/debugger panels. The caller owns context, theme, host and IO.
 #![forbid(unsafe_code)]
+mod forms;
 mod theme;
+pub use forms::{FormCommand, FormLayoutReport};
 mod views;
 use egui::{Color32, FontId, RichText, TextEdit, Vec2};
 use std::sync::atomic::{AtomicU32, Ordering};
@@ -9,6 +11,7 @@ pub use theme::{Theme, contrast};
 use vba_ide::{Action, Ide, Mode, SourceId, SyntaxClass, display_value};
 #[derive(Clone, Debug)]
 pub enum Command {
+    Form(FormCommand),
     Entry(String),
     Action(Action),
     Text(String),
@@ -50,6 +53,7 @@ pub fn apply(
     host: &mut impl vba_ide::Host,
 ) -> vba_ide::Result<()> {
     match command {
+        Command::Form(command) => forms::apply_form(ide, command, host),
         Command::Entry(name) => {
             ide.entry = name;
             Ok(())
@@ -207,6 +211,12 @@ enum EditOperation {
 }
 /// Persistent view preferences; source and execution live in `Ide`, not in this renderer.
 pub struct EditorUi {
+    pub form_view: bool,
+    pub form_report: Option<FormLayoutReport>,
+    form_modal: bool,
+    form_last_focus: Option<egui::Id>,
+    form_runtime_focus: Vec<(SourceId, u32, egui::Id)>,
+    form_drag: Option<(SourceId, u32, bool, egui::Vec2)>,
     pub project_visible: bool,
     pub properties_visible: bool,
     pub pane: Pane,
@@ -275,6 +285,12 @@ pub struct EditorUi {
 impl Default for EditorUi {
     fn default() -> Self {
         Self {
+            form_view: false,
+            form_report: None,
+            form_modal: true,
+            form_drag: None,
+            form_runtime_focus: vec![],
+            form_last_focus: None,
             project_visible: true,
             properties_visible: true,
             pane: Pane::Locals,
@@ -376,6 +392,9 @@ impl EditorUi {
         let stop = ide.execution().map(|s| (s.source, s.span.start()));
         if stop.is_some() && stop != self.last_stop {
             self.navigate = true;
+            if stop.is_some_and(|(source, _)| ide.form(source).is_some()) {
+                self.form_view = false;
+            }
         }
         self.last_stop = stop;
         let diagnostic = ide.diagnostics.first().and_then(|d| d.span);
@@ -406,7 +425,7 @@ impl EditorUi {
                 });
             });
             egui::Panel::bottom("vba.status").frame(egui::Frame::new().fill(theme.chrome).inner_margin(5)).show(ui,|ui|{
-                ui.horizontal(|ui|{ui.label(RichText::new(format!("* {}",ide.mode().label())).strong().color(theme.accent));ui.separator();if let Some(m)=ide.active_module(){ui.label(format!("Ln {}   {}{}",m.line_at(m.caret),m.name,if m.dirty(){" *"}else{""}));}ui.with_layout(egui::Layout::right_to_left(egui::Align::Center),|ui|{ui.label(RichText::new("Craft VBA Editor").small().color(theme.muted));});});
+                ui.horizontal(|ui|{ui.label(RichText::new(format!("* {}",ide.mode().label())).strong().color(theme.accent));ui.separator();if let Some(m)=ide.active_module(){ui.label(format!("Ln {}   {}{}",m.line_at(m.caret),m.name,if m.dirty() || ide.form(m.id).is_some_and(|d|d.dirty()){" *"}else{""}));}ui.with_layout(egui::Layout::right_to_left(egui::Align::Center),|ui|{ui.label(RichText::new("Craft VBA Editor").small().color(theme.muted));});});
             });
             let mut project_rect=None;
             if self.project_visible {
@@ -414,21 +433,22 @@ impl EditorUi {
                 let project=if self.project_right {egui::Panel::right("vba.project.right")} else {egui::Panel::left("vba.project")};
                 let p=project.default_size(size).min_size(145.0).max_size(340.0).resizable(true).show(ui,|ui|{
                     heading(ui,"Project Explorer",theme);
-                    ui.horizontal(|ui|{if ui.small_button("View Code").on_hover_text("View Code (F7)").clicked(){self.focus_editor=true;self.navigate=true;}ui.add_enabled(false,egui::Button::new("View Object")).on_hover_text("An object/form designer requires a host adapter");});
+                    ui.horizontal(|ui|{if ui.small_button("View Code").on_hover_text("View Code (F7)").clicked(){self.focus_editor=true;self.navigate=true;self.form_view=false;}
+if ui.add_enabled(ide.active_module().is_some_and(|m|ide.form(m.id).is_some()),egui::Button::new("View Object")).clicked(){self.form_view=true;}});
                     egui::ScrollArea::vertical().id_salt("project.tree").max_height((ui.available_height()-190.0).max(90.0)).show(ui,|ui|{
                         egui::CollapsingHeader::new(&ide.title).default_open(true).show(ui,|ui|{
-                            for (kind, label, glyph) in [(vba_ide::ModuleKind::Standard,"Modules","M"),(vba_ide::ModuleKind::Class,"Class Modules","C"),(vba_ide::ModuleKind::Document,"Document Modules","D")] {
-if ide.modules.iter().any(|m|m.kind==kind) {
+                            for (kind, label, glyph, form_group) in [(vba_ide::ModuleKind::Standard,"Modules","M",false),(vba_ide::ModuleKind::Class,"Class Modules","C",false),(vba_ide::ModuleKind::Document,"Document Modules","D",false),(vba_ide::ModuleKind::Class,"Forms","F",true)] {
+if ide.modules.iter().any(|m|m.kind==kind && ide.form(m.id).is_some()==form_group) {
 egui::CollapsingHeader::new(label).default_open(true).show(ui,|ui|{
-                                for (i,m) in ide.modules.iter().enumerate().filter(|(_,m)|m.kind==kind){let response=ui.selectable_label(ide.active==i,format!("{glyph} {}{}",m.name,if m.dirty(){" *"}else{""}));if self.focus_project && ide.active==i {response.request_focus();self.focus_project=false;}
+                                for (i,m) in ide.modules.iter().enumerate().filter(|(_,m)|m.kind==kind && ide.form(m.id).is_some()==form_group){let response=ui.selectable_label(ide.active==i,format!("{glyph} {}{}",m.name,if m.dirty() || ide.form(m.id).is_some_and(|d|d.dirty()){" *"}else{""}));if self.focus_project && ide.active==i {response.request_focus();self.focus_project=false;}
 if response.clicked(){commands.push(Command::SelectModule(i));self.navigate=true;}
-if response.double_clicked(){self.focus_editor=true;}response.context_menu(|ui|{if ui.button("View Code").clicked(){commands.push(Command::SelectModule(i));self.focus_editor=true;ui.close();}self.action_button(ui,ide,Action::Export,&mut commands);});}
+if response.double_clicked(){self.focus_editor=true;self.form_view=false;}response.context_menu(|ui|{if ui.button("View Code").clicked(){commands.push(Command::SelectModule(i));self.focus_editor=true;self.form_view=false;ui.close();}self.action_button(ui,ide,Action::Export,&mut commands);});}
                             });}}
                         });
                     });
                     if ui.button("Insert Module").clicked(){commands.push(Command::AddModule);}
                     ui.separator();
-                    if self.properties_visible {heading(ui,"Properties Window",theme);ui.horizontal(|ui|{ui.selectable_label(true,"Alphabetic").on_hover_text("Alphabetic properties");ui.add_enabled(false,egui::Button::new("Categorized")).on_hover_text("Only module metadata is available");});if let Some(m)=ide.active_module(){egui::Grid::new("properties").striped(true).show(ui,|ui|{ui.label("(Name)");if ui.button(&m.name).on_hover_text("Rename module").clicked(){self.rename_module=Some((m.id,m.name.clone()));}ui.end_row();ui.label("Type");ui.label(match m.kind {vba_ide::ModuleKind::Standard=>"Standard module",vba_ide::ModuleKind::Class=>"Class module",vba_ide::ModuleKind::Document=>"Document module"});ui.end_row();ui.label("Status");ui.label(if m.dirty(){"Modified"}else{"Saved"});ui.end_row();});ui.label(RichText::new("Select (Name) to rename the module.").small().color(theme.muted));}}
+                    if self.properties_visible {heading(ui,"Properties Window",theme);ui.horizontal(|ui|{ui.selectable_label(true,"Alphabetic").on_hover_text("Alphabetic properties");ui.add_enabled(false,egui::Button::new("Categorized")).on_hover_text("Only module metadata is available");});if let Some(m)=ide.active_module(){egui::Grid::new("properties").striped(true).show(ui,|ui|{ui.label("(Name)");if ui.button(&m.name).on_hover_text("Rename module").clicked(){self.rename_module=Some((m.id,m.name.clone()));}ui.end_row();ui.label("Type");ui.label(if ide.form(m.id).is_some() {"UserForm"} else {match m.kind {vba_ide::ModuleKind::Standard=>"Standard module",vba_ide::ModuleKind::Class=>"Class module",vba_ide::ModuleKind::Document=>"Document module"}});ui.end_row();ui.label("Status");ui.label(if m.dirty() || ide.form(m.id).is_some_and(|d|d.dirty()){"Modified"}else{"Saved"});ui.end_row();});ui.label(RichText::new("Select (Name) to rename the module.").small().color(theme.muted));}}
                 });project_rect=Some(p.response.rect);
             }
             let right=self.debugger_right && ui.available_width()>700.0;
@@ -438,7 +458,8 @@ if response.double_clicked(){self.focus_editor=true;}response.context_menu(|ui|{
                 egui::ScrollArea::both().id_salt("debug.content").auto_shrink([false,false]).show(ui,|ui|self.debug_pane(ui,ide,&mut commands,theme));
             });
             let editor=egui::CentralPanel::default().frame(egui::Frame::new().fill(theme.editor).inner_margin(6)).show(ui,|ui|{
-                if let Some(m)=ide.active_module(){
+                if self.form_view && ide.active_module().is_some_and(|m|ide.form(m.id).is_some()) { self.form_designer(ui,ide,&mut commands,theme); }
+                else if let Some(m)=ide.active_module(){
                     let compact=ui.available_width()<650.0;
                     ui.horizontal_wrapped(|ui|{
                         egui::ComboBox::new("object.selector", "Object").selected_text("(General)").width(120.0).show_ui(ui,|ui|{ui.selectable_label(true,"(General)").on_hover_text("Standard module; host object/event selectors need host metadata");});
@@ -457,6 +478,7 @@ if response.double_clicked(){self.focus_editor=true;}response.context_menu(|ui|{
             self.report=Some(LayoutReport{editor:editor.response.rect,project:project_rect,debugger:debug.response.rect,source:ide.active_module().map(|m|m.id),editor_scope:self.scope.unwrap_or(ui.scope_id())});
         });
         self.windows(ui, ide, &mut commands, theme);
+        self.form_windows(ui.ctx(), ide, &mut commands, theme);
         commands
     }
     fn find_occurrence(&mut self, ide: &Ide, commands: &mut Vec<Command>, backwards: bool) {
@@ -727,11 +749,17 @@ if response.double_clicked(){self.focus_editor=true;}response.context_menu(|ui|{
                 self.object_browser = true;
                 ui.close();
             }
-            Self::unavailable(
-                ui,
-                "Toolbox",
-                "UserForm designer is outside the current runtime profile",
-            );
+            if ui
+                .add_enabled(
+                    ide.active_module()
+                        .is_some_and(|m| ide.form(m.id).is_some()),
+                    egui::Button::new("Form Designer / Toolbox"),
+                )
+                .clicked()
+            {
+                self.form_view = true;
+                ui.close();
+            }
         });
         ui.menu_button("Insert", |ui| {
             if ui.button("Module").clicked() {
@@ -742,18 +770,19 @@ if response.double_clicked(){self.focus_editor=true;}response.context_menu(|ui|{
                 commands.push(Command::AddClass);
                 ui.close();
             }
-            Self::unavailable(
-                ui,
-                "UserForm",
-                "Form designer and binary form persistence are not implemented",
-            );
+            if ui
+                .add_enabled(ide.mode() == Mode::Design, egui::Button::new("UserForm"))
+                .clicked()
+            {
+                commands.push(Command::Form(FormCommand::Add));
+                self.form_view = true;
+                ui.close();
+            }
         });
         ui.menu_button("Format", |ui| {
-            Self::unavailable(
-                ui,
-                "Align / Size / Order",
-                "These commands apply to a UserForm designer",
-            )
+            if !self.form_format(ui, ide, commands) {
+                Self::unavailable(ui, "Align / Size / Order", "Select a form designer first");
+            }
         });
         ui.menu_button("Debug", |ui| {
             for a in [
@@ -846,6 +875,26 @@ if response.double_clicked(){self.focus_editor=true;}response.context_menu(|ui|{
         });
     }
     fn shortcuts(&mut self, ctx: &egui::Context, ide: &Ide, commands: &mut Vec<Command>) {
+        if self.form_view
+            && let Some(id) = ide
+                .active_module()
+                .map(|m| m.id)
+                .filter(|id| ide.form(*id).is_some())
+            && ide.mode() == Mode::Design
+        {
+            if ctx.input_mut(|i| i.consume_key(egui::Modifiers::NONE, egui::Key::F5)) {
+                commands.push(Command::Form(FormCommand::Run(id, self.form_modal)));
+            }
+            for (modifier, key, redo) in [
+                (egui::Modifiers::COMMAND, egui::Key::Z, false),
+                (egui::Modifiers::COMMAND, egui::Key::Y, true),
+            ] {
+                if ctx.input_mut(|i| i.consume_key(modifier, key)) {
+                    commands.push(Command::Form(FormCommand::History(id, redo)));
+                }
+            }
+        }
+
         if ctx.input_mut(|i| i.consume_key(egui::Modifiers::SHIFT, egui::Key::F3)) {
             self.find_occurrence(ide, commands, true);
         }

@@ -283,3 +283,16 @@ Unknown events, mismatched handler signatures, Optional/ParamArray/named/omitted
 event arguments and foreign WithEvents mutation are refused. Editor Options
 exposes all-error, class-module and unhandled-error trapping. Forms remain pending;
 see docs/m2-classes-and-forms.md for exact checkpoint and remaining work.
+
+## M2 completion: form events and modal continuations
+
+ADR 0024 adds explicitly opted-in `start_suspended_callback` and
+`finish_suspended_callback`; existing callbacks remain terminal-only. Waiting
+frames, foreign tokens, locations and error state survive ordinary event frames
+and source break/inspect/edit/resume. Depth is bounded at eight and work/payload
+budgets are shared. Cancel/disconnect release every pending token; failed events
+abort parked continuations. Snapshot/reset refuse unfinished parked callbacks.
+`read_instance_field` is inert and validates native handle/member identity.
+Named IR7 field captures preserve canonical ByRef storage. The VM has no form
+control definitions, toolkit or IO dependency. The upper IDE implements selected
+form lifecycle/control events; see [the exact profile](m2-acceptance.md).

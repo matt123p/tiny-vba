@@ -88,3 +88,50 @@ fn preferences_roundtrip_toolbar_order_and_views_but_not_source_or_execution_pol
     assert_eq!(restored.view.tab_width, 8);
     Ok(())
 }
+
+#[test]
+fn native_form_file_save_reopen_and_unsupported_resource_refusal_are_lossless() -> R {
+    let mut ide = vba_ide::Ide::new();
+    let id = ide.add_form("AuthoredForm")?;
+    ide.edit_form(
+        id,
+        vba_ide::forms::DesignEdit::Add(
+            vba_ide::forms::ControlKind::TextBox,
+            vba_ide::forms::Bounds {
+                left: 12.0,
+                top: 18.0,
+                width: 120.0,
+                height: 24.0,
+            },
+        ),
+    )?;
+    ide.set_text("' α\r\nOption Explicit\r\n".into())?;
+    let archive = ide.export_form(id)?;
+    let path = std::env::temp_dir().join(format!("vba-ui-form-{}.tvform", std::process::id()));
+    write_source(&path, &archive)?;
+    let (name, text) = read_source(&path)?;
+    let mut opened = vba_ide::Ide::new();
+    let id = opened.import_source_file(&name, &text)?;
+    assert_eq!(opened.export_form(id)?, archive);
+    let bad = format!("{archive}R\tunsupported.frx\n");
+    assert!(write_source(&path, &bad).is_err());
+    assert_eq!(read_source(&path)?.1, archive);
+    std::fs::remove_file(path)?;
+    Ok(())
+}
+
+#[test]
+fn invalid_form_open_preserves_the_existing_project() -> R {
+    let mut ide = vba_ide::Ide::new();
+    let id = ide.add_form("InvalidForm")?;
+    ide.set_text("Private Sub UserForm_Initialize(ByVal invalid As Long)\nEnd Sub".into())?;
+    let path =
+        std::env::temp_dir().join(format!("vba-ui-invalid-form-{}.tvform", std::process::id()));
+    write_source(&path, &ide.export_form(id)?)?;
+    let mut app = vba_ide_app::App::new()?;
+    let original = app.ide.active_module().ok_or("original")?.text.clone();
+    assert!(app.open(&path).is_err());
+    assert_eq!(app.ide.active_module().ok_or("preserved")?.text, original);
+    std::fs::remove_file(path)?;
+    Ok(())
+}

@@ -3,7 +3,7 @@
 use std::fmt;
 
 /// Caller-assigned identity, unique within a compilation/session source set.
-#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
+#[derive(Clone, Copy, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
 pub struct SourceId(pub u64);
 
 /// Caller-assigned identity for a statement within a source, including colon-separated statements.

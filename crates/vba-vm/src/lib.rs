@@ -223,7 +223,18 @@ pub struct ProjectState {
     sources: Vec<(vba_diagnostics::SourceId, String)>,
     values: BTreeMap<u32, Value>,
 }
+struct SuspendedInvocation {
+    frames: Vec<Frame>,
+    foreign: foreign::Session,
+    visit: Option<Visit>,
+    error: ErrorState,
+    raised_source: Option<String>,
+    result_reference: Option<Location>,
+    argument_continuation: bool,
+    stack_capacity: usize,
+}
 pub struct Session {
+    suspended_invocations: Vec<SuspendedInvocation>,
     default_instances: BTreeMap<ir::SourceIndex, vba_values::ObjectRef>,
     pending_result: Option<ReturnValue>,
     preserve_instances: bool,
@@ -405,6 +416,7 @@ impl Session {
             default_instances: BTreeMap::new(),
             pending_result: None,
             preserve_instances: false,
+            suspended_invocations: vec![],
             break_in_class: false,
             instances: Vec::new(),
             event_connections: BTreeMap::new(),
@@ -458,6 +470,11 @@ impl Session {
         &self.output
     }
     pub fn project_state(&self) -> Result<ProjectState> {
+        if !self.suspended_invocations.is_empty() {
+            return Err(command(
+                "finish suspended callbacks before taking project snapshots",
+            ));
+        }
         if !self.terminal() {
             return Err(command("project state requires a terminal invocation"));
         }
@@ -769,6 +786,105 @@ impl Session {
         }
         self.enqueue_callback(procedure, arguments, Some(object))
     }
+    /// Explicitly park a waiting invocation and deliver one already-validated callback.
+    /// The embedding must finish/abort the callback before polling the parked host wait.
+    pub fn start_suspended_callback(&mut self, host: &mut impl Host) -> Result<()> {
+        self.check_host(host)?;
+        if !matches!(self.state, Outcome::Waiting)
+            || !self.foreign.is_suspended()
+            || self.stale
+            || self.lifecycle_closed()
+            || self.suspended_invocations.len() >= 8
+            || self.callbacks.is_empty()
+        {
+            return Err(command(
+                "suspended callback requires a current wait, queued event and available depth",
+            ));
+        }
+        self.charge(256)?;
+        self.suspended_invocations
+            .try_reserve(1)
+            .map_err(|_| resource())?;
+        self.suspended_invocations.push(SuspendedInvocation {
+            frames: std::mem::take(&mut self.frames),
+            foreign: std::mem::take(&mut self.foreign),
+            visit: self.visit.take(),
+            error: std::mem::take(&mut self.error),
+            raised_source: self.raised_source.take(),
+            result_reference: self.host_result_reference.take(),
+            argument_continuation: std::mem::take(&mut self.argument_continuation),
+            stack_capacity: std::mem::take(&mut self.stack_capacity),
+        });
+        self.state = Outcome::Completed(ReturnValue::Sub);
+        if let Err(error) = self.start_next_callback(host) {
+            self.restore_suspended()?;
+            return Err(error);
+        }
+        Ok(())
+    }
+    pub fn has_suspended_invocation(&self) -> bool {
+        !self.suspended_invocations.is_empty()
+    }
+    fn restore_suspended(&mut self) -> Result<()> {
+        let saved = self
+            .suspended_invocations
+            .pop()
+            .ok_or_else(|| command("no suspended invocation"))?;
+        self.frames = saved.frames;
+        self.foreign = saved.foreign;
+        self.visit = saved.visit;
+        self.error = saved.error;
+        self.raised_source = saved.raised_source;
+        self.host_result_reference = saved.result_reference;
+        self.argument_continuation = saved.argument_continuation;
+        self.stack_capacity = saved.stack_capacity;
+        self.pending_result = None;
+        self.generation = self.generation.checked_add(1).ok_or_else(resource)?;
+        self.state = Outcome::Waiting;
+        Ok(())
+    }
+    /// Restore the exact waiting continuation after success, or cancel all waits after failure.
+    pub fn finish_suspended_callback(&mut self, host: &mut impl Host) -> Result<()> {
+        self.check_host(host)?;
+        if self.suspended_invocations.is_empty() || !self.terminal() {
+            return Err(command("callback is not terminal"));
+        }
+        if matches!(self.state, Outcome::Completed(_)) {
+            self.restore_suspended()
+        } else {
+            let failed = self.state.clone();
+            self.cancel(host)?;
+            self.state = failed;
+            Ok(())
+        }
+    }
+    /// Inert native field inspection. Does not execute property procedures or host calls.
+    pub fn read_instance_field(&self, object: vba_values::ObjectRef, name: &str) -> Result<Value> {
+        if name.len() > 128 {
+            return Err(command("field name budget"));
+        }
+        let instance = self.instance_object(object)?;
+        let class = self
+            .program
+            .program()
+            .classes
+            .iter()
+            .find(|c| c.source == instance.source)
+            .ok_or_else(|| invariant("instance class"))?;
+        let index = class
+            .fields
+            .iter()
+            .position(|f| f.public && f.name.eq_ignore_ascii_case(name))
+            .ok_or_else(|| command("public native field not found"))?;
+        self.store
+            .read(
+                *instance
+                    .fields
+                    .get(index)
+                    .ok_or_else(|| invariant("field location"))?,
+            )
+            .cloned()
+    }
     pub fn project_object(&self, name: &str) -> Result<vba_values::ObjectRef> {
         if name.len() > 128 {
             return Err(command("project symbol limit"));
@@ -969,6 +1085,11 @@ impl Session {
     /// Clear project state/output and prepare the original entry invocation again. Refused
     /// unless terminal and open; queued callbacks and lifetime work budgets are retained.
     pub fn reset_state(&mut self) -> Result<()> {
+        if !self.suspended_invocations.is_empty() {
+            return Err(command(
+                "cancel suspended invocations with their host before reset",
+            ));
+        }
         if !self.terminal() || self.lifecycle_closed() || self.stale {
             return Err(command(
                 "reset requires a terminal, open, current invocation",
@@ -1029,6 +1150,9 @@ impl Session {
     }
     pub fn program(&self) -> &ir::VerifiedProgram {
         &self.program
+    }
+    pub fn pending_host_token(&self) -> Option<u64> {
+        self.foreign.pending_token()
     }
     pub fn outcome(&self) -> &Outcome {
         &self.state
@@ -1793,9 +1917,18 @@ impl Session {
         } else {
             BTreeSet::new()
         };
+        let retained = self
+            .suspended_invocations
+            .iter()
+            .flat_map(|s| s.frames.iter())
+            .flat_map(|f| f.slots.iter().copied())
+            .collect::<BTreeSet<_>>();
         let persistent = &self.persistent;
         for location in self.kinds.keys() {
-            if !persistent.values().any(|l| l == location) && !native_fields.contains(location) {
+            if !persistent.values().any(|l| l == location)
+                && !native_fields.contains(location)
+                && !retained.contains(location)
+            {
                 let _ = self.store.invalidate(*location);
             }
         }
@@ -1807,10 +1940,14 @@ impl Session {
         self.pending_result = None;
         self.next_receiver = None;
         self.kinds.retain(|location, _| {
-            persistent.values().any(|l| l == location) || native_fields.contains(location)
+            persistent.values().any(|l| l == location)
+                || native_fields.contains(location)
+                || retained.contains(location)
         });
         self.array_types.retain(|location, _| {
-            persistent.values().any(|l| l == location) || native_fields.contains(location)
+            persistent.values().any(|l| l == location)
+                || native_fields.contains(location)
+                || retained.contains(location)
         });
         self.visit = None;
         self.pending_fault = None;
@@ -1830,10 +1967,15 @@ impl Session {
     }
     pub fn cancel(&mut self, host: &mut impl Host) -> Result<()> {
         self.check_host(host)?;
+        for suspended in &mut self.suspended_invocations {
+            suspended.foreign.cancel(host)?;
+        }
+        self.suspended_invocations.clear();
         self.closed = true;
         self.callbacks.clear();
         if self.terminal() {
             self.release_native_state()?;
+            self.cleanup();
             return Ok(());
         }
         self.foreign.cancel(host)?;
@@ -1843,10 +1985,15 @@ impl Session {
     }
     pub fn disconnect(&mut self, host: &mut impl Host) -> Result<()> {
         self.check_host(host)?;
+        for suspended in &mut self.suspended_invocations {
+            suspended.foreign.cancel(host)?;
+        }
+        self.suspended_invocations.clear();
         self.closed = true;
         self.callbacks.clear();
         if self.terminal() {
             self.release_native_state()?;
+            self.cleanup();
             return Ok(());
         }
         self.foreign.cancel(host)?;
@@ -1861,10 +2008,12 @@ impl Session {
     }
     /// Use only when the host is already gone; it cannot claim external token cleanup.
     pub fn host_lost(&mut self) -> Result<()> {
+        self.suspended_invocations.clear();
         self.closed = true;
         self.callbacks.clear();
         if self.terminal() {
             self.release_native_state()?;
+            self.cleanup();
             return Ok(());
         }
         self.foreign = foreign::Session::default();
@@ -2124,7 +2273,11 @@ impl Session {
                 break;
             }
             if self.frames.is_empty() && self.pending_result.is_some() {
-                match self.settle_instances() {
+                match if self.suspended_invocations.is_empty() {
+                    self.settle_instances()
+                } else {
+                    Ok(false)
+                } {
                     Ok(true) => continue,
                     Err(e) => {
                         self.fail(e)?;

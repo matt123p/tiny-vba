@@ -185,9 +185,20 @@ methods; native calls run on the same frames/controller as other VBA. Native
 state is separate from the foreign host's existing object store. Snapshots carry
 owned native state and rebind receiving-session handles. Normal lifecycle code
 is interpreted; reset/cancel cleanup is inert. No new shipping crate/dependency
-edge is added. Form designer/event-language work remains staged separately.
+edge is added. The selected form designer/runtime and exchange contract are implemented under ADR 0024.
 
 M2.2's `vba-ide::forms` model is toolkit/IO-free and owns bounded standard-control
 design data, selection and atomic layout/history commands. It contains no Office
 application objects, runtime control activation or persistence IO. Its document
-is independent of VM Reset. Shared egui designer/runtime integration remains pending.
+is independent of VM Reset. The shared egui designer/runtime and source/design exchange now use this same model under ADR 0024.
+
+## M2 standard forms (ADR 0024)
+
+`vba-ide` owns shared form design/source, the bounded `.tvform` codec, generated
+project-class support and form event orchestration. `vba-ui-egui` renders the
+designer and runtime; the shell owns explicit native/browser IO. The VM supplies
+generic parked host continuations and explicitly opted-in suspended callbacks,
+with no UI/control dependency. Existing terminal-only callbacks are unchanged.
+The reviewed 19-crate dependency graph is unchanged. See
+[contracts and acceptance](m2-acceptance.md) and
+[ADR 0024](decisions/0024-standard-form-execution-and-exchange.md).

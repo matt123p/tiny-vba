@@ -89,3 +89,6 @@ and controlled native/WASI acceptance.
 
 Downloaded reference evidence is ignored under `.cache/evidence/`; original rendered PNGs are
 ignored under `reports/ui/`. Neither is required for the ordinary offline test suite.
+
+- [M2 selected class/form acceptance and exchange format](m2-acceptance.md)
+- [ADR 0024: standard form execution and exchange](decisions/0024-standard-form-execution-and-exchange.md)

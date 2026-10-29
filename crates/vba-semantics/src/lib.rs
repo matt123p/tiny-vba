@@ -419,6 +419,9 @@ fn preflight(module: &ast::Module, budget: &mut Budget) -> Result<()> {
                         }
                     }
                 }
+                ast::StatementKind::FormLifecycle { target, .. } => {
+                    push(&mut pending, (Node::Expr(target), depth + 1), span)?;
+                }
                 ast::StatementKind::Assign { target, value, .. } => {
                     push(&mut pending, (Node::Expr(target), depth + 1), span)?;
                     push(&mut pending, (Node::Expr(value), depth + 1), span)?;
@@ -811,7 +814,14 @@ pub fn bind_with_references(
                 } else {
                     element
                 };
-                if !parameter.optional && parameters.iter().any(|p: &BoundParameter| p.optional) {
+                let property_value = matches!(
+                    procedure.property,
+                    Some(ast::PropertyKind::Let | ast::PropertyKind::Set)
+                ) && position + 1 == procedure.parameters.len();
+                if !parameter.optional
+                    && !property_value
+                    && parameters.iter().any(|p: &BoundParameter| p.optional)
+                {
                     return Err(err("required parameter after Optional", parameter.span));
                 }
                 let default = if parameter.optional {
@@ -837,7 +847,7 @@ pub fn bind_with_references(
                         array: parameter.array.then_some(element),
                         param_array: parameter.param_array,
                         kind,
-                        by_val: parameter.by_val || parameter.param_array,
+                        by_val: parameter.by_val || parameter.param_array || property_value,
                         optional: parameter.optional,
                         default,
                         span: parameter.span,
@@ -874,6 +884,63 @@ pub fn bind_with_references(
         }
         push(&mut module_constants, constants, source_span)?;
         push(&mut modules, module.clone(), source_span)?;
+    }
+    // Matching property accessors share indexed parameter contracts and value identity.
+    let mut property_groups = BTreeMap::<(usize, String), Vec<&Signature>>::new();
+    for signature in signatures.iter().filter(|s| s.property.is_some()) {
+        property_groups
+            .entry((signature.module, signature.name.to_ascii_lowercase()))
+            .or_default()
+            .push(signature);
+        if matches!(signature.property, Some(ast::PropertyKind::Set))
+            && signature
+                .parameters
+                .last()
+                .is_none_or(|value| !matches!(value.kind, ScalarKind::Object | ScalarKind::Variant))
+        {
+            return Err(err("Property Set requires an object value", signature.span));
+        }
+    }
+    for group in property_groups.values() {
+        let Some(getter) = group
+            .iter()
+            .find(|s| matches!(s.property, Some(ast::PropertyKind::Get)))
+        else {
+            continue;
+        };
+        for setter in group.iter().filter(|s| {
+            matches!(
+                s.property,
+                Some(ast::PropertyKind::Let | ast::PropertyKind::Set)
+            )
+        }) {
+            let Some((value, indices)) = setter.parameters.split_last() else {
+                return Err(err("property value parameter missing", setter.span));
+            };
+            if getter.result != Some(value.kind)
+                || getter.nominal_result != value.nominal
+                || getter.parameters.len() != indices.len()
+                || getter.parameters.iter().zip(indices).any(|(a, b)| {
+                    !a.name.eq_ignore_ascii_case(&b.name)
+                        || a.kind != b.kind
+                        || a.nominal != b.nominal
+                        || a.array != b.array
+                        || a.by_val != b.by_val
+                        || a.optional != b.optional
+                        || a.param_array != b.param_array
+                })
+            {
+                return Err(err(
+                    "property accessor signatures or value types differ",
+                    setter.span,
+                ));
+            }
+            if matches!(setter.property, Some(ast::PropertyKind::Set))
+                && !matches!(value.kind, ScalarKind::Object | ScalarKind::Variant)
+            {
+                return Err(err("Property Set requires an object value", setter.span));
+            }
+        }
     }
     let entries: Vec<_> = signatures
         .iter()
@@ -1480,6 +1547,29 @@ impl Binder<'_> {
                     Argument::Reference(slot)
                 } else {
                     let bound = self.expr(expr)?;
+                    if let Some(field) = self.project_field(&bound)
+                        && !matches!(expr.kind, ast::ExprKind::Parenthesized(_))
+                    {
+                        if field.kind != param.kind
+                            || field.nominal != param.nominal
+                            || field.array != param.array
+                        {
+                            return Err(err("ByRef project field type mismatch", expr.span));
+                        }
+                        push(
+                            &mut result,
+                            Argument::Mapped {
+                                parameter: index,
+                                argument: Box::new(Argument::DefaultReference {
+                                    value: bound,
+                                    kind: param.kind,
+                                    nominal: param.nominal.clone(),
+                                }),
+                            },
+                            arg.span,
+                        )?;
+                        continue;
+                    }
                     if matches!(&bound.kind,ExprKind::Foreign{kind:ForeignKind::DefaultGet,target,..} if matches!(target.kind,ExprKind::Local(_)))
                         && matches!(expr.kind, ast::ExprKind::Apply { .. })
                     {
@@ -1608,6 +1698,208 @@ impl Binder<'_> {
         }
         Ok(result)
     }
+    fn expression_nominal(&self, expr: &Expr) -> Option<vba_values::NominalType> {
+        match &expr.kind {
+            ExprKind::Local(slot) => {
+                let local = self.locals.get(*slot)?;
+                local.nominal.clone().or_else(|| {
+                    if local.receiver {
+                        self.classes
+                            .iter()
+                            .find(|c| c.module == self.signature.module)
+                            .and_then(|c| {
+                                vba_values::NominalType::new("VBAProject", "1", &c.name).ok()
+                            })
+                    } else {
+                        None
+                    }
+                })
+            }
+            ExprKind::New(module) | ExprKind::DefaultInstance(module) => self
+                .classes
+                .iter()
+                .find(|c| c.module == *module)
+                .and_then(|c| vba_values::NominalType::new("VBAProject", "1", &c.name).ok()),
+            ExprKind::Call { procedure, .. } => {
+                self.signatures.get(*procedure)?.nominal_result.clone()
+            }
+            ExprKind::Foreign { target, member, .. } => {
+                let ty = self.expression_nominal(target)?;
+                let class = self.classes.iter().find(|c| {
+                    ty.library().eq_ignore_ascii_case("VBAProject")
+                        && c.name.eq_ignore_ascii_case(ty.name())
+                })?;
+                class
+                    .fields
+                    .iter()
+                    .find(|f| f.name.eq_ignore_ascii_case(member))
+                    .and_then(|f| f.nominal.clone())
+                    .or_else(|| {
+                        self.signatures
+                            .iter()
+                            .find(|s| {
+                                s.module == class.module
+                                    && s.name.eq_ignore_ascii_case(member)
+                                    && !matches!(
+                                        s.property,
+                                        Some(ast::PropertyKind::Let | ast::PropertyKind::Set)
+                                    )
+                            })
+                            .and_then(|s| s.nominal_result.clone())
+                    })
+            }
+            _ => None,
+        }
+    }
+    fn project_field(&self, expr: &Expr) -> Option<&ClassField> {
+        let ExprKind::Foreign {
+            target,
+            member,
+            kind: ForeignKind::Get,
+            arguments,
+        } = &expr.kind
+        else {
+            return None;
+        };
+        if !arguments.is_empty() {
+            return None;
+        }
+        let ty = self.expression_nominal(target)?;
+        self.classes
+            .iter()
+            .find(|c| {
+                ty.library().eq_ignore_ascii_case("VBAProject")
+                    && c.name.eq_ignore_ascii_case(ty.name())
+            })?
+            .fields
+            .iter()
+            .find(|f| f.name.eq_ignore_ascii_case(member))
+    }
+    fn check_project_member(
+        &mut self,
+        target: &Expr,
+        member: &ast::Name,
+        args: &[ast::Argument],
+        kind: ForeignKind,
+        extra: Option<&ast::Expr>,
+    ) -> Result<()> {
+        let Some(ty) = self.expression_nominal(target) else {
+            return Ok(());
+        };
+        let Some(class) = self.classes.iter().find(|c| {
+            ty.library().eq_ignore_ascii_case("VBAProject")
+                && c.name.eq_ignore_ascii_case(ty.name())
+        }) else {
+            return Ok(());
+        };
+        let inside = class.module == self.signature.module;
+        if let Some(field) = class
+            .fields
+            .iter()
+            .find(|f| f.name.eq_ignore_ascii_case(&member.spelling))
+        {
+            if !field.public && !inside {
+                return Err(err("private project field is inaccessible", member.span));
+            }
+            if !args.is_empty() {
+                return Err(err("project field takes no index arguments", member.span));
+            }
+            if matches!(kind, ForeignKind::Set)
+                && !matches!(field.kind, ScalarKind::Object | ScalarKind::Variant)
+            {
+                return Err(err("Set requires an object field", member.span));
+            }
+            return Ok(());
+        }
+        let id = self
+            .signatures
+            .iter()
+            .position(|s| {
+                s.module == class.module
+                    && !s.event
+                    && s.name.eq_ignore_ascii_case(&member.spelling)
+                    && matches!(
+                        (&s.property, kind),
+                        (
+                            Some(ast::PropertyKind::Get),
+                            ForeignKind::Get | ForeignKind::Call
+                        ) | (None, ForeignKind::Call | ForeignKind::Get)
+                            | (Some(ast::PropertyKind::Let), ForeignKind::Let)
+                            | (Some(ast::PropertyKind::Set), ForeignKind::Set)
+                    )
+            })
+            .ok_or_else(|| {
+                err(
+                    "unknown project member or invalid property access",
+                    member.span,
+                )
+            })?;
+        let sig = self
+            .signatures
+            .get(id)
+            .ok_or_else(|| err("project member signature", member.span))?;
+        if sig.visibility == ast::Visibility::Private && !inside {
+            return Err(err("private project member is inaccessible", member.span));
+        }
+        let mut used = BTreeSet::new();
+        let params = sig.parameters.clone();
+        for (position, argument) in args.iter().enumerate() {
+            let index = if let Some(name) = &argument.name {
+                params
+                    .iter()
+                    .position(|p| p.name.eq_ignore_ascii_case(&name.spelling))
+                    .ok_or_else(|| err("unknown named project argument", name.span))?
+            } else {
+                position
+            };
+            if !used.insert(index) {
+                return Err(err("duplicate project argument", argument.span));
+            }
+            let param = params
+                .get(index)
+                .ok_or_else(|| err("project argument count mismatch", argument.span))?;
+            if argument.value.is_none() && !param.optional {
+                return Err(err("missing required project argument", argument.span));
+            }
+            if !param.by_val
+                && let Some(value) = &argument.value
+            {
+                let bound = self.expr(value)?;
+                let declaration = if let ExprKind::Local(slot) = &bound.kind {
+                    self.locals
+                        .get(*slot)
+                        .map(|l| (l.kind, l.nominal.clone(), l.array))
+                } else {
+                    self.project_field(&bound)
+                        .map(|f| (f.kind, f.nominal.clone(), f.array))
+                };
+                if let Some((kind, nominal, array)) = declaration
+                    && (kind != param.kind
+                        || nominal != param.nominal
+                        || param.array.is_some() && array != param.array)
+                {
+                    return Err(err("ByRef project argument type mismatch", value.span));
+                }
+            }
+        }
+        if extra.is_some() {
+            let index = params
+                .len()
+                .checked_sub(1)
+                .ok_or_else(|| err("property value parameter missing", member.span))?;
+            if !used.insert(index) {
+                return Err(err("duplicate property value argument", member.span));
+            }
+        }
+        if params
+            .iter()
+            .enumerate()
+            .any(|(i, p)| !p.optional && !p.param_array && !used.contains(&i))
+        {
+            return Err(err("missing required project argument", member.span));
+        }
+        Ok(())
+    }
     fn foreign(
         &mut self,
         target: &ast::Expr,
@@ -1657,6 +1949,7 @@ impl Binder<'_> {
             return self.imported(&import, arguments, target.span);
         }
         let bound_target = self.expr(target)?;
+        self.check_project_member(&bound_target, member, arguments, kind, extra)?;
         if let ExprKind::Local(slot) = &bound_target.kind
             && self
                 .locals
@@ -1677,10 +1970,16 @@ impl Binder<'_> {
                 &mut args,
                 ForeignArgument {
                     reference: !self.classes.is_empty()
-                        && matches!(
+                        && (matches!(
                             arg.value.as_ref().map(|e| &e.kind),
                             Some(ast::ExprKind::Name(_))
-                        ),
+                        ) || arg
+                            .value
+                            .as_ref()
+                            .map(|e| self.expr(e))
+                            .transpose()?
+                            .as_ref()
+                            .is_some_and(|e| self.project_field(e).is_some())),
                     name: arg.name.as_ref().map(|n| n.spelling.clone()),
                     value: arg.value.as_ref().map(|e| self.expr(e)).transpose()?,
                 },
@@ -2564,6 +2863,36 @@ impl Binder<'_> {
                     },
                     object: *object,
                 }
+            }
+            ast::StatementKind::FormLifecycle { target, unload } => {
+                let bound = self.expr(target)?;
+                if self.expression_nominal(&bound).is_none() {
+                    return Err(err(
+                        "Load/Unload requires a statically bound project form",
+                        site.span,
+                    ));
+                }
+                let member = ast::Name {
+                    spelling: if *unload { "VbaClose" } else { "VbaLoad" }.into(),
+                    span: site.span,
+                };
+                let mode = ast::Argument {
+                    name: None,
+                    span: site.span,
+                    value: Some(ast::Expr::integer_literal(site.span, 1)),
+                };
+                let call = self.foreign(
+                    target,
+                    &member,
+                    if *unload {
+                        std::slice::from_ref(&mode)
+                    } else {
+                        &[]
+                    },
+                    ForeignKind::Call,
+                    None,
+                )?;
+                StatementKind::Foreign(call)
             }
             ast::StatementKind::RaiseEvent { name, arguments } => {
                 let id = self

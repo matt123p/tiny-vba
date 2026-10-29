@@ -110,3 +110,10 @@ Unknown events, mismatched handler signatures, Optional/ParamArray/named/omitted
 event arguments and foreign WithEvents mutation are refused. Editor Options
 exposes all-error, class-module and unhandled-error trapping. Forms remain pending;
 see docs/m2-classes-and-forms.md for exact checkpoint and remaining work.
+
+## M2 form lifecycle syntax
+
+Load and Unload accept a target expression and retain their own source statement
+checkpoint. Binding requires a statically resolved project form lifecycle member;
+parsing alone never loads or executes a form. Selected form/event generation and
+unsupported resource boundaries are documented in [M2 acceptance](m2-acceptance.md).

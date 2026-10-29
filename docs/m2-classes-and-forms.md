@@ -4,9 +4,10 @@ Started 2026-10-28 on `feat/m2-classes-and-forms`, after fast-forwarding and
 pushing tiny-vba main to `2ee181d91411317a294d7ea30a49ac610c203431`.
 GridCraft main and its feature branch were not changed by that merge.
 
-Updated 2026-10-29. **M2.x remains in progress.** This record distinguishes the
-working runtime foundation from the remaining event-language/designer work.
-M3 has not been started; it follows completion of the requested M2 work.
+Updated 2026-10-29. **M2.1–M2.4 are complete for the selected profile** under ADR 0024; all final
+acceptance gates pass in [the completion report](m2-acceptance.md). M3 has not
+started. The stage table and dated checkpoint notes below are historical and
+describe the gaps before this completion implementation.
 
 | Stage | State |
 |---|---|

@@ -796,6 +796,29 @@ impl Builder<'_> {
                 {
                     self.emit(block, ir::Instruction::RefLocal(ir::LocalSlot(idx(slot)?)))?;
                     ir::ArgumentMode::Reference
+                } else if arg.reference
+                    && let bound::ExprKind::Foreign {
+                        target,
+                        member,
+                        arguments,
+                        ..
+                    } = &value.kind
+                {
+                    let scratch = self.scratch(ScalarKind::Variant)?;
+                    self.foreign(
+                        block,
+                        target,
+                        bound::ForeignKind::ArgumentGet,
+                        member,
+                        arguments,
+                    )?;
+                    self.blocks
+                        .get_mut(block)
+                        .and_then(|b| b.foreign.last_mut())
+                        .ok_or_else(|| error("field argument site"))?
+                        .1
+                        .result_reference = Some(ir::LocalSlot(idx(scratch)?));
+                    ir::ArgumentMode::Reference
                 } else {
                     self.expr(block, value)?;
                     ir::ArgumentMode::Value

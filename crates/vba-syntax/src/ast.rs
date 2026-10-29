@@ -107,6 +107,10 @@ pub struct Statement {
 }
 #[derive(Clone, Debug)]
 pub enum StatementKind {
+    FormLifecycle {
+        target: Expr,
+        unload: bool,
+    },
     RaiseEvent {
         name: Name,
         arguments: Vec<Argument>,
@@ -224,4 +228,15 @@ pub struct ForLoop {
     pub body: Vec<Statement>,
     pub next: StatementSite,
     pub next_counter: Option<Name>,
+}
+
+impl Expr {
+    /// Construct a bounded scalar literal for source elaboration.
+    pub fn integer_literal(span: Span, value: i32) -> Self {
+        Self {
+            span,
+            kind: ExprKind::Number(value.to_string()),
+            depth: 1,
+        }
+    }
 }

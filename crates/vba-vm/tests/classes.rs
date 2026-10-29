@@ -215,7 +215,7 @@ fn constructors_private_fields_methods_and_properties_execute_per_instance() -> 
 #[test]
 fn private_members_are_inaccessible_from_standard_modules() -> R {
     let mut s = session(
-        "Function Answer() As Long\nDim a As Counter\nSet a=New Counter\nOn Error Resume Next\na.total=99\nAnswer=Err.Number+a.Count\nEnd Function",
+        "Function Answer() As Long\nDim a As Object\nSet a=New Counter\nOn Error Resume Next\na.total=99\nAnswer=Err.Number+a.Count\nEnd Function",
         COUNTER,
     )?;
     assert_eq!(
@@ -328,7 +328,7 @@ fn instance_callbacks_share_fields_and_reject_reset_handles() -> R {
 
 #[test]
 fn default_properties_optional_named_arguments_and_exit_property_execute() -> R {
-    let class = "Attribute Item.VB_UserMemId = 0\nPrivate total As Long\nPublic Property Get Item(Optional ByVal index As Long = 2) As Long\nItem=total+index\nExit Property\nItem=999\nEnd Property\nPublic Property Let Item(ByVal index As Long,ByVal value As Long)\ntotal=value+index\nEnd Property";
+    let class = "Attribute Item.VB_UserMemId = 0\nPrivate total As Long\nPublic Property Get Item(Optional ByVal index As Long = 2) As Long\nItem=total+index\nExit Property\nItem=999\nEnd Property\nPublic Property Let Item(Optional ByVal index As Long = 2,ByVal value As Long)\ntotal=value+index\nEnd Property";
     let mut s = session(
         "Function Answer() As Long\nDim a As Counter\nSet a=New Counter\na(3)=4\nAnswer=a.Item()+a(Index:=5)\nEnd Function",
         class,
@@ -637,6 +637,61 @@ fn legacy_foreign_namespace_and_host_zero_remain_valid_without_project_classes()
     assert_eq!(
         drive(&mut s)?,
         Outcome::Completed(ReturnValue::Function(Value::Object(object)))
+    );
+    Ok(())
+}
+
+#[test]
+fn early_bound_members_reject_invalid_access_before_execution() -> R {
+    for code in [
+        "a.total=99",
+        "a.Missing",
+        "a.Add",
+        "a.Add wrong:=2",
+        "a.Count(1)=2",
+    ] {
+        assert!(
+            session(
+                &format!("Sub Main()\nDim a As Counter\nSet a=New Counter\n{code}\nEnd Sub"),
+                COUNTER
+            )
+            .is_err(),
+            "{code}"
+        );
+    }
+    Ok(())
+}
+#[test]
+fn external_native_fields_alias_across_procedure_and_method_calls() -> R {
+    let main = "Function Answer() As Long\nDim a As Counter\nSet a=New Counter\nChange a.total\na.Change a.total\nChange (a.total)\nAnswer=a.total\nEnd Function\nSub Change(ByRef n As Long)\nn=n+1\nEnd Sub";
+    let class = "Public total As Long\nPublic Sub Change(ByRef n As Long)\nn=n+10\nEnd Sub";
+    let mut s = session(main, class)?;
+    assert_eq!(
+        drive(&mut s)?,
+        Outcome::Completed(ReturnValue::Function(Value::Long(11)))
+    );
+    assert!(
+        session(
+            &main.replace("ByRef n As Long", "ByRef n As Integer"),
+            class
+        )
+        .is_err()
+    );
+    Ok(())
+}
+
+#[test]
+fn mismatched_property_accessors_are_rejected_and_assignment_values_are_byval() -> R {
+    let main = "Sub Main()\nEnd Sub";
+    assert!(session(main,"Property Get Item() As Long\nEnd Property\nProperty Let Item(value As String)\nEnd Property").is_err());
+    assert!(session(main,"Property Get Item(ByVal index As Long) As Long\nEnd Property\nProperty Let Item(ByVal different As Long, value As Long)\nEnd Property").is_err());
+    let mut s = session(
+        "Function Answer() As Long\nDim a As Counter,n As Long\nSet a=New Counter\nn=7\na.Item=n\nAnswer=n\nEnd Function",
+        "Property Get Item() As Long\nEnd Property\nProperty Let Item(value As Long)\nvalue=99\nEnd Property",
+    )?;
+    assert_eq!(
+        drive(&mut s)?,
+        Outcome::Completed(ReturnValue::Function(Value::Long(7)))
     );
     Ok(())
 }

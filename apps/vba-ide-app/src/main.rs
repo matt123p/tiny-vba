@@ -12,10 +12,13 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             "--capture" => app.capture_paused(std::path::PathBuf::from(
                 args.next().ok_or("--capture requires a PNG path")?,
             ))?,
+            "--capture-form" => app.capture_form(std::path::PathBuf::from(
+                args.next().ok_or("--capture-form requires a PNG path")?,
+            ))?,
             "--dark" => app.theme = vba_ui_egui::Theme::dark(),
             "--help" => {
                 println!(
-                    "Craft VBA Editor\nUsage: vba-ide-app [--open file.bas] [--capture report.png] [--dark]\nF5 run, F8 step, F9 breakpoint. --capture runs the authored demo to a real breakpoint, captures the native window and exits."
+                    "Craft VBA Editor\nUsage: vba-ide-app [--open file.bas|file.cls|file.tvform] [--capture report.png] [--capture-form report.png] [--dark]\nF5 run, F8 step, F9 breakpoint. --capture runs the authored demo to a real breakpoint, captures the native window and exits."
                 );
                 return Ok(());
             }

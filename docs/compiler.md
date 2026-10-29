@@ -190,7 +190,7 @@ use live element reads; host collection enumeration uses a bounded owned snapsho
 See [implementation and evidence](m1-defaults-and-collections.md). Earlier
 historical restrictions on default/collection syntax above are superseded here.
 
-## M2 class foundation (in progress)
+## M2 class profile
 
 IR 7 `project-classes-v7` adds explicitly parsed Class/Document components,
 project-local nominal types, New, Me, Get/Let/Set accessors, Exit Property,
@@ -210,5 +210,17 @@ order and canonical ByRef across sinks, and retains queued receivers through
 pause/resume. State transfer remaps objects and preserves subscription ordering.
 Unknown events, mismatched handler signatures, Optional/ParamArray/named/omitted
 event arguments and foreign WithEvents mutation are refused. Editor Options
-exposes all-error, class-module and unhandled-error trapping. Forms remain pending;
-see docs/m2-classes-and-forms.md for exact checkpoint and remaining work.
+exposes all-error, class-module and unhandled-error trapping. The selected form runtime/designer and source exchange are implemented under ADR 0024;
+see [M2 acceptance](m2-acceptance.md) for current scope and evidence.
+
+## M2 completion: static members and form input
+
+Under ADR 0024, typed project members validate names, visibility, access kinds,
+named/required/ByRef parameters and chained nominal receivers before execution.
+Matching property accessors have coherent index/value signatures; assignment
+value parameters are ByVal. Named native-field ArgumentGet captures require IR7;
+ordinary public field arguments alias canonical locations, while parenthesized
+expressions stay temporary. Late-bound Object/Variant retain runtime checks.
+Load/Unload bind to checked project form lifecycle methods. The IDE appends form
+class support to compiler input, retaining authored handler offsets and saving
+only original source plus design. See [M2 acceptance](m2-acceptance.md).

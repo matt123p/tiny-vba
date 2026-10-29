@@ -77,21 +77,25 @@ Declarative reference metadata/List Constants belong to the historical M10 imple
 executable external type/reference binding is new M1. Preserve original CR/CRLF source
 bytes through the editor view mapping and Static state across compatible same-host reruns until Reset.
 
-M2 is in progress under ADR 0023 / docs/m2-classes-and-forms.md. IR 7 adds
-project-owned class fields/method frames, lazy document state, scoped native
-handles and class callback/debugger execution. Native fields use canonical
-locations; external Office objects remain fork-owned. Preserve legacy refusal,
-inert import/watch behavior, generation checks and abnormal cleanup. Do not
-enable a form designer Run action or mark M2 complete from class-core evidence.
+M2's selected class/standard-form profile is implemented under ADR 0023/0024.
+Read docs/m2-acceptance.md for current scope, workflow, exchange format and gates;
+docs/m2-classes-and-forms.md retains historical incomplete checkpoints. Preserve
+IR7 class/event identity, canonical field ByRef, static visibility/signature checks,
+property value ByVal semantics, inert safe inspection and all three error modes.
 
-The M2 source-event increment verifies Event/WithEvents/RaiseEvent signatures,
-orders synchronous sink frames by connection assignment and preserves canonical
-ByRef, saved connections, pause/resume and fault/reset cleanup. The editor inserts
-real classes and exposes all three trapping modes. Forms remain pending; use the
-staged record and do not infer full M2 acceptance from this checkpoint.
+vba-ide owns the bounded shared design, authored source, .tvform codec and form
+orchestration; vba-ui-egui renders the same designer/runtime in native/browser
+hosts. Generated native control classes use ordinary Event/WithEvents frames.
+Explicit suspended callbacks park a modal caller; existing callbacks remain
+terminal-only. Retain parked locations, shared budgets, input ownership and host
+tokens through pause/resume. Cancel every token on Reset/close; do not execute
+user cleanup during abnormal shutdown. Design/history must survive VM Reset.
 
-M2.2 now has a bounded headless `vba_ide::forms` model with atomic layout/
-Properties edits, tab/z-order, grouping, zoom and content-based saved history.
-Mount that model in the reusable UI; do not create a second designer state in
-the application shell or mix runtime values with design/reset state. The visual
-designer, actual form Run/event wiring and persistence are still pending.
+Form import is inert and validates before project mutation. Save/export preserve
+exact authored source and design; revision acknowledgments must reject intervening
+source/design edits. Unknown formats, controls and binary resources fail explicitly.
+The selected Label/TextBox/CommandButton profile does not authorize COM/DLL or
+third-party controls, binary Office form/resource compatibility or package writeback.
+Office document bindings/events, storage, trust and package persistence stay in forks.
+Run CI/WASM/WASI plus UI/native/web and both Chromium smoke/form acceptance gates
+when changing these surfaces. M3 range/worksheet work is GridCraft-owned.

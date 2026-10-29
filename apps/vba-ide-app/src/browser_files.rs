@@ -32,7 +32,7 @@ impl BrowserFiles {
             .create_element("input")?
             .dyn_into::<web_sys::HtmlInputElement>()?;
         input.set_type("file");
-        input.set_accept(".bas,text/plain");
+        input.set_accept(".bas,.cls,.tvform,text/plain");
         input.set_attribute("hidden", "")?;
         document
             .body()
@@ -48,15 +48,17 @@ impl BrowserFiles {
             let ctx = ctx.clone();
             wasm_bindgen_futures::spawn_local(async move {
                 let name = file.name();
-                let imported = if !name.to_ascii_lowercase().ends_with(".bas")
-                    || file.size() > vba_ide::SourceFile::MAX_BYTES as f64
+                let imported = if ![".bas", ".cls", ".tvform"]
+                    .iter()
+                    .any(|extension| name.to_ascii_lowercase().ends_with(extension))
+                    || file.size() > (8 * 1024 * 1024) as f64
                 {
-                    Err("Choose a bounded UTF-8 .bas file".into())
+                    Err("Choose a bounded UTF-8 .bas/.cls/.tvform file".into())
                 } else {
                     match wasm_bindgen_futures::JsFuture::from(file.array_buffer()).await {
                         Ok(buffer) => {
                             let bytes = js_sys::Uint8Array::new(&buffer);
-                            if bytes.length() as usize > vba_ide::SourceFile::MAX_BYTES {
+                            if bytes.length() as usize > 8 * 1024 * 1024 {
                                 Err("Source budget exceeded".into())
                             } else {
                                 String::from_utf8(bytes.to_vec())
@@ -81,7 +83,7 @@ impl BrowserFiles {
             .map_err(|e| format!("Browser download failed: {e:?}"))
     }
     fn download_inner(&mut self, name: &str, text: &str) -> Result<(), JsValue> {
-        if text.len() > vba_ide::SourceFile::MAX_BYTES {
+        if text.len() > 8 * 1024 * 1024 {
             return Err(JsValue::from_str("source budget exceeded"));
         }
         let document = web_sys::window()

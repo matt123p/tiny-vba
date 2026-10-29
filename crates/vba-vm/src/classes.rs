@@ -558,6 +558,23 @@ impl Session {
                     message: "invalid field application".into(),
                 }));
             };
+            if site.kind == ir::ForeignKind::ArgumentGet {
+                let scratch = site
+                    .result_reference
+                    .ok_or_else(|| invariant("field reference scratch"))?;
+                let expected = self.location(scratch)?;
+                if self.kinds.get(&expected).is_some_and(|kind| {
+                    *kind != ScalarKind::Variant && Some(kind) != self.kinds.get(&location)
+                }) {
+                    return Err(runtime_diagnostic(runtime::Error::Vba {
+                        number: 13,
+                        message: "ByRef field type mismatch".into(),
+                    }));
+                }
+                self.push(Operand::Reference(location))?;
+                self.advance()?;
+                return Ok(());
+            }
             return self.finish_class_call(
                 site.kind,
                 site.result_reference

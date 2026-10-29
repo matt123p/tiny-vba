@@ -179,3 +179,14 @@ DAP is optional: `--features dap` enables the CLI stdio adapter and JSON depende
 It is not used by the native or embedded egui debugger. It accepts an explicitly
 preloaded source or launch `sourceCode`; unknown/unsupported requests fail clearly.
 Host effect policy, source/pause identity and lifecycle checks remain in the IDE.
+
+## M2 forms
+
+`Ide::add_form`, `edit_form`, `generate_form_handler`, `run_form`, `form_event`,
+`import_form` and `export_form` share design and actual VM execution across native,
+browser and embedding surfaces. The same `EditorUi` mounts the designer/runtime.
+Save/export use existing owned host requests; `mark_saved` checks combined source/
+design revisions. Hosts persist the payload and keep package/trust policy.
+The standalone shell accepts `.bas`, `.cls` and `.tvform`; the browser uses explicit
+upload/download. The original sample is `examples/forms/CustomerForm.tvform`.
+See [M2 profile, workflow, format and acceptance](../m2-acceptance.md).

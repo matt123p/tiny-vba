@@ -1,16 +1,13 @@
 # Remaining UI and host scope
 
-Updated 2026-10-28. The [remaining implementation plan](../implementation-plan.md)
+Updated 2026-10-29. The [remaining implementation plan](../implementation-plan.md)
 is authoritative for numbering, dependencies and acceptance. This index contains
 remaining UI/host work only; completed evidence is in
 [implementation progress](../implementation-progress.md).
 
-## Class/document runtime and standard Office forms — M2
-
-Follow [M2](../implementation-plan.md#m2--classdocument-semantics-and-standard-office-userforms):
-shared classes/properties/instances/events and error trapping before form execution,
-then the shared model/designer, standard Office controls, correctly signed event
-handlers and reviewed source/resource persistence. Host package acceptance is M7.
+M2's selected shared class/designer/runtime/exchange profile is complete; see
+[its acceptance report](../m2-acceptance.md). Remaining work below consumes that
+contract in real application/package workflows.
 
 Third-party ActiveX/OLE controls not supplied with Office applications are out of
 scope for now. Do not schedule their designer, loading or execution support.
@@ -38,12 +35,11 @@ scope and the implementation plan take precedence over that earlier proposal.
 
 | Remaining reference scope | Current allocation |
 |---|---|
-| Class/document runtime, class-specific trapping and P6 UserForms/designer | M2 |
 | Office document events and Range-aware UDF context | M5; shared class/event contracts in M2 |
 | P7 WordCraft/generalisation and actual host workflows | M6 |
 | Form/document source and package persistence; signatures | M7 |
 | Remaining lawful reference-build/fidelity observations | M6/M7, reported in M8 |
-| Applicable class/form parts of scenarios 1–23 | M2, with host/storage acceptance in M6/M7 |
+| Applicable form host/storage parts of scenarios 1–23 | M6/M7 using the completed selected M2 profile |
 | Public-source/provenance review (scenario 26) | Required throughout M1–M8 |
 
 Native Craft extensions, Python translation previews and Copilot-style assistance

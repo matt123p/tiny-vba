@@ -84,3 +84,9 @@ M4's external gate is complete under [ADR 0012](docs/decisions/0012-m4-oracle-ac
 [the oracle report](docs/m4-oracle-report.md) and IR 3. The reviewed MIT allowlist is the only
 corpus execution exception: never run upstream scripts or import implementation code. Preserve
 Schema 1/2 evidence distinctions, raw results, all 153 cases and legacy IR capability limits.
+
+The selected new M2 class/standard-form profile is implemented under ADR 0024;
+read [its acceptance/format contract](docs/m2-acceptance.md). Keep generated form
+support out of saved authored source, design state independent of VM Reset,
+modal callbacks explicit and bounded, and save acknowledgments revision-checked.
+Binary Office form resources/package writeback remain outside this profile.

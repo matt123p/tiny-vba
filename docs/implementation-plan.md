@@ -1,7 +1,7 @@
 # Remaining implementation plan
 
-Updated 2026-10-28. This plan contains **remaining work only**, using stable M2–M8 IDs
-in implementation order after completed M1. Completed work and the old-to-new milestone mapping
+Updated 2026-10-29. This plan contains **remaining work only**, using stable M3–M8 IDs
+in implementation order after completed M1 and the [selected M2 profile](m2-acceptance.md). Completed work and the old-to-new milestone mapping
 belong in [implementation progress](implementation-progress.md#plan-renumbering--2026-10-28).
 Historical reports and ADRs retain their original milestone numbers; use this
 document's numbers for new work.
@@ -16,7 +16,6 @@ separate and native host dispatch in Rust.
 
 | Milestone | Remaining work | Prerequisites |
 |---|---|---|
-| M2 | Class/document semantics and standard Office UserForms | M1 type/member contracts; runtime before designer execution |
 | M3 | Excel range and worksheet coverage | M1 |
 | M4 | Excel identity, values and member semantics | M1 and applicable M3 reference behavior |
 | M5 | Document modules, events and Range-aware UDFs | M2–M4 capabilities required by each workflow |
@@ -26,38 +25,11 @@ separate and native host dispatch in Rust.
 
 Implement shared language foundations before consumers, range references before
 range-dependent value/event behavior, and runtime semantics before form events.
-M3 can proceed alongside M2 after M1. WordCraft's object-model work in M6 can
-proceed alongside Excel work; its document/form events need the shared M2 contract.
+M1/M2 shared prerequisites are implemented for their declared profiles. WordCraft's
+object-model work in M6 can proceed alongside Excel work; its document/form events
+consume the shared M2 contract.
 Build tests and collect lawful evidence throughout every milestone. M8 is the
 final release gate, not a reason to postpone fuzzing, benchmarks or regression tests.
-
-## M2 — Class/document semantics and standard Office UserForms
-
-Owner: tiny-vba reusable language/runtime, form model and designer; forks own
-document bindings and persistence. Depends on M1's type/member contract.
-
-- **M2.1:** Specify and implement class/document modules, properties, instances,
-  event contracts and class-specific error trapping. Prove actual execution and
-  lifecycle behavior before enabling a designer Run action.
-- **M2.2:** Implement the shared form model and designer for the selected standard
-  controls supplied with Office: Toolbox, selection/drag/resize, grid/snap,
-  Properties, tab order, Format alignment/spacing/grouping/z-order and zoom.
-- **M2.3:** Generate/navigate correctly signed handlers and run/debug real form
-  events through the existing controller. Separate design mode from execution reset.
-- **M2.4:** Define reviewed form source/resource import/export and host persistence
-  interfaces; add round-trip fixtures for supported standard controls and explicit
-  diagnostics for unsupported resources.
-
-Acceptance: independently authored forms using standard Label, TextBox and
-CommandButton controls can be designed, exported/saved, reopened/imported and
-edited without loss. Events actually run, pause, inspect and resume; class/error
-modes and reset/cleanup pass. Verify keyboard, Properties, tab order, accessibility
-and original native/browser renders. Office package persistence is accepted in M7.
-
-Third-party ActiveX/OLE controls that are not supplied with Excel, Word,
-PowerPoint or other Office applications are **out of scope for now**. Do not add
-their loading, execution, designer support or acceptance fixtures to this plan.
-Supporting standard Office controls does not grant arbitrary COM/DLL execution.
 
 ## M3 — Excel range and worksheet coverage
 

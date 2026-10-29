@@ -3,6 +3,8 @@
 #![forbid(unsafe_code)]
 mod code_aids;
 mod editing;
+pub mod form_archive;
+mod form_project;
 pub mod forms;
 mod history;
 mod search;
@@ -266,6 +268,8 @@ pub struct StopLocation {
     pub procedure: String,
 }
 pub struct Ide {
+    forms: BTreeMap<SourceId, forms::FormDesigner>,
+    form_gate: form_project::FormGate,
     pub title: String,
     pub modules: Vec<Module>,
     pub active: usize,
@@ -307,6 +311,8 @@ impl Default for Ide {
 impl Ide {
     pub fn new() -> Self {
         Self {
+            forms: BTreeMap::new(),
+            form_gate: Default::default(),
             title: "Untitled Project".into(),
             modules: vec![],
             active: 0,
@@ -373,6 +379,19 @@ impl Ide {
         }
         self.active = index;
         Ok(())
+    }
+    pub fn import_source_file(&mut self, name: &str, text: &str) -> Result<SourceId> {
+        if name.to_ascii_lowercase().ends_with(".tvform") {
+            self.import_form(text)
+        } else if name.to_ascii_lowercase().ends_with(".bas")
+            || name.to_ascii_lowercase().ends_with(".cls")
+        {
+            self.add_module(name, text)
+        } else {
+            Err(error(
+                "unsupported source/resource format; choose .bas, .cls or .tvform",
+            ))
+        }
     }
     pub fn add_module(&mut self, name: &str, text: &str) -> Result<SourceId> {
         self.add_module_with_kind(
@@ -540,6 +559,9 @@ impl Ide {
         module.saved_revision = revision;
         module.saved_text = module.text.clone();
         module.saved_name = module.name.clone();
+        if let Some(form) = self.forms.get_mut(&id) {
+            form.mark_saved();
+        }
         Ok(())
     }
     pub fn take_requests(&mut self) -> Vec<HostRequest> {
@@ -616,17 +638,14 @@ impl Ide {
         }
     }
     fn compile(&mut self) -> Result<VerifiedProgram> {
-        let mut modules = Vec::new();
-        for module in &self.modules {
-            modules.push(parse(&module.source()?, module.kind)?);
-        }
+        let modules = self.form_modules()?;
         compile_modules(
             &modules,
             &CompileOptions {
                 entry: self.entry.clone(),
                 revision: format!("ide-{}", self.revision),
                 capabilities: vba_vm::capabilities(),
-                imports: self.imports.clone(),
+                imports: self.form_imports(),
                 references: self.reference_bindings.clone(),
                 ..Default::default()
             },
@@ -634,15 +653,22 @@ impl Ide {
     }
     fn launch(&mut self, host: &mut impl Host, step: bool) -> Result<()> {
         let program = self.compile()?;
+        let mut roots = self.roots.clone();
+        if !self.forms.is_empty() {
+            roots.insert(
+                "VbaFormsGate".into(),
+                ObjectRef {
+                    host: host.identity(),
+                    object: u64::MAX,
+                    generation: u64::MAX,
+                },
+            );
+        }
         let binding =
-            if self.imports.is_empty() && self.roots.is_empty() && self.type_resolver.is_none() {
+            if self.form_imports().is_empty() && roots.is_empty() && self.type_resolver.is_none() {
                 None
             } else {
-                Some(HostBinding::for_program(
-                    &program,
-                    host.identity(),
-                    self.roots.clone(),
-                )?)
+                Some(HostBinding::for_program(&program, host.identity(), roots)?)
             };
         let mut session = Session::new_with_type_resolver(
             program,
@@ -699,6 +725,21 @@ impl Ide {
         Ok(())
     }
     pub fn dispatch(&mut self, action: Action, host: &mut impl Host) -> Result<()> {
+        if self.forms.is_empty() {
+            return self.dispatch_unwrapped(action, host);
+        }
+        let mut gate = std::mem::take(&mut self.form_gate);
+        let result = self.dispatch_unwrapped(
+            action,
+            &mut form_project::FormHost {
+                host,
+                gate: &mut gate,
+            },
+        );
+        self.form_gate = gate;
+        result
+    }
+    fn dispatch_unwrapped(&mut self, action: Action, host: &mut impl Host) -> Result<()> {
         if !self.enabled(action) {
             return Err(error("command unavailable in the current execution state"));
         }
@@ -770,8 +811,16 @@ impl Ide {
                     .ok_or_else(|| error("no active module"))?;
                 self.requests.push(HostRequest::Save {
                     id: m.id,
-                    name: m.name.clone(),
-                    text: m.text.clone(),
+                    name: if let Some(form) = self.forms.get(&m.id) {
+                        format!("{}.tvform", form.form().name)
+                    } else {
+                        m.name.clone()
+                    },
+                    text: if self.forms.contains_key(&m.id) {
+                        self.export_form(m.id)?
+                    } else {
+                        m.text.clone()
+                    },
                     revision: m.revision,
                 });
             }
@@ -781,8 +830,16 @@ impl Ide {
                     .active_module()
                     .ok_or_else(|| error("no active module"))?;
                 self.requests.push(HostRequest::Export {
-                    name: m.name.clone(),
-                    text: m.text.clone(),
+                    name: if let Some(form) = self.forms.get(&m.id) {
+                        format!("{}.tvform", form.form().name)
+                    } else {
+                        m.name.clone()
+                    },
+                    text: if self.forms.contains_key(&m.id) {
+                        self.export_form(m.id)?
+                    } else {
+                        m.text.clone()
+                    },
                 });
             }
             Action::ReturnToHost => self.requests.push(HostRequest::ReturnToHost),
@@ -791,7 +848,24 @@ impl Ide {
         Ok(())
     }
     pub fn close(&mut self, host: &mut impl Host, discard_modified: bool) -> Result<()> {
-        if !discard_modified && self.modules.iter().any(Module::dirty) {
+        if self.forms.is_empty() {
+            return self.close_unwrapped(host, discard_modified);
+        }
+        let mut gate = std::mem::take(&mut self.form_gate);
+        let result = self.close_unwrapped(
+            &mut form_project::FormHost {
+                host,
+                gate: &mut gate,
+            },
+            discard_modified,
+        );
+        self.form_gate = gate;
+        result
+    }
+    fn close_unwrapped(&mut self, host: &mut impl Host, discard_modified: bool) -> Result<()> {
+        if !discard_modified
+            && (self.modules.iter().any(Module::dirty) || self.has_modified_forms())
+        {
             return Err(error("modified source requires save or explicit discard"));
         }
         if let Some(s) = &mut self.session {
@@ -799,6 +873,7 @@ impl Ide {
         }
         self.session = None;
         self.modules.clear();
+        self.forms.clear();
         self.controller = Controller::new();
         self.stale = false;
         self.refresh_watches();
@@ -830,6 +905,29 @@ impl Ide {
         self.tick(host)
     }
     pub fn tick(&mut self, host: &mut impl Host) -> Result<()> {
+        if self.forms.is_empty() {
+            return self.tick_core(host);
+        }
+        self.update_form_waits();
+        if let Some(token) = self
+            .session
+            .as_ref()
+            .filter(|s| matches!(s.outcome(), Outcome::Waiting))
+            .and_then(Session::pending_host_token)
+            && self.form_gate.waits.contains_key(&token)
+            && !self.form_gate.ready.contains(&token)
+        {
+            return Ok(());
+        }
+        let mut gate = std::mem::take(&mut self.form_gate);
+        let result = self.tick_core(&mut form_project::FormHost {
+            host,
+            gate: &mut gate,
+        });
+        self.form_gate = gate;
+        result
+    }
+    fn tick_core(&mut self, host: &mut impl Host) -> Result<()> {
         if self.stale {
             return Ok(());
         }
@@ -900,6 +998,15 @@ impl Ide {
                 self.controller.remove_breakpoint(statement);
             }
             self.show_execution();
+        }
+        if let Some(session) = &mut self.session
+            && session.has_suspended_invocation()
+            && matches!(
+                session.outcome(),
+                Outcome::Completed(_) | Outcome::Failed(_) | Outcome::Cancelled
+            )
+        {
+            session.finish_suspended_callback(host)?;
         }
         self.refresh_watches();
         Ok(())

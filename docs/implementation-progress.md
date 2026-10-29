@@ -2,12 +2,46 @@
 
 Updated 2026-10-29. The classic-editor/debugger profile is implemented; its
 historical milestone is M10. Runtime remains m5-host-v1 with verified IR 1/2/3/4/5/6/7.
-The [remaining plan](implementation-plan.md) retains stable **M2–M8** task IDs.
-**M1.x is complete** for the declared registered-type/default/collection profile.
-Current: **M2.1/M2.2**, class/document runtime and the headless form design model. Office objects, document events,
-trust and packaging remain fork-owned.
+The [remaining plan](implementation-plan.md) retains stable **M3–M8** task IDs.
+**M1 and M2 are complete for their declared profiles.** Office objects,
+document events, trust and packaging remain fork-owned. M3 has not started.
 
-## M2 completion audit after feature merges (2026-10-29)
+## M2 completion — selected classes and standard forms (2026-10-29)
+
+[ADR 0024](decisions/0024-standard-form-execution-and-exchange.md) and the
+[self-contained acceptance map](m2-acceptance.md) close M2.1–M2.4. Typed project
+member/visibility/signature and coherent property binding, canonical external
+field ByRef and property assignment-value semantics now have regressions.
+The shared egui designer mounts the existing model with Toolbox, real drag/resize,
+Properties, keyboard/tab order, Format/group/z-order, zoom and bounded history.
+
+Selected Label/TextBox/CommandButton events execute through ordinary native
+classes and source Event/WithEvents frames. Modal/modeless Show, Load/Hide/Unload,
+QueryClose cancellation, nested modal input ownership, source break/inspect/edit/
+resume and Reset/close cleanup are exercised. Explicit suspended callbacks retain
+waiting callers and host tokens without replay or reentrancy. Original source,
+design identity/groups/geometry and independent paint/tab order round-trip through
+strict `.tvform` v1 native/browser IO and revision-acknowledged host requests.
+Malformed/unknown resources, stale saves and invalid imports refuse atomically.
+
+Final validation: `cargo xtask ci` **PASS (374 workspace tests)**;
+`cargo xtask wasm` **PASS**; `cargo xtask wasm-run` **PASS (180 actual WASI tests)**;
+`cargo xtask ui` **PASS (127 tests, 24 original renders)**; native debugger/form
+captures, real web build and both Chromium smoke/form workflows **PASS**.
+Original light/dark/narrow/scaled/host-theme, native and browser images were
+inspected. The 19-crate headless DAG is unchanged; no sibling repository changed.
+
+This is the declared predeclared-form profile with `.tvform` exchange, not
+universal VBA/UserForm or binary Office resource compatibility. Explicit `New`
+form display, unselected controls/events, Friend/As New/Implements, COM activation
+and binary Office form/package writeback remain outside the profile. The report
+lists exact boundaries. No fresh Office oracle result is claimed.
+
+M2 is removed from the remaining plan without renumbering M3–M8. Next smallest
+planned task: **M3.1** range-reference/materialization budget separation in
+GridCraft. It has not started under this tiny-vba-only task.
+
+## Historical M2 completion audit after feature merges (2026-10-29)
 
 Merged main `cadc744` is **not M2-complete**. The
 [M2 acceptance audit](m2-classes-and-forms.md#completion-audit-after-feature-merges-2026-10-29)

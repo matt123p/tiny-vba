@@ -672,6 +672,15 @@ impl Parser<'_> {
             return self.if_statement(start, site);
         } else if self.eat("For") {
             return self.for_statement(start, site);
+        } else if self.at("Load") || self.at("Unload") {
+            let unload = self.eat("Unload");
+            if !unload {
+                self.require("Load")?;
+            }
+            StatementKind::FormLifecycle {
+                target: self.expr(0)?,
+                unload,
+            }
         } else if self.eat("Stop") {
             StatementKind::Stop
         } else if self.eat("Exit") {

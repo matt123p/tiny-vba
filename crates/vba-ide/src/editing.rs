@@ -290,6 +290,9 @@ impl Ide {
         Ok((result, caret))
     }
     pub fn rename_module(&mut self, id: SourceId, name: &str) -> Result<()> {
+        if self.forms.contains_key(&id) {
+            return self.rename_form_component(id, name);
+        }
         let kind = self
             .modules
             .iter()
@@ -364,6 +367,15 @@ impl Ide {
         self.changed()
     }
     pub fn remove_module(&mut self, id: SourceId, discard_modified: bool) -> Result<()> {
+        if self.forms.contains_key(&id) && self.session.is_some() {
+            return Err(error("reset before removing a form"));
+        }
+        if !discard_modified && self.forms.get(&id).is_some_and(|d| d.dirty()) {
+            return Err(error(
+                "save/export form design or explicitly discard before removing",
+            ));
+        }
+
         let index = self
             .modules
             .iter()
@@ -375,6 +387,7 @@ impl Ide {
             ));
         }
         self.modules.remove(index);
+        self.forms.remove(&id);
         self.undo_edits.retain(|state| state.id != id);
         self.redo_edits.retain(|state| state.id != id);
         self.active = self.active.min(self.modules.len().saturating_sub(1));
@@ -390,8 +403,16 @@ impl Ide {
             .find(|m| m.id == id)
             .ok_or_else(|| error("unknown module"))?;
         self.requests.push(HostRequest::Export {
-            name: m.name.clone(),
-            text: m.text.clone(),
+            name: if let Some(form) = self.forms.get(&id) {
+                format!("{}.tvform", form.form().name)
+            } else {
+                m.name.clone()
+            },
+            text: if self.forms.contains_key(&id) {
+                self.export_form(id)?
+            } else {
+                m.text.clone()
+            },
         });
         Ok(())
     }

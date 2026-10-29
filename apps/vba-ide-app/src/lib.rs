@@ -99,11 +99,16 @@ impl App {
     #[cfg(not(target_arch = "wasm32"))]
     pub fn open(&mut self, path: &std::path::Path) -> Result<(), Box<dyn std::error::Error>> {
         let (name, text) = read_source(path)?;
-        self.ide = Ide::new();
-        self.ide.add_module(&name, &text)?;
+        let mut project = Ide::new();
+        project.import_source_file(&name, &text)?;
+        self.ide = project;
         if let Some(p) = self.ide.active_module().and_then(|m| m.procedures.first()) {
             self.ide.entry = p.name.clone();
         }
+        self.view.form_view = self
+            .ide
+            .active_module()
+            .is_some_and(|m| self.ide.form(m.id).is_some());
         self.path = path.to_string_lossy().into();
         Ok(())
     }
@@ -120,6 +125,27 @@ impl App {
         self.capture = Some(path);
         Ok(())
     }
+    #[cfg(not(target_arch = "wasm32"))]
+    pub fn capture_form(&mut self, path: std::path::PathBuf) -> vba_ide::Result<()> {
+        if !self
+            .ide
+            .active_module()
+            .is_some_and(|m| self.ide.form(m.id).is_some())
+        {
+            self.ide = Ide::new();
+            self.ide
+                .import_form(include_str!("../../../examples/forms/CustomerForm.tvform"))?;
+        }
+        let id = self
+            .ide
+            .active_module()
+            .ok_or_else(|| vba_ide::Diagnostic::new("VBA_UI", "form missing"))?
+            .id;
+        self.view.form_view = true;
+        self.ide.run_form(id, true, &mut NoHost)?;
+        self.capture = Some(path);
+        Ok(())
+    }
     fn requests(&mut self) {
         for request in self.ide.take_requests() {
             match request {
@@ -127,7 +153,15 @@ impl App {
                 HostRequest::ReturnToHost => self.ide.message(
                     "Standalone editor: there is no workbook/document window to return to.",
                 ),
-                other => self.file_request = Some(other),
+                other => {
+                    if let HostRequest::Save { name, .. } | HostRequest::Export { name, .. } =
+                        &other
+                        && name.ends_with(".tvform")
+                    {
+                        self.path = name.clone();
+                    }
+                    self.file_request = Some(other);
+                }
             }
         }
     }
@@ -136,9 +170,13 @@ impl App {
         if let Some(imported) = self.browser_files.take_import() {
             if matches!(self.file_request, Some(HostRequest::Import)) {
                 match imported {
-                    Ok((name, text)) => match self.ide.add_module(&name, &text) {
+                    Ok((name, text)) => match self.ide.import_source_file(&name, &text) {
                         Ok(_) => {
                             self.file_request = None;
+                            self.view.form_view = self
+                                .ide
+                                .active_module()
+                                .is_some_and(|m| self.ide.form(m.id).is_some());
                             self.ide.message("Source file imported without execution.");
                         }
                         Err(d) => self.ide.message(d.to_string()),
@@ -154,13 +192,13 @@ impl App {
         if self.file_request.is_some() {
             let mut close = false;
             egui::Window::new("Source File").collapsible(false).show(ctx,|ui|{
-            ui.label("Plain UTF-8 .bas source — Office binary projects are not rewritten.");
+            ui.label("UTF-8 .bas/.cls source or .tvform source/design — Office binary projects are not rewritten.");
             ui.add(egui::TextEdit::singleline(&mut self.path).hint_text("Source path")).on_hover_text("Source file path");
             #[cfg(not(target_arch="wasm32"))]
             if ui.button("Confirm Source File").clicked() && let Some(request)=self.file_request.clone() {
                 let path=std::path::PathBuf::from(&self.path);
                 let result:Result<(),Box<dyn std::error::Error>>=match request {
-                    HostRequest::Import=>read_source(&path).and_then(|(name,text)|self.ide.add_module(&name,&text).map(|_|()).map_err(Into::into)),
+                    HostRequest::Import=>read_source(&path).and_then(|(name,text)|self.ide.import_source_file(&name,&text).map(|_|()).map_err(Into::into)),
                     HostRequest::Save{id,text,revision,..}=>write_source(&path,&text).and_then(|()|self.ide.mark_saved(id,revision).map_err(Into::into)),
                     HostRequest::Export{text,..}=>write_source(&path,&text),_=>Ok(())
                 };
@@ -169,11 +207,11 @@ impl App {
             #[cfg(target_arch="wasm32")]
             {ui.label("Browser source transfer");match &mut self.file_request {Some(HostRequest::Import)=>{
                 if ui.button("Choose Source File...").clicked() && let Err(message)=self.browser_files.choose(ctx.clone()) {self.ide.message(message);}
-                ui.label("Paste a UTF-8 .bas module:");
-                ui.add(egui::TextEdit::multiline(&mut self.browser_source).desired_rows(12).char_limit(vba_ide::SourceFile::MAX_BYTES)).on_hover_text("Source to import");
+                ui.label("Paste UTF-8 .bas/.cls source or a .tvform archive:");
+                ui.add(egui::TextEdit::multiline(&mut self.browser_source).desired_rows(12).char_limit(8*1024*1024)).on_hover_text("Source to import");
                 if ui.button("Import Source").clicked(){
-                    if !self.path.to_ascii_lowercase().ends_with(".bas"){self.ide.message("Choose a .bas module name.");}
-                    else {match self.ide.add_module(&self.path,&self.browser_source){Ok(_)=>{close=true;self.browser_source.clear();},Err(d)=>self.ide.message(d.to_string())}}
+                    if ![".bas",".cls",".tvform"].iter().any(|extension|self.path.to_ascii_lowercase().ends_with(extension)){self.ide.message("Choose a .bas, .cls or .tvform name.");}
+                    else {match self.ide.import_source_file(&self.path,&self.browser_source){Ok(_)=>{close=true;self.browser_source.clear();},Err(d)=>self.ide.message(d.to_string())}}
                 }
             },Some(HostRequest::Save{name,text,..}|HostRequest::Export{name,text,..})=>{
                 if ui.button("Download Source File").clicked() {match self.browser_files.download(name,text) {Ok(())=>self.ide.message("Download requested. Source remains modified until save is acknowledged."),Err(message)=>self.ide.message(message)}}
@@ -246,7 +284,7 @@ impl eframe::App for App {
     }
     fn ui(&mut self, ui: &mut egui::Ui, _frame: &mut eframe::Frame) {
         if ui.ctx().input(|i| i.viewport().close_requested())
-            && self.ide.modules.iter().any(|m| m.dirty())
+            && (self.ide.modules.iter().any(|m| m.dirty()) || self.ide.has_modified_forms())
         {
             ui.ctx()
                 .send_viewport_cmd(egui::ViewportCommand::CancelClose);
@@ -287,7 +325,7 @@ impl eframe::App for App {
         self.frames = self.frames.saturating_add(1);
         #[cfg(not(target_arch = "wasm32"))]
         if self.frames > 6
-            && self.ide.mode() == Mode::Break
+            && matches!(self.ide.mode(), Mode::Break | Mode::Waiting)
             && let Some(path) = self.capture.take()
         {
             let ctx = ui.ctx().clone();
@@ -329,21 +367,30 @@ impl eframe::App for App {
 #[cfg(not(target_arch = "wasm32"))]
 pub fn read_source(path: &std::path::Path) -> Result<(String, String), Box<dyn std::error::Error>> {
     use std::io::Read;
-    if !path
+    let extension = path
         .extension()
         .and_then(|s| s.to_str())
-        .is_some_and(|s| s.eq_ignore_ascii_case("bas"))
-    {
-        return Err("Only plain .bas source files are supported; binary/form/class execution is unavailable".into());
+        .unwrap_or_default()
+        .to_ascii_lowercase();
+    if !["bas", "cls", "tvform"].contains(&extension.as_str()) {
+        return Err("Choose .bas, .cls or .tvform; binary Office resources are unsupported".into());
     }
+    let limit = if extension == "tvform" {
+        8 * 1024 * 1024
+    } else {
+        vba_ide::SourceFile::MAX_BYTES
+    };
     let mut bytes = Vec::new();
     std::fs::File::open(path)?
-        .take((vba_ide::SourceFile::MAX_BYTES + 1) as u64)
+        .take((limit + 1) as u64)
         .read_to_end(&mut bytes)?;
-    if bytes.len() > vba_ide::SourceFile::MAX_BYTES {
-        return Err("source size limit exceeded".into());
+    if bytes.len() > limit {
+        return Err("source/archive size limit exceeded".into());
     }
     let text = String::from_utf8(bytes)?;
+    if extension == "tvform" {
+        vba_ide::form_archive::decode(&text)?;
+    }
     let name = path
         .file_name()
         .and_then(|s| s.to_str())
@@ -353,16 +400,24 @@ pub fn read_source(path: &std::path::Path) -> Result<(String, String), Box<dyn s
 }
 #[cfg(not(target_arch = "wasm32"))]
 pub fn write_source(path: &std::path::Path, text: &str) -> Result<(), Box<dyn std::error::Error>> {
-    if text.len() > vba_ide::SourceFile::MAX_BYTES
-        || !path
-            .extension()
-            .and_then(|s| s.to_str())
-            .is_some_and(|s| s.eq_ignore_ascii_case("bas"))
-    {
-        return Err(
-            "expected bounded plain .bas source; Office binary project writeback is unavailable"
-                .into(),
-        );
+    let extension = path
+        .extension()
+        .and_then(|s| s.to_str())
+        .unwrap_or_default()
+        .to_ascii_lowercase();
+    if !["bas", "cls", "tvform"].contains(&extension.as_str()) {
+        return Err("Choose .bas, .cls or .tvform; binary Office writeback is unsupported".into());
+    }
+    let limit = if extension == "tvform" {
+        8 * 1024 * 1024
+    } else {
+        vba_ide::SourceFile::MAX_BYTES
+    };
+    if text.len() > limit {
+        return Err("source/archive size limit exceeded".into());
+    }
+    if extension == "tvform" {
+        vba_ide::form_archive::decode(text)?;
     }
     std::fs::write(path, text)?;
     Ok(())

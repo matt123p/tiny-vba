@@ -127,6 +127,7 @@ impl Form {
             identifier(&c.name)?;
             c.bounds.validate()?;
             if c.id == 0
+                || c.group == Some(0)
                 || !ids.insert(c.id)
                 || !names.insert(c.name.to_ascii_lowercase())
                 || c.name.eq_ignore_ascii_case(&self.name)
@@ -193,7 +194,7 @@ pub struct FormDesigner {
     undo: Vec<Form>,
     redo: Vec<Form>,
     revision: u64,
-    saved: Form,
+    saved: Option<Form>,
     zoom: u16,
     grid: f32,
     snap: bool,
@@ -227,11 +228,29 @@ impl FormDesigner {
             undo: vec![],
             redo: vec![],
             revision: 0,
-            saved,
+            saved: Some(saved),
             zoom: 100,
             grid: 6.0,
             snap: true,
         })
+    }
+    pub(crate) fn rename_component(&mut self, name: &str) -> Result<()> {
+        let mut candidate = self.form.clone();
+        candidate.name = name.into();
+        candidate.validate()?;
+        let revision = self
+            .revision
+            .checked_add(1)
+            .ok_or_else(|| error("form revision budget"))?;
+        self.form = candidate;
+        for snapshot in self.undo.iter_mut().chain(&mut self.redo) {
+            snapshot.name = name.into();
+        }
+        self.revision = revision;
+        Ok(())
+    }
+    pub fn revision(&self) -> u64 {
+        self.revision
     }
     pub fn form(&self) -> &Form {
         &self.form
@@ -240,10 +259,13 @@ impl FormDesigner {
         &self.selected
     }
     pub fn dirty(&self) -> bool {
-        self.form != self.saved
+        self.saved.as_ref() != Some(&self.form)
+    }
+    pub fn mark_unsaved(&mut self) {
+        self.saved = None;
     }
     pub fn mark_saved(&mut self) {
-        self.saved = self.form.clone();
+        self.saved = Some(self.form.clone());
     }
     pub fn primary(&self) -> Option<u32> {
         self.primary

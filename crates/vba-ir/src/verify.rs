@@ -750,7 +750,14 @@ fn validate(
                     | ForeignKind::EnumerateObjects
             );
             if implicit {
-                if p.ir_version < IR6_VERSION || !site.member.is_empty() {
+                let named_field = site.kind == ForeignKind::ArgumentGet
+                    && !site.member.is_empty()
+                    && p.ir_version >= IR7_VERSION;
+                if named_field {
+                    name(&site.member)?;
+                    feature(p, caps, "project-classes-v7")?;
+                }
+                if p.ir_version < IR6_VERSION || (!site.member.is_empty() && !named_field) {
                     return Err(invalid("invalid implicit member contract"));
                 }
                 feature(

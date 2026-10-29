@@ -107,6 +107,9 @@ pub struct Session {
     pending: Option<Pending>,
 }
 impl Session {
+    pub fn pending_token(&self) -> Option<u64> {
+        self.pending.as_ref().map(|p| p.token)
+    }
     pub fn is_suspended(&self) -> bool {
         self.pending.is_some()
     }

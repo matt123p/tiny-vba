@@ -173,6 +173,17 @@ fn run() -> Result<(), Box<dyn Error>> {
                     "--locked",
                 ],
             )?;
+            command(
+                "cargo",
+                &[
+                    "run",
+                    "-p",
+                    "vba-ui-egui",
+                    "--example",
+                    "form_snapshots",
+                    "--locked",
+                ],
+            )?;
         }
         Some("ui-native") => {
             command(
@@ -185,6 +196,18 @@ fn run() -> Result<(), Box<dyn Error>> {
                     "--",
                     "--capture",
                     "reports/ui/native-paused.png",
+                ],
+            )?;
+            command(
+                "cargo",
+                &[
+                    "run",
+                    "-p",
+                    "vba-ide-app",
+                    "--locked",
+                    "--",
+                    "--capture-form",
+                    "reports/ui/native-form.png",
                 ],
             )?;
         }
