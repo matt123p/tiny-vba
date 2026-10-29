@@ -152,3 +152,8 @@ third-party controls, binary Office form/resource compatibility or package write
 Office document bindings/events, storage, trust and package persistence stay in forks.
 Run CI/WASM/WASI plus UI/native/web and both Chromium smoke/form acceptance gates
 when changing these surfaces. M3 range/worksheet work is GridCraft-owned.
+
+ADR 0025 distinguishes fixed getter aliases from method aliases. Getter aliases
+resolve before chained member dispatch; captured results retain identity. Keep
+method shortcuts and root-object imports unchanged. Dynamic Office roots remain
+fork-owned; do not substitute mutable proxy handles for captured objects.

@@ -189,3 +189,116 @@ fn unbound_roots_refuse_the_launch_and_hidden_roots_stay_invisible() -> R {
     assert_eq!(root.name, "Sheet1");
     Ok(())
 }
+
+#[test]
+fn getter_alias_resolves_before_chained_get_let_and_named_call() -> R {
+    let source = SourceFile::new(SourceId(1), "getter.bas".into(), "Function Answer() As Long\ncurrent.Value = 7\ncurrent.Touch Index:=2\nAnswer = current.Count\nEnd Function".into())?;
+    let program = compile(
+        &source,
+        &CompileOptions {
+            imports: vec![Import {
+                name: "current".into(),
+                root: "Host".into(),
+                member: Some("Current".into()),
+                kind: InvokeKind::Get,
+            }],
+            capabilities: vba_vm::capabilities(),
+            ..Default::default()
+        },
+    )?;
+    let binding = HostBinding::for_program(
+        &program,
+        TARGET.host,
+        BTreeMap::from([("Host".into(), TARGET)]),
+    )?;
+    let mut session = Session::new(program, 1, vec![], Some(binding), Limits::default())?;
+    let child = ObjectRef {
+        object: 5,
+        ..TARGET
+    };
+    let result = |value| {
+        Reply::Complete(Completion {
+            value,
+            writes: vec![],
+        })
+    };
+    struct GetterHost {
+        replies: std::collections::VecDeque<Reply>,
+        trace: Vec<Event>,
+    }
+    impl vba_foreign::Host for GetterHost {
+        fn identity(&self) -> u64 {
+            TARGET.host
+        }
+        fn invoke(&mut self, call: vba_foreign::HostCall) -> Reply {
+            assert!(
+                call.target == TARGET
+                    || call.target
+                        == ObjectRef {
+                            object: 5,
+                            ..TARGET
+                        }
+            );
+            self.trace.push(Event::Invoke(call));
+            self.replies.pop_front().unwrap_or_else(|| {
+                Reply::Error(vba_foreign::ForeignError {
+                    number: 5,
+                    description: "script exhausted".into(),
+                })
+            })
+        }
+        fn resume(&mut self, _: u64) -> Reply {
+            done()
+        }
+        fn cancel(&mut self, _: u64) {}
+    }
+    let mut host = GetterHost {
+        replies: vec![
+            result(Value::Object(child)),
+            done(),
+            result(Value::Object(child)),
+            done(),
+            result(Value::Object(child)),
+            result(Value::Long(42)),
+        ]
+        .into(),
+        trace: vec![],
+    };
+    assert_eq!(
+        run_to_boundary(&mut session, &mut host, &Controller::new(), 1024)?,
+        Outcome::Completed(ReturnValue::Function(Value::Long(42)))
+    );
+    let calls: Vec<_> = host
+        .trace
+        .iter()
+        .filter_map(|event| {
+            if let Event::Invoke(call) = event {
+                Some(call)
+            } else {
+                None
+            }
+        })
+        .collect();
+    assert_eq!(
+        calls
+            .iter()
+            .map(|c| (c.target.object, c.member.as_str(), c.kind))
+            .collect::<Vec<_>>(),
+        vec![
+            (4, "Current", InvokeKind::Get),
+            (5, "Value", InvokeKind::Let),
+            (4, "Current", InvokeKind::Get),
+            (5, "Touch", InvokeKind::Call),
+            (4, "Current", InvokeKind::Get),
+            (5, "Count", InvokeKind::Get)
+        ]
+    );
+    assert_eq!(
+        calls
+            .get(3)
+            .and_then(|c| c.arguments.first())
+            .and_then(|a| a.name.as_deref()),
+        Some("Index")
+    );
+    Ok(())
+}

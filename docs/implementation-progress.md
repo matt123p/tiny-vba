@@ -4,7 +4,20 @@ Updated 2026-10-29. The classic-editor/debugger profile is implemented; its
 historical milestone is M10. Runtime remains m5-host-v1 with verified IR 1/2/3/4/5/6/7.
 The [remaining plan](implementation-plan.md) retains stable **M3–M8** task IDs.
 **M1 and M2 are complete for their declared profiles.** Office objects,
-document events, trust and packaging remain fork-owned. M3 has not started.
+document events, trust and packaging remain fork-owned. M3 is being audited against GridCraft’s existing implementation; M4 acceptance is in progress.
+
+## M3 audit / M4 shared prerequisite (2026-10-29)
+
+GridCraft already contains M3.1–M3.3 range/navigation/native structural work.
+The initial native audit passes 48 adapter tests and two structural engine tests.
+Final cross-repository acceptance and documentation are being completed with M4;
+this checkpoint does not claim those final gates have passed.
+
+[ADR 0025](decisions/0025-getter-alias-member-dispatch.md) corrects imported property
+getter chaining. A generic two-object regression checks fresh getter resolution,
+exact targets/Get/Call/Let intent and named arguments, retaining method shortcuts.
+The 19-crate DAG, native protocol and IR versions are unchanged. Excel definitions,
+identity, conversions and workbook effects stay in GridCraft.
 
 ## M2 completion — selected classes and standard forms (2026-10-29)
 

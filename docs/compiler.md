@@ -224,3 +224,8 @@ expressions stay temporary. Late-bound Object/Variant retain runtime checks.
 Load/Unload bind to checked project form lifecycle methods. The IDE appends form
 class support to compiler input, retaining authored handler offsets and saving
 only original source plus design. See [M2 acceptance](m2-acceptance.md).
+
+Getter aliases resolve before chained member Get/Call/Let/Set under
+[ADR 0025](decisions/0025-getter-alias-member-dispatch.md). Method aliases retain
+the existing fixed-call shortcut. Hosts can therefore expose dynamic roots while
+objects captured by source retain their identity. No IR version changes.

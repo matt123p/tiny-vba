@@ -296,3 +296,8 @@ abort parked continuations. Snapshot/reset refuse unfinished parked callbacks.
 Named IR7 field captures preserve canonical ByRef storage. The VM has no form
 control definitions, toolkit or IO dependency. The upper IDE implements selected
 form lifecycle/control events; see [the exact profile](m2-acceptance.md).
+
+Getter aliases resolve before chained member Get/Call/Let/Set under
+[ADR 0025](decisions/0025-getter-alias-member-dispatch.md). Method aliases retain
+the existing fixed-call shortcut. Hosts can therefore expose dynamic roots while
+objects captured by source retain their identity. No IR version changes.
