@@ -28,6 +28,9 @@ The module owns a source snapshot and all tokens (including whitespace, comments
 continuations). Successful lexing reconstructs the exact input through token spans.
 Identifiers retain spelling and offer an ASCII case-insensitive key. Numbers retain raw
 spelling/suffixes; strings decode doubled quotes without converting to runtime values.
+Named argument labels accept contextual reserved words (for example `End:=`), as
+member names do after a period. Their original spelling and source spans are retained;
+ordinary declarations continue to reject reserved identifiers.
 All ranges are checked half-open UTF-8 byte spans. Diagnostic coordinates are one-based
 Unicode scalar columns, with LF, CRLF and lone CR support.
 

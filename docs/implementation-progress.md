@@ -961,7 +961,17 @@ do not create an output, and reset clears retained results.
 
 Independently authored VM regressions verify callback `ByRef` mutation is returned exactly once
 and that a failed callback does not expose a partial output. `cargo xtask ci` passes across the
-complete tiny-vba workspace after this API. WordCraft uses
-the result to implement the standard `Document_BeforeSave(SaveAsUI, Cancel)` and
-`Document_BeforeClose(Cancel)` host contracts. WordCraft records those application workflows in its
-own M6 integration profile. This shared API does not itself establish Office event behavior.
+complete tiny-vba workspace after this API. WordCraft uses the result for its explicit
+save/close cancellation extensions. These document-module hooks are not standard Word
+events: Word's cancellable `DocumentBeforeSave` and `DocumentBeforeClose` events belong
+to Application. WordCraft records the canonical `Document_Close()` path and its extension
+contracts in its own M6 integration profile. This shared API does not itself establish Office behavior.
+
+## M6 contextual named argument labels (2026-10-30)
+
+WordCraft's independently authored `Range.SetRange End:=..., Start:=...` workflow
+exposed a parser refusal of reserved-word argument labels. The generic syntax parser
+now uses its existing contextual member-name grammar for the label before `:=`.
+It preserves exact spelling/spans and identifier budgets; ordinary declarations still
+reject reserved identifiers. A generic parser regression covers `End:=` and `Type:=`;
+the real document execution and argument/error contract remain WordCraft-owned.

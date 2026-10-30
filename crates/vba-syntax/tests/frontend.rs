@@ -141,6 +141,37 @@ fn operator_precedence_and_parentheses_are_structural() -> Result<(), Box<dyn Er
     Ok(())
 }
 #[test]
+fn reserved_word_argument_labels_preserve_spelling_and_spans() -> Result<(), Box<dyn Error>> {
+    let file = source("Sub Demo()\nclient.Run End:=3, Type:=4\nEnd Sub\n")?;
+    let parsed = parse(&file, ModuleKind::Standard)?;
+    assert!(parsed.syntax_valid(), "{:?}", parsed.diagnostics);
+    let StatementKind::Call { arguments, .. } = &parsed
+        .module
+        .procedures
+        .first()
+        .ok_or("procedure")?
+        .body
+        .first()
+        .ok_or("call")?
+        .kind
+    else {
+        return Err("call".into());
+    };
+    for (argument, expected) in arguments.iter().zip(["End", "Type"]) {
+        let label = argument.name.as_ref().ok_or("named argument")?;
+        assert_eq!(label.spelling, expected);
+        assert_eq!(file.slice(label.span)?, expected);
+    }
+    assert_eq!(arguments.len(), 2);
+    let invalid = source("Sub Demo()\nDim End As Long\nEnd Sub\n")?;
+    assert!(
+        !parse(&invalid, ModuleKind::Standard)?.syntax_valid(),
+        "ordinary declarations still reject reserved identifiers"
+    );
+    Ok(())
+}
+
+#[test]
 fn call_forms_named_omitted_and_parenthesized_arguments_stay_distinct() -> Result<(), Box<dyn Error>>
 {
     let file = source(

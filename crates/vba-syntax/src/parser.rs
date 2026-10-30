@@ -1072,7 +1072,8 @@ impl Parser<'_> {
             }
             let start = self.token().span;
             let name = if self.token().kind == TokenKind::Word && self.look(1, ":=") {
-                let name = self.name()?;
+                // Argument labels, like member names after '.', may be reserved words.
+                let name = self.member_name()?;
                 self.require(":=")?;
                 Some(name)
             } else {
