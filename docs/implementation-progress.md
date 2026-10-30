@@ -949,3 +949,19 @@ acceptance covers native and direct-control cell edits, the cell-editor commit, 
 gesture with source and destination callbacks, 15 content-edit commands, format-only suppression
 and no-op duplicate removal. See [`m5-acceptance.md`](m5-acceptance.md) for the exact scope and
 test record.
+
+## M6 shared callback output API (2026-10-30)
+
+[ADR 0028](decisions/0028-callback-byref-output.md) defines the shared return path for host-scheduled
+callback `ByRef` parameters. The VM captures final parameter values at normal callback completion,
+preserving their argument indices, and the IDE exposes one-shot FIFO consumption and explicit
+clearing to host adapters. Results are bounded by the existing session payload/work and callback
+budgets; callbacks without ByRef parameters retain no output snapshot. Failed/cancelled callbacks
+do not create an output, and reset clears retained results.
+
+Independently authored VM regressions verify callback `ByRef` mutation is returned exactly once
+and that a failed callback does not expose a partial output. `cargo xtask ci` passes across the
+complete tiny-vba workspace after this API. WordCraft uses
+the result to implement the standard `Document_BeforeSave(SaveAsUI, Cancel)` and
+`Document_BeforeClose(Cancel)` host contracts. WordCraft records those application workflows in its
+own M6 integration profile. This shared API does not itself establish Office event behavior.

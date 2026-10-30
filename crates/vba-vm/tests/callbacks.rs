@@ -454,6 +454,25 @@ fn callback_byref_mutations_are_returned_to_the_host() -> R {
     );
     Ok(())
 }
+
+#[test]
+fn failed_callback_does_not_return_partial_byref_outputs() -> R {
+    let mut s = program(
+        "Function Answer() As Long\nAnswer = 1\nEnd Function\nSub FailAfterWrite(Cancel As Boolean)\nCancel = True\nErr.Raise 5\nEnd Sub\n",
+    )?;
+    finish(&mut s)?;
+    s.schedule_callback("FailAfterWrite", vec![Value::Boolean(false)])?;
+    assert!(matches!(
+        s.run_next_callback(&mut vba_vm::NoHost, 64, &mut |_| Ok(false))?,
+        Outcome::Failed(failure) if failure.number == Some(5)
+    ));
+    assert_eq!(
+        s.take_callback_outputs(),
+        None,
+        "a failed callback never commits ByRef outputs"
+    );
+    Ok(())
+}
 #[test]
 fn stale_source_refuses_delivery_without_consuming_callback() -> R {
     let mut s = program(PROJECT)?;
