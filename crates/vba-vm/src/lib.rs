@@ -276,6 +276,8 @@ pub struct Session {
     allocated_locations: usize,
     stack_capacity: usize,
     callbacks: VecDeque<ScheduledCallback>,
+    callback_output_frame: Option<u64>,
+    callback_outputs: VecDeque<Vec<(usize, Value)>>,
     closed: bool,
     entry_arguments: Vec<Value>,
 }
@@ -496,6 +498,8 @@ impl Session {
             allocated_locations: 0,
             stack_capacity: 0,
             callbacks: VecDeque::new(),
+            callback_output_frame: None,
+            callback_outputs: VecDeque::new(),
             closed: false,
             entry_arguments: prepared.clone(),
         };
@@ -1066,6 +1070,15 @@ impl Session {
     pub fn pending_callbacks(&self) -> usize {
         self.callbacks.len()
     }
+    /// Take the ByRef parameter values written by the oldest completed host-scheduled callback.
+    /// Callback arguments are host-owned snapshots, so outputs are copied back explicitly.
+    pub fn take_callback_outputs(&mut self) -> Option<Vec<(usize, Value)>> {
+        self.callback_outputs.pop_front()
+    }
+    /// Discard prior callback output snapshots before starting a distinct host event.
+    pub fn clear_callback_outputs(&mut self) {
+        self.callback_outputs.clear();
+    }
     /// Replace the host-root references (ADR 0015: the host owns object lifetime). The same
     /// validation as launch applies: identity match, cap 64, unique case-insensitive names and
     /// every declared host root must remain bound. Refused on a closed lifecycle.
@@ -1205,6 +1218,7 @@ impl Session {
             self.fail(error)?;
             return Ok(());
         }
+        self.callback_output_frame = Some(self.top()?.id);
         self.counters.callbacks_run = self
             .counters
             .callbacks_run
@@ -1252,6 +1266,8 @@ impl Session {
         self.next_connection = 0;
         self.default_instances.clear();
         self.callbacks.retain(|c| c.receiver.is_none());
+        self.callback_output_frame = None;
+        self.callback_outputs.clear();
         self.next_receiver = None;
         self.pending_result = None;
         self.output.clear();
@@ -2039,6 +2055,7 @@ impl Session {
         self.pause(PauseReason::Checkpoint)
     }
     fn cleanup(&mut self) {
+        self.callback_output_frame = None;
         self.host_result_reference = None;
         self.argument_continuation = false;
         let native_fields = if self.preserve_instances {
@@ -3027,6 +3044,62 @@ impl Session {
                 };
                 if self.top()?.handler.fault.is_some() {
                     self.error = ErrorState::default();
+                }
+                if self.callback_output_frame == Some(self.top()?.id) {
+                    let outputs = {
+                        let frame = self.top()?;
+                        let procedure = self
+                            .program
+                            .program()
+                            .procedures
+                            .get(frame.procedure.0 as usize)
+                            .ok_or_else(|| invariant("callback procedure"))?;
+                        let mut outputs = Vec::new();
+                        reserve(&mut outputs, procedure.parameters.len())?;
+                        for (index, parameter) in procedure.parameters.iter().enumerate() {
+                            if parameter.mode == ir::ParameterMode::ByRef {
+                                let slot = frame
+                                    .slots
+                                    .get(index)
+                                    .ok_or_else(|| invariant("callback parameter slot"))?;
+                                outputs.push((index, self.store.read(*slot)?.clone()));
+                            }
+                        }
+                        outputs
+                    };
+                    let output_bytes = match outputs.iter().try_fold(0usize, |size, (_, value)| {
+                        size.checked_add(value_bytes(value)).ok_or_else(resource)
+                    }) {
+                        Ok(size) => size,
+                        Err(error) => {
+                            self.fail(error)?;
+                            return Ok(());
+                        }
+                    };
+                    if output_bytes > self.limits.payload {
+                        self.fail(resource())?;
+                        return Ok(());
+                    }
+                    if !outputs.is_empty() {
+                        let retained_bytes = match output_bytes
+                            .checked_add(std::mem::size_of::<Vec<(usize, Value)>>())
+                        {
+                            Some(size) => size,
+                            None => {
+                                self.fail(resource())?;
+                                return Ok(());
+                            }
+                        };
+                        if self.callback_outputs.len() >= self.limits.callbacks
+                            || self.charge(retained_bytes).is_err()
+                            || self.callback_outputs.try_reserve(1).is_err()
+                        {
+                            self.fail(resource())?;
+                            return Ok(());
+                        }
+                        self.callback_outputs.push_back(outputs);
+                    }
+                    self.callback_output_frame = None;
                 }
                 let frame = self.frames.pop().ok_or_else(|| invariant("return frame"))?;
                 self.stack_capacity = self

@@ -620,6 +620,16 @@ impl Ide {
     pub fn take_requests(&mut self) -> Vec<HostRequest> {
         std::mem::take(&mut self.requests)
     }
+    /// Consume ByRef values written by the oldest completed host-scheduled callback.
+    pub fn take_callback_outputs(&mut self) -> Option<Vec<(usize, Value)>> {
+        self.session.as_mut()?.take_callback_outputs()
+    }
+    /// Discard callback outputs from earlier host operations before delivering a new event.
+    pub fn clear_callback_outputs(&mut self) {
+        if let Some(session) = &mut self.session {
+            session.clear_callback_outputs();
+        }
+    }
     pub fn configure_host(
         &mut self,
         imports: Vec<Import>,

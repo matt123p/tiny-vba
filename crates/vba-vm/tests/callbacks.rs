@@ -428,6 +428,32 @@ fn callback_byref_parameters_use_owned_top_level_arguments() -> R {
     );
     Ok(())
 }
+
+#[test]
+fn callback_byref_mutations_are_returned_to_the_host() -> R {
+    let mut s = program(
+        "Function Answer() As Long\nAnswer = 1\nEnd Function\nSub BeforeSave(ByVal SaveAsUI As Boolean, Cancel As Boolean)\nCancel = True\nEnd Sub\n",
+    )?;
+    finish(&mut s)?;
+    s.schedule_callback(
+        "BeforeSave",
+        vec![Value::Boolean(false), Value::Boolean(false)],
+    )?;
+    assert_eq!(
+        s.run_next_callback(&mut vba_vm::NoHost, 64, &mut |_| Ok(false))?,
+        Outcome::Completed(ReturnValue::Sub)
+    );
+    assert_eq!(
+        s.take_callback_outputs(),
+        Some(vec![(1, Value::Boolean(true))])
+    );
+    assert_eq!(
+        s.take_callback_outputs(),
+        None,
+        "outputs are delivered once"
+    );
+    Ok(())
+}
 #[test]
 fn stale_source_refuses_delivery_without_consuming_callback() -> R {
     let mut s = program(PROJECT)?;
