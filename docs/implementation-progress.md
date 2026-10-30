@@ -1,11 +1,12 @@
 # Implementation progress
 
-Updated 2026-10-29. The classic-editor/debugger profile is implemented; its
+Updated 2026-10-30. The classic-editor/debugger profile is implemented; its
 historical milestone is M10. Runtime remains m5-host-v1 with verified IR 1/2/3/4/5/6/7.
-The [remaining plan](implementation-plan.md) retains stable **M5–M8** task IDs.
-**M1–M4 are complete for their declared profiles.** Office objects,
-document events, trust and packaging remain fork-owned. M3/M4 are implemented and audited in GridCraft, with a published immutable
-tiny-vba dependency and no development path override.
+The [remaining plan](implementation-plan.md) retains stable **M6–M8** task IDs.
+**M1–M5 are complete for their declared profiles.** Office objects, document
+events, trust and packaging remain fork-owned. M3/M4 are implemented and audited in GridCraft,
+with a published immutable tiny-vba dependency and no development path override. M5's
+document-module, event and Range-aware UDF acceptance is recorded in [m5-acceptance.md](m5-acceptance.md).
 
 ## M3/M4 completion — range, identity, values and members (2026-10-29)
 
@@ -42,9 +43,17 @@ no local path override, and no unrelated dependency updates. Final pinned
 native/WASM/full-CI/window checks close the acceptance gate, as recorded in the
 acceptance report. GridCraft’s integrated implementation is committed as `f320728d`.
 Both repositories retain their separate ownership and commits.
-M3 and M4 are removed from the remaining plan without renumbering M5–M8.
-Next smallest task: **M5.1** document-module/code-name execution with code-owner
-context, while keeping source import inert.
+M3 and M4 were removed from the remaining plan without renumbering M5–M8. M5 is
+now also complete for its declared profile; current work starts at M6.
+
+## M5.1 groundwork — explicit document code names (2026-10-29)
+
+The IDE model now preserves a document module's VBA code name separately from its
+source/display name. `add_document_module` validates the supplied identifier and
+requires it to match the module's `VB_Name` attribute; adding source remains inert.
+This shared editor groundwork preserves identity without executing source. GridCraft now binds the
+resolved code name to the live host object for callback execution; M5.1 signature/member acceptance,
+the broader event policy and UDF acceptance remain open.
 
 ## M2 completion — selected classes and standard forms (2026-10-29)
 
@@ -872,3 +881,71 @@ complete as recorded above. See the plan for remaining milestones.
 - Strict corpus verification: seven Git pins and 646 candidate file hashes checked; no macros executed.
 - Current documentation/skill links and unchanged source document copies checked.
 - macOS/Windows jobs are configured, not run locally. No MSRV run, fuzzing or VBA runtime tests yet.
+
+## M5 callback and UDF implementation slice — accepted profile (2026-10-30)
+
+[ADR 0026](decisions/0026-document-module-code-name-model.md) records document-module code names
+in the IDE. [ADR 0027](decisions/0027-document-callback-delivery.md) now specifies the shared
+host-authorized callback seam: a verified predeclared document class is selected by code name,
+its instance is created lazily, and callbacks (including first-use initialization) run through the
+existing bounded session queue and debugger frames. The host remains responsible for trust and
+captured arguments. ADR 0027 attaches the live host owner to the VM document instance; VM-authored
+members remain local and unresolved `Me` members use the ordinary foreign permission/dispatch path.
+
+Shared regressions cover inert code-name validation and callback selection by VBA code name, including
+lazy `Class_Initialize` ordering. Both pass on native and WASI. `cargo xtask ci`, `cargo xtask wasm`
+and `cargo xtask wasm-run` pass; the new IDE regression and the complete VM class suite pass natively.
+These checks establish the generic shared callback contract only; they do not establish Office event,
+recalculation or unchanged-workbook acceptance.
+
+GridCraft's working `feat/m5-document-events-udfs` branch adds workbook/sheet `codeName` persistence,
+inert project import, explicit open/change queue APIs, bounded `EnableEvents`, selected UI and VBA
+write notifications, declared Range/Object UDF parameters as read-only Range handles, `Caller`,
+`Volatile`, and persistent UDF project state. Variant and scalar UDF parameters keep the regular
+M4 value/array conversion while the calculation call retains reference provenance. The UDF VM now
+receives GridCraft's shared object type resolver. The calculation graph tracks per-formula UDF
+volatility; unknown UDF calls no longer force volatility, so a later `Application.Volatile(False)`
+stops unrelated-edit recalculation. UDF `Range.Value` and `Value2` share the regular typed/untyped
+M4 read conversion.
+
+The UDF read-only host now exposes Caller/Range Address, Row/Column, Count, Worksheet, Offset and
+Resize, along with worksheet Name/CodeName and parent workbook CodeName. It continues to refuse
+cell writes, workbook mutations and asynchronous calls.
+
+M5 is accepted for the declared profile. Worksheet callbacks scope unqualified
+Range/Cells/Rows/Columns construction to the event owner without changing active selection. Live
+`Me` forwarding is exercised against a real GridCraft workbook while another sheet is active.
+Independently authored tests cover inert document import, explicit Workbook_Open,
+FIFO/exactly-once event delivery, EnableEvents tail cancellation/re-enable, a full 256-event chain
+followed by a fresh chain, breakpoint pause/resume, Range identity, Caller, Static state, volatility
+on/off and native/direct-control/cell-editor/drag-cut edit sources. The VM document object remains a
+VBA instance forwarding unresolved members to the captured host owner. GridCraft event notifications
+cover the reviewed native mutation set; reset/close/trust cancellation, queue exhaustion, callback
+partial effects and form callbacks pass authored acceptance. A verified idle IDE session
+now lets callbacks run from Design mode without an unrelated Main invocation. `Workbook_Open` is
+exposed through an explicit, trust-checked command and never runs on import. Native event coverage includes cell/range writes, AutoFill/Series, directional fills, Flash Fill, sort, remove-duplicates, Text to Columns, content clears, Clear All and paste; formats-only paste/fill is suppressed. Callback failure cancels the remaining queued batch while already committed writes remain grouped for undo. On queue-budget
+exhaustion, native UI edits remain committed but the callback is reported as not queued, while VBA
+Range writes preflight and refuse before mutation. This is now recorded in GridCraft's VBA contract.
+Cell-editor commits, direct control commands and drag-cut now enter the same post-commit event hook,
+so these UI paths do not silently bypass the notification policy.
+The idle session compiles the full project with a temporary inert standard entry stub; private
+document handlers remain callback-only, and authored breakpoints are rebound before delivery.
+GridCraft synchronizes sheet identities before write-event preflight and checks the bound workbook
+still exists without requiring it to be the active workbook. Its embedded IDE
+reuses the M2 standard-form runtime through the same host; `.tvform` remains external exchange data,
+not workbook VBA metadata. The 256-event budget now resets at the idle boundary before a new native
+or explicit Workbook_Open event is preflighted, so a fully used prior chain cannot starve later work.
+Native notifications now include reviewed command sources for content writes, paste/clear,
+fill/series, Flash Fill, sort, duplicate removal and Text to Columns; that command reports its
+committed output bounds, including a custom destination. GridCraft authored VBA tests, a native
+cell-edit UI test and calc tests now pass. Event tests cover breakpoint/resume exactly once;
+Reset/close/trust cancellation; queue exhaustion before VBA mutation; and callback failure cancelling
+the tail while retaining an undoable earlier write. Worksheet UDF tests now cover Range identity,
+Caller, Row/Column, Address, Offset/Resize, Date/Currency typed `Value` versus numeric `Value2`, and
+refusal of `Application.OnTime` with no workbook mutation. GridCraft now imports `.tvform` files via
+the embedded IDE Import action and routes TextBox/button callbacks through the workbook host; the
+modal completion/close test leaves no wait token. M5 acceptance E01–E10 now pass. Embedded UI
+acceptance covers native and direct-control cell edits, the cell-editor commit, an actual drag-cut
+gesture with source and destination callbacks, 15 content-edit commands, format-only suppression
+and no-op duplicate removal. See [`m5-acceptance.md`](m5-acceptance.md) for the exact scope and
+test record.

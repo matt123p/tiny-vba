@@ -460,6 +460,53 @@ fn predeclared_document_state_is_lazy_shared_and_restored_without_import_executi
 }
 
 #[test]
+fn document_callbacks_are_selected_by_code_name_and_initialize_before_handler() -> R {
+    let main = SourceFile::new(SourceId(1), "Main.bas".into(), "Sub Main()\nEnd Sub".into())?;
+    let document = SourceFile::new(
+        SourceId(2),
+        "Sheet source.cls".into(),
+        "Attribute VB_Name = \"SheetCode\"\nPrivate Sub Class_Initialize()\nDebug.Print \"initialize\"\nEnd Sub\nPublic Sub Changed()\nDebug.Print \"changed\"\nEnd Sub".into(),
+    )?;
+    let parsed = [
+        parse(&main, ModuleKind::Standard)?,
+        parse(&document, ModuleKind::Document)?,
+    ];
+    let program = compile_modules(
+        &parsed,
+        &CompileOptions {
+            entry: "Main".into(),
+            capabilities: vba_vm::capabilities(),
+            ..Default::default()
+        },
+    )?;
+    let mut session = Session::new(program, 1, vec![], None, Limits::default())?;
+    assert_eq!(drive(&mut session)?, Outcome::Completed(ReturnValue::Sub));
+    assert!(
+        session
+            .schedule_document_callback("Sheet source", "Changed", vec![])
+            .is_err()
+    );
+    session.schedule_document_callback("SheetCode", "Changed", vec![])?;
+    assert_eq!(session.pending_callbacks(), 2);
+    assert_eq!(
+        session.run_next_callback(&mut NoHost, 64, &mut |_| Ok(false))?,
+        Outcome::Completed(ReturnValue::Sub)
+    );
+    assert_eq!(
+        session.run_next_callback(&mut NoHost, 64, &mut |_| Ok(false))?,
+        Outcome::Completed(ReturnValue::Sub)
+    );
+    assert_eq!(
+        session.output(),
+        &[
+            vba_values::VbaString::from_utf8("initialize")?,
+            vba_values::VbaString::from_utf8("changed")?,
+        ]
+    );
+    Ok(())
+}
+
+#[test]
 fn class_metadata_is_verified_and_legacy_consumers_refuse_it() -> R {
     let s = session(
         "Function Answer() As Long\nDim a As Counter\nSet a=New Counter\nAnswer=a.Read()\nEnd Function",

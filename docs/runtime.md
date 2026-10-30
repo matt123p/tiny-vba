@@ -95,6 +95,19 @@ budget produces a clean terminal failure. `Session::rebind_roots()` validates ho
 required roots and refuses nonempty roots without a host binding. Nested/reentrant dispatch and mid-run injection stay
 rejected; event ordering and Office-shaped event policy remain fork-owned.
 
+M5 document callbacks may be queued with `Session::schedule_document_callback(code_name, member, arguments)`;
+an embedding with live document objects may use `schedule_document_callback_with_owner` to attach a
+host-owned object to the predeclared class instance. The VM resolves only verified document classes
+by code name. Declared fields/procedures remain VM-owned; unresolved members on a document receiver
+forward through the existing host permission/identity path to the attached owner. Owner references
+are identity-checked and included in project-state snapshots. The host decides event authorization,
+captures arguments and schedules delivery after the active invocation is terminal. The IDE can also
+create a verified idle session for a host-authorized callback in Design mode: it compiles with the
+temporary standard-module entry stub, then queues the handler through the same session/debugger
+path without making a private document procedure a compiler entry or launching the project's normal
+entry procedure. This does not permit automatic
+`Workbook_Open` execution or provide event ordering by itself.
+
 `vba-debug::Controller` binds breakpoints to the VM instance, compiled revision and StatementId. Multiple
 statements on a line are separate stops. Step Into targets the next visible visit; Over stays in the
 starting frame or surviving ancestors; Out targets surviving ancestors. Descendant calls finish their

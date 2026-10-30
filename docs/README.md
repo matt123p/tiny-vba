@@ -95,3 +95,5 @@ ignored under `reports/ui/`. Neither is required for the ordinary offline test s
 
 [M3/M4 fork acceptance and publication status](m3-m4-host-acceptance.md) records
 the current host milestones separately from historical language milestone IDs.
+[M5 document-event and Range-aware UDF acceptance map](m5-acceptance.md) records the
+independently authored GridCraft scenarios accepted for the declared profile.

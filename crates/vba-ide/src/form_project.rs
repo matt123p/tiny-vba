@@ -481,6 +481,7 @@ impl Ide {
             kind: ModuleKind::Class,
             id: SourceId(0),
             name: format!("{}.frm", form.name),
+            code_name: None,
             text: source.clone(),
             caret: 0,
             revision: 0,

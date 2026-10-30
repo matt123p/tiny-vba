@@ -1792,6 +1792,20 @@ impl Binder<'_> {
         }) else {
             return Ok(());
         };
+        if class.document
+            && !class
+                .fields
+                .iter()
+                .any(|field| field.name.eq_ignore_ascii_case(&member.spelling))
+            && !self.signatures.iter().any(|signature| {
+                signature.module == class.module
+                    && signature.name.eq_ignore_ascii_case(&member.spelling)
+            })
+        {
+            // Unknown members on a document-module receiver are late-bound by the host object
+            // bound to that document code name. The VM still enforces local class members below.
+            return Ok(());
+        }
         let inside = class.module == self.signature.module;
         if let Some(field) = class
             .fields

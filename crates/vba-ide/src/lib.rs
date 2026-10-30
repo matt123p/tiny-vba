@@ -40,6 +40,21 @@ pub const DEMO: &str = "Attribute VB_Name = \"Module1\"\nOption Explicit\n\nPubl
 fn error(message: &str) -> Diagnostic {
     Diagnostic::new("VBA_IDE", message)
 }
+fn document_code_name(text: &str) -> Option<String> {
+    let source = SourceFile::new(SourceId(0), "document.cls".into(), text.into()).ok()?;
+    let parsed = parse(&source, ModuleKind::Document).ok()?;
+    parsed.module.attributes.iter().find_map(|attribute| {
+        (attribute.path.len() == 1
+            && attribute
+                .path
+                .first()
+                .is_some_and(|name| name.spelling.eq_ignore_ascii_case("VB_Name")))
+        .then(|| match &attribute.value.kind {
+            vba_syntax::ExprKind::String(value) => Some(value.clone()),
+            _ => None,
+        })?
+    })
+}
 #[derive(Clone, Debug)]
 pub struct Procedure {
     pub name: String,
@@ -54,6 +69,8 @@ pub struct Module {
     pub kind: ModuleKind,
     pub id: SourceId,
     pub name: String,
+    /// Stable VBA identity for a document module, independent of its display/file name.
+    pub code_name: Option<String>,
     pub text: String,
     pub caret: usize,
     pub revision: u64,
@@ -293,6 +310,7 @@ pub struct Ide {
     requests: Vec<HostRequest>,
     temporary_breakpoint: Option<StatementId>,
     session_host: Option<u64>,
+    document_event_delivery: bool,
     bookmarks: BTreeSet<(u64, usize)>,
     navigation: Vec<(SourceId, usize)>,
     pub constants: Vec<ConstantInfo>,
@@ -336,6 +354,7 @@ impl Ide {
             requests: vec![],
             temporary_breakpoint: None,
             session_host: None,
+            document_event_delivery: false,
             bookmarks: BTreeSet::new(),
             navigation: Vec::new(),
             constants: Vec::new(),
@@ -441,6 +460,11 @@ impl Ide {
             kind,
             id,
             name: name.into(),
+            code_name: if kind == ModuleKind::Document {
+                document_code_name(text)
+            } else {
+                None
+            },
             text: text.into(),
             caret: 0,
             revision: 0,
@@ -457,6 +481,35 @@ impl Ide {
         self.modules.push(module);
         self.active = self.modules.len().saturating_sub(1);
         self.changed()?;
+        Ok(id)
+    }
+    /// Add a document module while keeping its VBA code name separate from its source name.
+    /// Importing the module only stores source; it never runs its procedures or events.
+    pub fn add_document_module(
+        &mut self,
+        source_name: &str,
+        code_name: &str,
+        text: &str,
+    ) -> Result<SourceId> {
+        if code_name.is_empty()
+            || code_name.len() > 128
+            || !code_name.chars().enumerate().all(|(index, ch)| {
+                ch == '_' || ch.is_ascii_alphanumeric() && (index > 0 || !ch.is_ascii_digit())
+            })
+        {
+            return Err(error("invalid document code name"));
+        }
+        let source = SourceFile::new(SourceId(self.next_source), source_name.into(), text.into())?;
+        let parsed = parse(&source, ModuleKind::Document)?;
+        if !parsed.syntax_valid()
+            || document_code_name(text).is_none_or(|found| !found.eq_ignore_ascii_case(code_name))
+        {
+            return Err(error("document code name must match its VB_Name attribute"));
+        }
+        let id = self.add_module_with_kind(source_name, text, ModuleKind::Document)?;
+        if let Some(module) = self.modules.iter_mut().find(|module| module.id == id) {
+            module.code_name = Some(code_name.into());
+        }
         Ok(id)
     }
     fn changed(&mut self) -> Result<()> {
@@ -651,6 +704,84 @@ impl Ide {
             },
         )
     }
+    /// Compile all authored modules with a temporary standard entry point for a session that
+    /// will only deliver a host-authorized document callback. The callback itself is selected
+    /// later by document code name; private document handlers are not compiler entry points.
+    fn compile_idle_document_callback(&self) -> Result<VerifiedProgram> {
+        let mut modules = self.form_modules()?;
+        let suffix = (0..=MAX_MODULES)
+            .find(|suffix| {
+                let entry = format!("TinyVbaIdleEntry{suffix}");
+                let module_name = format!("TinyVbaIdleHost{suffix}");
+                modules.iter().all(|module| {
+                    module
+                        .module
+                        .procedures
+                        .iter()
+                        .all(|procedure| !procedure.name.spelling.eq_ignore_ascii_case(&entry))
+                        && module.module.attributes.iter().all(|attribute| {
+                            !attribute.path.first().is_some_and(|name| name.spelling.eq_ignore_ascii_case("VB_Name"))
+                                || !matches!(&attribute.value.kind, vba_syntax::ExprKind::String(name) if name.eq_ignore_ascii_case(&module_name))
+                        })
+                })
+            })
+            .ok_or_else(|| error("temporary document callback entry name budget"))?;
+        let entry = format!("TinyVbaIdleEntry{suffix}");
+        let module_name = format!("TinyVbaIdleHost{suffix}");
+        let source = SourceFile::new(
+            SourceId(u64::MAX - 4),
+            format!("{module_name}.bas"),
+            format!("Attribute VB_Name = \"{module_name}\"\nPublic Sub {entry}()\nEnd Sub\n"),
+        )?;
+        let parsed = parse(&source, ModuleKind::Standard)?;
+        if let Some(diagnostic) = parsed.diagnostics.first() {
+            return Err(diagnostic.clone());
+        }
+        modules
+            .try_reserve(1)
+            .map_err(|_| error("temporary callback module allocation budget"))?;
+        modules.push(parsed);
+        compile_modules(
+            &modules,
+            &CompileOptions {
+                entry,
+                revision: format!("ide-{}-idle-callback", self.revision),
+                capabilities: vba_vm::capabilities(),
+                imports: self.form_imports(),
+                references: self.reference_bindings.clone(),
+                ..Default::default()
+            },
+        )
+    }
+    fn bind_breakpoints(
+        controller: &mut Controller,
+        modules: &[Module],
+        session: &Session,
+    ) -> Result<()> {
+        for module in modules {
+            for byte in &module.breakpoints {
+                for checkpoint in session
+                    .program()
+                    .program()
+                    .procedures
+                    .iter()
+                    .flat_map(|procedure| &procedure.checkpoints)
+                    .filter(|checkpoint| {
+                        checkpoint.visible
+                            && checkpoint.span.source() == module.id
+                            && checkpoint.span.start() == *byte
+                    })
+                {
+                    controller.set_breakpoint(
+                        session,
+                        &session.program().program().revision,
+                        checkpoint.statement,
+                    )?;
+                }
+            }
+        }
+        Ok(())
+    }
     fn launch(&mut self, host: &mut impl Host, step: bool) -> Result<()> {
         let program = self.compile()?;
         let mut roots = self.roots.clone();
@@ -693,31 +824,13 @@ impl Ide {
             watch.previous = None;
         }
         self.temporary_breakpoint = None;
-        for module in &self.modules {
-            for byte in &module.breakpoints {
-                for checkpoint in session
-                    .program()
-                    .program()
-                    .procedures
-                    .iter()
-                    .flat_map(|p| &p.checkpoints)
-                    .filter(|c| {
-                        c.visible && c.span.source() == module.id && c.span.start() == *byte
-                    })
-                {
-                    self.controller.set_breakpoint(
-                        &session,
-                        &session.program().program().revision,
-                        checkpoint.statement,
-                    )?;
-                }
-            }
-        }
+        Self::bind_breakpoints(&mut self.controller, &self.modules, &session)?;
         if step {
             session.request_pause();
         }
         self.session = Some(session);
         self.session_host = Some(host.identity());
+        self.document_event_delivery = false;
         self.stale = false;
         self.selected_frame = 0;
         self.diagnostics.clear();
@@ -788,6 +901,7 @@ impl Ide {
                     s.cancel(host)?;
                 }
                 self.session = None;
+                self.document_event_delivery = false;
                 self.controller = Controller::new();
                 self.stale = false;
                 self.selected_frame = 0;
@@ -872,6 +986,7 @@ impl Ide {
             s.disconnect(host)?;
         }
         self.session = None;
+        self.document_event_delivery = false;
         self.modules.clear();
         self.forms.clear();
         self.controller = Controller::new();
@@ -904,9 +1019,100 @@ impl Ide {
         self.selected_frame = 0;
         self.tick(host)
     }
+    /// Deliver one host-authorized callback to a document module selected by VBA code name.
+    /// The current invocation must be terminal; events are never run during source import.
+    pub fn dispatch_document_event(
+        &mut self,
+        code_name: &str,
+        handler: &str,
+        arguments: Vec<Value>,
+        host: &mut impl Host,
+    ) -> Result<()> {
+        self.dispatch_document_event_for_owner(code_name, handler, arguments, None, host)
+    }
+    /// Deliver a document callback with its host-owned workbook/worksheet object as `Me`'s
+    /// forwarding target. The host handle must use the active host identity.
+    pub fn dispatch_document_event_for_owner(
+        &mut self,
+        code_name: &str,
+        handler: &str,
+        arguments: Vec<Value>,
+        owner: Option<ObjectRef>,
+        host: &mut impl Host,
+    ) -> Result<()> {
+        if self
+            .session_host
+            .is_some_and(|identity| identity != host.identity())
+        {
+            return Err(error("document event host identity mismatch"));
+        }
+        if self.stale || !matches!(self.mode(), Mode::Completed | Mode::Design) {
+            return Err(error(
+                "document events require an idle or completed project",
+            ));
+        }
+        if self.session.is_none() {
+            let program = self.compile_idle_document_callback()?;
+            let mut roots = self.roots.clone();
+            if !self.forms.is_empty() {
+                roots.insert(
+                    "VbaFormsGate".into(),
+                    ObjectRef {
+                        host: host.identity(),
+                        object: u64::MAX,
+                        generation: u64::MAX,
+                    },
+                );
+            }
+            let binding = if owner.is_none()
+                && self.form_imports().is_empty()
+                && roots.is_empty()
+                && self.type_resolver.is_none()
+            {
+                None
+            } else {
+                Some(HostBinding::for_program(&program, host.identity(), roots)?)
+            };
+            self.session = Some(Session::new_idle_with_type_resolver(
+                program,
+                1,
+                binding,
+                Limits::default(),
+                self.type_resolver.clone(),
+            )?);
+            self.session_host = Some(host.identity());
+            self.controller = Controller::new();
+            let session = self
+                .session
+                .as_mut()
+                .ok_or_else(|| error("idle session was not created"))?;
+            session.set_break_on_error(self.break_on_errors);
+            session.set_break_in_class_modules(self.break_in_class_modules);
+            Self::bind_breakpoints(&mut self.controller, &self.modules, session)?;
+            self.watch_evaluations = 0;
+            self.watch_budget_exhausted = false;
+            for watch in &mut self.watches {
+                watch.previous = None;
+            }
+            self.temporary_breakpoint = None;
+            self.selected_frame = 0;
+            self.diagnostics.clear();
+            self.messages.clear();
+        }
+        let session = self
+            .session
+            .as_mut()
+            .ok_or_else(|| error("no project session"))?;
+        session.schedule_document_callback_with_owner(code_name, handler, arguments, owner)?;
+        session.start_next_callback(host)?;
+        self.document_event_delivery = true;
+        self.selected_frame = 0;
+        self.tick(host)
+    }
     pub fn tick(&mut self, host: &mut impl Host) -> Result<()> {
         if self.forms.is_empty() {
-            return self.tick_core(host);
+            self.tick_core(host)?;
+            return self.tick_document_event(host);
         }
         self.update_form_waits();
         if let Some(token) = self
@@ -925,7 +1131,32 @@ impl Ide {
             gate: &mut gate,
         });
         self.form_gate = gate;
-        result
+        result?;
+        self.tick_document_event(host)
+    }
+    fn tick_document_event(&mut self, host: &mut impl Host) -> Result<()> {
+        if !self.document_event_delivery || !matches!(self.mode(), Mode::Completed) {
+            return Ok(());
+        }
+        let session = self
+            .session
+            .as_mut()
+            .ok_or_else(|| error("no project session"))?;
+        if session.pending_callbacks() == 0 {
+            self.document_event_delivery = false;
+            return Ok(());
+        }
+        session.start_next_callback(host)?;
+        self.tick_core(host)?;
+        if matches!(self.mode(), Mode::Completed)
+            && self
+                .session
+                .as_ref()
+                .is_some_and(|session| session.pending_callbacks() == 0)
+        {
+            self.document_event_delivery = false;
+        }
+        Ok(())
     }
     fn tick_core(&mut self, host: &mut impl Host) -> Result<()> {
         if self.stale {
@@ -1631,6 +1862,35 @@ mod watch_budget_tests {
         }
         assert_eq!(ide.mode(), Mode::Completed);
         assert_eq!(ide.output(), vec!["1"]);
+        Ok(())
+    }
+}
+
+#[cfg(test)]
+mod document_module_tests {
+    use super::*;
+
+    #[test]
+    fn document_code_name_is_validated_and_import_stays_inert() -> Result<()> {
+        let mut ide = Ide::new();
+        let source = "Attribute VB_Name = \"SheetCode\"\nPrivate Sub Worksheet_Change(ByVal Target As Range)\nDebug.Print 1\nEnd Sub";
+        let id = ide.add_document_module("Sheet1.cls", "SheetCode", source)?;
+        let module = ide
+            .modules
+            .iter()
+            .find(|module| module.id == id)
+            .ok_or_else(|| error("module missing"))?;
+        assert_eq!(module.name, "Sheet1.cls");
+        assert_eq!(module.code_name.as_deref(), Some("SheetCode"));
+        assert_eq!(ide.output(), Vec::<String>::new());
+        assert!(
+            ide.add_document_module("Sheet2.cls", "OtherName", source)
+                .is_err()
+        );
+        assert!(
+            ide.add_document_module("Sheet2.cls", "1Bad", source)
+                .is_err()
+        );
         Ok(())
     }
 }

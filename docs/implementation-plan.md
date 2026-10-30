@@ -1,6 +1,6 @@
 # Remaining implementation plan
 
-Updated 2026-10-29. This plan contains **remaining work only**, using stable M5–M8 IDs
+Updated 2026-10-30. This plan contains **remaining work only**, using stable M6–M8 IDs
 in implementation order after completed M1, the [selected M2 profile](m2-acceptance.md),
 and the [M3/M4 host profiles](m3-m4-host-acceptance.md). Completed work and the old-to-new milestone mapping
 belong in [implementation progress](implementation-progress.md#plan-renumbering--2026-10-28).
@@ -17,20 +17,19 @@ separate and native host dispatch in Rust.
 
 | Milestone | Remaining work | Prerequisites |
 |---|---|---|
-| M5 | Document modules, events and Range-aware UDFs | M2–M4 capabilities required by each workflow |
 | M6 | Remaining GridCraft and WordCraft integration | M1; M2–M5 for corresponding form/event/Excel workflows |
 | M7 | Unchanged-document and package acceptance | Applicable M1–M6 capabilities and explicit writeback design |
 | M8 | Expanded conformance, hardening and release | M1–M7 acceptance for the declared release profile |
 
 Implement shared language foundations before consumers, range references before
 range-dependent value/event behavior, and runtime semantics before form events.
-M1–M4 are complete for their declared profiles. WordCraft's
+M1–M5 are complete for their declared profiles. WordCraft's
 object-model work in M6 can proceed alongside Excel work; its document/form events
 consume the shared M2 contract.
 Build tests and collect lawful evidence throughout every milestone. M8 is the
 final release gate, not a reason to postpone fuzzing, benchmarks or regression tests.
 
-## M5 — Document modules, events and Range-aware UDFs
+## M5 completion record — Document modules, events and Range-aware UDFs
 
 Owner: tiny-vba shared class/document/callback semantics; GridCraft document
 bindings, event ordering, standard Office controls and calculation context.
@@ -45,9 +44,11 @@ Depends on applicable M2–M4 capabilities; reuse shared contracts.
   behavior, persistent state and recalculation rules. Enforce the declared UDF
   mutation policy without silently substituting value arrays for references.
 
-Acceptance: unchanged authored handlers and UDFs execute against real GridCraft
-state. Pause/inspect/resume, exactly-once dispatch, reset/close/trust revocation
-and calculation dependencies pass. No untrusted automatic open execution.
+Accepted for the declared profile. Unchanged authored handlers and UDFs execute
+against real GridCraft state. Pause/inspect/resume, exactly-once dispatch,
+reset/close/trust revocation and calculation dependencies pass. Workbook_Open
+never executes on import. The [M5 acceptance map](m5-acceptance.md) records all
+ten passing scenarios and the exact native, WASM and authored-test evidence.
 
 ## M6 — Remaining GridCraft and WordCraft integration
 
