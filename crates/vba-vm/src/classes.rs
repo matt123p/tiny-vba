@@ -12,6 +12,7 @@ pub(super) struct Instance {
     pub terminating: bool,
     pub object: vba_values::ObjectRef,
     pub source: ir::SourceIndex,
+    pub document_owner: Option<vba_values::ObjectRef>,
     pub ty: vba_values::NominalType,
     pub fields: Vec<Location>,
 }
@@ -30,6 +31,7 @@ pub(super) struct Snapshot {
     connections: Vec<u64>,
     object: vba_values::ObjectRef,
     source: ir::SourceIndex,
+    document_owner: Option<vba_values::ObjectRef>,
     values: Vec<Value>,
 }
 pub(super) struct Restore {
@@ -220,6 +222,7 @@ impl Session {
                         .collect(),
                     object: i.object,
                     source: i.source,
+                    document_owner: i.document_owner,
                     values: i
                         .fields
                         .iter()
@@ -248,6 +251,18 @@ impl Session {
                 .iter()
                 .find(|c| c.source == snapshot.source)
                 .ok_or_else(|| command("saved class not found"))?;
+            if snapshot.document_owner.is_some_and(|owner| {
+                !class.document
+                    || owner.host == 0
+                    || self
+                        .binding
+                        .as_ref()
+                        .is_none_or(|binding| owner.host != binding.identity)
+            }) {
+                return Err(command(
+                    "saved document owner does not match the current host",
+                ));
+            }
             if snapshot.values.len() != class.fields.len() {
                 return Err(command("saved class fields differ"));
             }
@@ -271,6 +286,7 @@ impl Session {
                 terminating: false,
                 object,
                 source: class.source,
+                document_owner: snapshot.document_owner,
                 ty: vba_values::NominalType::new("VBAProject", "1", &class.name)?,
                 fields: vec![],
             });
@@ -378,7 +394,83 @@ impl Session {
                 })
             })
     }
+    pub(super) fn bind_document_owner(
+        &mut self,
+        object: vba_values::ObjectRef,
+        owner: vba_values::ObjectRef,
+    ) -> Result<()> {
+        let instance = self.instance_object(object)?;
+        let class = self
+            .program
+            .program()
+            .classes
+            .iter()
+            .find(|class| class.source == instance.source)
+            .ok_or_else(|| invariant("document owner class"))?;
+        let identity = self.binding.as_ref().map(|binding| binding.identity);
+        if !class.document || owner.host == 0 || identity != Some(owner.host) {
+            return Err(command("document owner must be a current host object"));
+        }
+        if instance
+            .document_owner
+            .is_some_and(|current| current != owner)
+        {
+            return Err(command(
+                "document module is already bound to another host object",
+            ));
+        }
+        let instance = self
+            .instances
+            .iter_mut()
+            .find(|instance| instance.object == object && instance.alive)
+            .ok_or_else(|| invariant("document owner instance"))?;
+        instance.document_owner = Some(owner);
+        Ok(())
+    }
+    pub(super) fn document_forward_target(
+        &self,
+        object: vba_values::ObjectRef,
+        site: &ir::ForeignSite,
+    ) -> Result<Option<vba_values::ObjectRef>> {
+        let instance = self.instance_object(object)?;
+        let class = self
+            .program
+            .program()
+            .classes
+            .iter()
+            .find(|class| class.source == instance.source)
+            .ok_or_else(|| invariant("document forwarding class"))?;
+        if !class.document {
+            return Ok(None);
+        }
+        let member = if site.member.is_empty() {
+            class.default_member.as_deref().unwrap_or("")
+        } else {
+            site.member.as_str()
+        };
+        if class
+            .fields
+            .iter()
+            .any(|field| field.name.eq_ignore_ascii_case(member))
+            || class
+                .methods
+                .iter()
+                .any(|method| method.name.eq_ignore_ascii_case(member))
+        {
+            return Ok(None);
+        }
+        Ok(instance.document_owner)
+    }
     pub(super) fn new_instance(&mut self, source: ir::SourceIndex) -> Result<()> {
+        let object = self.allocate_instance(source)?;
+        self.push(Operand::Value(Value::Object(object)))?;
+        self.advance()?;
+        self.initialize_instance(source, object, true)
+    }
+    pub(super) fn allocate_instance(
+        &mut self,
+        source: ir::SourceIndex,
+    ) -> Result<vba_values::ObjectRef> {
         let class = self
             .program
             .program()
@@ -441,11 +533,26 @@ impl Session {
             terminating: false,
             object,
             source,
+            document_owner: None,
             ty: vba_values::NominalType::new("VBAProject", "1", &class.name)?,
             fields,
         });
-        self.push(Operand::Value(Value::Object(object)))?;
-        self.advance()?;
+        Ok(object)
+    }
+    pub(super) fn initialize_instance(
+        &mut self,
+        source: ir::SourceIndex,
+        object: vba_values::ObjectRef,
+        lifecycle_return: bool,
+    ) -> Result<()> {
+        let class = self
+            .program
+            .program()
+            .classes
+            .iter()
+            .find(|c| c.source == source)
+            .cloned()
+            .ok_or_else(|| invariant("class source"))?;
         if let Some(initializer) = class
             .methods
             .iter()
@@ -462,7 +569,9 @@ impl Session {
             }
             self.next_receiver = Some(object);
             self.push_frame(initializer.procedure, vec![])?;
-            self.top_mut()?.class_return = Some(ClassReturn::Initialize(object));
+            if lifecycle_return {
+                self.top_mut()?.class_return = Some(ClassReturn::Initialize(object));
+            }
         }
         Ok(())
     }

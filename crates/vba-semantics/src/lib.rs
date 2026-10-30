@@ -1792,6 +1792,20 @@ impl Binder<'_> {
         }) else {
             return Ok(());
         };
+        if class.document
+            && !class
+                .fields
+                .iter()
+                .any(|field| field.name.eq_ignore_ascii_case(&member.spelling))
+            && !self.signatures.iter().any(|signature| {
+                signature.module == class.module
+                    && signature.name.eq_ignore_ascii_case(&member.spelling)
+            })
+        {
+            // Unknown members on a document-module receiver are late-bound by the host object
+            // bound to that document code name. The VM still enforces local class members below.
+            return Ok(());
+        }
         let inside = class.module == self.signature.module;
         if let Some(field) = class
             .fields
@@ -1932,15 +1946,15 @@ impl Binder<'_> {
                 return Err(err("constant is not writable or callable", member.span));
             }
         }
-        // A fixed-member alias owns the whole application. A root-object import must
-        // instead bind the root and retain the requested member/kind/arguments.
+        // Method aliases own the whole application. Getter aliases first resolve
+        // their value, then retain the requested member/kind/arguments.
         if let ast::ExprKind::Name(name) = &target.kind
             && !self.symbols.contains_key(&name.key())
             && let Some(import) = self
                 .imports
                 .iter()
                 .find(|i| i.name.eq_ignore_ascii_case(&name.spelling))
-                .filter(|i| i.member.is_some())
+                .filter(|i| i.member.is_some() && i.kind == vba_foreign::InvokeKind::Call)
                 .cloned()
         {
             if !matches!(kind, ForeignKind::Call | ForeignKind::Get) {

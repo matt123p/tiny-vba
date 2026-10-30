@@ -319,6 +319,44 @@ impl Session {
         limits: Limits,
         type_resolver: Option<std::sync::Arc<dyn foreign::ObjectTypeResolver>>,
     ) -> Result<Self> {
+        Self::construct(
+            program,
+            identity,
+            arguments,
+            binding,
+            limits,
+            type_resolver,
+            true,
+        )
+    }
+    /// Create a project session that has host bindings but no launched entry frame.
+    /// It is intended for host-authorized document callbacks delivered from design mode.
+    pub fn new_idle_with_type_resolver(
+        program: ir::VerifiedProgram,
+        identity: u64,
+        binding: Option<HostBinding>,
+        limits: Limits,
+        type_resolver: Option<std::sync::Arc<dyn foreign::ObjectTypeResolver>>,
+    ) -> Result<Self> {
+        Self::construct(
+            program,
+            identity,
+            Vec::new(),
+            binding,
+            limits,
+            type_resolver,
+            false,
+        )
+    }
+    fn construct(
+        program: ir::VerifiedProgram,
+        identity: u64,
+        arguments: Vec<Value>,
+        binding: Option<HostBinding>,
+        limits: Limits,
+        type_resolver: Option<std::sync::Arc<dyn foreign::ObjectTypeResolver>>,
+        start_entry: bool,
+    ) -> Result<Self> {
         // A structural target or caller-invented capability set never enables missing runtime code.
         ir::recheck(&program, &capabilities(), &ir::VerifyLimits::default())?;
         let p = program.program();
@@ -344,8 +382,11 @@ impl Session {
             .procedures
             .get(p.entry.0 as usize)
             .ok_or_else(|| invariant("entry missing"))?;
-        if arguments.len() != entry.parameters.len() {
+        if start_entry && arguments.len() != entry.parameters.len() {
             return Err(command("launch argument count mismatch"));
+        }
+        if !start_entry && !arguments.is_empty() {
+            return Err(command("idle session cannot have launch arguments"));
         }
         if let Some(binding) = &binding {
             if binding.identity == 0 && !p.classes.is_empty() {
@@ -463,7 +504,11 @@ impl Session {
                 .checked_add(nominal_payload)
                 .ok_or_else(resource)?,
         )?;
-        session.push_frame(entry_id, prepared.into_iter().map(Operand::Value).collect())?;
+        if start_entry {
+            session.push_frame(entry_id, prepared.into_iter().map(Operand::Value).collect())?;
+        } else {
+            session.state = Outcome::Completed(ReturnValue::Sub);
+        }
         Ok(session)
     }
     pub fn output(&self) -> &[vba_values::VbaString] {
@@ -783,6 +828,94 @@ impl Session {
             .is_none_or(|p| p.kind != ir::ProcedureKind::Sub)
         {
             return Err(command("event handler must be a Sub"));
+        }
+        self.enqueue_callback(procedure, arguments, Some(object))
+    }
+    /// Queue a callback on a predeclared document module selected by its VBA code name.
+    /// The document instance remains VM-owned; the embedding decides when the associated
+    /// host event is authorized and supplies already-captured arguments.
+    pub fn schedule_document_callback(
+        &mut self,
+        code_name: &str,
+        member: &str,
+        arguments: Vec<Value>,
+    ) -> Result<usize> {
+        self.schedule_document_callback_with_owner(code_name, member, arguments, None)
+    }
+    /// Queue a document callback and associate its predeclared instance with a host-owned
+    /// workbook/worksheet object. The owner must belong to the current host binding.
+    pub fn schedule_document_callback_with_owner(
+        &mut self,
+        code_name: &str,
+        member: &str,
+        arguments: Vec<Value>,
+        owner: Option<vba_values::ObjectRef>,
+    ) -> Result<usize> {
+        if code_name.is_empty() || code_name.len() > 128 {
+            return Err(command("invalid document code name"));
+        }
+        if member.is_empty()
+            || member.len() > 128
+            || member.eq_ignore_ascii_case("Class_Initialize")
+            || member.eq_ignore_ascii_case("Class_Terminate")
+        {
+            return Err(command("invalid document callback member"));
+        }
+        let class = self
+            .program
+            .program()
+            .classes
+            .iter()
+            .find(|class| {
+                class.document && class.predeclared && class.name.eq_ignore_ascii_case(code_name)
+            })
+            .cloned()
+            .ok_or_else(|| command("unknown document code name"))?;
+        let source = class.source;
+        let procedure = class
+            .methods
+            .iter()
+            .find(|method| {
+                method.name.eq_ignore_ascii_case(member) && method.kind == ir::ForeignKind::Call
+            })
+            .map(|method| method.procedure)
+            .ok_or_else(|| command("unknown document event handler"))?;
+        if self
+            .program
+            .program()
+            .procedures
+            .get(procedure.0 as usize)
+            .is_none_or(|procedure| procedure.kind != ir::ProcedureKind::Sub)
+        {
+            return Err(command("document event handler must be a Sub"));
+        }
+        let object = if let Some(object) = self.default_instances.get(&source).copied() {
+            object
+        } else {
+            let object = self.allocate_instance(source)?;
+            self.default_instances.insert(source, object);
+            if let Some(initializer) = class
+                .methods
+                .iter()
+                .find(|method| method.name.eq_ignore_ascii_case("Class_Initialize"))
+            {
+                if self
+                    .program
+                    .program()
+                    .procedures
+                    .get(initializer.procedure.0 as usize)
+                    .is_none_or(|procedure| {
+                        !procedure.parameters.is_empty() || procedure.kind != ir::ProcedureKind::Sub
+                    })
+                {
+                    return Err(invariant("document initializer signature"));
+                }
+                self.enqueue_callback(initializer.procedure, vec![], Some(object))?;
+            }
+            object
+        };
+        if let Some(owner) = owner {
+            self.bind_document_owner(object, owner)?;
         }
         self.enqueue_callback(procedure, arguments, Some(object))
     }
@@ -2971,7 +3104,7 @@ impl Session {
             });
         }
         arguments.reverse();
-        let target = self.pop_value()?;
+        let mut target = self.pop_value()?;
         let owner = if matches!(
             site.kind,
             ir::ForeignKind::DefaultLet
@@ -3140,7 +3273,11 @@ impl Session {
             && object.host == 0
             && !self.program.program().classes.is_empty()
         {
-            return self.invoke_class(*object, site, arguments);
+            if let Some(host_owner) = self.document_forward_target(*object, &site)? {
+                target = Value::Object(host_owner);
+            } else {
+                return self.invoke_class(*object, site, arguments);
+            }
         }
         let Value::Object(target) = target else {
             return Err(runtime_diagnostic(runtime::Error::Vba {

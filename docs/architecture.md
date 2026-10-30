@@ -62,7 +62,8 @@ ByRef obligations and explicit result/error/wait state. Its owned M0 Rust protot
 It must not know Excel/Word names, Range behavior, Office enums or document storage.
 The applications implement a bridge to their own Office compatibility layers.
 Root-object imports preserve member Get/Call/Let/Set dispatch; fixed-member aliases
-retain their M5 shortcut semantics ([ADR 0017](decisions/0017-imported-root-members.md)).
+retain their M5 shortcut semantics for methods ([ADR 0017](decisions/0017-imported-root-members.md)).
+Property getter aliases resolve before chaining under [ADR 0025](decisions/0025-getter-alias-member-dispatch.md); the returned object retains its identity.
 The VM owns VBA class instances;
 external object references preserve host identity/lifetime without defining a parallel Office registry.
 

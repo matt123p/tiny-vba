@@ -1,7 +1,8 @@
 # Remaining implementation plan
 
-Updated 2026-10-29. This plan contains **remaining work only**, using stable M3–M8 IDs
-in implementation order after completed M1 and the [selected M2 profile](m2-acceptance.md). Completed work and the old-to-new milestone mapping
+Updated 2026-10-30. This plan contains **remaining work only**, using stable M6–M8 IDs
+in implementation order after completed M1, the [selected M2 profile](m2-acceptance.md),
+and the [M3/M4 host profiles](m3-m4-host-acceptance.md). Completed work and the old-to-new milestone mapping
 belong in [implementation progress](implementation-progress.md#plan-renumbering--2026-10-28).
 Historical reports and ADRs retain their original milestone numbers; use this
 document's numbers for new work.
@@ -16,59 +17,19 @@ separate and native host dispatch in Rust.
 
 | Milestone | Remaining work | Prerequisites |
 |---|---|---|
-| M3 | Excel range and worksheet coverage | M1 |
-| M4 | Excel identity, values and member semantics | M1 and applicable M3 reference behavior |
-| M5 | Document modules, events and Range-aware UDFs | M2–M4 capabilities required by each workflow |
 | M6 | Remaining GridCraft and WordCraft integration | M1; M2–M5 for corresponding form/event/Excel workflows |
 | M7 | Unchanged-document and package acceptance | Applicable M1–M6 capabilities and explicit writeback design |
 | M8 | Expanded conformance, hardening and release | M1–M7 acceptance for the declared release profile |
 
 Implement shared language foundations before consumers, range references before
 range-dependent value/event behavior, and runtime semantics before form events.
-M1/M2 shared prerequisites are implemented for their declared profiles. WordCraft's
+M1–M5 are complete for their declared profiles. WordCraft's
 object-model work in M6 can proceed alongside Excel work; its document/form events
 consume the shared M2 contract.
 Build tests and collect lawful evidence throughout every milestone. M8 is the
 final release gate, not a reason to postpone fuzzing, benchmarks or regression tests.
 
-## M3 — Excel range and worksheet coverage
-
-Owner: GridCraft; tiny-vba changes only for necessary generic mechanisms.
-Depends on M1 typed/default-member/collection support.
-
-- **M3.1:** Separate range-reference construction from cell materialization
-  budgets. Implement Cells zero/one/two-index forms and column letters, Rows,
-  Columns, CountLarge and Item with Excel argument names and coercion rules.
-- **M3.2:** Implement relative Range.Range, Offset/Resize, local/qualified and named
-  references, and explicit multi-area behavior. Preserve sheet ownership and
-  checked arithmetic without allocating whole-sheet cell arrays.
-- **M3.3:** Add UsedRange, End and Find/navigation workflows. Route structural
-  edits through native engine commands with protection and undo/recalculation.
-
-Acceptance: unchanged authored source covers last-row, iteration, relative/named
-range and boundary workflows. Verify addresses/types, overflow/errors, resource
-refusals and mutation atomicity natively and in WASM.
-
-## M4 — Excel identity, values and member semantics
-
-Owner: GridCraft identity/conversion/commands; shared VBA coercion stays in
-tiny-vba. Depends on M1 and relevant M3 reference behavior.
-
-- **M4.1:** Supply stable worksheet identities and dynamic roots. Distinguish
-  ThisWorkbook from ActiveWorkbook and support active sheet/cell/selection without
-  retargeting stale handles after rename/reorder or document switching.
-- **M4.2:** Match Value versus Value2 Date/Currency behavior, typed errors,
-  scalar/array assignment and formula/text conversion. Complete Address optional
-  arguments and supported A1/R1C1, relative and external forms.
-- **M4.3:** Implement required formatting objects, application settings and
-  calculation/member signatures with real engine behavior. Catalogue completion
-  must describe actual support; unsupported operations fail explicitly.
-
-Acceptance: compare exact value tags, array bounds, signatures/named arguments,
-owner identity, selection and calculation effects. Test document/sheet lifetime,
-undo and protection. Distinguish public documentation from observed evidence.
-
-## M5 — Document modules, events and Range-aware UDFs
+## M5 completion record — Document modules, events and Range-aware UDFs
 
 Owner: tiny-vba shared class/document/callback semantics; GridCraft document
 bindings, event ordering, standard Office controls and calculation context.
@@ -83,9 +44,11 @@ Depends on applicable M2–M4 capabilities; reuse shared contracts.
   behavior, persistent state and recalculation rules. Enforce the declared UDF
   mutation policy without silently substituting value arrays for references.
 
-Acceptance: unchanged authored handlers and UDFs execute against real GridCraft
-state. Pause/inspect/resume, exactly-once dispatch, reset/close/trust revocation
-and calculation dependencies pass. No untrusted automatic open execution.
+Accepted for the declared profile. Unchanged authored handlers and UDFs execute
+against real GridCraft state. Pause/inspect/resume, exactly-once dispatch,
+reset/close/trust revocation and calculation dependencies pass. Workbook_Open
+never executes on import. The [M5 acceptance map](m5-acceptance.md) records all
+ten passing scenarios and the exact native, WASM and authored-test evidence.
 
 ## M6 — Remaining GridCraft and WordCraft integration
 
