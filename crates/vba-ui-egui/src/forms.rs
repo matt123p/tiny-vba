@@ -75,8 +75,14 @@ fn control_text(value: vba_ide::Value) -> String {
 fn command(commands: &mut Vec<Command>, id: SourceId, edit: DesignEdit) {
     commands.push(Command::Form(FormCommand::Edit(id, edit)));
 }
-fn string_property(ui: &mut egui::Ui, label: &str, value: &mut String, limit: usize) -> bool {
-    let label = ui.label(label);
+fn string_property(
+    ui: &mut egui::Ui,
+    label: &str,
+    value: &mut String,
+    limit: usize,
+    theme: Theme,
+) -> bool {
+    let label = ui.label(theme.label(label));
     let changed = ui
         .add(TextEdit::singleline(value).char_limit(limit))
         .labelled_by(label.id)
@@ -84,8 +90,8 @@ fn string_property(ui: &mut egui::Ui, label: &str, value: &mut String, limit: us
     ui.end_row();
     changed
 }
-fn number_property(ui: &mut egui::Ui, label: &str, value: &mut f32) -> bool {
-    let label = ui.label(label);
+fn number_property(ui: &mut egui::Ui, label: &str, value: &mut f32, theme: Theme) -> bool {
+    let label = ui.label(theme.label(label));
     let changed = ui
         .add(
             egui::DragValue::new(value)
@@ -103,6 +109,7 @@ impl EditorUi {
         ui: &mut egui::Ui,
         ide: &Ide,
         commands: &mut Vec<Command>,
+        theme: Theme,
     ) -> bool {
         let Some(id) = ide
             .active_module()
@@ -170,19 +177,22 @@ impl EditorUi {
                 ))
                 .strong(),
             );
-            if ui.button("View Form Code").clicked() {
+            if ui.button(theme.label("View Form Code")).clicked() {
                 self.form_view = false;
                 self.focus_editor = true;
             }
             if ui
-                .add_enabled(editable, egui::Button::new("Run Form"))
+                .add_enabled(editable, egui::Button::new(theme.label("Run Form")))
                 .clicked()
             {
                 commands.push(Command::Form(FormCommand::Run(id, self.form_modal)));
             }
-            ui.checkbox(&mut self.form_modal, "Modal");
+            ui.checkbox(&mut self.form_modal, theme.label("Modal"));
             if ui
-                .add_enabled(ide.enabled(Action::Reset), egui::Button::new("Reset Form"))
+                .add_enabled(
+                    ide.enabled(Action::Reset),
+                    egui::Button::new(theme.label("Reset Form")),
+                )
                 .clicked()
             {
                 commands.push(Command::Action(Action::Reset));
@@ -190,7 +200,7 @@ impl EditorUi {
         });
         ui.add_enabled_ui(editable, |ui| {
             ui.horizontal_wrapped(|ui| {
-                ui.label("Toolbox:");
+                ui.label(theme.label("Toolbox:"));
                 for kind in [
                     ControlKind::Label,
                     ControlKind::TextBox,
@@ -214,13 +224,19 @@ impl EditorUi {
                     }
                 }
                 if ui
-                    .add_enabled(designer.can_undo(), egui::Button::new("Undo Design"))
+                    .add_enabled(
+                        designer.can_undo(),
+                        egui::Button::new(theme.label("Undo Design")),
+                    )
                     .clicked()
                 {
                     commands.push(Command::Form(FormCommand::History(id, false)));
                 }
                 if ui
-                    .add_enabled(designer.can_redo(), egui::Button::new("Redo Design"))
+                    .add_enabled(
+                        designer.can_redo(),
+                        egui::Button::new(theme.label("Redo Design")),
+                    )
                     .clicked()
                 {
                     commands.push(Command::Form(FormCommand::History(id, true)));
@@ -234,8 +250,10 @@ impl EditorUi {
                 }
                 let mut grid = designer.grid();
                 let mut snap = designer.snap();
-                let changed = ui.checkbox(&mut snap, "Snap to Grid").changed();
-                let label = ui.label("Grid points");
+                let changed = ui
+                    .checkbox(&mut snap, theme.label("Snap to Grid"))
+                    .changed();
+                let label = ui.label(theme.label("Grid points"));
                 if ui
                     .add(egui::DragValue::new(&mut grid).range(1.0..=72.0))
                     .labelled_by(label.id)
@@ -247,7 +265,9 @@ impl EditorUi {
             });
         });
         if !editable {
-            ui.label("Reset execution to edit the design. Runtime values are separate.");
+            ui.label(
+                theme.label("Reset execution to edit the design. Runtime values are separate."),
+            );
         }
         ui.separator();
         let properties = if ui.available_width() < 650.0 {
@@ -262,7 +282,7 @@ impl EditorUi {
                 .max_size(300.0)
         };
         properties.resizable(true).show(ui, |ui| {
-            ui.heading("Form Properties");
+            ui.heading(theme.label("Form Properties"));
             egui::ScrollArea::vertical()
                 .id_salt("form.props.scroll")
                 .show(ui, |ui| {
@@ -278,26 +298,38 @@ impl EditorUi {
                                 .num_columns(2)
                                 .striped(true)
                                 .show(ui, |ui| {
-                                    changed |= string_property(ui, "Control Name", &mut c.name, 64);
-                                    changed |= string_property(ui, "Caption", &mut c.caption, 1024);
+                                    changed |=
+                                        string_property(ui, "Control Name", &mut c.name, 64, theme);
+                                    changed |=
+                                        string_property(ui, "Caption", &mut c.caption, 1024, theme);
                                     if c.kind == ControlKind::TextBox {
-                                        changed |= string_property(ui, "Text", &mut c.text, 16384);
+                                        changed |=
+                                            string_property(ui, "Text", &mut c.text, 16384, theme);
                                     }
-                                    changed |= number_property(ui, "Left", &mut c.bounds.left);
-                                    changed |= number_property(ui, "Top", &mut c.bounds.top);
-                                    changed |= number_property(ui, "Width", &mut c.bounds.width);
-                                    changed |= number_property(ui, "Height", &mut c.bounds.height);
-                                    changed |= ui.checkbox(&mut c.enabled, "Enabled").changed();
+                                    changed |=
+                                        number_property(ui, "Left", &mut c.bounds.left, theme);
+                                    changed |= number_property(ui, "Top", &mut c.bounds.top, theme);
+                                    changed |=
+                                        number_property(ui, "Width", &mut c.bounds.width, theme);
+                                    changed |=
+                                        number_property(ui, "Height", &mut c.bounds.height, theme);
+                                    changed |= ui
+                                        .checkbox(&mut c.enabled, theme.label("Enabled"))
+                                        .changed();
                                     ui.end_row();
-                                    changed |= ui.checkbox(&mut c.visible, "Visible").changed();
+                                    changed |= ui
+                                        .checkbox(&mut c.visible, theme.label("Visible"))
+                                        .changed();
                                     ui.end_row();
-                                    changed |= ui.checkbox(&mut c.tab_stop, "Tab Stop").changed();
+                                    changed |= ui
+                                        .checkbox(&mut c.tab_stop, theme.label("Tab Stop"))
+                                        .changed();
                                     ui.end_row();
                                 });
                             if changed {
                                 command(commands, id, DesignEdit::Replace(c));
                             }
-                            if ui.button("View Default Event").clicked() {
+                            if ui.button(theme.label("View Default Event")).clicked() {
                                 commands.push(Command::Form(FormCommand::Handler(
                                     id,
                                     Some(control.id),
@@ -306,7 +338,7 @@ impl EditorUi {
                                 self.form_view = false;
                                 self.navigate = true;
                             }
-                            if ui.button("Delete Selection").clicked() {
+                            if ui.button(theme.label("Delete Selection")).clicked() {
                                 command(commands, id, DesignEdit::Delete);
                             }
                         } else {
@@ -316,9 +348,10 @@ impl EditorUi {
                             let mut changed = false;
                             ui.label(&form.name);
                             egui::Grid::new("form.props").num_columns(2).show(ui, |ui| {
-                                changed |= string_property(ui, "Form Caption", &mut caption, 1024);
-                                changed |= number_property(ui, "Form Width", &mut width);
-                                changed |= number_property(ui, "Form Height", &mut height);
+                                changed |=
+                                    string_property(ui, "Form Caption", &mut caption, 1024, theme);
+                                changed |= number_property(ui, "Form Width", &mut width, theme);
+                                changed |= number_property(ui, "Form Height", &mut height, theme);
                             });
                             if changed {
                                 command(
@@ -350,7 +383,7 @@ impl EditorUi {
                             }
                         }
                         ui.separator();
-                        ui.heading("Tab Order");
+                        ui.heading(theme.label("Tab Order"));
                         for (position, control) in form.tab_order.iter().enumerate() {
                             if let Some(c) = form.controls.iter().find(|c| c.id == *control) {
                                 ui.horizontal(|ui| {
@@ -655,7 +688,7 @@ impl EditorUi {
                             .unwrap_or_else(|_| form.caption.clone()),
                     );
                     if ui
-                        .add_enabled(idle, egui::Button::new("Close Form"))
+                        .add_enabled(idle, egui::Button::new(theme.label("Close Form")))
                         .clicked()
                     {
                         commands.push(Command::Form(FormCommand::Event(id, None, None)));
@@ -781,9 +814,11 @@ impl EditorUi {
                     );
                 });
                 if !idle {
-                    ui.label("Execution paused or running — use the debugger to continue.");
+                    ui.label(
+                        theme.label("Execution paused or running — use the debugger to continue."),
+                    );
                 }
-                if ui.button("Reset Form Execution").clicked() {
+                if ui.button(theme.label("Reset Form Execution")).clicked() {
                     commands.push(Command::Action(Action::Reset));
                 }
             };

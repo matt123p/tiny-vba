@@ -70,12 +70,12 @@ impl EditorUi {
             current
         };
         let Some(p) = m.procedures.get(selected) else {
-            ui.label("Full Module View — repair incomplete procedure source.");
+            ui.label(theme.label("Full Module View — repair incomplete procedure source."));
             self.code_editor(ui, ide, commands, theme);
             return;
         };
         if split {
-            egui::ComboBox::new("split.procedure", "Split procedure")
+            egui::ComboBox::new("split.procedure", theme.label("Split procedure"))
                 .selected_text(&p.name)
                 .show_ui(ui, |ui| {
                     for (index, p) in m.procedures.iter().enumerate() {

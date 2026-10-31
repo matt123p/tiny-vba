@@ -1,7 +1,18 @@
 //! Original, injectable theme tokens. No global context style or font installation.
 use egui::Color32 as C;
+use std::borrow::Cow;
+
+/// Host-owned interface label lookup. Source text, identifiers and authored form
+/// captions are never passed to this callback.
+pub type Localizer = for<'a> fn(&'a str) -> Cow<'a, str>;
+
+fn english(label: &str) -> Cow<'_, str> {
+    Cow::Borrowed(label)
+}
+
 #[derive(Clone, Copy, Debug)]
 pub struct Theme {
+    pub localize: Localizer,
     pub dark: bool,
     pub chrome: C,
     pub editor: C,
@@ -18,8 +29,13 @@ pub struct Theme {
     pub execution_text: C,
 }
 impl Theme {
+    pub fn label<'a>(self, english: &'a str) -> Cow<'a, str> {
+        (self.localize)(english)
+    }
+
     pub fn light() -> Self {
         Self {
+            localize: english,
             dark: false,
             chrome: C::from_rgb(238, 240, 243),
             editor: C::WHITE,
@@ -38,6 +54,7 @@ impl Theme {
     }
     pub fn dark() -> Self {
         Self {
+            localize: english,
             dark: true,
             chrome: C::from_rgb(37, 42, 51),
             editor: C::from_rgb(24, 28, 35),

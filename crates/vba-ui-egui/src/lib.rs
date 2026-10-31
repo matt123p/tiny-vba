@@ -7,7 +7,7 @@ mod views;
 use egui::{Color32, FontId, RichText, TextEdit, Vec2};
 use std::sync::atomic::{AtomicU32, Ordering};
 static NEXT_VIEW: AtomicU32 = AtomicU32::new(1);
-pub use theme::{Theme, contrast};
+pub use theme::{Localizer, Theme, contrast};
 use vba_ide::{Action, Ide, Mode, SourceId, SyntaxClass, display_value};
 #[derive(Clone, Debug)]
 pub enum Command {
@@ -367,7 +367,7 @@ impl Default for EditorUi {
     }
 }
 fn heading(ui: &mut egui::Ui, label: &str, theme: Theme) {
-    ui.label(RichText::new(label).strong().color(theme.text));
+    ui.label(RichText::new(theme.label(label)).strong().color(theme.text));
     ui.separator();
 }
 fn window_theme(ui: &mut egui::Ui, theme: Theme) {
@@ -379,9 +379,13 @@ fn window_theme(ui: &mut egui::Ui, theme: Theme) {
     ui.visuals_mut().override_text_color = Some(theme.text);
     ui.visuals_mut().extreme_bg_color = theme.editor;
 }
-fn text_field(ui: &mut egui::Ui, text: &mut String, label: &str) -> egui::Response {
-    ui.add(TextEdit::singleline(text).hint_text(label).char_limit(1024))
-        .on_hover_text(label)
+fn text_field(ui: &mut egui::Ui, text: &mut String, label: &str, theme: Theme) -> egui::Response {
+    ui.add(
+        TextEdit::singleline(text)
+            .hint_text(theme.label(label))
+            .char_limit(1024),
+    )
+    .on_hover_text(theme.label(label))
 }
 impl EditorUi {
     /// Mount in any caller-owned `Ui`, including a host tab, window, panel or standalone shell.
@@ -411,7 +415,7 @@ impl EditorUi {
             ui.spacing_mut().item_spacing=egui::vec2(6.0,5.0);
             self.shortcuts(ui.ctx(),ide,&mut commands);
             egui::Panel::top("vba.menu").frame(egui::Frame::new().fill(theme.chrome).inner_margin(5)).show(ui,|ui|{
-                egui::MenuBar::new().ui(ui,|ui|self.menus(ui,ide,&mut commands));
+                egui::MenuBar::new().ui(ui,|ui|self.menus(ui,ide,&mut commands, theme));
                 ui.separator();ui.horizontal_wrapped(|ui|{
                     for action in self.toolbar_actions.iter().copied().take(16) {
                         let glyph=match action{Action::Save=>"Save",Action::Run=>"Run",Action::Pause=>"Break",Action::Reset=>"Reset",Action::StepInto=>"Into",Action::StepOver=>"Over",Action::StepOut=>"Out",_=>action.label()};
@@ -419,13 +423,13 @@ impl EditorUi {
                         if ui.add_enabled(ide.enabled(action),egui::Button::new(label)).on_hover_text(format!("{} ({})",action.label(),action.shortcut())).clicked(){commands.push(Command::Action(action));}
                     }
                     ui.separator();
-                    egui::ComboBox::new("run.entry", "Entry").selected_text(ide.entry.clone()).width(125.0).show_ui(ui,|ui|{for m in &ide.modules{for p in &m.procedures{if ui.selectable_label(ide.entry==p.name,&p.name).on_hover_text(&p.signature).clicked(){commands.push(Command::Entry(p.name.clone()));}}}});
-                    if ui.button("Project").on_hover_text("Project Explorer (Ctrl+R)").clicked(){self.project_visible= !self.project_visible;}
-                    if ui.button("Find").on_hover_text("Find (Ctrl+F)").clicked(){self.find_open= !self.find_open;}
+                    egui::ComboBox::new("run.entry", theme.label("Entry")).selected_text(ide.entry.clone()).width(125.0).show_ui(ui,|ui|{for m in &ide.modules{for p in &m.procedures{if ui.selectable_label(ide.entry==p.name,&p.name).on_hover_text(&p.signature).clicked(){commands.push(Command::Entry(p.name.clone()));}}}});
+                    if ui.button(theme.label("Project")).on_hover_text(theme.label("Project Explorer (Ctrl+R)")).clicked(){self.project_visible= !self.project_visible;}
+                    if ui.button(theme.label("Find")).on_hover_text(theme.label("Find (Ctrl+F)")).clicked(){self.find_open= !self.find_open;}
                 });
             });
             egui::Panel::bottom("vba.status").frame(egui::Frame::new().fill(theme.chrome).inner_margin(5)).show(ui,|ui|{
-                ui.horizontal(|ui|{ui.label(RichText::new(format!("* {}",ide.mode().label())).strong().color(theme.accent));ui.separator();if let Some(m)=ide.active_module(){ui.label(format!("Ln {}   {}{}",m.line_at(m.caret),m.name,if m.dirty() || ide.form(m.id).is_some_and(|d|d.dirty()){" *"}else{""}));}ui.with_layout(egui::Layout::right_to_left(egui::Align::Center),|ui|{ui.label(RichText::new("Craft VBA Editor").small().color(theme.muted));});});
+                ui.horizontal(|ui|{ui.label(RichText::new(format!("* {}",ide.mode().label())).strong().color(theme.accent));ui.separator();if let Some(m)=ide.active_module(){ui.label(format!("Ln {}   {}{}",m.line_at(m.caret),m.name,if m.dirty() || ide.form(m.id).is_some_and(|d|d.dirty()){" *"}else{""}));}ui.with_layout(egui::Layout::right_to_left(egui::Align::Center),|ui|{ui.label(RichText::new(theme.label("Craft VBA Editor")).small().color(theme.muted));});});
             });
             let mut project_rect=None;
             if self.project_visible {
@@ -433,8 +437,8 @@ impl EditorUi {
                 let project=if self.project_right {egui::Panel::right("vba.project.right")} else {egui::Panel::left("vba.project")};
                 let p=project.default_size(size).min_size(145.0).max_size(340.0).resizable(true).show(ui,|ui|{
                     heading(ui,"Project Explorer",theme);
-                    ui.horizontal(|ui|{if ui.small_button("View Code").on_hover_text("View Code (F7)").clicked(){self.focus_editor=true;self.navigate=true;self.form_view=false;}
-if ui.add_enabled(ide.active_module().is_some_and(|m|ide.form(m.id).is_some()),egui::Button::new("View Object")).clicked(){self.form_view=true;}});
+                    ui.horizontal(|ui|{if ui.small_button(theme.label("View Code")).on_hover_text(theme.label("View Code (F7)")).clicked(){self.focus_editor=true;self.navigate=true;self.form_view=false;}
+if ui.add_enabled(ide.active_module().is_some_and(|m|ide.form(m.id).is_some()),egui::Button::new(theme.label("View Object"))).clicked(){self.form_view=true;}});
                     egui::ScrollArea::vertical().id_salt("project.tree").max_height((ui.available_height()-190.0).max(90.0)).show(ui,|ui|{
                         egui::CollapsingHeader::new(&ide.title).default_open(true).show(ui,|ui|{
                             for (kind, label, glyph, form_group) in [(vba_ide::ModuleKind::Standard,"Modules","M",false),(vba_ide::ModuleKind::Class,"Class Modules","C",false),(vba_ide::ModuleKind::Document,"Document Modules","D",false),(vba_ide::ModuleKind::Class,"Forms","F",true)] {
@@ -442,13 +446,13 @@ if ide.modules.iter().any(|m|m.kind==kind && ide.form(m.id).is_some()==form_grou
 egui::CollapsingHeader::new(label).default_open(true).show(ui,|ui|{
                                 for (i,m) in ide.modules.iter().enumerate().filter(|(_,m)|m.kind==kind && ide.form(m.id).is_some()==form_group){let response=ui.selectable_label(ide.active==i,format!("{glyph} {}{}",m.name,if m.dirty() || ide.form(m.id).is_some_and(|d|d.dirty()){" *"}else{""}));if self.focus_project && ide.active==i {response.request_focus();self.focus_project=false;}
 if response.clicked(){commands.push(Command::SelectModule(i));self.navigate=true;}
-if response.double_clicked(){self.focus_editor=true;self.form_view=false;}response.context_menu(|ui|{if ui.button("View Code").clicked(){commands.push(Command::SelectModule(i));self.focus_editor=true;self.form_view=false;ui.close();}self.action_button(ui,ide,Action::Export,&mut commands);});}
+if response.double_clicked(){self.focus_editor=true;self.form_view=false;}response.context_menu(|ui|{if ui.button(theme.label("View Code")).clicked(){commands.push(Command::SelectModule(i));self.focus_editor=true;self.form_view=false;ui.close();}self.action_button(ui,ide,Action::Export,&mut commands, theme);});}
                             });}}
                         });
                     });
-                    if ui.button("Insert Module").clicked(){commands.push(Command::AddModule);}
+                    if ui.button(theme.label("Insert Module")).clicked(){commands.push(Command::AddModule);}
                     ui.separator();
-                    if self.properties_visible {heading(ui,"Properties Window",theme);ui.horizontal(|ui|{ui.selectable_label(true,"Alphabetic").on_hover_text("Alphabetic properties");ui.add_enabled(false,egui::Button::new("Categorized")).on_hover_text("Only module metadata is available");});if let Some(m)=ide.active_module(){egui::Grid::new("properties").striped(true).show(ui,|ui|{ui.label("(Name)");if ui.button(&m.name).on_hover_text("Rename module").clicked(){self.rename_module=Some((m.id,m.name.clone()));}ui.end_row();ui.label("Type");ui.label(if ide.form(m.id).is_some() {"UserForm"} else {match m.kind {vba_ide::ModuleKind::Standard=>"Standard module",vba_ide::ModuleKind::Class=>"Class module",vba_ide::ModuleKind::Document=>"Document module"}});ui.end_row();ui.label("Status");ui.label(if m.dirty() || ide.form(m.id).is_some_and(|d|d.dirty()){"Modified"}else{"Saved"});ui.end_row();});ui.label(RichText::new("Select (Name) to rename the module.").small().color(theme.muted));}}
+                    if self.properties_visible {heading(ui,"Properties Window",theme);ui.horizontal(|ui|{ui.selectable_label(true,theme.label("Alphabetic")).on_hover_text(theme.label("Alphabetic properties"));ui.add_enabled(false,egui::Button::new(theme.label("Categorized"))).on_hover_text(theme.label("Only module metadata is available"));});if let Some(m)=ide.active_module(){egui::Grid::new("properties").striped(true).show(ui,|ui|{ui.label(theme.label("(Name)"));if ui.button(&m.name).on_hover_text(theme.label("Rename module")).clicked(){self.rename_module=Some((m.id,m.name.clone()));}ui.end_row();ui.label(theme.label("Type"));ui.label(if ide.form(m.id).is_some() {"UserForm"} else {match m.kind {vba_ide::ModuleKind::Standard=>"Standard module",vba_ide::ModuleKind::Class=>"Class module",vba_ide::ModuleKind::Document=>"Document module"}});ui.end_row();ui.label(theme.label("Status"));ui.label(if m.dirty() || ide.form(m.id).is_some_and(|d|d.dirty()){"Modified"}else{"Saved"});ui.end_row();});ui.label(RichText::new(theme.label("Select (Name) to rename the module.")).small().color(theme.muted));}}
                 });project_rect=Some(p.response.rect);
             }
             let right=self.debugger_right && ui.available_width()>700.0;
@@ -462,18 +466,18 @@ if response.double_clicked(){self.focus_editor=true;self.form_view=false;}respon
                 else if let Some(m)=ide.active_module(){
                     let compact=ui.available_width()<650.0;
                     ui.horizontal_wrapped(|ui|{
-                        egui::ComboBox::new("object.selector", "Object").selected_text("(General)").width(120.0).show_ui(ui,|ui|{ui.selectable_label(true,"(General)").on_hover_text("Standard module; host object/event selectors need host metadata");});
+                        egui::ComboBox::new("object.selector", theme.label("Object")).selected_text(theme.label("(General)")).width(120.0).show_ui(ui,|ui|{ui.selectable_label(true,theme.label("(General)")).on_hover_text(theme.label("Standard module; host object/event selectors need host metadata"));});
                         let current=m.procedures.iter().rev().find(|p|p.start<=m.caret).or_else(||m.procedures.first());
-                        egui::ComboBox::new("procedure.selector", "Procedure").selected_text(current.map_or("(Declarations)",|p|p.name.as_str())).width(140.0).show_ui(ui,|ui|{for p in &m.procedures{if ui.selectable_label(current.is_some_and(|c|c.name==p.name),&p.name).on_hover_text(&p.signature).clicked(){commands.push(Command::Caret(p.start));self.navigate=true;}}});
-                        if !compact {ui.label(RichText::new("Full Module View").small().color(theme.muted));}
+                        egui::ComboBox::new("procedure.selector", theme.label("Procedure")).selected_text(current.map_or("(Declarations)",|p|p.name.as_str())).width(140.0).show_ui(ui,|ui|{for p in &m.procedures{if ui.selectable_label(current.is_some_and(|c|c.name==p.name),&p.name).on_hover_text(&p.signature).clicked(){commands.push(Command::Caret(p.start));self.navigate=true;}}});
+                        if !compact {ui.label(RichText::new(theme.label("Full Module View")).small().color(theme.muted));}
                     });ui.separator();
-                    if self.find_open { self.find_bar(ui,ide,&mut commands); }
+                    if self.find_open { self.find_bar(ui,ide,&mut commands, theme); }
                     if self.split_view {
                         let height=(ui.available_height()*0.5).max(90.0);
                         egui::Panel::bottom("vba.split").default_size(height).min_size(80.0).resizable(true).show(ui,|ui|self.procedure_editor(ui,ide,&mut commands,theme,true));
                     }
                     if self.procedure_view {self.procedure_editor(ui,ide,&mut commands,theme,false);} else {self.code_editor(ui,ide,&mut commands,theme);}
-                }else{ui.centered_and_justified(|ui|ui.label("Insert or import a module to begin."));}
+                }else{ui.centered_and_justified(|ui|ui.label(theme.label("Insert or import a module to begin.")));}
             });
             self.report=Some(LayoutReport{editor:editor.response.rect,project:project_rect,debugger:debug.response.rect,source:ide.active_module().map(|m|m.id),editor_scope:self.scope.unwrap_or(ui.scope_id())});
         });
@@ -503,22 +507,28 @@ if response.double_clicked(){self.focus_editor=true;self.form_view=false;}respon
             Err(d) => commands.push(Command::Report(d.to_string())),
         }
     }
-    fn find_bar(&mut self, ui: &mut egui::Ui, ide: &Ide, commands: &mut Vec<Command>) {
+    fn find_bar(
+        &mut self,
+        ui: &mut egui::Ui,
+        ide: &Ide,
+        commands: &mut Vec<Command>,
+        theme: Theme,
+    ) {
         ui.horizontal_wrapped(|ui| {
-            let response = text_field(ui, &mut self.find, "Find text");
+            let response = text_field(ui, &mut self.find, "Find text", theme);
             if self.focus_find {
                 response.request_focus();
                 self.focus_find = false;
             }
-            text_field(ui, &mut self.replace, "Replace with");
-            if ui.button("Find Next").clicked() {
+            text_field(ui, &mut self.replace, "Replace with", theme);
+            if ui.button(theme.label("Find Next")).clicked() {
                 self.find_occurrence(ide, commands, false);
             }
-            if ui.button("Find Previous").clicked() {
+            if ui.button(theme.label("Find Previous")).clicked() {
                 self.find_occurrence(ide, commands, true);
             }
             let previous = self.find_options.scope;
-            egui::ComboBox::new("find.scope", "Search scope")
+            egui::ComboBox::new("find.scope", theme.label("Search scope"))
                 .selected_text(format!("{:?}", self.find_options.scope))
                 .show_ui(ui, |ui| {
                     for (scope, label) in [
@@ -538,7 +548,7 @@ if response.double_clicked(){self.focus_editor=true;self.form_view=false;}respon
             if previous != self.find_options.scope || case_changed || word_changed {
                 self.last_find = None;
             }
-            if ui.button("Replace").clicked() && !self.find.is_empty() {
+            if ui.button(theme.label("Replace")).clicked() && !self.find.is_empty() {
                 commands.push(Command::ReplaceOne(
                     self.find.clone(),
                     self.replace.clone(),
@@ -546,14 +556,14 @@ if response.double_clicked(){self.focus_editor=true;self.form_view=false;}respon
                 ));
                 self.navigate = true;
             }
-            if ui.button("Replace All").clicked() && !self.find.is_empty() {
+            if ui.button(theme.label("Replace All")).clicked() && !self.find.is_empty() {
                 commands.push(Command::ReplaceWith(
                     self.find.clone(),
                     self.replace.clone(),
                     self.find_options,
                 ));
             }
-            if ui.small_button("Close Find").clicked() {
+            if ui.small_button(theme.label("Close Find")).clicked() {
                 self.find_open = false;
             }
         });
@@ -565,11 +575,12 @@ if response.double_clicked(){self.focus_editor=true;self.form_view=false;}respon
         ide: &Ide,
         action: Action,
         commands: &mut Vec<Command>,
+        theme: Theme,
     ) {
         if ui
             .add_enabled(
                 ide.enabled(action),
-                egui::Button::new(action.label()).shortcut_text(action.shortcut()),
+                egui::Button::new(theme.label(action.label())).shortcut_text(action.shortcut()),
             )
             .on_hover_text(action.id())
             .clicked()
@@ -578,32 +589,32 @@ if response.double_clicked(){self.focus_editor=true;self.form_view=false;}respon
             ui.close();
         }
     }
-    fn unavailable(ui: &mut egui::Ui, label: &str, why: &str) {
-        ui.add_enabled(false, egui::Button::new(label))
-            .on_hover_text(why);
+    fn unavailable(ui: &mut egui::Ui, label: &str, why: &str, theme: Theme) {
+        ui.add_enabled(false, egui::Button::new(theme.label(label)))
+            .on_hover_text(theme.label(why));
     }
-    fn menus(&mut self, ui: &mut egui::Ui, ide: &Ide, commands: &mut Vec<Command>) {
-        ui.menu_button("File", |ui| {
+    fn menus(&mut self, ui: &mut egui::Ui, ide: &Ide, commands: &mut Vec<Command>, theme: Theme) {
+        ui.menu_button(theme.label("File"), |ui| {
             for a in [Action::Save, Action::Import, Action::Export] {
-                self.action_button(ui, ide, a, commands);
+                self.action_button(ui, ide, a, commands, theme);
             }
             ui.separator();
             if let Some(m) = ide.active_module() {
-                if ui.button("Rename Module...").clicked() {
+                if ui.button(theme.label("Rename Module...")).clicked() {
                     self.rename_module = Some((m.id, m.name.clone()));
                     ui.close();
                 }
-                if ui.button("Remove Module...").clicked() {
+                if ui.button(theme.label("Remove Module...")).clicked() {
                     self.remove_module = Some(m.id);
                     ui.close();
                 }
             }
-            self.action_button(ui, ide, Action::ReturnToHost, commands);
-            self.action_button(ui, ide, Action::CloseProject, commands);
+            self.action_button(ui, ide, Action::ReturnToHost, commands, theme);
+            self.action_button(ui, ide, Action::CloseProject, commands, theme);
         });
         let was_edit_open = self.edit_menu_open;
         self.edit_menu_open = false;
-        ui.menu_button("Edit", |ui| {
+        ui.menu_button(theme.label("Edit"), |ui| {
             self.edit_menu_open = true;
             if !was_edit_open && let Some(m) = ide.active_module() {
                 let id = self
@@ -627,9 +638,9 @@ if response.double_clicked(){self.focus_editor=true;self.form_view=false;}respon
                         || !matches!(operation, EditOperation::Paste));
                 let response = ui.add_enabled(available, egui::Button::new(label));
                 if cfg!(target_arch = "wasm32") && matches!(operation, EditOperation::Paste) {
-                    response
-                        .clone()
-                        .on_hover_text("Use Ctrl+V / Cmd+V or the browser paste command");
+                    response.clone().on_hover_text(
+                        theme.label("Use Ctrl+V / Cmd+V or the browser paste command"),
+                    );
                 }
                 if response.clicked() {
                     match operation {
@@ -668,48 +679,57 @@ if response.double_clicked(){self.focus_editor=true;self.form_view=false;}respon
                 }
             }
             ui.separator();
-            if ui.button("Find...    Ctrl+F").clicked() {
+            if ui.button(theme.label("Find...    Ctrl+F")).clicked() {
                 self.find_open = true;
                 self.focus_find = true;
                 ui.close();
             }
-            if ui.button("Replace...    Ctrl+H").clicked() {
+            if ui.button(theme.label("Replace...    Ctrl+H")).clicked() {
                 self.find_open = true;
                 self.focus_find = true;
                 ui.close();
             }
-            if ui.button("Complete Word    Ctrl+Space").clicked() {
+            if ui
+                .button(theme.label("Complete Word    Ctrl+Space"))
+                .clicked()
+            {
                 self.request_completion(ide);
                 ui.close();
             }
-            if ui.button("List Constants    Ctrl+Shift+J").clicked() {
+            if ui
+                .button(theme.label("List Constants    Ctrl+Shift+J"))
+                .clicked()
+            {
                 self.constants_open = true;
                 ui.close();
             }
-            if ui.button("Quick Info    Ctrl+I").clicked() {
+            if ui.button(theme.label("Quick Info    Ctrl+I")).clicked() {
                 self.info = Some(
                     ide.quick_info(&ide.word_at_caret())
                         .unwrap_or_else(|| "No metadata for this symbol".into()),
                 );
                 ui.close();
             }
-            if ui.button("Parameter Info    Ctrl+Shift+I").clicked() {
+            if ui
+                .button(theme.label("Parameter Info    Ctrl+Shift+I"))
+                .clicked()
+            {
                 self.info = Some(
                     ide.signature_help()
                         .unwrap_or_else(|| "No parameter metadata at the caret".into()),
                 );
                 ui.close();
             }
-            if ui.button("Definition    Shift+F2").clicked() {
+            if ui.button(theme.label("Definition    Shift+F2")).clicked() {
                 commands.push(Command::Definition(ide.word_at_caret()));
                 self.navigate = true;
                 ui.close();
             }
         });
-        ui.menu_button("View", |ui| {
-            ui.checkbox(&mut self.procedure_view, "Procedure View");
-            ui.checkbox(&mut self.split_view, "Split Code View");
-            if ui.button("Toggle Bookmark").clicked() {
+        ui.menu_button(theme.label("View"), |ui| {
+            ui.checkbox(&mut self.procedure_view, theme.label("Procedure View"));
+            ui.checkbox(&mut self.split_view, theme.label("Split Code View"));
+            if ui.button(theme.label("Toggle Bookmark")).clicked() {
                 commands.push(Command::ToggleBookmark);
                 ui.close();
             }
@@ -720,18 +740,27 @@ if response.double_clicked(){self.focus_editor=true;self.form_view=false;}respon
                     ui.close();
                 }
             }
-            if ui.button("Last Position    Ctrl+Shift+F2").clicked() {
+            if ui
+                .button(theme.label("Last Position    Ctrl+Shift+F2"))
+                .clicked()
+            {
                 commands.push(Command::NavigateBack);
                 self.navigate = true;
                 ui.close();
             }
-            if ui.button("Code    F7").clicked() {
+            if ui.button(theme.label("Code    F7")).clicked() {
                 self.focus_editor = true;
                 self.navigate = true;
                 ui.close();
             }
-            ui.checkbox(&mut self.project_visible, "Project Explorer    Ctrl+R");
-            ui.checkbox(&mut self.properties_visible, "Properties Window    F4");
+            ui.checkbox(
+                &mut self.project_visible,
+                theme.label("Project Explorer    Ctrl+R"),
+            );
+            ui.checkbox(
+                &mut self.properties_visible,
+                theme.label("Properties Window    F4"),
+            );
             for (pane, label) in [
                 (Pane::Immediate, "Immediate Window    Ctrl+G"),
                 (Pane::Locals, "Locals Window"),
@@ -745,7 +774,7 @@ if response.double_clicked(){self.focus_editor=true;self.form_view=false;}respon
                     ui.close();
                 }
             }
-            if ui.button("Object Browser    F2").clicked() {
+            if ui.button(theme.label("Object Browser    F2")).clicked() {
                 self.object_browser = true;
                 ui.close();
             }
@@ -753,7 +782,7 @@ if response.double_clicked(){self.focus_editor=true;self.form_view=false;}respon
                 .add_enabled(
                     ide.active_module()
                         .is_some_and(|m| ide.form(m.id).is_some()),
-                    egui::Button::new("Form Designer / Toolbox"),
+                    egui::Button::new(theme.label("Form Designer / Toolbox")),
                 )
                 .clicked()
             {
@@ -761,17 +790,20 @@ if response.double_clicked(){self.focus_editor=true;self.form_view=false;}respon
                 ui.close();
             }
         });
-        ui.menu_button("Insert", |ui| {
-            if ui.button("Module").clicked() {
+        ui.menu_button(theme.label("Insert"), |ui| {
+            if ui.button(theme.label("Module")).clicked() {
                 commands.push(Command::AddModule);
                 ui.close();
             }
-            if ui.button("Class Module").clicked() {
+            if ui.button(theme.label("Class Module")).clicked() {
                 commands.push(Command::AddClass);
                 ui.close();
             }
             if ui
-                .add_enabled(ide.mode() == Mode::Design, egui::Button::new("UserForm"))
+                .add_enabled(
+                    ide.mode() == Mode::Design,
+                    egui::Button::new(theme.label("UserForm")),
+                )
                 .clicked()
             {
                 commands.push(Command::Form(FormCommand::Add));
@@ -779,12 +811,17 @@ if response.double_clicked(){self.focus_editor=true;self.form_view=false;}respon
                 ui.close();
             }
         });
-        ui.menu_button("Format", |ui| {
-            if !self.form_format(ui, ide, commands) {
-                Self::unavailable(ui, "Align / Size / Order", "Select a form designer first");
+        ui.menu_button(theme.label("Format"), |ui| {
+            if !self.form_format(ui, ide, commands, theme) {
+                Self::unavailable(
+                    ui,
+                    "Align / Size / Order",
+                    "Select a form designer first",
+                    theme,
+                );
             }
         });
-        ui.menu_button("Debug", |ui| {
+        ui.menu_button(theme.label("Debug"), |ui| {
             for a in [
                 Action::Compile,
                 Action::StepInto,
@@ -793,12 +830,12 @@ if response.double_clicked(){self.focus_editor=true;self.form_view=false;}respon
                 Action::ToggleBreakpoint,
                 Action::ClearBreakpoints,
             ] {
-                self.action_button(ui, ide, a, commands);
+                self.action_button(ui, ide, a, commands, theme);
             }
             if ui
                 .add_enabled(
                     ide.mode() == Mode::Break,
-                    egui::Button::new("Run to Cursor").shortcut_text("Ctrl+F8"),
+                    egui::Button::new(theme.label("Run to Cursor")).shortcut_text("Ctrl+F8"),
                 )
                 .clicked()
             {
@@ -808,7 +845,7 @@ if response.double_clicked(){self.focus_editor=true;self.form_view=false;}respon
             if ui
                 .add_enabled(
                     ide.mode() == Mode::Break,
-                    egui::Button::new("Show Next Statement"),
+                    egui::Button::new(theme.label("Show Next Statement")),
                 )
                 .clicked()
             {
@@ -818,29 +855,30 @@ if response.double_clicked(){self.focus_editor=true;self.form_view=false;}respon
                 }
                 ui.close();
             }
-            if ui.add_enabled(ide.mode()==Mode::Break,egui::Button::new("Set Next Statement")).on_hover_text("Verified straight-line active procedure only; control-flow/handler regions are refused").clicked() { commands.push(Command::SetNextStatement); self.navigate=true; ui.close(); }
-            if ui.add_enabled(ide.mode()==Mode::Break,egui::Button::new("Quick Watch...    Shift+F9")).clicked() { self.quick_watch=true; self.watch=ide.word_at_caret(); ui.close(); }
-            if ui.button("Add Watch...").clicked() {
+            if ui.add_enabled(ide.mode()==Mode::Break,egui::Button::new(theme.label("Set Next Statement"))).on_hover_text(theme.label("Verified straight-line active procedure only; control-flow/handler regions are refused")).clicked() { commands.push(Command::SetNextStatement); self.navigate=true; ui.close(); }
+            if ui.add_enabled(ide.mode()==Mode::Break,egui::Button::new(theme.label("Quick Watch...    Shift+F9"))).clicked() { self.quick_watch=true; self.watch=ide.word_at_caret(); ui.close(); }
+            if ui.button(theme.label("Add Watch...")).clicked() {
                 self.pane = Pane::Watches;
                 ui.close();
             }
         });
-        ui.menu_button("Run", |ui| {
+        ui.menu_button(theme.label("Run"), |ui| {
             for a in [Action::Run, Action::Pause, Action::Reset] {
-                self.action_button(ui, ide, a, commands);
+                self.action_button(ui, ide, a, commands, theme);
             }
             Self::unavailable(
                 ui,
                 "Design Mode",
                 "Host event policy is supplied by the embedding application",
+                theme,
             );
         });
-        ui.menu_button("Tools", |ui| {
-            if ui.button("Options...").clicked() {
+        ui.menu_button(theme.label("Tools"), |ui| {
+            if ui.button(theme.label("Options...")).clicked() {
                 self.options_open = true;
                 ui.close();
             }
-            if ui.button("References...").clicked() {
+            if ui.button(theme.label("References...")).clicked() {
                 self.references_open = true;
                 ui.close();
             }
@@ -848,16 +886,18 @@ if response.double_clicked(){self.focus_editor=true;self.form_view=false;}respon
                 ui,
                 "Digital Signature...",
                 "Signing and binary project preservation are host-owned",
+                theme,
             );
         });
-        ui.menu_button("Add-Ins", |ui| {
+        ui.menu_button(theme.label("Add-Ins"), |ui| {
             Self::unavailable(
                 ui,
                 "Add-In Manager...",
                 "Binary VBE add-ins are not supported",
+                theme,
             )
         });
-        ui.menu_button("Window", |ui| {
+        ui.menu_button(theme.label("Window"), |ui| {
             for (i, m) in ide.modules.iter().enumerate() {
                 if ui.selectable_label(i == ide.active, &m.name).clicked() {
                     commands.push(Command::SelectModule(i));
@@ -866,12 +906,12 @@ if response.double_clicked(){self.focus_editor=true;self.form_view=false;}respon
                 }
             }
         });
-        ui.menu_button("Help", |ui| {
+        ui.menu_button(theme.label("Help"), |ui| {
             ui.hyperlink_to("VBA Language Reference","https://learn.microsoft.com/en-us/office/vba/language/reference/user-interface-help/visual-basic-user-interface-help");
-            ui.label("Craft VBA Editor • independently authored");
-            ui.label("F5 Run • F8 Step • F9 Breakpoint");
-            ui.label("Safe watches never invoke host properties or functions.");
-            ui.label("Plain source editing; no Office binary project writeback.");
+            ui.label(theme.label("Craft VBA Editor • independently authored"));
+            ui.label(theme.label("F5 Run • F8 Step • F9 Breakpoint"));
+            ui.label(theme.label("Safe watches never invoke host properties or functions."));
+            ui.label(theme.label("Plain source editing; no Office binary project writeback."));
         });
     }
     fn shortcuts(&mut self, ctx: &egui::Context, ide: &Ide, commands: &mut Vec<Command>) {
@@ -1452,7 +1492,7 @@ if response.double_clicked(){self.focus_editor=true;self.form_view=false;}respon
                         self.focus_editor = false;
                     }
                     let output = TextEdit::multiline(&mut text)
-                        .hint_text("VBA source editor")
+                        .hint_text(theme.label("VBA source editor"))
                         .id(id)
                         .font(font.clone())
                         .code_editor()
@@ -1468,11 +1508,9 @@ if response.double_clicked(){self.focus_editor=true;self.form_view=false;}respon
                         .frame(egui::Frame::NONE)
                         .layouter(&mut layouter)
                         .show(ui);
-                    output
-                        .response
-                        .response
-                        .clone()
-                        .on_hover_text("VBA source editor — F9 breakpoint, F8 step, Ctrl+F find");
+                    output.response.response.clone().on_hover_text(
+                        theme.label("VBA source editor — F9 breakpoint, F8 step, Ctrl+F find"),
+                    );
                     if output.response.has_focus() {
                         self.editing_view = Some(id);
                     }
@@ -1595,7 +1633,7 @@ if response.double_clicked(){self.focus_editor=true;self.form_view=false;}respon
                                             ));
                                         }
                                         if array.elements().len() > 32 {
-                                            ui.label("First 32 elements shown.");
+                                            ui.label(theme.label("First 32 elements shown."));
                                         }
                                     });
                             } else {
@@ -1603,7 +1641,9 @@ if response.double_clicked(){self.focus_editor=true;self.form_view=false;}respon
                             }
                             if ui
                                 .selectable_label(false, display_value(&value))
-                                .on_hover_text("Double-click to edit this active-frame value")
+                                .on_hover_text(
+                                    theme.label("Double-click to edit this active-frame value"),
+                                )
                                 .double_clicked()
                             {
                                 self.local_edit = Some((
@@ -1623,8 +1663,8 @@ if response.double_clicked(){self.focus_editor=true;self.form_view=false;}respon
             }
             Pane::Watches => {
                 ui.horizontal(|ui| {
-                    text_field(ui, &mut self.watch, "Watch expression");
-                    if ui.button("Add Watch").clicked() {
+                    text_field(ui, &mut self.watch, "Watch expression", theme);
+                    if ui.button(theme.label("Add Watch")).clicked() {
                         commands.push(Command::AddWatchContext(
                             std::mem::take(&mut self.watch),
                             self.watch_kind,
@@ -1633,7 +1673,7 @@ if response.double_clicked(){self.focus_editor=true;self.form_view=false;}respon
                         ));
                     }
                 });
-                egui::ComboBox::new("watch.type", "Watch type")
+                egui::ComboBox::new("watch.type", theme.label("Watch type"))
                     .selected_text(format!("{:?}", self.watch_kind))
                     .show_ui(ui, |ui| {
                         for (kind, label) in [
@@ -1651,7 +1691,7 @@ if response.double_clicked(){self.focus_editor=true;self.form_view=false;}respon
                         }
                     });
                 let old_module = self.watch_module;
-                egui::ComboBox::new("watch.module", "Watch module")
+                egui::ComboBox::new("watch.module", theme.label("Watch module"))
                     .selected_text(
                         self.watch_module
                             .and_then(|id| ide.modules.iter().find(|m| m.id == id))
@@ -1666,7 +1706,7 @@ if response.double_clicked(){self.focus_editor=true;self.form_view=false;}respon
                 if old_module != self.watch_module {
                     self.watch_procedure = None;
                 }
-                egui::ComboBox::new("watch.procedure", "Watch procedure")
+                egui::ComboBox::new("watch.procedure", theme.label("Watch procedure"))
                     .selected_text(self.watch_procedure.as_deref().unwrap_or("All Procedures"))
                     .show_ui(ui, |ui| {
                         ui.selectable_value(&mut self.watch_procedure, None, "All Procedures");
@@ -1718,14 +1758,18 @@ if response.double_clicked(){self.focus_editor=true;self.form_view=false;}respon
                         }
                     });
                 ui.label(
-                    RichText::new("Safe expressions only • calls and property getters are refused")
-                        .small()
-                        .color(theme.muted),
+                    RichText::new(
+                        theme.label(
+                            "Safe expressions only • calls and property getters are refused",
+                        ),
+                    )
+                    .small()
+                    .color(theme.muted),
                 );
             }
             Pane::Stack => {
                 if ide.frames().is_empty() {
-                    ui.label("Call Stack is available in break mode.");
+                    ui.label(theme.label("Call Stack is available in break mode."));
                 }
                 for (i, _) in ide.frames().iter().enumerate() {
                     let label = ide.frame_description(i);
@@ -1744,13 +1788,18 @@ if response.double_clicked(){self.focus_editor=true;self.form_view=false;}respon
                 }
                 ui.horizontal(|ui| {
                     ui.monospace(">");
-                    let r = text_field(ui, &mut self.immediate, "Immediate command: ? counter");
+                    let r = text_field(
+                        ui,
+                        &mut self.immediate,
+                        "Immediate command: ? counter",
+                        theme,
+                    );
                     if self.focus_pane {
                         r.request_focus();
                         self.focus_pane = false;
                     }
                     if (r.lost_focus() && ui.input(|i| i.key_pressed(egui::Key::Enter)))
-                        || ui.button("Evaluate").clicked()
+                        || ui.button(theme.label("Evaluate")).clicked()
                     {
                         let text = std::mem::take(&mut self.immediate);
                         commands.push(if self.allow_isolated_immediate {
@@ -1792,7 +1841,7 @@ if response.double_clicked(){self.focus_editor=true;self.form_view=false;}respon
             .fill(theme.chrome)
             .stroke(egui::Stroke::new(1.0, theme.border))
             .inner_margin(8);
-        egui::Window::new(RichText::new("Object Browser").color(theme.text))
+        egui::Window::new(RichText::new(theme.label("Object Browser")).color(theme.text))
             .id(scope.with("browser"))
             .frame(frame)
             .open(&mut self.object_browser)
@@ -1805,7 +1854,9 @@ if response.double_clicked(){self.focus_editor=true;self.form_view=false;}respon
                 };
                 ui.visuals_mut().override_text_color = Some(theme.text);
                 ui.visuals_mut().extreme_bg_color = theme.editor;
-                ui.label("<All Libraries> — project symbols and supplied host catalogue");
+                ui.label(
+                    theme.label("<All Libraries> — project symbols and supplied host catalogue"),
+                );
                 let libraries = ide
                     .catalog
                     .iter()
@@ -1813,7 +1864,7 @@ if response.double_clicked(){self.focus_editor=true;self.form_view=false;}respon
                     .chain(ide.constants.iter().map(|item| item.library.clone()))
                     .chain(ide.references.iter().map(|item| item.name.clone()))
                     .collect::<std::collections::BTreeSet<_>>();
-                egui::ComboBox::new("browser.library", "Library filter")
+                egui::ComboBox::new("browser.library", theme.label("Library filter"))
                     .selected_text(if self.browser_library.is_empty() {
                         "All Libraries"
                     } else {
@@ -1841,7 +1892,7 @@ if response.double_clicked(){self.focus_editor=true;self.form_view=false;}respon
                         ui.hyperlink_to("Library Help", url);
                     }
                 }
-                text_field(ui, &mut self.browser_search, "Search symbols");
+                text_field(ui, &mut self.browser_search, "Search symbols", theme);
                 ui.separator();
                 egui::ScrollArea::both().show(ui, |ui| {
                     *ui.visuals_mut() = if theme.dark {
@@ -1921,7 +1972,7 @@ if response.double_clicked(){self.focus_editor=true;self.form_view=false;}respon
                     });
                 });
             });
-        egui::Window::new(RichText::new("Editor Options").color(theme.text))
+        egui::Window::new(RichText::new(theme.label("Editor Options")).color(theme.text))
             .id(scope.with("options"))
             .frame(frame)
             .open(&mut self.options_open)
@@ -1935,9 +1986,12 @@ if response.double_clicked(){self.focus_editor=true;self.form_view=false;}respon
                 ui.visuals_mut().extreme_bg_color = theme.editor;
                 ui.add(egui::Slider::new(&mut self.font_size, 11.0..=22.0).text("Code font size"));
                 ui.add(egui::Slider::new(&mut self.tab_width, 1..=16).text("Tab width"));
-                ui.checkbox(&mut self.auto_indent, "Auto Indent");
-                ui.checkbox(&mut self.correct_case, "Auto Case Correction");
-                ui.checkbox(&mut self.project_right, "Dock Project Explorer on right");
+                ui.checkbox(&mut self.auto_indent, theme.label("Auto Indent"));
+                ui.checkbox(&mut self.correct_case, theme.label("Auto Case Correction"));
+                ui.checkbox(
+                    &mut self.project_right,
+                    theme.label("Dock Project Explorer on right"),
+                );
                 ui.checkbox(
                     &mut self.debugger_right,
                     "Dock debugger on right (bottom on narrow views)",
@@ -1990,8 +2044,8 @@ if response.double_clicked(){self.focus_editor=true;self.form_view=false;}respon
                         });
                     }
                 });
-                ui.label("Monospace font is inherited from the host.");
-                ui.label("Error Trapping");
+                ui.label(theme.label("Monospace font is inherited from the host."));
+                ui.label(theme.label("Error Trapping"));
                 if ui
                     .radio(ide.break_on_errors, "Break on All Errors")
                     .clicked()
@@ -2017,13 +2071,13 @@ if response.double_clicked(){self.focus_editor=true;self.form_view=false;}respon
             });
         if self.quick_watch {
             let mut open = true;
-            egui::Window::new("Quick Watch")
+            egui::Window::new(theme.label("Quick Watch"))
                 .id(scope.with("quick.watch"))
                 .open(&mut open)
                 .frame(frame)
                 .show(ctx, |ui| {
                     window_theme(ui, theme);
-                    text_field(ui, &mut self.watch, "Quick Watch expression");
+                    text_field(ui, &mut self.watch, "Quick Watch expression", theme);
                     match ide.evaluate(&self.watch) {
                         Ok(value) => {
                             ui.monospace(format!(
@@ -2036,18 +2090,18 @@ if response.double_clicked(){self.focus_editor=true;self.form_view=false;}respon
                             ui.label(d.message);
                         }
                     }
-                    if ui.button("Add to Watches").clicked() {
+                    if ui.button(theme.label("Add to Watches")).clicked() {
                         commands.push(Command::AddWatch(self.watch.clone()));
                     }
-                    ui.label(
+                    ui.label(theme.label(
                         "Read-only inspection; functions and property getters are not invoked.",
-                    );
+                    ));
                 });
             self.quick_watch = open;
         }
         if let Some(info) = &self.info {
             let mut open = true;
-            egui::Window::new("Symbol Information")
+            egui::Window::new(theme.label("Symbol Information"))
                 .id(scope.with("symbol.info"))
                 .open(&mut open)
                 .frame(frame)
@@ -2059,15 +2113,15 @@ if response.double_clicked(){self.focus_editor=true;self.form_view=false;}respon
                 self.info = None;
             }
         }
-        egui::Window::new("References")
+        egui::Window::new(theme.label("References"))
             .id(scope.with("references"))
             .open(&mut self.references_open)
             .frame(frame)
             .show(ctx, |ui| {
                 window_theme(ui, theme);
-                ui.label(
+                ui.label(theme.label(
                     "Metadata supplied by the host; this dialog never loads native libraries.",
-                );
+                ));
                 for reference in &ide.references {
                     ui.label(format!(
                         "{} {}{}",
@@ -2084,15 +2138,15 @@ if response.double_clicked(){self.focus_editor=true;self.form_view=false;}respon
                     }
                 }
                 if ide.references.is_empty() {
-                    ui.label("No external reference metadata supplied.");
+                    ui.label(theme.label("No external reference metadata supplied."));
                 }
             });
         let mut insert_constant = None;
-        egui::Window::new(RichText::new("List Constants").color(theme.text)).id(scope.with("constants")).open(&mut self.constants_open).frame(frame).show(ctx,|ui| {
+        egui::Window::new(RichText::new(theme.label("List Constants")).color(theme.text)).id(scope.with("constants")).open(&mut self.constants_open).frame(frame).show(ctx,|ui| {
             window_theme(ui,theme);
-            text_field(ui,&mut self.browser_search,"Constant prefix");
+            text_field(ui,&mut self.browser_search,"Constant prefix", theme);
             egui::ScrollArea::vertical().max_height(300.0).show(ui,|ui| {for name in ide.list_constants(&self.browser_search) { if ui.selectable_label(false,&name).clicked() { insert_constant=Some(name); } }});
-            ui.label("Select to insert a name. Host constant metadata does not grant execution capabilities.");
+            ui.label(theme.label("Select to insert a name. Host constant metadata does not grant execution capabilities."));
         });
         if let Some(name) = insert_constant {
             self.completion_prefix = ide
@@ -2104,17 +2158,17 @@ if response.double_clicked(){self.focus_editor=true;self.form_view=false;}respon
         }
         if let Some((source, name)) = &mut self.rename_module {
             let mut done = false;
-            egui::Window::new("Rename Module")
+            egui::Window::new(theme.label("Rename Module"))
                 .id(scope.with("rename.module"))
                 .collapsible(false)
                 .show(ctx, |ui| {
                     window_theme(ui, theme);
-                    text_field(ui, name, "Module name");
-                    if ui.button("Rename").clicked() {
+                    text_field(ui, name, "Module name", theme);
+                    if ui.button(theme.label("Rename")).clicked() {
                         commands.push(Command::RenameModule(*source, name.clone()));
                         done = true;
                     }
-                    if ui.button("Cancel").clicked() {
+                    if ui.button(theme.label("Cancel")).clicked() {
                         done = true;
                     }
                 });
@@ -2124,15 +2178,15 @@ if response.double_clicked(){self.focus_editor=true;self.form_view=false;}respon
         }
         if let Some(source) = self.remove_module {
             let mut done = false;
-            egui::Window::new("Remove Module?")
+            egui::Window::new(theme.label("Remove Module?"))
                 .id(scope.with("remove.module"))
                 .collapsible(false)
                 .show(ctx, |ui| {
                     window_theme(ui, theme);
-                    ui.label(
+                    ui.label(theme.label(
                         "Export source before removing it. Cancelling export keeps the module.",
-                    );
-                    if ui.button("Export Source First...").clicked() {
+                    ));
+                    if ui.button(theme.label("Export Source First...")).clicked() {
                         commands.push(Command::ExportModule(source));
                     }
                     if ui
@@ -2142,7 +2196,7 @@ if response.double_clicked(){self.focus_editor=true;self.form_view=false;}respon
                         commands.push(Command::RemoveModule(source, true));
                         done = true;
                     }
-                    if ui.button("Keep Module").clicked() {
+                    if ui.button(theme.label("Keep Module")).clicked() {
                         done = true;
                     }
                 });
@@ -2165,12 +2219,12 @@ if response.double_clicked(){self.focus_editor=true;self.form_view=false;}respon
                     };
                     ui.visuals_mut().override_text_color = Some(theme.text);
                     ui.visuals_mut().extreme_bg_color = theme.editor;
-                    text_field(ui, value, "VBA value expression");
-                    if ui.button("Apply Value").clicked() {
+                    text_field(ui, value, "VBA value expression", theme);
+                    if ui.button(theme.label("Apply Value")).clicked() {
                         commands.push(Command::EditLocal(name.clone(), value.clone()));
                         done = true;
                     }
-                    if ui.button("Cancel").clicked() {
+                    if ui.button(theme.label("Cancel")).clicked() {
                         done = true;
                     }
                 });
@@ -2194,9 +2248,13 @@ if response.double_clicked(){self.focus_editor=true;self.form_view=false;}respon
                             ui.visuals_mut().selection.stroke.color = theme.editor;
                             ui.visuals_mut().override_text_color = Some(theme.text);
                             ui.set_max_width(320.0);
-                            ui.label(RichText::new("Complete Word").strong().color(theme.text));
+                            ui.label(
+                                RichText::new(theme.label("Complete Word"))
+                                    .strong()
+                                    .color(theme.text),
+                            );
                             if choices.is_empty() {
-                                ui.label("No supported matches");
+                                ui.label(theme.label("No supported matches"));
                             }
                             egui::ScrollArea::vertical()
                                 .max_height(180.0)
@@ -2221,9 +2279,11 @@ if response.double_clicked(){self.focus_editor=true;self.form_view=false;}respon
                                     }
                                 });
                             ui.label(
-                                RichText::new("Up/Down select; Enter/Tab accept; Esc close")
-                                    .small()
-                                    .color(theme.muted),
+                                RichText::new(
+                                    theme.label("Up/Down select; Enter/Tab accept; Esc close"),
+                                )
+                                .small()
+                                .color(theme.muted),
                             );
                         });
                 });
