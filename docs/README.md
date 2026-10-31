@@ -111,4 +111,5 @@ The [remaining plan](implementation-plan.md) assigns M6.5 to check current
 evidence against both, M6.6/M6.7 to close the gaps under the existing ownership
 split (shared binding in tiny-vba; Excel host globals and active state in the
 forks), M6.8 to bring host-object member completion to the shared IDE, and M7.4
-to run their matrices as unchanged-document acceptance.
+to run their matrices as unchanged-document acceptance. That work is implemented;
+see the [M6.5 check](m6-context-resolution-check.md).

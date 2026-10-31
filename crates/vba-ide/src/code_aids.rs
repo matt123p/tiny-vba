@@ -11,18 +11,78 @@ pub fn line_starts(text: &str) -> impl Iterator<Item = usize> + '_ {
     }))
 }
 
-/// Full receiver prefix and the byte start of the word to replace.
+/// Full receiver prefix and the byte start of the word to replace. The scan
+/// accepts call-shaped receivers (`Range("A1").`, `Worksheets("Data").`) by
+/// tracking balanced parentheses and string literals, bounded so a hostile
+/// buffer cannot drive unbounded work.
 pub fn completion_prefix(text: &str, caret: usize) -> (&str, usize) {
     let before = text.get(..caret).unwrap_or_default();
-    let start = before
-        .char_indices()
-        .rev()
-        .take_while(|(_, c)| c.is_alphanumeric() || *c == '_' || *c == '.')
-        .last()
-        .map_or(before.len(), |(i, _)| i);
+    let mut depth = 0usize;
+    let mut quoted = false;
+    let mut start = before.len();
+    for (scanned, (i, c)) in before.char_indices().rev().enumerate() {
+        if scanned >= 512 {
+            break;
+        }
+        if quoted {
+            if c == '"' {
+                quoted = false;
+            }
+            start = i;
+            continue;
+        }
+        match c {
+            '"' => {
+                quoted = true;
+                start = i;
+            }
+            ')' => {
+                depth += 1;
+                if depth > 32 {
+                    break;
+                }
+                start = i;
+            }
+            '(' => {
+                if depth == 0 {
+                    break;
+                }
+                depth -= 1;
+                start = i;
+            }
+            '.' => start = i,
+            ',' if depth > 0 => start = i,
+            c if c.is_alphanumeric() || c == '_' => start = i,
+            _ if depth > 0 => start = i,
+            _ => break,
+        }
+    }
     let prefix = before.get(start..).unwrap_or_default();
-    let word = prefix.rfind('.').map_or(start, |i| start + i + 1);
+    let word = start + last_word_start(prefix);
     (prefix, word)
+}
+/// Byte offset just after the last top-level dot of the prefix, outside calls
+/// and string literals.
+fn last_word_start(prefix: &str) -> usize {
+    let mut depth = 0usize;
+    let mut quoted = false;
+    let mut word = 0usize;
+    for (i, c) in prefix.char_indices() {
+        if quoted {
+            if c == '"' {
+                quoted = false;
+            }
+            continue;
+        }
+        match c {
+            '"' => quoted = true,
+            '(' => depth += 1,
+            ')' => depth = depth.saturating_sub(1),
+            '.' if depth == 0 => word = i + 1,
+            _ => (),
+        }
+    }
+    word
 }
 
 #[derive(Clone, Debug)]
@@ -67,6 +127,7 @@ pub(crate) fn symbols(module: &vba_syntax::Module) -> Vec<Symbol> {
                         }
                         pending.push(otherwise);
                     }
+                    StatementKind::With { body, .. } => pending.push(body),
                     StatementKind::For(f) => pending.push(&f.body),
                     StatementKind::ForEach(f) => pending.push(&f.body),
                     _ => {}

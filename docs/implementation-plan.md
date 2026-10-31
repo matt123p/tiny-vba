@@ -56,47 +56,39 @@ Owner: application forks for Office objects, UI/storage/trust/events/undo/recalc
 tiny-vba for shared embedding APIs. M1 supplies generic types; M2 supplies shared
 classes/forms. Excel workflow acceptance consumes the applicable M3–M5 behavior.
 
-- **M6.1:** Implement the selected Word object/metadata profile, live ranges and
-  character units, bridge and document roots in WordCraft. Define exact supported
-  signatures, conversions, lifetime and error behavior with authored workflows.
-- **M6.2:** Embed and verify the shared editor in WordCraft with real document
-  projects, host theme/fonts/shortcuts, source save/return routing and catalogue
-  metadata. Extend both forks' coverage to the new document/form/event workflows.
-- **M6.3:** Verify real workbook/document mutations, waits, pause/edit/resume,
-  event ordering, abnormal-stop/reset/close cleanup and the host's undo/recalc/
-  partial-side-effect policy. Define Word document events against M2 contracts.
-- **M6.4:** Add independently authored document workflows and permitted
-  reference-build observations. Record each owning fork's executable evidence.
-- **M6.5:** Check the shared binder/runtime and both forks against the
-  [module types and execution contexts](vba_module_types_and_execution_contexts.md) and
-  [Excel context and object resolution](vba_excel_context_and_object_resolution.md)
-  specifications. Record implemented, refused and missing behavior per owned layer — module-kind
-  binding, implicit `Me` members, shadowing, `With` receivers, host globals, active-context
-  consultation and IDE receiver typing for host objects — and update the compatibility matrix
-  before scheduling the gaps.
-- **M6.6:** Close the shared resolution gaps M6.5 records in tiny-vba: staged identifier
-  resolution over locals/parameters/module/project declarations, eligible implicit `Me` members
-  for class and document modules, then host globals; per-module-kind binding metadata; local and
-  member shadowing; innermost-only leading-dot `With` receivers that never change `Me` or active
-  state; callee module-kind rules on cross-module calls; no implicit current-workbook frame
-  parameter.
-- **M6.7:** Close the fork-owned context gaps: Excel host globals (`Range`, `Cells`, `Rows`,
-  `Columns`, `Worksheets`, `Workbooks`, `Selection`, `Application`) consulted at invocation against
-  live application state; distinct `ThisWorkbook`/`ActiveWorkbook`/`ActiveSheet`/`Me` identities;
-  code-name objects stable across tab renames; chart-sheet, no-active-workbook and non-Range
-  `Selection` error behavior; `Application.Run` and add-in `ThisWorkbook` context preservation.
-  WordCraft supplies the corresponding document roots under its M6.1 profile.
-- **M6.8:** Make IDE member completion work for host objects: type receivers from configured
-  host imports and call shapes (`ThisWorkbook.`, `ActiveSheet.`, `Range("A1").`,
-  `Worksheets("Data").`, `Cells(1, 1).`), have each fork declare the member/result types it
-  actually supports in its catalogue, and complete `Me`/code-name receivers where the host binds
-  document objects. WordCraft gains this with its M6.2 editor embed. Code aids stay read-only and
-  metadata-driven; they never invoke host members.
+Completed for the declared profile (2026-10-31), with the [M6.5 per-layer
+check](m6-context-resolution-check.md) as the scope-driving record:
+
+- **M6.5:** the check records implemented, refused and missing behavior per owned layer
+  against [module types and execution contexts](vba_module_types_and_execution_contexts.md) and
+  [Excel context and object resolution](vba_excel_context_and_object_resolution.md), and the
+  [compatibility matrix](compatibility-matrix.md) now carries the result.
+- **M6.6:** staged identifier resolution over locals/parameters/module/project declarations,
+  host-declared implicit `Me` members for document modules, then host globals; per-module-kind
+  binding; local/member shadowing with project-before-global precedence; innermost-only
+  leading-dot `With` receivers that never change `Me` or active state; standard-module-only
+  bare cross-module callees; no implicit current-workbook frame parameter.
+- **M6.7:** the forks dispatch declared host globals per invocation against live application
+  state with distinct `ThisWorkbook`/`ActiveWorkbook`/`ActiveSheet`/`Me` identities and stable
+  code names; GridCraft proves the specifications' unshadowed binding and live-consultation
+  cases in real workbook workflows, and WordCraft supplies the document roots under its M6.1
+  profile. `Application.Run`, add-in context and chart sheets stay refused/NOT_RUN in the check.
+- **M6.8:** IDE member completion types receivers from host-declared import result types and
+  call shapes (`ThisWorkbook.`, `Range("A1").`, `Worksheets("Data").`, `Cells(1, 1).`) plus
+  `Me`/code-name document types; each fork declares the member/result types it supports in its
+  catalogue. Code aids stay read-only and metadata-driven; they never invoke host members.
+
+Remaining before M6 closes (M6.2/M6.3/M6.4 partials in WordCraft, plus evidence): the
+shared-renderer localization bridge so WordCraft's translation audit passes with the editor
+open (M6.2), an ordinary-run `ThisDocument` binding proof (M6.3), permitted Microsoft Office
+reference-build observations while no Office session is available — recorded NOT_RUN (M6.4) —
+and each fork's full CI gate on the updated immutable pin. These are tracked in the check and
+the forks' M6 documents, not silently dropped.
 
 Acceptance: both forks reuse the same editor and shared interpreter repository.
 Real document workflows verify effects and lifecycle without replay or retained
 locks; tiny-vba-only snapshots and generic doubles cannot satisfy this gate. The
-M6.5 record drives M6.6/M6.7 scope, and acceptance includes the specifications'
+M6.5 record drove M6.6/M6.7 scope, and acceptance includes the specifications'
 unshadowed module-kind binding and live host-global consultation cases in real
 fork workflows. Declared host globals and typed/call receivers complete their
 members in the shared editor without host invocation. Package round trips and

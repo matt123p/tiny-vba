@@ -670,6 +670,8 @@ impl Parser<'_> {
             StatementKind::Declare(self.declarations(Visibility::Default, true)?)
         } else if self.eat("If") {
             return self.if_statement(start, site);
+        } else if self.eat("With") {
+            return self.with_statement(start, site);
         } else if self.eat("For") {
             return self.for_statement(start, site);
         } else if self.at("Load") || self.at("Unload") {
@@ -713,7 +715,7 @@ impl Parser<'_> {
         } else {
             if self.token().kind != TokenKind::Word || reserved(self.text()) {
                 // Let/Set are handled explicitly; other statement keywords fail closed.
-                if !self.at("Let") && !self.at("Set") {
+                if !self.at("Let") && !self.at("Set") && !self.at(".") {
                     return Err(self.unsupported("statement kind"));
                 }
             }
@@ -830,6 +832,23 @@ impl Parser<'_> {
                 arms,
                 otherwise,
                 single_line: false,
+                end,
+            },
+        })
+    }
+    fn with_statement(&mut self, start: Span, mut site: StatementSite) -> PResult<Statement> {
+        let receiver = self.expr(0)?;
+        site.span = self.span(start)?;
+        self.boundary()?;
+        let body = self.block()?;
+        let end_start = self.require("End")?.span;
+        self.require("With")?;
+        let end = self.site(self.span(end_start)?)?;
+        Ok(Statement {
+            site,
+            kind: StatementKind::With {
+                receiver,
+                body,
                 end,
             },
         })
@@ -993,14 +1012,34 @@ impl Parser<'_> {
             TokenKind::Word if !reserved(self.text()) => {
                 return self.target(true);
             }
+            TokenKind::Symbol if self.text() == "." => {
+                // A leading dot roots the chain at the innermost With receiver.
+                return self.target(true);
+            }
             _ => return Err(self.error("expected expression")),
         };
         self.expression(self.span(token.span)?, kind)
     }
     fn target(&mut self, applications: bool) -> PResult<Expr> {
-        let name = self.name()?;
-        let start = name.span;
-        let mut target = self.expression(start, ExprKind::Name(name))?;
+        let start = self.token().span;
+        let mut target = if self.at(".") {
+            // A leading dot roots the chain at the innermost With receiver. The
+            // dot is consumed here, so the first member follows immediately.
+            let dot = self.bump().span;
+            let root = self.expression(self.span(dot)?, ExprKind::WithReceiver)?;
+            let name = self.member_name()?;
+            self.expression(
+                self.span(dot)?,
+                ExprKind::Member {
+                    target: Box::new(root),
+                    name,
+                },
+            )?
+        } else {
+            let name = self.name()?;
+            let name_span = name.span;
+            self.expression(name_span, ExprKind::Name(name))?
+        };
         let mut chain = 0;
         loop {
             chain += 1;

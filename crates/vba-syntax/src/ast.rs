@@ -150,6 +150,11 @@ pub enum StatementKind {
         single_line: bool,
         end: Option<StatementSite>,
     },
+    With {
+        receiver: Expr,
+        body: Vec<Statement>,
+        end: StatementSite,
+    },
     ForEach(Box<ForEachLoop>),
     For(Box<ForLoop>),
     Exit(ExitKind),
@@ -204,6 +209,9 @@ pub enum ExprKind {
         target: Box<Expr>,
         name: Name,
     },
+    /// A leading-dot expression inside a `With` block. The binder resolves this
+    /// to the innermost enclosing `With` receiver; it never denotes `Me`.
+    WithReceiver,
     Apply {
         target: Box<Expr>,
         arguments: Vec<Argument>,

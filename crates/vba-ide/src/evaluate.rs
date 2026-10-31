@@ -148,6 +148,9 @@ fn evaluate_ast(
         ExprKind::Member { .. } => Err(error(
             "Side effects refused: property access is not available in safe watches",
         )),
+        ExprKind::WithReceiver => Err(error(
+            "Side effects refused: a With receiver is not available in safe watches",
+        )),
     }
 }
 pub fn display_value(value: &Value) -> String {

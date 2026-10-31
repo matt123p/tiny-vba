@@ -57,6 +57,8 @@ pub struct BoundLocal {
     pub span: Span,
     pub parameter: bool,
     pub result: bool,
+    /// Hidden helper slot (a `With` receiver); never shown as a debugger local.
+    pub synthetic: bool,
 }
 #[derive(Clone, Debug)]
 pub struct Signature {
@@ -493,6 +495,7 @@ pub fn bind_with_imports(
         entry,
         imports,
         &vba_foreign::ReferenceSet::default(),
+        &BTreeMap::new(),
     )
 }
 pub fn bind_with_references(
@@ -500,6 +503,7 @@ pub fn bind_with_references(
     entry: &str,
     imports: &[vba_foreign::Import],
     references: &vba_foreign::ReferenceSet,
+    document_members: &BTreeMap<String, Vec<String>>,
 ) -> Result<BoundProgram> {
     vba_foreign::validate_imports(imports)?;
     if parsed.is_empty() || parsed.len() > 256 {
@@ -1046,6 +1050,19 @@ pub fn bind_with_references(
             loop_depth: 0,
             loop_controls: BTreeSet::new(),
             classes: &classes,
+            with_stack: Vec::new(),
+            me_slot: None,
+            implicit_me: if module.kind == ast::ModuleKind::Document {
+                document_members
+                    .get(&module_name(module).to_ascii_lowercase())
+                    .cloned()
+                    .unwrap_or_default()
+                    .into_iter()
+                    .map(|name| name.to_ascii_lowercase())
+                    .collect()
+            } else {
+                Vec::new()
+            },
         };
         let mut local_names = BTreeSet::new();
         for param in &sig.parameters {
@@ -1097,6 +1114,7 @@ pub fn bind_with_references(
                 .last_mut()
                 .ok_or_else(|| err("receiver local", sig.span))?
                 .receiver = true;
+            binder.me_slot = Some(binder.locals.len().saturating_sub(1));
         }
         binder.collect(&syntax.body, &mut local_names)?;
         for declaration in &module.declarations {
@@ -1213,6 +1231,12 @@ struct Binder<'a> {
     root_slots: BTreeMap<String, usize>,
     loop_depth: usize,
     loop_controls: BTreeSet<usize>,
+    /// Innermost-first stack of hidden `With` receiver slots.
+    with_stack: Vec<usize>,
+    /// The instance receiver (`Me`) slot in class/document modules.
+    me_slot: Option<usize>,
+    /// Host-declared implicit `Me` member names for document modules.
+    implicit_me: Vec<String>,
 }
 impl Binder<'_> {
     fn local(
@@ -1247,6 +1271,7 @@ impl Binder<'_> {
                 span,
                 parameter,
                 result,
+                synthetic: false,
             },
             span,
         )
@@ -1318,12 +1343,96 @@ impl Binder<'_> {
                     }
                     self.collect(otherwise, names)?;
                 }
+                ast::StatementKind::With { body, .. } => self.collect(body, names)?,
                 ast::StatementKind::For(loop_) => self.collect(&loop_.body, names)?,
                 ast::StatementKind::ForEach(loop_) => self.collect(&loop_.body, names)?,
                 _ => (),
             }
         }
         Ok(())
+    }
+    /// Allocate the hidden object slot holding one `With` receiver.
+    fn with_receiver_slot(&mut self, span: Span) -> Result<usize> {
+        if self.with_stack.len() >= 32 {
+            return Err(limit(span));
+        }
+        if self.locals.len() >= MAX_SLOTS {
+            return Err(limit(span));
+        }
+        let index = self.locals.len();
+        push(
+            &mut self.locals,
+            BoundLocal {
+                field: None,
+                receiver: false,
+                nominal: None,
+                host_root: false,
+                persistent: None,
+                array: None,
+                // Opaque metadata name; bracketed forms are never VBA identifiers,
+                // and the compiler keeps the slot invisible to debugger locals.
+                name: format!("<with{index}>"),
+                kind: ScalarKind::Object,
+                span,
+                parameter: false,
+                result: false,
+                synthetic: true,
+            },
+            span,
+        )?;
+        Ok(index)
+    }
+    /// Bind a member dispatch against the instance receiver (`Me`) for the
+    /// document-module implicit-member rule. Bare names declared by the host as
+    /// eligible members resolve here before host globals.
+    fn me_member(&mut self, member: &str, arguments: &[ast::Argument], span: Span) -> Result<Expr> {
+        let slot = self.me_slot.ok_or_else(|| err("receiver local", span))?;
+        let target = Expr {
+            span,
+            kind: ExprKind::Local(slot),
+        };
+        let mut args = Vec::new();
+        let mut named = false;
+        for arg in arguments {
+            if arg.name.is_some() {
+                named = true;
+            } else if named {
+                return Err(err("positional argument after named", arg.span));
+            }
+            push(
+                &mut args,
+                ForeignArgument {
+                    reference: false,
+                    name: arg.name.as_ref().map(|n| n.spelling.clone()),
+                    value: arg.value.as_ref().map(|e| self.expr(e)).transpose()?,
+                },
+                arg.span,
+            )?;
+        }
+        Ok(Expr {
+            span,
+            kind: ExprKind::Foreign {
+                target: Box::new(target),
+                kind: if arguments.is_empty() {
+                    ForeignKind::Get
+                } else {
+                    ForeignKind::Call
+                },
+                member: member.to_string(),
+                arguments: args,
+            },
+        })
+    }
+    /// Document-module implicit-member rule: the bare name is an eligible `Me`
+    /// member not shadowed by a local or a project declaration.
+    fn implicit_me_member(&self, name: &ast::Name) -> bool {
+        !self.symbols.contains_key(&name.key())
+            && !self
+                .lookup
+                .local
+                .contains_key(&(self.signature.module, name.key()))
+            && !self.lookup.public.contains_key(&name.key())
+            && self.implicit_me.iter().any(|member| *member == name.key())
     }
     fn symbol(&mut self, name: &ast::Name) -> Result<Symbol> {
         if let Some(symbol) = self.symbols.get(&name.key()) {
@@ -1387,6 +1496,7 @@ impl Binder<'_> {
                 span: name.span,
                 parameter: false,
                 result: false,
+                synthetic: false,
             },
             name.span,
         )?;
@@ -1950,17 +2060,23 @@ impl Binder<'_> {
         // their value, then retain the requested member/kind/arguments.
         if let ast::ExprKind::Name(name) = &target.kind
             && !self.symbols.contains_key(&name.key())
-            && let Some(import) = self
+        {
+            // Document-module implicit `Me` members precede host import aliases.
+            if self.implicit_me_member(name) {
+                return self.me_member(&name.spelling, arguments, target.span);
+            }
+            if let Some(import) = self
                 .imports
                 .iter()
                 .find(|i| i.name.eq_ignore_ascii_case(&name.spelling))
                 .filter(|i| i.member.is_some() && i.kind == vba_foreign::InvokeKind::Call)
                 .cloned()
-        {
-            if !matches!(kind, ForeignKind::Call | ForeignKind::Get) {
-                return Err(unsupported("import member write", member.span));
+            {
+                if !matches!(kind, ForeignKind::Call | ForeignKind::Get) {
+                    return Err(unsupported("import member write", member.span));
+                }
+                return self.imported(&import, arguments, target.span);
             }
-            return self.imported(&import, arguments, target.span);
         }
         let bound_target = self.expr(target)?;
         self.check_project_member(&bound_target, member, arguments, kind, extra)?;
@@ -2140,6 +2256,7 @@ impl Binder<'_> {
                     span,
                     parameter: false,
                     result: false,
+                    synthetic: false,
                 },
                 span,
             )?;
@@ -2277,21 +2394,7 @@ impl Binder<'_> {
                         kind: ExprKind::DefaultInstance(class.module),
                     });
                 }
-                if !self.symbols.contains_key(&name.key())
-                    && let Some(import) = self
-                        .imports
-                        .iter()
-                        .find(|i| i.name.eq_ignore_ascii_case(&name.spelling))
-                        .cloned()
-                {
-                    return self.imported(&import, &[], expr.span);
-                }
-                if name.key() == "erl" {
-                    return Ok(Expr {
-                        span: expr.span,
-                        kind: ExprKind::ErrField("erl".into()),
-                    });
-                }
+                // Project declarations shadow implicit instance members and host globals.
                 if !self.symbols.contains_key(&name.key())
                     && (self
                         .lookup
@@ -2308,15 +2411,32 @@ impl Binder<'_> {
                         return Err(err("Sub used as value", expr.span));
                     }
                     let arguments = self.arguments(id, &[], expr.span)?;
-                    ExprKind::Call {
-                        procedure: id,
-                        arguments,
-                    }
-                } else {
-                    match self.symbol(name)? {
-                        Symbol::Local(slot) => ExprKind::Local(slot),
-                        Symbol::Constant(v) => ExprKind::Constant(v),
-                    }
+                    return Ok(Expr {
+                        span: expr.span,
+                        kind: ExprKind::Call {
+                            procedure: id,
+                            arguments,
+                        },
+                    });
+                }
+                if !self.symbols.contains_key(&name.key())
+                    && let Some(import) = self
+                        .imports
+                        .iter()
+                        .find(|i| i.name.eq_ignore_ascii_case(&name.spelling))
+                        .cloned()
+                {
+                    return self.imported(&import, &[], expr.span);
+                }
+                if name.key() == "erl" {
+                    return Ok(Expr {
+                        span: expr.span,
+                        kind: ExprKind::ErrField("erl".into()),
+                    });
+                }
+                match self.symbol(name)? {
+                    Symbol::Local(slot) => ExprKind::Local(slot),
+                    Symbol::Constant(v) => ExprKind::Constant(v),
                 }
             }
             ast::ExprKind::Apply { target, arguments } => {
@@ -2375,15 +2495,7 @@ impl Binder<'_> {
                 let ast::ExprKind::Name(name) = &target.kind else {
                     return self.default_member(target, arguments, ForeignKind::DefaultGet, None);
                 };
-                if !self.symbols.contains_key(&name.key())
-                    && let Some(import) = self
-                        .imports
-                        .iter()
-                        .find(|i| i.name.eq_ignore_ascii_case(&name.spelling))
-                        .cloned()
-                {
-                    return self.imported(&import, arguments, expr.span);
-                }
+                // Local array indexing and local object default members shadow every global name.
                 if let Some(Symbol::Local(slot)) = self.symbols.get(&name.key()).cloned()
                     && let Some(kind) = self.locals.get(slot).and_then(|l| l.array)
                 {
@@ -2403,6 +2515,42 @@ impl Binder<'_> {
                         .is_some_and(|l| matches!(l.kind, ScalarKind::Object | ScalarKind::Variant))
                 {
                     return self.default_member(target, arguments, ForeignKind::DefaultGet, None);
+                }
+                // Project declarations shadow implicit instance members and host globals.
+                if self
+                    .lookup
+                    .local
+                    .contains_key(&(self.signature.module, name.key()))
+                    || self.lookup.public.contains_key(&name.key())
+                {
+                    let id = self.callee(name)?;
+                    if self
+                        .signatures
+                        .get(id)
+                        .is_none_or(|s| s.kind != ast::ProcedureKind::Function)
+                    {
+                        return Err(err("Sub used as value", expr.span));
+                    }
+                    return Ok(Expr {
+                        span: expr.span,
+                        kind: ExprKind::Call {
+                            procedure: id,
+                            arguments: self.arguments(id, arguments, expr.span)?,
+                        },
+                    });
+                }
+                // Document-module implicit `Me` members precede host globals.
+                if self.implicit_me_member(name) {
+                    return self.me_member(&name.spelling, arguments, expr.span);
+                }
+                if !self.symbols.contains_key(&name.key())
+                    && let Some(import) = self
+                        .imports
+                        .iter()
+                        .find(|i| i.name.eq_ignore_ascii_case(&name.spelling))
+                        .cloned()
+                {
+                    return self.imported(&import, arguments, expr.span);
                 }
                 if !self
                     .lookup
@@ -2512,6 +2660,13 @@ impl Binder<'_> {
                 }
                 return self.foreign(target, name, &[], ForeignKind::Get, None);
             }
+            ast::ExprKind::WithReceiver => {
+                let slot = *self
+                    .with_stack
+                    .last()
+                    .ok_or_else(|| err("leading dot requires an active With block", expr.span))?;
+                ExprKind::Local(slot)
+            }
             _ => ExprKind::Constant(literal(expr, self.references, Some(&self.symbols))?),
         };
         Ok(Expr {
@@ -2597,6 +2752,46 @@ impl Binder<'_> {
     fn block(&mut self, body: &[ast::Statement]) -> Result<Vec<Statement>> {
         let mut result = Vec::new();
         for statement in body {
+            if let ast::StatementKind::With {
+                receiver,
+                body,
+                end,
+            } = &statement.kind
+            {
+                // The receiver is evaluated once in the enclosing scope and stored in a
+                // hidden object slot. Leading-dot members resolve to the innermost slot;
+                // the With block never changes `Me` or any active host state.
+                let value = self.expr(receiver)?;
+                let slot = self.with_receiver_slot(statement.site.span)?;
+                self.with_stack.push(slot);
+                let bound = self.block(body);
+                self.with_stack.pop();
+                push(
+                    &mut result,
+                    Statement {
+                        site: statement.site,
+                        kind: StatementKind::Assign {
+                            slot,
+                            value,
+                            object: true,
+                        },
+                    },
+                    statement.site.span,
+                )?;
+                for bound in bound? {
+                    let span = bound.site.span;
+                    push(&mut result, bound, span)?;
+                }
+                push(
+                    &mut result,
+                    Statement {
+                        site: *end,
+                        kind: StatementKind::Declare,
+                    },
+                    end.span,
+                )?;
+                continue;
+            }
             if let ast::StatementKind::Declare(declarations) = &statement.kind {
                 for declaration in declarations {
                     if let Some(dimensions) = &declaration.dimensions {
@@ -2631,6 +2826,10 @@ impl Binder<'_> {
     fn statement(&mut self, statement: &ast::Statement) -> Result<Statement> {
         let site = statement.site;
         let bound = match &statement.kind {
+            ast::StatementKind::With { .. } => {
+                // `With` blocks are expanded by `block`, which owns their receiver slot.
+                return Err(unsupported("With outside block binding", site.span));
+            }
             ast::StatementKind::ReDim {
                 name,
                 dimensions,
@@ -3006,6 +3205,33 @@ impl Binder<'_> {
                 let ast::ExprKind::Name(name) = &target.kind else {
                     return Err(unsupported("foreign member call", target.span));
                 };
+                // Project declarations shadow implicit instance members and host globals.
+                if self
+                    .lookup
+                    .local
+                    .contains_key(&(self.signature.module, name.key()))
+                    || self.lookup.public.contains_key(&name.key())
+                {
+                    let id = self.callee(name)?;
+                    return Ok(Statement {
+                        site,
+                        kind: StatementKind::Call {
+                            procedure: id,
+                            arguments: self.arguments(id, arguments, site.span)?,
+                        },
+                    });
+                }
+                // Document-module implicit `Me` members precede host globals.
+                if self.implicit_me_member(name) {
+                    return Ok(Statement {
+                        site,
+                        kind: StatementKind::Foreign(self.me_member(
+                            &name.spelling,
+                            arguments,
+                            site.span,
+                        )?),
+                    });
+                }
                 if !self.symbols.contains_key(&name.key())
                     && let Some(import) = self
                         .imports

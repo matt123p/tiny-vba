@@ -320,6 +320,12 @@ pub struct Ide {
     undo_edits: Vec<history::EditState>,
     redo_edits: Vec<history::EditState>,
     replaying_edit: bool,
+    /// Host-declared result types for host globals (completion metadata only).
+    host_types: BTreeMap<String, String>,
+    /// Host-declared instance types per document code name (completion metadata only).
+    document_types: BTreeMap<String, String>,
+    /// Host-declared implicit `Me` members per document module, used for compilation.
+    document_members: BTreeMap<String, Vec<String>>,
 }
 impl Default for Ide {
     fn default() -> Self {
@@ -364,6 +370,9 @@ impl Ide {
             undo_edits: Vec::new(),
             redo_edits: Vec::new(),
             replaying_edit: false,
+            host_types: BTreeMap::new(),
+            document_types: BTreeMap::new(),
+            document_members: BTreeMap::new(),
         }
     }
     pub fn demo() -> Result<Self> {
@@ -648,6 +657,76 @@ impl Ide {
         self.catalog = catalog;
         Ok(())
     }
+    /// Declare the host's document context. `document_members` supplies the eligible
+    /// implicit `Me` member names per document module (keyed by `VB_Name`, used for
+    /// compilation); `document_types` declares the instance catalogue type per document
+    /// code name and `host_types` the result type of each host global, both used for
+    /// read-only completion metadata. Declaring a member or type never lets code aids
+    /// invoke anything, and entries must be identifiers the host actually supports.
+    pub fn configure_document_context(
+        &mut self,
+        document_members: BTreeMap<String, Vec<String>>,
+        document_types: BTreeMap<String, String>,
+        host_types: BTreeMap<String, String>,
+    ) -> Result<()> {
+        if self.session.is_some() {
+            return Err(error("reset before changing the document context"));
+        }
+        let valid_identifier = |name: &str| -> bool {
+            !name.is_empty()
+                && name.len() <= 255
+                && name.chars().enumerate().all(|(index, c)| {
+                    c == '_' || (c.is_ascii_alphanumeric() && (index > 0 || !c.is_ascii_digit()))
+                })
+        };
+        if document_members.len() > 256 || document_types.len() > 256 || host_types.len() > 256 {
+            return Err(error("document context budget exceeded"));
+        }
+        let mut payload = 0usize;
+        for (module, members) in &document_members {
+            payload = payload.saturating_add(module.len());
+            if !valid_identifier(module) || members.len() > 256 {
+                return Err(error("invalid document member metadata"));
+            }
+            for member in members {
+                payload = payload.saturating_add(member.len());
+                if !valid_identifier(member) {
+                    return Err(error("invalid document member name"));
+                }
+            }
+        }
+        for map in [&document_types, &host_types] {
+            for (name, ty) in map {
+                payload = payload.saturating_add(name.len()).saturating_add(ty.len());
+                if !valid_identifier(name) || ty.is_empty() || ty.len() > 256 {
+                    return Err(error("invalid host type metadata"));
+                }
+            }
+        }
+        if payload > 1_048_576 {
+            return Err(error("document context payload limit"));
+        }
+        let fold = |map: BTreeMap<String, String>| -> BTreeMap<String, String> {
+            map.into_iter()
+                .map(|(name, ty)| (name.to_ascii_lowercase(), ty))
+                .collect()
+        };
+        self.document_members = document_members
+            .iter()
+            .map(|(module, members)| {
+                (
+                    module.to_ascii_lowercase(),
+                    members
+                        .iter()
+                        .map(|member| member.to_ascii_lowercase())
+                        .collect(),
+                )
+            })
+            .collect();
+        self.document_types = fold(document_types);
+        self.host_types = fold(host_types);
+        Ok(())
+    }
     pub fn message(&mut self, text: impl Into<String>) {
         if self.messages.len() >= 256 {
             self.messages.remove(0);
@@ -710,6 +789,7 @@ impl Ide {
                 capabilities: vba_vm::capabilities(),
                 imports: self.form_imports(),
                 references: self.reference_bindings.clone(),
+                document_members: self.document_members.clone(),
                 ..Default::default()
             },
         )
@@ -759,6 +839,7 @@ impl Ide {
                 capabilities: vba_vm::capabilities(),
                 imports: self.form_imports(),
                 references: self.reference_bindings.clone(),
+                document_members: self.document_members.clone(),
                 ..Default::default()
             },
         )
@@ -1677,7 +1758,7 @@ impl Ide {
         let mut names = BTreeSet::new();
         if prefix.contains('.') {
             if let Some((owner, member)) = prefix.rsplit_once('.') {
-                let receiver_type = self.receiver_type(owner);
+                let receiver_type = self.receiver_expression_type(owner);
                 if owner.eq_ignore_ascii_case("Debug")
                     && "print".starts_with(&member.to_ascii_lowercase())
                 {

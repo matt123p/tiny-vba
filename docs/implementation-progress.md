@@ -3,10 +3,38 @@
 Updated 2026-10-31. The classic-editor/debugger profile is implemented; its
 historical milestone is M10. Runtime remains m5-host-v1 with verified IR 1/2/3/4/5/6/7.
 The [remaining plan](implementation-plan.md) retains stable **M6–M8** task IDs.
-**M1–M5 are complete for their declared profiles.** Office objects, document
-events, trust and packaging remain fork-owned. M3/M4 are implemented and audited in GridCraft,
-with a published immutable tiny-vba dependency and no development path override. M5's
-document-module, event and Range-aware UDF acceptance is recorded in [m5-acceptance.md](m5-acceptance.md).
+**M1–M5 are complete for their declared profiles, and M6's shared and fork-owned
+context work (M6.5–M6.8 plus the fork acceptance for M6.7) is implemented**; the
+remaining M6 items are recorded in the [M6.5 check](m6-context-resolution-check.md).
+Office objects, document events, trust and packaging remain fork-owned.
+
+## M6 module-context, resolution and host-object completion (2026-10-31)
+
+Implemented the M6.5–M6.8 scope defined by the [per-layer check](m6-context-resolution-check.md)
+against the two supplied specifications. Shared: staged bare-name resolution
+(locals/parameters/module/project declarations, then host-declared document-module implicit
+`Me` members, then host imports) with project-before-global shadowing; the `With` statement
+end to end (parser, binder, hidden receiver slots, innermost-only leading dots, debugger-
+invisible slots, native and WASI execution); and IDE receiver typing for host objects —
+host-declared import result types, call-shaped receivers, `Me`/code-name document types and
+catalogue member walks — still read-only and metadata-driven. CompileOptions gained
+`document_members`; the IDE gained `configure_document_context`. Fixed a pre-existing strict
+Clippy failure in vba-ui-egui's form Format buttons (theme styling) that blocked the gate.
+
+Fork acceptance (in GridCraft/WordCraft under their M6 branches): GridCraft declares
+worksheet implicit members and proves the specifications' unshadowed module-kind binding and
+live host-global consultation cases against real workbook sessions; WordCraft declares
+`ThisDocument` implicit members and pins the same shared revision. Remaining M6 items are
+explicitly refused/NOT_RUN in the check (Application.Run, add-ins, chart sheets, Office
+reference observations) rather than claimed.
+
+Validation from this checkout: `cargo xtask ci` PASS (392 workspace tests; strict Clippy,
+fmt, layers, provenance, assets and corpora), `cargo xtask wasm` PASS, `cargo xtask wasm-run`
+PASS (188 actual WASI tests). New regressions: 3 parser (With/leading dots/unterminated),
+4 binder (With slots, dot refusal, shadowing, implicit members), 4 VM end-to-end
+(`with_resolution.rs`), 3 IDE receiver typing (`host_completion.rs`) plus the existing
+31 vba-ui-egui interaction tests. IR versions, the 19-crate DAG and the m5-host-v1 profile
+are unchanged; no fresh Office oracle observation is claimed.
 
 ## Plan addition — module-context and name-resolution specifications (2026-10-31)
 

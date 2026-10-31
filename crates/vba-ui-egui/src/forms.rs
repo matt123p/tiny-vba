@@ -145,7 +145,7 @@ impl EditorUi {
                 ("Bring to Front", DesignEdit::Front),
                 ("Send to Back", DesignEdit::Back),
             ] {
-                if ui.button(label).clicked() {
+                if ui.button(theme.label(label)).clicked() {
                     command(commands, id, edit);
                     ui.close();
                 }

@@ -494,3 +494,73 @@ fn control_headers_terminators_and_parameter_metadata_are_preserved() -> Result<
     assert_eq!(file.slice(end.ok_or("End If")?.span)?, "End If");
     Ok(())
 }
+
+#[test]
+fn with_statement_preserves_receiver_leading_dots_and_end_site() -> Result<(), Box<dyn Error>> {
+    let file = source(
+        "Function Answer() As Long\nWith Worksheets(1)\n.Cells(1, 1).Value = 7\nAnswer = .Value\nEnd With\nEnd Function\n",
+    )?;
+    let parsed = parse(&file, ModuleKind::Standard)?;
+    assert!(parsed.syntax_valid(), "{:?}", parsed.diagnostics);
+    let procedure = parsed.module.procedures.first().ok_or("procedure")?;
+    let statement = procedure.body.first().ok_or("With")?;
+    let StatementKind::With {
+        receiver,
+        body,
+        end,
+    } = &statement.kind
+    else {
+        return Err("With".into());
+    };
+    assert_eq!(file.slice(statement.site.span)?, "With Worksheets(1)");
+    assert_eq!(file.slice(receiver.span)?, "Worksheets(1)");
+    assert_eq!(body.len(), 2);
+    assert_eq!(file.slice(end.span)?, "End With");
+    // The leading-dot assignment targets a WithReceiver-rooted member chain.
+    let StatementKind::Assign { target, .. } = &body.first().ok_or("assign")?.kind else {
+        return Err("assign".into());
+    };
+    let ExprKind::Member { target, .. } = &target.kind else {
+        return Err("member target".into());
+    };
+    let ExprKind::Apply { target, .. } = &target.kind else {
+        return Err("apply".into());
+    };
+    let ExprKind::Member { target, .. } = &target.kind else {
+        return Err("member receiver".into());
+    };
+    assert!(matches!(target.kind, ExprKind::WithReceiver));
+    Ok(())
+}
+
+#[test]
+fn nested_with_bodies_and_call_shaped_leading_dots_parse() -> Result<(), Box<dyn Error>> {
+    let file = source(
+        "Sub Demo()\nWith ThisWorkbook\nWith .Worksheets(\"Data\")\n.Range(.Cells(1, 1), .Cells(2, 2)).ClearContents\nEnd With\nEnd With\nEnd Sub\n",
+    )?;
+    let parsed = parse(&file, ModuleKind::Standard)?;
+    assert!(parsed.syntax_valid(), "{:?}", parsed.diagnostics);
+    let procedure = parsed.module.procedures.first().ok_or("procedure")?;
+    let StatementKind::With { body, .. } = &procedure.body.first().ok_or("With")?.kind else {
+        return Err("With".into());
+    };
+    let StatementKind::With { receiver, .. } = &body.first().ok_or("inner With")?.kind else {
+        return Err("inner With".into());
+    };
+    let ExprKind::Apply { target, .. } = &receiver.kind else {
+        return Err("inner receiver".into());
+    };
+    let ExprKind::Member { target, .. } = &target.kind else {
+        return Err("inner member".into());
+    };
+    assert!(matches!(target.kind, ExprKind::WithReceiver));
+    Ok(())
+}
+
+#[test]
+fn unterminated_with_records_a_diagnostic() -> Result<(), Box<dyn Error>> {
+    let file = source("Sub Demo()\nWith Worksheets(1)\n.Cells(1, 1).Value = 7\nEnd Sub\n")?;
+    let parsed = parse(&file, ModuleKind::Standard)?;
+    assert!(!parsed.syntax_valid());
+    Ok(())
+}

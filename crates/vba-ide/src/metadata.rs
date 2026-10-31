@@ -87,12 +87,176 @@ impl Ide {
         self.reference_bindings = bindings;
         Ok(())
     }
+    /// Result type of one catalogue member on a declared owner type.
+    pub(crate) fn member_result_type(&self, owner: &str, member: &str) -> Option<String> {
+        let item = self.catalog.iter().find(|item| {
+            item.supported
+                && self.catalog_owner_matches(item, owner)
+                && item.name.eq_ignore_ascii_case(member)
+        })?;
+        let words = item.signature.split_whitespace().collect::<Vec<_>>();
+        let at = words
+            .iter()
+            .rposition(|word| word.eq_ignore_ascii_case("As"))?;
+        let returned = words.get(at + 1)?.trim_matches(['(', ')']).to_string();
+        let object = if item.owner.contains('.') {
+            self.reference_bindings
+                .object_type(&item.owner)
+                .ok()
+                .flatten()
+        } else {
+            None
+        };
+        let library = object
+            .as_ref()
+            .map_or(item.library.as_str(), |ty| ty.library());
+        let qualified = format!("{library}.{returned}");
+        Some(
+            if !returned.contains('.')
+                && self
+                    .reference_bindings
+                    .object_type(&qualified)
+                    .ok()
+                    .flatten()
+                    .is_some()
+            {
+                qualified
+            } else {
+                returned
+            },
+        )
+    }
+    /// Byte offset of the `(` opening the trailing balanced call in `expression`,
+    /// ignoring parens inside string literals. Bounded by the expression length.
+    fn trailing_call_open(expression: &str) -> Option<usize> {
+        let bytes = expression.as_bytes();
+        if *bytes.last()? != b')' {
+            return None;
+        }
+        let mut depth = 0usize;
+        let mut index = bytes.len();
+        let mut quoted = false;
+        while index > 0 {
+            index = index.saturating_sub(1);
+            let byte = *bytes.get(index)?;
+            if quoted {
+                if byte == b'"' {
+                    // Doubled quotes are escapes; a single quote ends the literal.
+                    if index > 0 && bytes.get(index - 1) == Some(&b'"') {
+                        index = index.saturating_sub(1);
+                    } else {
+                        quoted = false;
+                    }
+                }
+                continue;
+            }
+            match byte {
+                b'"' => quoted = true,
+                b')' => {
+                    depth += 1;
+                    if depth > 64 {
+                        return None;
+                    }
+                }
+                b'(' => {
+                    depth = depth.saturating_sub(1);
+                    if depth == 0 {
+                        return Some(index);
+                    }
+                }
+                _ => (),
+            }
+        }
+        None
+    }
+    /// Byte offset of the last `.` outside parens and string literals, searched
+    /// from the end so qualified call shapes split at their final member.
+    fn trailing_member_dot(expression: &str) -> Option<usize> {
+        let bytes = expression.as_bytes();
+        let mut depth = 0usize;
+        let mut quoted = false;
+        let mut index = bytes.len();
+        while index > 0 {
+            index = index.saturating_sub(1);
+            let byte = *bytes.get(index)?;
+            if quoted {
+                if byte == b'"' {
+                    if index > 0 && bytes.get(index - 1) == Some(&b'"') {
+                        index = index.saturating_sub(1);
+                    } else {
+                        quoted = false;
+                    }
+                }
+                continue;
+            }
+            match byte {
+                b'"' => quoted = true,
+                b')' => {
+                    depth += 1;
+                    if depth > 64 {
+                        return None;
+                    }
+                }
+                b'(' => depth = depth.saturating_sub(1),
+                b'.' if depth == 0 => return Some(index),
+                _ => (),
+            }
+        }
+        None
+    }
+    /// Resolve a receiver *expression* — which may carry call shapes such as
+    /// `Range("A1")`, `Worksheets("Data")` or `Workbooks("B").Worksheets("S")` —
+    /// to its declared catalogue type. Metadata only: nothing is invoked.
+    pub(crate) fn receiver_expression_type(&self, expression: &str) -> Option<String> {
+        let expression = expression.trim();
+        if expression.is_empty() || expression.len() > 1024 {
+            return None;
+        }
+        let Some(open) = Self::trailing_call_open(expression) else {
+            return self.receiver_type(expression);
+        };
+        let head = expression.get(..open)?.trim_end();
+        if head.is_empty() {
+            return None;
+        }
+        let arguments_present = !expression
+            .get(open + 1..expression.len().saturating_sub(1))?
+            .trim()
+            .is_empty();
+        let member = match Self::trailing_member_dot(head) {
+            None => {
+                let base = self.receiver_type(head)?;
+                // A call on a bare receiver applies its default member (`Item`).
+                if arguments_present {
+                    self.member_result_type(&base, "Item").unwrap_or(base)
+                } else {
+                    base
+                }
+            }
+            Some(dot) => {
+                let owner = head.get(..dot)?.trim_end();
+                let name = head.get(dot + 1..)?.trim();
+                if owner.is_empty() || name.is_empty() {
+                    return None;
+                }
+                let base = self.receiver_expression_type(owner)?;
+                let member = self.member_result_type(&base, name)?;
+                if arguments_present {
+                    self.member_result_type(&member, "Item").unwrap_or(member)
+                } else {
+                    member
+                }
+            }
+        };
+        Some(member)
+    }
     pub(crate) fn receiver_type(&self, receiver: &str) -> Option<String> {
         if receiver.len() > 1024 {
             return None;
         }
         let mut parts = receiver.split('.');
         let root = parts.next()?;
+        let root_key = root.to_ascii_lowercase();
         let mut ty = self
             .source_completions()
             .into_iter()
@@ -103,45 +267,29 @@ impl Ide {
                     .iter()
                     .find(|item| item.supported && item.owner.eq_ignore_ascii_case(root))
                     .map(|item| item.owner.clone())
-            })?;
+            })
+            .or_else(|| self.host_types.get(&root_key).cloned())
+            .or_else(|| {
+                // `Me` resolves to the active document module's declared instance type.
+                (root_key == "me").then_some(()).and_then(|()| {
+                    let module = self.active_module()?;
+                    self.document_types
+                        .get(
+                            &module
+                                .code_name
+                                .clone()
+                                .unwrap_or_default()
+                                .to_ascii_lowercase(),
+                        )
+                        .cloned()
+                })
+            })
+            .or_else(|| self.document_types.get(&root_key).cloned())?;
         for (depth, part) in parts.enumerate() {
             if depth >= 32 {
                 return None;
             }
-            let member = self.catalog.iter().find(|item| {
-                item.supported
-                    && self.catalog_owner_matches(item, &ty)
-                    && item.name.eq_ignore_ascii_case(part)
-            })?;
-            let words = member.signature.split_whitespace().collect::<Vec<_>>();
-            let at = words
-                .iter()
-                .rposition(|word| word.eq_ignore_ascii_case("As"))?;
-            let returned = words.get(at + 1)?.trim_matches(['(', ')']);
-            let owner = if member.owner.contains('.') {
-                self.reference_bindings
-                    .object_type(&member.owner)
-                    .ok()
-                    .flatten()
-            } else {
-                None
-            };
-            let library = owner
-                .as_ref()
-                .map_or(member.library.as_str(), |ty| ty.library());
-            let qualified = format!("{library}.{returned}");
-            ty = if !returned.contains('.')
-                && self
-                    .reference_bindings
-                    .object_type(&qualified)
-                    .ok()
-                    .flatten()
-                    .is_some()
-            {
-                qualified
-            } else {
-                returned.to_string()
-            };
+            ty = self.member_result_type(&ty, part)?;
         }
         Some(ty)
     }
@@ -323,7 +471,7 @@ impl Ide {
             ));
         }
         let (owner, member) = name.rsplit_once('.')?;
-        let ty = self.receiver_type(owner);
+        let ty = self.receiver_expression_type(owner);
         self.catalog
             .iter()
             .find(|item| {

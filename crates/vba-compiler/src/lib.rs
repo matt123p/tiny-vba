@@ -29,6 +29,10 @@ pub struct CompileOptions {
     pub revision: String,
     pub capabilities: ir::Capabilities,
     pub limits: ir::VerifyLimits,
+    /// Host-declared implicit `Me` member names per document module, keyed by the
+    /// module's `VB_Name` (case-insensitively). Bare eligible names resolve to the
+    /// instance receiver before host globals. Metadata only; never executes anything.
+    pub document_members: std::collections::BTreeMap<String, Vec<String>>,
 }
 impl Default for CompileOptions {
     fn default() -> Self {
@@ -39,6 +43,7 @@ impl Default for CompileOptions {
             revision: "source-1".into(),
             capabilities: ir::Capabilities::ir7_structural(),
             limits: ir::VerifyLimits::default(),
+            document_members: std::collections::BTreeMap::new(),
         }
     }
 }
@@ -66,6 +71,7 @@ pub fn compile_modules(
         &options.entry,
         &options.imports,
         &options.references,
+        &options.document_members,
     )?;
     let mut sources = Vec::new();
     for module in &program.modules {
@@ -171,7 +177,10 @@ pub fn compile_modules(
                     } else {
                         Some(local.span)
                     },
-                    visible: !local.result && !local.host_root && !local.receiver,
+                    visible: !local.result
+                        && !local.host_root
+                        && !local.receiver
+                        && !local.synthetic,
                 },
             )?;
         }
