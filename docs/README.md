@@ -97,3 +97,18 @@ ignored under `reports/ui/`. Neither is required for the ordinary offline test s
 the current host milestones separately from historical language milestone IDs.
 [M5 document-event and Range-aware UDF acceptance map](m5-acceptance.md) records the
 independently authored GridCraft scenarios accepted for the declared profile.
+
+## Module-context and name-resolution specifications (2026-10-31)
+
+- [VBA module types and execution contexts](vba_module_types_and_execution_contexts.md):
+  module kinds, `Me`/instance identity, entry-point context preservation and a
+  differential compatibility matrix.
+- [Excel context, name resolution and object discovery](vba_excel_context_and_object_resolution.md):
+  staged identifier resolution, host globals versus `Me`/`With`, active versus
+  code context and compatibility tests.
+
+The [remaining plan](implementation-plan.md) assigns M6.5 to check current
+evidence against both, M6.6/M6.7 to close the gaps under the existing ownership
+split (shared binding in tiny-vba; Excel host globals and active state in the
+forks), M6.8 to bring host-object member completion to the shared IDE, and M7.4
+to run their matrices as unchanged-document acceptance.

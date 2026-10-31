@@ -1,12 +1,38 @@
 # Implementation progress
 
-Updated 2026-10-30. The classic-editor/debugger profile is implemented; its
+Updated 2026-10-31. The classic-editor/debugger profile is implemented; its
 historical milestone is M10. Runtime remains m5-host-v1 with verified IR 1/2/3/4/5/6/7.
 The [remaining plan](implementation-plan.md) retains stable **M6–M8** task IDs.
 **M1–M5 are complete for their declared profiles.** Office objects, document
 events, trust and packaging remain fork-owned. M3/M4 are implemented and audited in GridCraft,
 with a published immutable tiny-vba dependency and no development path override. M5's
 document-module, event and Range-aware UDF acceptance is recorded in [m5-acceptance.md](m5-acceptance.md).
+
+## Plan addition — module-context and name-resolution specifications (2026-10-31)
+
+User-supplied specifications [vba_module_types_and_execution_contexts](vba_module_types_and_execution_contexts.md)
+and [vba_excel_context_and_object_resolution](vba_excel_context_and_object_resolution.md) are
+indexed in [docs/README.md](README.md). The [remaining plan](implementation-plan.md) adds M6.5 —
+a per-layer check of implemented, refused and missing behavior against current M1–M5 evidence —
+plus M6.6/M6.7 for the resulting shared resolution and fork host-global/context gaps, and M7.4
+for the two documents' differential matrices as unchanged-document acceptance. Documentation-only
+change: no product code, runtime contract or compatibility claim. M5's accepted profile
+(document code names, `Me`-bound event owners, Range-aware UDF context) is unchanged; M6.5 must
+reconcile these specifications against that evidence before new implementation starts.
+
+Reviewing the reported IntelliSense gap found the shared cause: vba-ide receiver typing
+(crates/vba-ide/src/metadata.rs `receiver_type`) resolves only bare source symbols and catalogue
+owners, and the completion prefix scan (crates/vba-ide/src/code_aids.rs `completion_prefix`)
+drops call-shaped receivers, so configured host imports (`ThisWorkbook`, `ActiveSheet`) and call
+receivers (`Range("A1")`, `Worksheets("Data")`) never reach member completion. Typed locals
+(`Dim ws As Worksheet` + `ws.`) and the bare owner `Application.` do complete; GridCraft's only
+completion regressions cover the typed-local path (gridcraft crates/vba/tests/nominal.rs), and
+WordCraft has no embedded editor/catalogue yet (M6.2). The plan adds M6.8 for shared receiver
+typing plus fork-declared catalogue coverage. Documentation-only change; no product code or
+compatibility claim.
+
+Validation for this documentation-only revision: local link targets verified and
+`git diff --check` passes in this checkout.
 
 ## M3/M4 completion — range, identity, values and members (2026-10-29)
 

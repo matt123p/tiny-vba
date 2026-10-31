@@ -1,6 +1,6 @@
 # Remaining implementation plan
 
-Updated 2026-10-30. This plan contains **remaining work only**, using stable M6–M8 IDs
+Updated 2026-10-31. This plan contains **remaining work only**, using stable M6–M8 IDs
 in implementation order after completed M1, the [selected M2 profile](m2-acceptance.md),
 and the [M3/M4 host profiles](m3-m4-host-acceptance.md). Completed work and the old-to-new milestone mapping
 belong in [implementation progress](implementation-progress.md#plan-renumbering--2026-10-28).
@@ -17,7 +17,7 @@ separate and native host dispatch in Rust.
 
 | Milestone | Remaining work | Prerequisites |
 |---|---|---|
-| M6 | Remaining GridCraft and WordCraft integration | M1; M2–M5 for corresponding form/event/Excel workflows |
+| M6 | Remaining GridCraft and WordCraft integration; module-context and name-resolution conformance | M1; M2–M5 for corresponding form/event/Excel workflows |
 | M7 | Unchanged-document and package acceptance | Applicable M1–M6 capabilities and explicit writeback design |
 | M8 | Expanded conformance, hardening and release | M1–M7 acceptance for the declared release profile |
 
@@ -67,11 +67,40 @@ classes/forms. Excel workflow acceptance consumes the applicable M3–M5 behavio
   partial-side-effect policy. Define Word document events against M2 contracts.
 - **M6.4:** Add independently authored document workflows and permitted
   reference-build observations. Record each owning fork's executable evidence.
+- **M6.5:** Check the shared binder/runtime and both forks against the
+  [module types and execution contexts](vba_module_types_and_execution_contexts.md) and
+  [Excel context and object resolution](vba_excel_context_and_object_resolution.md)
+  specifications. Record implemented, refused and missing behavior per owned layer — module-kind
+  binding, implicit `Me` members, shadowing, `With` receivers, host globals, active-context
+  consultation and IDE receiver typing for host objects — and update the compatibility matrix
+  before scheduling the gaps.
+- **M6.6:** Close the shared resolution gaps M6.5 records in tiny-vba: staged identifier
+  resolution over locals/parameters/module/project declarations, eligible implicit `Me` members
+  for class and document modules, then host globals; per-module-kind binding metadata; local and
+  member shadowing; innermost-only leading-dot `With` receivers that never change `Me` or active
+  state; callee module-kind rules on cross-module calls; no implicit current-workbook frame
+  parameter.
+- **M6.7:** Close the fork-owned context gaps: Excel host globals (`Range`, `Cells`, `Rows`,
+  `Columns`, `Worksheets`, `Workbooks`, `Selection`, `Application`) consulted at invocation against
+  live application state; distinct `ThisWorkbook`/`ActiveWorkbook`/`ActiveSheet`/`Me` identities;
+  code-name objects stable across tab renames; chart-sheet, no-active-workbook and non-Range
+  `Selection` error behavior; `Application.Run` and add-in `ThisWorkbook` context preservation.
+  WordCraft supplies the corresponding document roots under its M6.1 profile.
+- **M6.8:** Make IDE member completion work for host objects: type receivers from configured
+  host imports and call shapes (`ThisWorkbook.`, `ActiveSheet.`, `Range("A1").`,
+  `Worksheets("Data").`, `Cells(1, 1).`), have each fork declare the member/result types it
+  actually supports in its catalogue, and complete `Me`/code-name receivers where the host binds
+  document objects. WordCraft gains this with its M6.2 editor embed. Code aids stay read-only and
+  metadata-driven; they never invoke host members.
 
 Acceptance: both forks reuse the same editor and shared interpreter repository.
 Real document workflows verify effects and lifecycle without replay or retained
-locks; tiny-vba-only snapshots and generic doubles cannot satisfy this gate.
-Package round trips and signatures are the next milestone's separate gate.
+locks; tiny-vba-only snapshots and generic doubles cannot satisfy this gate. The
+M6.5 record drives M6.6/M6.7 scope, and acceptance includes the specifications'
+unshadowed module-kind binding and live host-global consultation cases in real
+fork workflows. Declared host globals and typed/call receivers complete their
+members in the shared editor without host invocation. Package round trips and
+signatures are the next milestone's separate gate.
 
 ## M7 — Unchanged-document and package acceptance
 
@@ -89,6 +118,14 @@ specimens require M2 and the corresponding host event/persistence integration.
   invalidation as a separate reviewed contract before implementation. Distinguish
   original-byte preservation from edited-source writeback. No protection/P-code
   bypass or unrestricted binary add-ins.
+- **M7.4:** Execute the two specifications' module-context and name-resolution
+  matrices ([module types](vba_module_types_and_execution_contexts.md),
+  [object resolution](vba_excel_context_and_object_resolution.md)) as
+  unchanged-document evidence: per-module-kind binding with a different workbook
+  active, `With` versus bare identifiers, shadowing, code names after tab rename,
+  late binding, and chart-sheet/add-in cases where licensed specimens permit.
+  Record PASS/MISMATCH/UNSUPPORTED/NOT_RUN per case; encode binding precedence
+  only from verified observations, never from documentation alone.
 
 Acceptance: per-document profile/version/evidence records distinguish PASS,
 MISMATCH, UNSUPPORTED and NOT_RUN. Verify forms/standard controls, source
