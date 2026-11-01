@@ -26,7 +26,11 @@ operations in its source remain separate compatibility work. This is a targeted
 language correction; M7 remains untouched. Validation: `cargo xtask ci` PASS
 (419 workspace tests), `cargo xtask wasm` PASS, `cargo xtask wasm-run` PASS
 (222 actual WASI tests, including the full execution regression suite).
-See [ADR 0031](decisions/0031-variant-for-counters.md).
+See [ADR 0031](decisions/0031-variant-for-counters.md). Shared fix `f680441`
+is published on main and pinned in both forks. Final adapter checks pass
+(GridCraft 75, WordCraft 28), as do both full application CI gates.
+Next smallest compatibility task: StrComp, followed by a separate audit of the
+workbook’s Excel selection/clipboard/sort calls; no full-workbook run is claimed.
 
 ## M6 implementation and acceptance audit (2026-11-01)
 
