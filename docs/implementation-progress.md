@@ -28,13 +28,18 @@ live host-global consultation cases against real workbook sessions; WordCraft de
 explicitly refused/NOT_RUN in the check (Application.Run, add-ins, chart sheets, Office
 reference observations) rather than claimed.
 
-Validation from this checkout: `cargo xtask ci` PASS (392 workspace tests; strict Clippy,
+Validation from this checkout: `cargo xtask ci` PASS (393 workspace tests; strict Clippy,
 fmt, layers, provenance, assets and corpora), `cargo xtask wasm` PASS, `cargo xtask wasm-run`
 PASS (188 actual WASI tests). New regressions: 3 parser (With/leading dots/unterminated),
-4 binder (With slots, dot refusal, shadowing, implicit members), 4 VM end-to-end
-(`with_resolution.rs`), 3 IDE receiver typing (`host_completion.rs`) plus the existing
-31 vba-ui-egui interaction tests. IR versions, the 19-crate DAG and the m5-host-v1 profile
-are unchanged; no fresh Office oracle observation is claimed.
+5 binder (With slots, dot refusal, shadowing, implicit members, member writes on implicit
+receivers), 4 VM end-to-end (`with_resolution.rs`), 4 IDE receiver typing
+(`host_completion.rs`), 1 UI localization render regression (`drawn_chrome_text_goes_through_
+the_injected_localizer`) plus the existing 31 vba-ui-egui interaction tests. IR versions, the
+19-crate DAG and the m5-host-v1 profile are unchanged; no fresh Office oracle observation is
+claimed. Two follow-up commits on the same day: member writes on implicit `Me` receivers keep
+the requested member application (found by WordCraft's acceptance workflows), and the shared
+editor's remaining chrome labels route through the injected localizer with the render
+regression above — the change that turns WordCraft's translation-audit gate green.
 
 ## Plan addition — module-context and name-resolution specifications (2026-10-31)
 
