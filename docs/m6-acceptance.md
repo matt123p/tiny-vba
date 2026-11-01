@@ -1,10 +1,15 @@
 # M6 integration acceptance audit
 
-Updated 2026-11-01. **Local implementation is complete for the declared profile;
-M6 is not yet fully accepted.** Fresh Microsoft Office reference observations
-remain NOT_RUN and have not been waived. Shared implementation revision
-`d40a283699ce0eb0e998493d3443731622050b3c` is published on main and pinned in
-both application forks, with no local Cargo overrides. M7 has not started.
+Updated 2026-11-01. **M6 is signed off for the declared, tested integration
+profile.** At the owner’s explicit direction, fresh Excel/Word reference
+comparisons formerly associated with M6.4 are deferred to **M8.5**. They remain
+NOT_RUN and are still required by that later release-validation gate. M7 is
+unblocked and is the next milestone; no Office comparison PASS is implied.
+See [ADR 0032](decisions/0032-m6-sign-off-and-reference-comparison-deferral.md).
+
+The M6 implementation/evidence below records shared revision `d40a283` and the
+fork acceptance runs. The subsequent Variant For correction is published at
+`f680441` and pinned in both forks, with shared and full fork CI passing.
 
 ## Implemented scope
 
@@ -13,7 +18,7 @@ both application forks, with no local Cargo overrides. M7 has not started.
 | M6.1 | WordCraft's bounded native Application/Document/Selection/Range profile, nominal catalogue, live UTF-16 ranges and stale-handle refusals; real document/session tests |
 | M6.2 | Shared editor embedding, per-document trust/source state, native/browser source routing; actual Chromium inert import and byte-identical CRLF/Unicode export; asynchronous source-save success/cancel/failure/stale-completion tests; Alt+F11 full-frame regression |
 | M6.3 | WordCraft live WithEvents Application BeforeClose/BeforeSave/WindowSelectionChange routing; all-sink signature validation before effects, connection order, ByRef propagation, debugger pause/reset, lifecycle cancellation and native undo grouping |
-| M6.4 | Authored fork workflows pass; **fresh Word/Excel observations NOT_RUN** |
+| M6.4 | Authored fork workflows PASS; fresh Word/Excel comparison transferred to M8.5, **NOT_RUN** |
 | M6.5–M6.8 | Existing [per-layer/context acceptance](m6-context-resolution-check.md): staged resolution, With, fork globals/implicit Me and read-only receiver completion |
 | M6.9 | Owned module/member metadata, exact procedure-local invocation attribute, signed IDs, known-value validation and bounded class export envelope; metadata has no executable checkpoints |
 | M6.10 | Canonical raw source plus reversible code projection; raw/view coordinates, newline/Unicode preservation, hidden-record edits/history/search/export (including a temporarily erased procedure name), mapped debugger gutters and procedure views; read-only raw inspector |
@@ -65,13 +70,15 @@ committed locally: WordCraft `067a053f`, GridCraft `a191e84d`.
   selected macro/shape context in the host Macros dialog; strict optional-feature
   Clippy and the VBA-enabled WASM host check also PASS.
 
-## Explicit boundaries and remaining acceptance
+## Sign-off boundaries and deferred comparison
 
-The owner has no Word or Excel installation; Document Control lists no connected
-sessions. Public Microsoft documentation and inherited oracle results are useful
-specification/evidence, but do not substitute for the M6.4 fresh-reference gate.
-Do not mark M6 accepted or begin M7 without actual observations or an explicit
-owner decision changing that requirement.
+The owner has no Word or Excel installation and no connected Office sessions
+are available. On 2026-11-01 the owner explicitly directed that these comparisons
+move to a later milestone so M6 could be signed off and work could proceed.
+[M8.5](implementation-plan.md#m8--expanded-conformance-hardening-and-release)
+now owns the fresh-reference gate. Public documentation and inherited results do
+not substitute for those future observations. M6 sign-off rests on the shared,
+real-fork and local UI/browser evidence above; its supported scope is unchanged.
 
 Document code names are host-owned. Both current forks refuse rename requests
 without changing raw metadata or host identity; the acknowledgement API does not

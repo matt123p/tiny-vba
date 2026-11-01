@@ -11,10 +11,11 @@ is not the project's goal.
 
 **Current status:** the shared engine, editor/debugger and read-only project importer
 are implemented, with verified IR 1–7 and the `m5-host-v1` runtime profile.
-The current M6 work adds host-event subscriptions, VBA attribute metadata and a
-lossless code view for embedding in GridCraft and WordCraft. See the
-[M6 acceptance record](docs/m6-acceptance.md) for tested behavior and remaining gates.
-Fresh Microsoft Office reference observations remain NOT_RUN; M7 has not started.
+M6 is signed off for its tested integration profile, including host events, VBA
+attribute metadata and a lossless code view embedded in GridCraft and WordCraft.
+[M7 is next](docs/implementation-plan.md): unchanged-document/package acceptance.
+Fresh Excel/Word comparisons remain NOT_RUN and are scheduled for M8.5. See the
+[M6 acceptance record](docs/m6-acceptance.md) for evidence and boundaries.
 
 All **44 authored scenarios and 153 reviewed ReflexGrid cases pass**. The latter match published
 Microsoft Excel Mac oracle expectations; this is inherited evidence, not a new local Excel run.

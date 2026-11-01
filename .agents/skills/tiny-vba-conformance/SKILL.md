@@ -85,3 +85,8 @@ Read [the report](../../../docs/m4-oracle-report.md) and current language contra
 plus 153 inherited upstream-reported Excel Mac scenarios PASS. Schema 2 and the reviewed allowlist
 preserve raw results/environment/hashes; no fresh Office run is claimed. Use m5-host-v1
 and explicit IR 3/4 capabilities, retaining IR 1/2 refusal rules. Unselected external cases remain NOT_RUN.
+
+[ADR 0032](../../../docs/decisions/0032-m6-sign-off-and-reference-comparison-deferral.md)
+signs off M6 for its tested integration profile by owner direction. Fresh
+Excel/Word comparisons are deferred to M8.5 and remain NOT_RUN until observed;
+they no longer block M7. Keep authored, inherited and fresh evidence distinct.

@@ -1,6 +1,6 @@
 # Remaining UI and host scope
 
-Updated 2026-10-29. The [remaining implementation plan](../implementation-plan.md)
+Updated 2026-11-01. The [remaining implementation plan](../implementation-plan.md)
 is authoritative for numbering, dependencies and acceptance. This index contains
 remaining UI/host work only; completed evidence is in
 [implementation progress](../implementation-progress.md).
@@ -13,19 +13,18 @@ Third-party ActiveX/OLE controls not supplied with Office applications are out o
 scope for now. Do not schedule their designer, loading or execution support.
 Standard Office controls remain in scope through independent implementations.
 
-## Host embedding and real document workflows — M6 and M7
+## Real document/package workflows — M7
 
-Follow [M6](../implementation-plan.md#m6--remaining-gridcraft-and-wordcraft-integration)
-for WordCraft objects/bridge/editor integration and new real-host workflows in
-both forks. Shared code stays in tiny-vba; Office objects, trust, document state,
+[M5 document/event/UDF acceptance](../m5-acceptance.md) and
+[M6 shared/fork integration](../m6-acceptance.md) are complete for their declared
+profiles. Shared code stays in tiny-vba; Office objects, trust, document state,
 event ordering and undo/recalculation stay in the application forks.
-[M5](../implementation-plan.md#m5--document-modules-events-and-range-aware-udfs)
-owns Excel document events and reference-aware UDF behavior.
 
 [M7](../implementation-plan.md#m7--unchanged-document-and-package-acceptance)
-owns unchanged-source .xlsm/.docm package acceptance, forms/standard controls,
-signature handling and reviewed writeback design. Generic-host doubles and
-standalone UI images cannot establish real Office compatibility.
+is next: unchanged-source .xlsm/.docm package acceptance, forms/standard controls,
+signature handling and reviewed writeback design. Fresh Excel/Word comparisons
+are deferred to [M8.5](../implementation-plan.md#m8--expanded-conformance-hardening-and-release).
+Generic-host doubles and standalone UI images cannot establish real Office compatibility.
 
 ## Remaining specification traceability
 
@@ -35,11 +34,9 @@ scope and the implementation plan take precedence over that earlier proposal.
 
 | Remaining reference scope | Current allocation |
 |---|---|
-| Office document events and Range-aware UDF context | M5; shared class/event contracts in M2 |
-| P7 WordCraft/generalisation and actual host workflows | M6 |
 | Form/document source and package persistence; signatures | M7 |
-| Remaining lawful reference-build/fidelity observations | M6/M7, reported in M8 |
-| Applicable form host/storage parts of scenarios 1–23 | M6/M7 using the completed selected M2 profile |
+| Remaining lawful reference-build/fidelity observations | M8.5; NOT_RUN until observed |
+| Applicable form host/storage parts of scenarios 1–23 | M7 using the completed M2/M5/M6 profiles |
 | Public-source/provenance review (scenario 26) | Required throughout M1–M8 |
 
 Native Craft extensions, Python translation previews and Copilot-style assistance

@@ -1,6 +1,6 @@
 # Compatibility matrix
 
-Updated 2026-10-31. Stage: M5 document/event/UDF profile accepted against GridCraft; M6 module-context/name-resolution conformance, fork host-global acceptance and M6.8 IDE receiver typing implemented for the declared profile (see the [M6.5 check](m6-context-resolution-check.md)); M7 package acceptance and M8 release gates remain. **The documented m5-host-v1 consumer, including M3 control, M4 scalar widths and IR 4 host roots, has execution evidence; the 44 authored and 153 reviewed fixtures remain asserted PASS.**
+Updated 2026-11-01. Stage: M5 document/event/UDF profile accepted against GridCraft; M6 signed off for the tested integration profile, including module-context/name-resolution, fork host globals, editor metadata/projection and receiver typing (see the [M6.5 check](m6-context-resolution-check.md)); M7 package acceptance and M8 release gates remain. **The documented m5-host-v1 consumer, including M3 control, M4 scalar widths and IR 4 host roots, has execution evidence; the 44 authored and 153 reviewed fixtures remain asserted PASS.**
 
 | Dimension | Status | Evidence / next gate |
 | Imported object member dispatch | Implemented binder correction, including getter aliases | ADR 0017/0025; vba-vm/tests/embedding.rs preserves actual Get/Call/Let/Set, named arguments and returned object targets |
@@ -86,7 +86,7 @@ the published immutable shared dependency without development path overrides. Se
 | Document rename | Host validation/acknowledgement API; current forks refuse code-name changes |
 | Host WithEvents | Capability-gated live foreign subscriptions with signature/identity validation and bounded ordered delivery |
 | Word Application events | Trusted BeforeClose/BeforeSave/WindowSelectionChange in WordCraft; authored workflow evidence |
-| Microsoft Office reference observations | NOT_RUN; no available installation/session; not waived |
+| Microsoft Office reference observations | NOT_RUN; deferred by owner direction to M8.5; M6 signed off for its tested profile |
 
 See [M6 acceptance](m6-acceptance.md). Binary project writeback, third-party
 controls and Excel Macro Options remain outside this implemented profile.

@@ -1,6 +1,7 @@
 # Documentation index
 
-The remaining plan uses new M1–M8 numbering. Earlier implementation reports,
+M1–M6 are signed off for their declared profiles; the remaining plan starts at
+M7. Fresh Excel/Word comparison is deferred to M8.5. The plan uses new M1–M8 numbering. Earlier implementation reports,
 specifications and ADRs retain historical IDs; see the
 [mapping](implementation-progress.md#plan-renumbering--2026-10-28).
 
@@ -9,7 +10,7 @@ Read [architecture](architecture.md), [implementation plan](implementation-plan.
 
 [VBA attributes and Excel code-view investigation](vba-attributes-and-editor-projection.md)
 documents hidden module/member metadata, recorded-macro attributes, the blank
-`ThisWorkbook` code view, related declarations and planned M6.9–M6.12 fixes.
+`ThisWorkbook` code view, related declarations and the now-implemented M6.9–M6.12 fixes.
 [UI ownership decision](decisions/0002-editor-debugger-ui.md),
 [editor/debugger UI contract](editor-debugger-ui.md), [developer guide](developer-guide.md),
 [debugger](debugger.md), [conformance](conformance-methodology.md)
@@ -126,3 +127,5 @@ separate from authored acceptance.
 - [M6 acceptance audit](m6-acceptance.md): shared/fork evidence and unavailable Office observations.
 
 - [ADR 0031: scalar Variant For controls](decisions/0031-variant-for-counters.md).
+
+- [ADR 0032: M6 sign-off and deferred Excel/Word comparison](decisions/0032-m6-sign-off-and-reference-comparison-deferral.md).

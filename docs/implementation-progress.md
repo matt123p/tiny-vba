@@ -2,10 +2,13 @@
 
 Updated 2026-11-01. The classic-editor/debugger profile is implemented; its
 historical milestone is M10. Runtime remains m5-host-v1 with verified IR 1/2/3/4/5/6/7.
-The [remaining plan](implementation-plan.md) retains stable **M6–M8** task IDs.
-**M1–M5 are complete for their declared profiles, and M6's shared and fork-owned
-context work (M6.5–M6.8 plus the fork acceptance for M6.7) is implemented**; the
-remaining acceptance gates are recorded in the [M6 audit](m6-acceptance.md).
+The [remaining plan](implementation-plan.md) now contains **M7–M8**.
+**M1–M6 are signed off for their declared profiles.** The owner approved moving
+fresh Excel/Word comparisons from M6.4 to M8.5 on 2026-11-01; those comparisons
+remain NOT_RUN and no longer block M7. [M6 acceptance](m6-acceptance.md) records
+the tested scope and [ADR 0032](decisions/0032-m6-sign-off-and-reference-comparison-deferral.md)
+records the revised gate. **Next: M7.1**, curate and classify licensed specimens
+for unchanged-document/package acceptance. M7 implementation has not started.
 Office objects, document events, trust and packaging remain fork-owned.
 
 ## Reported Food.xlsm For-counter correction (2026-11-01)
@@ -51,13 +54,11 @@ WordCraft/GridCraft sessions. See [ADR 0029](decisions/0029-host-event-subscript
 [ADR 0030](decisions/0030-attribute-metadata-and-code-projection.md) and the
 [M6 acceptance record](m6-acceptance.md) for evidence and current integration gates.
 
-Shared CI, WASM, actual WASI, UI, native UI and web-build gates pass. Fresh Office
-observations remain NOT_RUN: no connected session or owner installation exists.
-This is an unfulfilled acceptance requirement, not an inferred pass or waiver.
-M7 remains untouched. The shared code is published at `d40a283` on main; both forks pin it without
-local overrides. Both forks’ full CI, final Git-pinned adapter suites and
-optional-feature checks pass. The only remaining M6 acceptance requirement is
-fresh Office reference evidence (or an explicit change to that requirement).
+Shared CI, WASM, actual WASI, UI, native UI and web-build gates pass. Both forks’
+full CI, Git-pinned adapter suites and optional-feature checks pass. M6 is signed
+off for this declared integration profile by owner direction on 2026-11-01.
+Fresh Office observations remain NOT_RUN and are now tracked under M8.5;
+this is a scheduling/acceptance change, not a new compatibility result.
 
 ## Plan addition — hidden VBA attributes and document code view (2026-11-01)
 
@@ -1120,3 +1121,108 @@ now uses its existing contextual member-name grammar for the label before `:=`.
 It preserves exact spelling/spans and identifier budgets; ordinary declarations still
 reject reserved identifiers. A generic parser regression covers `End:=` and `Type:=`;
 the real document execution and argument/error contract remain WordCraft-owned.
+
+## Completed M5/M6 plan scope
+
+Moved from the remaining plan on M6 sign-off, 2026-11-01. Task IDs and the
+implemented profile remain traceable; fresh Office comparison is now M8.5.
+
+### M5 completion record — Document modules, events and Range-aware UDFs
+
+Owner: tiny-vba shared class/document/callback semantics; GridCraft document
+bindings, event ordering, standard Office controls and calculation context.
+Depends on applicable M2–M4 capabilities; reuse shared contracts.
+
+- **M5.1:** Execute workbook/worksheet modules with code-name roots, correct
+  signatures and code-owner context while keeping import inert.
+- **M5.2:** Deliver Workbook_Open/Worksheet_Change and selected document/standard
+  control events with defined ordering, EnableEvents, reentrancy/recursion
+  budgets, cancellation and partial-side-effect policy. Connect M2 forms.
+- **M5.3:** Add Range/reference-aware UDF arguments and Caller/Volatile/context
+  behavior, persistent state and recalculation rules. Enforce the declared UDF
+  mutation policy without silently substituting value arrays for references.
+
+Accepted for the declared profile. Unchanged authored handlers and UDFs execute
+against real GridCraft state. Pause/inspect/resume, exactly-once dispatch,
+reset/close/trust revocation and calculation dependencies pass. Workbook_Open
+never executes on import. The [M5 acceptance map](m5-acceptance.md) records all
+ten passing scenarios and the exact native, WASM and authored-test evidence.
+
+### M6 — Completed GridCraft and WordCraft integration
+
+Owner: application forks for Office objects, UI/storage/trust/events/undo/recalc;
+tiny-vba for shared embedding APIs. M1 supplies generic types; M2 supplies shared
+classes/forms. Excel workflow acceptance consumes the applicable M3–M5 behavior.
+
+Completed for the declared profile (2026-10-31), with the [M6.5 per-layer
+check](m6-context-resolution-check.md) as the scope-driving record:
+
+- **M6.5:** the check records implemented, refused and missing behavior per owned layer
+  against [module types and execution contexts](vba_module_types_and_execution_contexts.md) and
+  [Excel context and object resolution](vba_excel_context_and_object_resolution.md), and the
+  [compatibility matrix](compatibility-matrix.md) now carries the result.
+- **M6.6:** staged identifier resolution over locals/parameters/module/project declarations,
+  host-declared implicit `Me` members for document modules, then host globals; per-module-kind
+  binding; local/member shadowing with project-before-global precedence; innermost-only
+  leading-dot `With` receivers that never change `Me` or active state; standard-module-only
+  bare cross-module callees; no implicit current-workbook frame parameter.
+- **M6.7:** the forks dispatch declared host globals per invocation against live application
+  state with distinct `ThisWorkbook`/`ActiveWorkbook`/`ActiveSheet`/`Me` identities and stable
+  code names; GridCraft proves the specifications' unshadowed binding and live-consultation
+  cases in real workbook workflows, and WordCraft supplies the document roots under its M6.1
+  profile. `Application.Run`, add-in context and chart sheets stay refused/NOT_RUN in the check.
+- **M6.8:** IDE member completion types receivers from host-declared import result types and
+  call shapes (`ThisWorkbook.`, `Range("A1").`, `Worksheets("Data").`, `Cells(1, 1).`) plus
+  `Me`/code-name document types; each fork declares the member/result types it supports in its
+  catalogue. Code aids stay read-only and metadata-driven; they never invoke host members.
+
+M6 is signed off for its tested profile. Fresh Office comparisons formerly
+associated with M6.4 moved to M8.5 by owner decision; they remain NOT_RUN.
+
+#### Attribute and document-module corrections (2026-11-01; implemented)
+
+The [attribute/editor investigation](vba-attributes-and-editor-projection.md)
+records online sources, the two screenshot failures and local code findings.
+M6.9–M6.11 are implemented under [ADR 0030](decisions/0030-attribute-metadata-and-code-projection.md).
+M6.12 has native/WASM/WASI, GUI and actual fork regression evidence, recorded in
+[acceptance](m6-acceptance.md). Office observations remain unavailable.
+Document code-name renames use a host acknowledgement contract; the current forks
+explicitly refuse them because binary project writeback is outside this profile.
+
+- **M6.9:** tiny-vba syntax/semantics/compiler: parse module and member attributes
+  as owned metadata at their documented positions, including procedure-local
+  `Macro2.VB_ProcData.VB_Invoke_Func = " \n14"` and signed member IDs. Preserve raw
+  spans/values and associate targets; validate placement and literal forms.
+  Retain opaque metadata without claiming semantics; diagnose unsupported
+  semantic requirements. Generate no executable statements/checkpoints for
+  attributes. Ordinary unsupported VBA must keep its diagnostics.
+- **M6.10:** tiny-vba IDE/shared UI: default to a code view omitting recognized
+  attribute/export-header ranges while retaining canonical raw source. Provide
+  a bounded reversible mapping for edits, CR/LF/CRLF, Unicode, diagnostics,
+  completion, search/replace, navigation, breakpoints and full/procedure views.
+  Preserve hidden records through insertion, member rename/delete, undo/redo
+  and revision-checked plain-source save/export. Add a read-only raw metadata
+  inspector; do not strip source in the read-only importer.
+- **M6.11:** tiny-vba IDE/shared UI plus fork integration: an attribute-only
+  `ThisWorkbook` opens as blank code while the document component remains in
+  the explorer. Present its code name in explorer/Properties `(Name)`, separate
+  from `.cls` source/export filenames; preserve event navigation and host-bound
+  identity. Route rename through host validation and consistent metadata updates.
+  Expose supported descriptions/Instancing without making host-owned attributes
+  arbitrary editable code. GridCraft owns Excel Macro Options and shortcut policy.
+- **M6.12:** regress the exact member-attribute shape with a minimal independently
+  authored executable procedure, invalid/unknown metadata, signed IDs, default
+  member/enumerator semantics or explicit refusals, attribute-only documents,
+  mapped debugging/editing and exact raw-source retention. Run native/WASM/WASI,
+  shared UI/native/browser gates and real fork workflows. Keep the workbook's
+  unrelated host-method gaps separate. Office reference-build observations stay
+  NOT_RUN until actually collected; import never executes handlers.
+
+Acceptance: both forks reuse the same editor and shared interpreter repository.
+Real document workflows verify effects and lifecycle without replay or retained
+locks; tiny-vba-only snapshots and generic doubles cannot satisfy this gate. The
+M6.5 record drove M6.6/M6.7 scope, and acceptance includes the specifications'
+unshadowed module-kind binding and live host-global consultation cases in real
+fork workflows. Declared host globals and typed/call receivers complete their
+members in the shared editor without host invocation. Package round trips and
+signatures are the next milestone's separate gate.
