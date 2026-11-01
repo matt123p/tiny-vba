@@ -145,10 +145,16 @@ pub(crate) fn project(text: &str, modules: &[Description]) -> Result<Vec<ModuleK
         };
         if let Some(kind) = kind {
             let name = if kind == ModuleKind::Document {
+                // MS-OVBA 2.3.1.4: `Document=<name>/<DocTlibVer>` with
+                // `HEXINT32 = "&H" 8HEXDIG` (2.1.1.6), e.g. `Sheet1/&H00000000`.
                 let (name, cookie) = value
                     .split_once('/')
                     .ok_or_else(|| corrupt("document module cookie missing"))?;
-                if cookie.len() != 8 || !cookie.bytes().all(|b| b.is_ascii_hexdigit()) {
+                let hex = cookie
+                    .strip_prefix("&H")
+                    .or_else(|| cookie.strip_prefix("&h"))
+                    .ok_or_else(|| corrupt("invalid document module cookie"))?;
+                if hex.len() != 8 || !hex.bytes().all(|b| b.is_ascii_hexdigit()) {
                     return Err(corrupt("invalid document module cookie"));
                 }
                 name

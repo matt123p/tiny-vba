@@ -176,12 +176,21 @@ fn module_identity_type_stream_mapping_and_attributes_must_agree() {
             b"Class=Utilities".as_slice(),
         ),
         (b"Module=Utilities", b"Module=Other"),
-        (b"/00000000", b"/nothex!!"),
+        (b"/&H00000000", b"/nothex!!"),
+        (b"/&H00000000", b"/00000000"),
+        (b"/&H00000000", b"/&H0"),
+        (b"/&H00000000", b"/&H000000000"),
+        (b"/&H00000000", b"/&h0000000/"),
     ] {
         let mut f = fixture();
         replace(&mut f.project, from, to);
         assert_eq!(code(&f), "VBA_PROJECT_CORRUPT");
     }
+    // ABNF string literals are case-insensitive: a lowercase "&h" prefix is the
+    // same HEXINT32 terminal. Hex digits may be lowercase too.
+    let mut f = fixture();
+    replace(&mut f.project, b"/&H00000000", b"/&hab12cd34");
+    assert!(decode(&f.bytes(), &Limits::default()).is_ok());
     let mut f = fixture();
     replace(f.wm.as_mut().unwrap(), b"Utilities", b"OtherName");
     assert_eq!(code(&f), "VBA_PROJECT_CORRUPT");

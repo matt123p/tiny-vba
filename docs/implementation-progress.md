@@ -8,6 +8,22 @@ context work (M6.5–M6.8 plus the fork acceptance for M6.7) is implemented**; t
 remaining M6 items are recorded in the [M6.5 check](m6-context-resolution-check.md).
 Office objects, document events, trust and packaging remain fork-owned.
 
+## M6 fix — real-world document-module cookies decode (2026-11-01)
+
+A real Excel-authored workbook (`Food.xlsm`, user-supplied) was refused by the
+importer with `invalid document module cookie`: the PROJECT-stream check required
+eight bare hex digits, while MS-OVBA §2.3.1.4/§2.1.1.6 specify the document
+module's `DocTlibVer` as `HEXINT32 = "&H" 8HEXDIG` — Excel writes
+`Document=Sheet1/&H00000000`. The controlled authored fixture had baked in the
+non-spec form, so every authored test asserted the wrong grammar. Fixed the check
+to the specified form (case-insensitive `&H` per ABNF string-literal semantics;
+exactly eight hex digits), switched the fixture to the spec form, and added
+positive/negative regressions (lowercase prefix accepted; bare, short, overlong
+and nested forms refuse). `Food.xlsm`'s project now decodes: `Module1` plus
+`ThisWorkbook`/`Sheet1`/`Sheet2` document modules with preserved source.
+Validation: `cargo xtask ci` PASS, `cargo xtask wasm-run` PASS (27 groups). No
+execution claim: import stays inert and the workbook's recorded macro is never run.
+
 ## M6 module-context, resolution and host-object completion (2026-10-31)
 
 Implemented the M6.5–M6.8 scope defined by the [per-layer check](m6-context-resolution-check.md)

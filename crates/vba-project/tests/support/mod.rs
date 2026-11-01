@@ -160,7 +160,8 @@ impl Fixture {
                 spec.kind,
                 spec.name,
                 if spec.kind == "Document" {
-                    "/00000000"
+                    // MS-OVBA HEXINT32: the DocTlibVer cookie carries the VB "&H" prefix.
+                    "/&H00000000"
                 } else {
                     ""
                 }
