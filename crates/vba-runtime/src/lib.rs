@@ -49,6 +49,21 @@ pub fn intrinsic_extended_with_context(
     if function == vba_values::Intrinsic::StrComp {
         return coercion::strcomp(arguments, context);
     }
+    if matches!(
+        function,
+        vba_values::Intrinsic::InStr | vba_values::Intrinsic::InStrRev
+    ) {
+        return coercion::instr(function, arguments, context);
+    }
+    if function == vba_values::Intrinsic::Split {
+        return coercion::split_context(arguments, context);
+    }
+    if function == vba_values::Intrinsic::Filter {
+        return coercion::filter_context(arguments, context);
+    }
+    if function == vba_values::Intrinsic::Replace {
+        return coercion::replace_context(arguments, context);
+    }
     intrinsic_extended(function, arguments, context.comparison_mode())
 }
 

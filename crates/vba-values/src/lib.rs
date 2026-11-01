@@ -264,8 +264,10 @@ pub enum Intrinsic {
     IIf,
     DebugPrint,
     InStr,
+    InStrRev,
     Replace,
     Split,
+    Filter,
     Join,
     IsObject,
     Array,
@@ -300,6 +302,9 @@ pub enum Intrinsic {
     Right,
     Mid,
     Trim,
+    LTrim,
+    RTrim,
+    StrReverse,
     LCase,
     UCase,
     Asc,
@@ -370,7 +375,9 @@ pub enum IntrinsicOmittedDefault {
     One,
     MinusOne,
     Space,
+    True,
     ModuleCompare,
+    BinaryCompare,
     ToEnd,
     FunctionSpecific,
 }
@@ -465,6 +472,15 @@ const INSTR_PARAMS: &[IntrinsicParameter] = &[
         IntrinsicOmittedDefault::ModuleCompare,
     ),
 ];
+const INSTRREV_PARAMS: &[IntrinsicParameter] = &[
+    parameter("stringcheck", true),
+    parameter("stringmatch", true),
+    with_default(parameter("start", false), IntrinsicOmittedDefault::MinusOne),
+    with_default(
+        parameter("compare", false),
+        IntrinsicOmittedDefault::BinaryCompare,
+    ),
+];
 const REPLACE_PARAMS: &[IntrinsicParameter] = &[
     parameter("expression", true),
     parameter("find", true),
@@ -483,6 +499,15 @@ const SPLIT_PARAMS: &[IntrinsicParameter] = &[
         IntrinsicOmittedDefault::Space,
     ),
     with_default(parameter("limit", false), IntrinsicOmittedDefault::MinusOne),
+    with_default(
+        parameter("compare", false),
+        IntrinsicOmittedDefault::ModuleCompare,
+    ),
+];
+const FILTER_PARAMS: &[IntrinsicParameter] = &[
+    raw_parameter("sourcearray", true),
+    parameter("match", true),
+    with_default(parameter("include", false), IntrinsicOmittedDefault::True),
     with_default(
         parameter("compare", false),
         IntrinsicOmittedDefault::ModuleCompare,
@@ -535,7 +560,15 @@ const fn descriptor(
     variadic: bool,
     signature: &'static str,
 ) -> IntrinsicDescriptor {
-    let (minimum_ir, capability) = if matches!(intrinsic, Intrinsic::StrComp) {
+    let (minimum_ir, capability) = if matches!(
+        intrinsic,
+        Intrinsic::StrComp
+            | Intrinsic::InStr
+            | Intrinsic::InStrRev
+            | Intrinsic::Replace
+            | Intrinsic::Split
+            | Intrinsic::Filter
+    ) {
         (8, "intrinsics-m6a-v1")
     } else if matches!(intrinsic, Intrinsic::IIf) {
         (3, "intrinsics-v3")
@@ -545,8 +578,10 @@ const fn descriptor(
     let minimum_arguments = match intrinsic {
         Intrinsic::IIf => 3,
         Intrinsic::InStr => 2,
+        Intrinsic::InStrRev => 2,
         Intrinsic::Replace => 3,
         Intrinsic::Split => 1,
+        Intrinsic::Filter => 2,
         Intrinsic::Join => 1,
         Intrinsic::Array => 0,
         Intrinsic::LBound | Intrinsic::UBound => 1,
@@ -565,9 +600,12 @@ const fn descriptor(
                 IntrinsicFamily::Arrays
             }
             Intrinsic::IIf => IntrinsicFamily::Selection,
-            Intrinsic::InStr | Intrinsic::Replace | Intrinsic::Split | Intrinsic::Join => {
-                IntrinsicFamily::StringSearch
-            }
+            Intrinsic::InStr
+            | Intrinsic::InStrRev
+            | Intrinsic::Replace
+            | Intrinsic::Split
+            | Intrinsic::Filter
+            | Intrinsic::Join => IntrinsicFamily::StringSearch,
             Intrinsic::IsObject
             | Intrinsic::IsArray
             | Intrinsic::IsMissing
@@ -594,6 +632,9 @@ const fn descriptor(
             | Intrinsic::Right
             | Intrinsic::Mid
             | Intrinsic::Trim
+            | Intrinsic::LTrim
+            | Intrinsic::RTrim
+            | Intrinsic::StrReverse
             | Intrinsic::LCase
             | Intrinsic::UCase
             | Intrinsic::Asc
@@ -610,7 +651,15 @@ const fn descriptor(
         minimum_arguments,
         maximum_arguments: if variadic { 256 } else { parameters.len() },
         return_variant: return_variant(intrinsic),
-        effect: if matches!(intrinsic, Intrinsic::StrComp) {
+        effect: if matches!(
+            intrinsic,
+            Intrinsic::StrComp
+                | Intrinsic::InStr
+                | Intrinsic::InStrRev
+                | Intrinsic::Replace
+                | Intrinsic::Split
+                | Intrinsic::Filter
+        ) {
             IntrinsicEffect::Contextual
         } else {
             IntrinsicEffect::Pure
@@ -619,8 +668,16 @@ const fn descriptor(
         minimum_ir,
         capability,
         signature,
-        platform_requirements: if matches!(intrinsic, Intrinsic::StrComp) {
-            "injected string-comparison service"
+        platform_requirements: if matches!(
+            intrinsic,
+            Intrinsic::StrComp
+                | Intrinsic::InStr
+                | Intrinsic::InStrRev
+                | Intrinsic::Replace
+                | Intrinsic::Split
+                | Intrinsic::Filter
+        ) {
+            "injected string-comparison service for Text mode"
         } else {
             "portable core"
         },
@@ -632,10 +689,10 @@ const fn return_variant(intrinsic: Intrinsic) -> IntrinsicReturn {
     use IntrinsicReturn as R;
     use ScalarKind as K;
     match intrinsic {
-        I::Array | I::ArrayBaseOne | I::Split => R::Array,
+        I::Array | I::ArrayBaseOne | I::Split | I::Filter => R::Array,
         I::StrComp => R::Variant,
         I::IIf | I::Abs | I::Int | I::Fix => R::Polymorphic,
-        I::InStr | I::Len | I::LBound | I::UBound => R::Fixed(K::Long),
+        I::InStr | I::InStrRev | I::Len | I::LBound | I::UBound => R::Fixed(K::Long),
         I::IsObject | I::IsArray | I::IsMissing | I::IsEmpty | I::IsNull | I::IsError => {
             R::Fixed(K::Boolean)
         }
@@ -647,6 +704,9 @@ const fn return_variant(intrinsic: Intrinsic) -> IntrinsicReturn {
         | I::Right
         | I::Mid
         | I::Trim
+        | I::LTrim
+        | I::RTrim
+        | I::StrReverse
         | I::LCase
         | I::UCase
         | I::Chr => R::Fixed(K::String),
@@ -675,6 +735,7 @@ pub const INTRINSIC_DESCRIPTORS: &[IntrinsicDescriptor] = &[
         "IIf(expr, truepart, falsepart)",
     ),
     instr_descriptor(),
+    instrrev_descriptor(),
     descriptor(
         Intrinsic::StrComp,
         "StrComp",
@@ -695,6 +756,13 @@ pub const INTRINSIC_DESCRIPTORS: &[IntrinsicDescriptor] = &[
         SPLIT_PARAMS,
         false,
         "Split(expression, [delimiter, [limit, [compare]]])",
+    ),
+    descriptor(
+        Intrinsic::Filter,
+        "Filter",
+        FILTER_PARAMS,
+        false,
+        "Filter(sourcearray, match, [include, [compare]])",
     ),
     descriptor(
         Intrinsic::Join,
@@ -892,6 +960,15 @@ pub const INTRINSIC_DESCRIPTORS: &[IntrinsicDescriptor] = &[
         "Mid(string, start, [length])",
     ),
     descriptor(Intrinsic::Trim, "Trim", ONE_VALUE, false, "Trim(string)"),
+    descriptor(Intrinsic::LTrim, "LTrim", ONE_VALUE, false, "LTrim(string)"),
+    descriptor(Intrinsic::RTrim, "RTrim", ONE_VALUE, false, "RTrim(string)"),
+    descriptor(
+        Intrinsic::StrReverse,
+        "StrReverse",
+        ONE_VALUE,
+        false,
+        "StrReverse(expression)",
+    ),
     descriptor(Intrinsic::LCase, "LCase", ONE_VALUE, false, "LCase(string)"),
     descriptor(Intrinsic::UCase, "UCase", ONE_VALUE, false, "UCase(string)"),
     descriptor(Intrinsic::Asc, "Asc", ONE_VALUE, false, "Asc(string)"),
@@ -905,6 +982,16 @@ const fn instr_descriptor() -> IntrinsicDescriptor {
         INSTR_PARAMS,
         false,
         "InStr([start,] string1, string2, [compare])",
+    )
+}
+
+const fn instrrev_descriptor() -> IntrinsicDescriptor {
+    descriptor(
+        Intrinsic::InStrRev,
+        "InStrRev",
+        INSTRREV_PARAMS,
+        false,
+        "InStrRev(stringcheck, stringmatch, [start, [compare]])",
     )
 }
 

@@ -626,8 +626,12 @@ Malformed mappings fail before VM or host dispatch. Targets capped at IR 7
 refuse the opcode explicitly.
 
 The compiler emits IR 8 calls for named or omitted intrinsic arguments and for
-StrComp, retaining legacy opcodes for unchanged fully positional calls. Both
-contextual instructions capture the calling module's comparison mode. The
-adapter materializes descriptor defaults, including optional gaps where a
-function contract supplies a concrete default. Contextual string comparison
-uses an injected provider; without one the VM returns named Unsupported.
+StrComp, InStr, InStrRev, Replace, Split and Filter, retaining legacy opcodes for unchanged fully
+positional calls to other intrinsics. These string operations capture the
+calling module's comparison mode. InStr's two-argument form uses its start
+omission and module compare defaults; InStrRev's omitted compare defaults to
+Binary. Replace applies its start/count defaults and module comparison mode;
+Split applies its delimiter/limit defaults and module comparison mode.
+Filter applies its include and module comparison defaults and returns a zero-based String array.
+Text matching uses the injected string-comparison provider; without one the VM
+returns named Unsupported.

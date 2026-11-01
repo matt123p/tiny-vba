@@ -205,6 +205,23 @@ pub fn intrinsic(function: I, args: &[V]) -> Result<V> {
             "StrComp requires an injected comparison context".into(),
         ));
     }
+    if function == I::InStrRev {
+        let mut slots = [None, None, None, None];
+        for (index, value) in args.iter().enumerate() {
+            let slot = slots
+                .get_mut(index)
+                .ok_or_else(|| error(450, "Wrong number of arguments"))?;
+            *slot = Some(value.clone());
+        }
+        let context = super::IntrinsicContext::no_services(
+            vba_values::IntrinsicComparisonMode::Binary,
+            "",
+            "",
+            "",
+            32,
+        );
+        return instr(function, &slots, &context);
+    }
     if function == I::IIf {
         return args
             .get(if super::condition(args.first().ok_or_else(mismatch)?)? {
@@ -411,8 +428,11 @@ pub fn intrinsic(function: I, args: &[V]) -> Result<V> {
             }
             V::Double(n)
         }
-        Len | Left | Right | Mid | Trim | LCase | UCase | Asc => {
+        Len | Left | Right | Mid | Trim | LTrim | RTrim | StrReverse | LCase | UCase | Asc => {
             if matches!(v, V::Null) {
+                if function == StrReverse {
+                    return Err(error(94, "Invalid use of Null"));
+                }
                 return Ok(V::Null);
             }
             let s = text(v)?;
@@ -461,8 +481,19 @@ pub fn intrinsic(function: I, args: &[V]) -> Result<V> {
                 while end > start && units.get(end - 1) == Some(&32) {
                     end -= 1;
                 }
+            } else if function == LTrim {
+                while units.get(start) == Some(&32) {
+                    start += 1;
+                }
+            } else if function == RTrim {
+                while end > start && units.get(end - 1) == Some(&32) {
+                    end -= 1;
+                }
             }
             let mut out = units.get(start..end).ok_or_else(mismatch)?.to_vec();
+            if function == StrReverse {
+                out.reverse();
+            }
             if matches!(function, LCase | UCase) {
                 for unit in &mut out {
                     if *unit <= 127 {
@@ -506,6 +537,18 @@ pub fn intrinsic_extended(
     if arguments.len() > 256 {
         return Err(error(450, "Wrong number of arguments"));
     }
+    if matches!(
+        function,
+        I::InStr | I::InStrRev | I::Replace | I::Split | I::Filter
+    ) {
+        let context = super::IntrinsicContext::no_services(compare_mode, "", "", "", 32);
+        return match function {
+            I::Replace => replace_context(arguments, &context),
+            I::Split => split_context(arguments, &context),
+            I::Filter => filter_context(arguments, &context),
+            _ => instr(function, arguments, &context),
+        };
+    }
     let descriptor = function
         .descriptor()
         .ok_or_else(|| Error::Unsupported("intrinsic descriptor unavailable".into()))?;
@@ -540,6 +583,7 @@ pub fn intrinsic_extended(
                         Error::Resource("string budget exceeded".into())
                     })?))
                 }
+                IntrinsicOmittedDefault::True => Some(V::Boolean(true)),
                 IntrinsicOmittedDefault::ModuleCompare => Some(V::Integer(
                     if compare_mode == vba_values::IntrinsicComparisonMode::Binary {
                         0
@@ -547,6 +591,7 @@ pub fn intrinsic_extended(
                         1
                     },
                 )),
+                IntrinsicOmittedDefault::BinaryCompare => Some(V::Integer(0)),
                 IntrinsicOmittedDefault::ToEnd => None,
                 IntrinsicOmittedDefault::FunctionSpecific => {
                     return Err(Error::Unsupported(
@@ -585,6 +630,469 @@ fn find_units(haystack: &[u16], needle: &[u16]) -> Option<usize> {
             .position(|window| window == needle)
     }
 }
+
+const MAX_STRING_SEARCH_WORK: usize = 1_048_576;
+
+fn find_candidate(
+    haystack: &[u16],
+    needle: &[u16],
+    range: (usize, usize),
+    reverse: bool,
+    mode: vba_values::IntrinsicComparisonMode,
+    context: &super::IntrinsicContext<'_>,
+    work: &mut usize,
+) -> Result<Option<usize>> {
+    let (low, high) = range;
+    if needle.is_empty() || low > high || needle.len() > haystack.len() {
+        return Ok(None);
+    }
+    let last = haystack.len() - needle.len();
+    let low = low.min(last);
+    let high = high.min(last);
+    if low > high {
+        return Ok(None);
+    }
+    let mut candidate = if reverse { high } else { low };
+    loop {
+        *work = work
+            .checked_add(needle.len())
+            .ok_or_else(|| Error::Resource("string search work budget exceeded".into()))?;
+        if *work > MAX_STRING_SEARCH_WORK {
+            return Err(Error::Resource("string search work budget exceeded".into()));
+        }
+        let window = haystack
+            .get(candidate..candidate + needle.len())
+            .ok_or_else(mismatch)?;
+        let matches = if mode == vba_values::IntrinsicComparisonMode::Binary {
+            window == needle
+        } else {
+            let candidate_string = VbaString::from_units(window.to_vec())
+                .map_err(|_| Error::Resource("string allocation failed".into()))?;
+            let needle_string = VbaString::from_units(needle.to_vec())
+                .map_err(|_| Error::Resource("string allocation failed".into()))?;
+            context.compare_strings_in_mode(mode, &candidate_string, &needle_string)?
+                == std::cmp::Ordering::Equal
+        };
+        if matches {
+            return Ok(Some(candidate));
+        }
+        if reverse {
+            let Some(previous) = candidate.checked_sub(1) else {
+                break;
+            };
+            if previous < low {
+                break;
+            }
+            candidate = previous;
+        } else if candidate == high {
+            break;
+        } else {
+            candidate = candidate.checked_add(1).ok_or_else(overflow)?;
+        }
+    }
+    Ok(None)
+}
+
+pub(crate) fn instr(
+    function: I,
+    arguments: &[Option<V>],
+    context: &super::IntrinsicContext<'_>,
+) -> Result<V> {
+    let reverse = function == I::InStrRev;
+    if !matches!(function, I::InStr | I::InStrRev) {
+        return Err(mismatch());
+    }
+    if arguments.len() != 4 {
+        return Err(error(450, "Wrong number of arguments"));
+    }
+    let (haystack_slot, needle_slot, start_slot, compare_slot) =
+        if reverse { (0, 1, 2, 3) } else { (1, 2, 0, 3) };
+    let compare = arguments.get(compare_slot).and_then(Option::as_ref);
+    let start_value = arguments.get(start_slot).and_then(Option::as_ref);
+    if !reverse && compare.is_some() && start_value.is_none() {
+        return Err(error(5, "Invalid procedure call or argument"));
+    }
+    let mode = match compare {
+        None if reverse => vba_values::IntrinsicComparisonMode::Binary,
+        None => context.comparison_mode(),
+        Some(V::Null) => return Err(error(94, "Invalid use of Null")),
+        Some(value) => match integral(value, i128::MIN, i128::MAX)? {
+            -1 => context.comparison_mode(),
+            0 => vba_values::IntrinsicComparisonMode::Binary,
+            1 => vba_values::IntrinsicComparisonMode::Text,
+            2 => {
+                return Err(Error::Unsupported(
+                    "Access database comparison is unavailable".into(),
+                ));
+            }
+            _ => return Err(error(5, "Invalid procedure call or argument")),
+        },
+    };
+    let start = match (reverse, start_value) {
+        (false, None) => 1,
+        (true, None) => -1,
+        (_, Some(value)) => integral(value, i128::MIN, i128::MAX)?,
+    };
+    if (!reverse && start < 1) || (reverse && start < -1) {
+        return Err(error(5, "Invalid procedure call or argument"));
+    }
+    if [haystack_slot, needle_slot].into_iter().any(|slot| {
+        arguments
+            .get(slot)
+            .and_then(Option::as_ref)
+            .is_some_and(|value| matches!(value, V::Null))
+    }) {
+        return Ok(V::Null);
+    }
+    let haystack = text(
+        arguments
+            .get(haystack_slot)
+            .and_then(Option::as_ref)
+            .ok_or_else(mismatch)?,
+    )?;
+    let needle = text(
+        arguments
+            .get(needle_slot)
+            .and_then(Option::as_ref)
+            .ok_or_else(mismatch)?,
+    )?;
+    let haystack_units = haystack.units();
+    let needle_units = needle.units();
+    let length = i128::try_from(haystack_units.len()).map_err(|_| overflow())?;
+    let start_position = if reverse && start == -1 {
+        length
+    } else {
+        start
+    };
+    if reverse {
+        if start_position > length || start_position == 0 || haystack_units.is_empty() {
+            return Ok(V::Long(0));
+        }
+    } else if start_position > length {
+        return Ok(V::Long(0));
+    }
+    if needle_units.is_empty() {
+        return Ok(V::Long(
+            i32::try_from(start_position).map_err(|_| overflow())?,
+        ));
+    }
+    if needle_units.len() > haystack_units.len() {
+        return Ok(V::Long(0));
+    }
+    let max_candidate = haystack_units.len() - needle_units.len();
+    let (low, high) = if reverse {
+        let Some(last) = usize::try_from(start_position)
+            .ok()
+            .and_then(|position| position.checked_sub(needle_units.len()))
+        else {
+            return Ok(V::Long(0));
+        };
+        (0, last.min(max_candidate))
+    } else {
+        let first = usize::try_from(start_position - 1).map_err(|_| overflow())?;
+        (first, max_candidate)
+    };
+    if !reverse && low > max_candidate {
+        return Ok(V::Long(0));
+    }
+    let mut work = 0usize;
+    let found = find_candidate(
+        haystack_units,
+        needle_units,
+        (low, high),
+        reverse,
+        mode,
+        context,
+        &mut work,
+    )?;
+    Ok(V::Long(match found {
+        Some(candidate) => i32::try_from(candidate + 1).map_err(|_| overflow())?,
+        None => 0,
+    }))
+}
+
+pub(crate) fn replace_context(
+    arguments: &[Option<V>],
+    context: &super::IntrinsicContext<'_>,
+) -> Result<V> {
+    if arguments.len() != 6 {
+        return Err(error(450, "Wrong number of arguments"));
+    }
+    let mode = match arguments.get(5).and_then(Option::as_ref) {
+        None => context.comparison_mode(),
+        Some(V::Null) => return Err(error(94, "Invalid use of Null")),
+        Some(value) => match integral(value, i128::MIN, i128::MAX)? {
+            -1 => context.comparison_mode(),
+            0 => vba_values::IntrinsicComparisonMode::Binary,
+            1 => vba_values::IntrinsicComparisonMode::Text,
+            2 => {
+                return Err(Error::Unsupported(
+                    "Access database comparison is unavailable".into(),
+                ));
+            }
+            _ => return Err(error(5, "Invalid procedure call or argument")),
+        },
+    };
+    let start = match arguments.get(3).and_then(Option::as_ref) {
+        None => 1,
+        Some(value) => integral(value, i128::MIN, i128::from(i32::MAX))?,
+    };
+    if start < 1 {
+        return Err(error(5, "Invalid procedure call or argument"));
+    }
+    let count = match arguments.get(4).and_then(Option::as_ref) {
+        None => -1,
+        Some(value) => integral(value, i128::MIN, i128::from(i32::MAX))?,
+    };
+    if count < -1 {
+        return Err(error(5, "Invalid procedure call or argument"));
+    }
+    let source = text(
+        arguments
+            .first()
+            .and_then(Option::as_ref)
+            .ok_or_else(mismatch)?,
+    )?;
+    let find = text(
+        arguments
+            .get(1)
+            .and_then(Option::as_ref)
+            .ok_or_else(mismatch)?,
+    )?;
+    let replacement = text(
+        arguments
+            .get(2)
+            .and_then(Option::as_ref)
+            .ok_or_else(mismatch)?,
+    )?;
+    let source_units = source.units();
+    let start_index = usize::try_from(start - 1).map_err(|_| overflow())?;
+    let Some(suffix) = source_units.get(start_index..) else {
+        return Ok(V::String(
+            VbaString::from_units(Vec::new()).map_err(|_| mismatch())?,
+        ));
+    };
+    let mut output = Vec::new();
+    let append = |output: &mut Vec<u16>, units: &[u16]| -> Result<()> {
+        if output.len().saturating_add(units.len()) > VbaString::MAX_UNITS {
+            return Err(Error::Resource("string budget exceeded".into()));
+        }
+        output
+            .try_reserve(units.len())
+            .map_err(|_| Error::Resource("string allocation failed".into()))?;
+        output.extend_from_slice(units);
+        Ok(())
+    };
+    if count == 0 || find.units().is_empty() {
+        append(&mut output, suffix)?;
+        return Ok(V::String(
+            VbaString::from_units(output).map_err(|_| mismatch())?,
+        ));
+    }
+    let mut remaining = suffix;
+    let mut changed = 0i128;
+    let mut work = 0usize;
+    while changed < count || count < 0 {
+        let Some(index) = find_candidate(
+            remaining,
+            find.units(),
+            (0, remaining.len().saturating_sub(find.units().len())),
+            false,
+            mode,
+            context,
+            &mut work,
+        )?
+        else {
+            break;
+        };
+        append(&mut output, remaining.get(..index).ok_or_else(mismatch)?)?;
+        append(&mut output, replacement.units())?;
+        remaining = remaining
+            .get(index + find.units().len()..)
+            .ok_or_else(mismatch)?;
+        changed = changed.checked_add(1).ok_or_else(overflow)?;
+    }
+    append(&mut output, remaining)?;
+    Ok(V::String(
+        VbaString::from_units(output).map_err(|_| mismatch())?,
+    ))
+}
+
+pub(crate) fn split_context(
+    arguments: &[Option<V>],
+    context: &super::IntrinsicContext<'_>,
+) -> Result<V> {
+    if arguments.len() != 4 {
+        return Err(error(450, "Wrong number of arguments"));
+    }
+    let mode = match arguments.get(3).and_then(Option::as_ref) {
+        None => context.comparison_mode(),
+        Some(V::Null) => return Err(error(94, "Invalid use of Null")),
+        Some(value) => match integral(value, i128::MIN, i128::MAX)? {
+            -1 => context.comparison_mode(),
+            0 => vba_values::IntrinsicComparisonMode::Binary,
+            1 => vba_values::IntrinsicComparisonMode::Text,
+            2 => {
+                return Err(Error::Unsupported(
+                    "Access database comparison is unavailable".into(),
+                ));
+            }
+            _ => return Err(error(5, "Invalid procedure call or argument")),
+        },
+    };
+    let limit = match arguments.get(2).and_then(Option::as_ref) {
+        None => -1,
+        Some(value) => integral(value, i128::MIN, i128::from(i32::MAX))?,
+    };
+    if limit < -1 {
+        return Err(error(5, "Invalid procedure call or argument"));
+    }
+    let source = text(
+        arguments
+            .first()
+            .and_then(Option::as_ref)
+            .ok_or_else(mismatch)?,
+    )?;
+    let delimiter = match arguments.get(1).and_then(Option::as_ref) {
+        Some(value) => text(value)?,
+        None => VbaString::from_utf8(" ")
+            .map_err(|_| Error::Resource("string allocation failed".into()))?,
+    };
+    if source.units().is_empty() || limit == 0 {
+        return Ok(V::Array(vba_values::VbaArray::empty(K::String, 0)));
+    }
+    let mut parts = Vec::new();
+    let mut remaining = source.units();
+    let mut work = 0usize;
+    if !delimiter.units().is_empty() {
+        loop {
+            let parts_count = i128::try_from(parts.len()).map_err(|_| overflow())?;
+            if limit >= 0 && parts_count.saturating_add(1) >= limit {
+                break;
+            }
+            let Some(index) = find_candidate(
+                remaining,
+                delimiter.units(),
+                (0, remaining.len().saturating_sub(delimiter.units().len())),
+                false,
+                mode,
+                context,
+                &mut work,
+            )?
+            else {
+                break;
+            };
+            parts
+                .try_reserve(1)
+                .map_err(|_| Error::Resource("split array allocation failed".into()))?;
+            parts.push(V::String(
+                VbaString::from_units(remaining.get(..index).ok_or_else(mismatch)?.to_vec())
+                    .map_err(|_| Error::Resource("split string allocation failed".into()))?,
+            ));
+            remaining = remaining
+                .get(index + delimiter.units().len()..)
+                .ok_or_else(mismatch)?;
+        }
+    }
+    parts
+        .try_reserve(1)
+        .map_err(|_| Error::Resource("split array allocation failed".into()))?;
+    parts.push(V::String(
+        VbaString::from_units(remaining.to_vec())
+            .map_err(|_| Error::Resource("split string allocation failed".into()))?,
+    ));
+    let upper =
+        i32::try_from(parts.len().checked_sub(1).ok_or_else(mismatch)?).map_err(|_| overflow())?;
+    let mut array = vba_values::VbaArray::new(K::String, vec![(0, upper)], true)
+        .map_err(|_| Error::Resource("split array budget exceeded".into()))?;
+    for (index, part) in parts.into_iter().enumerate() {
+        array.set(index, part).map_err(value_error)?;
+    }
+    Ok(V::Array(array))
+}
+
+pub(crate) fn filter_context(
+    arguments: &[Option<V>],
+    context: &super::IntrinsicContext<'_>,
+) -> Result<V> {
+    if arguments.len() != 4 {
+        return Err(error(450, "Wrong number of arguments"));
+    }
+    let mode = match arguments.get(3).and_then(Option::as_ref) {
+        None => context.comparison_mode(),
+        Some(V::Null) => return Err(error(94, "Invalid use of Null")),
+        Some(value) => match integral(value, i128::MIN, i128::MAX)? {
+            -1 => context.comparison_mode(),
+            0 => vba_values::IntrinsicComparisonMode::Binary,
+            1 => vba_values::IntrinsicComparisonMode::Text,
+            2 => {
+                return Err(Error::Unsupported(
+                    "Access database comparison is unavailable".into(),
+                ));
+            }
+            _ => return Err(error(5, "Invalid procedure call or argument")),
+        },
+    };
+    let include = match arguments.get(2).and_then(Option::as_ref) {
+        None => true,
+        Some(value) => super::condition(value)?,
+    };
+    let source = match arguments.first().and_then(Option::as_ref) {
+        Some(V::Array(array)) if array.bounds().len() == 1 => array,
+        Some(V::Array(_)) => return Err(error(13, "Type mismatch")),
+        _ => return Err(error(13, "Type mismatch")),
+    };
+    let match_text = text(
+        arguments
+            .get(1)
+            .and_then(Option::as_ref)
+            .ok_or_else(mismatch)?,
+    )?;
+    if !matches!(source.kind(), K::String | K::Variant) {
+        return Err(mismatch());
+    }
+    let mut selected = Vec::new();
+    selected
+        .try_reserve(source.elements().len())
+        .map_err(|_| Error::Resource("filter array allocation failed".into()))?;
+    let mut work = 0usize;
+    for value in source.elements() {
+        let V::String(candidate) = value else {
+            return Err(mismatch());
+        };
+        let found = match_text.units().is_empty()
+            || find_candidate(
+                candidate.units(),
+                match_text.units(),
+                (
+                    0,
+                    candidate
+                        .units()
+                        .len()
+                        .saturating_sub(match_text.units().len()),
+                ),
+                false,
+                mode,
+                context,
+                &mut work,
+            )?
+            .is_some();
+        if found == include {
+            selected.push(value.clone());
+        }
+    }
+    if selected.is_empty() {
+        return Ok(V::Array(vba_values::VbaArray::empty(K::String, 0)));
+    }
+    let upper = i32::try_from(selected.len() - 1).map_err(|_| overflow())?;
+    let mut array = vba_values::VbaArray::new(K::String, vec![(0, upper)], true)
+        .map_err(|_| Error::Resource("filter array budget exceeded".into()))?;
+    for (index, value) in selected.into_iter().enumerate() {
+        array.set(index, value).map_err(value_error)?;
+    }
+    Ok(V::Array(array))
+}
+
 fn string_function(function: I, args: &[V]) -> Result<V> {
     let get = |index: usize| args.get(index).ok_or_else(mismatch);
     let mut output = Vec::new();

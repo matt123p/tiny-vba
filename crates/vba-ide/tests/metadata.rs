@@ -47,7 +47,9 @@ fn intrinsic_completion_and_signature_help_use_executable_descriptors() -> R {
     let info = ide.parameter_info().ok_or("intrinsic signature")?;
     assert_eq!(info.signature, "Round(expression, [numdecimalplaces])");
     assert!(ide.completions("InS").contains(&"InStr".into()));
+    assert!(ide.completions("InStrR").contains(&"InStrRev".into()));
     assert!(ide.completions("StrC").contains(&"StrComp".into()));
+    assert!(ide.completions("Filt").contains(&"Filter".into()));
     assert_eq!(ide.completions("VBA.Ro"), vec!["Round"]);
     assert_eq!(
         ide.quick_info("VBA.Round").as_deref(),
@@ -56,6 +58,14 @@ fn intrinsic_completion_and_signature_help_use_executable_descriptors() -> R {
     assert_eq!(
         ide.quick_info("StrComp").as_deref(),
         Some("StrComp(string1, string2, [compare])")
+    );
+    assert_eq!(
+        ide.quick_info("InStrRev").as_deref(),
+        Some("InStrRev(stringcheck, stringmatch, [start, [compare]])")
+    );
+    assert_eq!(
+        ide.quick_info("Filter").as_deref(),
+        Some("Filter(sourcearray, match, [include, [compare]])")
     );
     Ok(())
 }

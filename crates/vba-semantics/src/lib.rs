@@ -2423,7 +2423,15 @@ impl Binder<'_> {
         let extended = arguments
             .iter()
             .any(|argument| argument.name.is_some() || argument.value.is_none())
-            || function == vba_values::Intrinsic::StrComp;
+            || matches!(
+                function,
+                vba_values::Intrinsic::StrComp
+                    | vba_values::Intrinsic::InStr
+                    | vba_values::Intrinsic::InStrRev
+                    | vba_values::Intrinsic::Replace
+                    | vba_values::Intrinsic::Split
+                    | vba_values::Intrinsic::Filter
+            );
         if !extended {
             let mut values = Vec::new();
             for (index, argument) in arguments.iter().enumerate() {
@@ -2548,6 +2556,15 @@ impl Binder<'_> {
             if let Some(slot) = assigned.get_mut(parameter_index) {
                 *slot = true;
             }
+        }
+        if function == vba_values::Intrinsic::InStr
+            && assigned.get(3).copied().unwrap_or(false)
+            && !matches!(
+                bindings.first(),
+                Some(vba_values::IntrinsicArgumentBinding::Evaluated(_))
+            )
+        {
+            return Err(err("InStr compare requires a supplied start", span));
         }
         for (index, parameter) in descriptor.parameters.iter().enumerate() {
             if parameter.required && !assigned.get(index).copied().unwrap_or(false) {

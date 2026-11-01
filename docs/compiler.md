@@ -17,10 +17,11 @@ The nominal extension and legacy-consumer refusal are in
 [ADR 0021](decisions/0021-nominal-host-object-types.md).
 
 IR 8 defines and verifies M6A `IntrinsicCall` and contextual `BinaryCompare`
-instructions. Named or omitted intrinsic calls and StrComp lower to explicit
-plans; unchanged fully positional calls retain legacy instructions. Contextual
-comparisons capture the calling module's Option Compare mode and require an
-injected provider when string operands need collation. See the [IR 8 contract](bytecode-vm-specification.md#ir-8-extended-intrinsic-calls).
+instructions. Named or omitted intrinsic calls and StrComp, InStr, InStrRev,
+Replace, Split and Filter lower to explicit plans; unchanged fully positional calls for
+other functions retain legacy instructions. Contextual comparisons capture the
+calling module's Option Compare mode and require an injected provider when
+string operands need collation. See the [IR 8 contract](bytecode-vm-specification.md#ir-8-extended-intrinsic-calls).
 
 # M2 binding and verified bytecode
 

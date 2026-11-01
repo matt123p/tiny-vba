@@ -170,7 +170,12 @@ functions; split a row below further when its tests or dependencies warrant it.
 | F3 | M6A.7 | F2 | Shared bare/qualified binder, named/omitted argument planning, alias identity and code aids. Source-order side-effect and shadowing tests pass. |
 | F4 | M6A.2/M6A.5 | F3 | Effective module comparison, constants and context seam; coherent Binary/Text comparison contract, locale double and explicit unavailable-service behaviour. |
 | S1 | M6A.2 | F4 | StrComp end-to-end first; exact Integer/Null results, errors, default/-1/0/1 modes and real module context. |
-| S2 onward | M6A.2 | S1 | InStr/InStrRev, Replace, Split/Join/Filter, edge/case/reverse/repetition, then character/byte/`$` variants in small packets; audit existing functions as well. |
+| S2 | M6A.2 | S1 | InStr/InStrRev, including distinct omitted compare defaults, reverse-position bounds and injected Text comparison. |
+| S3 | M6A.2 | S2 | Replace start/count/compare behavior and typed/error boundaries. |
+| S4 | M6A.2 | S3 | Split/Join array shape, bounds, empty fields and defaults. |
+| S5 | M6A.2 | S4 | Filter include/compare behavior and String array results. |
+| S6 | M6A.2 | S5 | Add LTrim/RTrim and StrReverse with whitespace-edge, UTF-16 and Null boundaries. |
+| S7 onward | M6A.2 | S6 | Audit case/repetition functions, then character/byte/`$` variants in small packets; audit existing functions as well. |
 | C1 onward | M6A.3 | F3; relevant context | Conversion/predicates first, then formatting. Decimal and target-width foundation precede CDec/CLngPtr; no Double approximation. |
 | A1 onward | M6A.4 | F3 | Arrays/bounds and conditional selection/evaluation; preserve existing array storage/aliases and IIf eagerness. |
 | N1 onward | M6A.4 | F3 | Pure numeric functions, then financial functions with bounded convergence and exact VBA error contracts. |

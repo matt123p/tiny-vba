@@ -87,9 +87,9 @@ Every scenario not explicitly listed as an executed test remains `NOT_RUN`.
 | Public spelling | Signature / call shape (reference form) | Current code audit | Disposition / packet | Worksheet counterpart and required discriminator | Evidence |
 |---|---|---|---|---|---|
 | StrComp | `(string1, string2, [compare])` | Implemented through IR 8; comparison requires an injected provider | S1 | EXACT; Variant(Integer) -1/0/1 or Null for Null string | [VBA](https://learn.microsoft.com/en-us/office/vba/language/reference/user-interface-help/strcomp-function) |
-| InStr | `([start,] string1, string2, [compare])` | Partial: binary search only | Required S2 | FIND/SEARCH; no match returns 0, reverse not supported | [VBA index](https://learn.microsoft.com/en-us/office/vba/language/reference/functions-visual-basic-for-applications) |
-| InStrRev | `(stringcheck, stringmatch, [start, [compare]])` | Absent | Required S2 | Reverse composed search; reverse indexing and no-match 0 | [VBA index](https://learn.microsoft.com/en-us/office/vba/language/reference/functions-visual-basic-for-applications) |
-| Replace | `(expression, find, replace, [start, [count, [compare]]])` | Partial: binary only; incomplete Null/error precedence | Required S2 | SUBSTITUTE/REPLACE; substring replacement, start/count and compare | [VBA](https://learn.microsoft.com/en-us/office/vba/language/reference/user-interface-help/replace-function) |
+| InStr | `([start,] string1, string2, [compare])` | Implemented through IR 8; Text comparison requires an injected provider | S2 | FIND/SEARCH; no match returns 0; VBA returns one-based position | [VBA](https://learn.microsoft.com/en-us/office/vba/language/reference/user-interface-help/instr-function) |
+| InStrRev | `(stringcheck, stringmatch, [start, [compare]])` | Implemented through IR 8; Text comparison requires an injected provider | S2 | Reverse composed search; reverse indexing and no-match 0; omitted compare defaults to Binary | [VBA](https://learn.microsoft.com/en-us/office/vba/language/reference/user-interface-help/instrrev-function) |
+| Replace | `(expression, find, replace, [start, [count, [compare]]])` | Implemented through IR 8; Text comparison requires an injected provider | S3 | SUBSTITUTE/REPLACE; substring replacement, start/count and compare | [VBA](https://learn.microsoft.com/en-us/office/vba/language/reference/user-interface-help/replace-function) |
 | Left / Left$ | `(string, length)` | Left partial; `$` absent | Required S2 | LEFT; `$` preserves String return identity | [VBA index](https://learn.microsoft.com/en-us/office/vba/language/reference/functions-visual-basic-for-applications) |
 | Right / Right$ | `(string, length)` | Right partial; `$` absent | Required S2 | RIGHT; `$` preserves String return identity | [VBA index](https://learn.microsoft.com/en-us/office/vba/language/reference/functions-visual-basic-for-applications) |
 | Mid / Mid$ | `(string, start, [length])` | Mid partial; `$` absent | Required S2 | MID; UTF-16 indexing and optional length | [VBA index](https://learn.microsoft.com/en-us/office/vba/language/reference/functions-visual-basic-for-applications) |
@@ -98,11 +98,11 @@ Every scenario not explicitly listed as an executed test remains `NOT_RUN`.
 | LCase / LCase$ | `(string)` | Partial: ASCII only | Required S2; locale provider | LOWER; locale and Null | [VBA index](https://learn.microsoft.com/en-us/office/vba/language/reference/functions-visual-basic-for-applications) |
 | UCase / UCase$ | `(string)` | Partial: ASCII only | Required S2; locale provider | UPPER; locale and Null | [VBA index](https://learn.microsoft.com/en-us/office/vba/language/reference/functions-visual-basic-for-applications) |
 | Trim / Trim$ | `(string)` | Partial: trims U+0020 edges | Required S2 | TRIM; VBA retains internal repeated spaces | [Excel VBA](https://learn.microsoft.com/en-us/office/vba/api/excel.worksheetfunction.trim) |
-| LTrim / LTrim$ | `(string)` | Absent | Required S2 | TRIM composed; left edge only | [VBA index](https://learn.microsoft.com/en-us/office/vba/language/reference/functions-visual-basic-for-applications) |
-| RTrim / RTrim$ | `(string)` | Absent | Required S2 | TRIM composed; right edge only | [VBA index](https://learn.microsoft.com/en-us/office/vba/language/reference/functions-visual-basic-for-applications) |
+| LTrim | `(string)` | Implemented; Null propagates | S6 | TRIM composed; removes leading U+0020 only | [VBA](https://learn.microsoft.com/en-us/office/vba/language/reference/user-interface-help/ltrim-rtrim-and-trim-functions) |
+| RTrim | `(string)` | Implemented; Null propagates | S6 | TRIM composed; removes trailing U+0020 only | [VBA](https://learn.microsoft.com/en-us/office/vba/language/reference/user-interface-help/ltrim-rtrim-and-trim-functions) |
 | Space / Space$ | `(number)` | Absent | Required S2 | REPT; creates spaces with count rules | [VBA index](https://learn.microsoft.com/en-us/office/vba/language/reference/functions-visual-basic-for-applications) |
 | String / String$ | `(number, character)` | Absent | Required S2 | REPT; character code or first character semantics | [VBA index](https://learn.microsoft.com/en-us/office/vba/language/reference/functions-visual-basic-for-applications) |
-| StrReverse | `(expression)` | Absent | Required S2 | No direct counterpart; reverse UTF-16 character units | [VBA index](https://learn.microsoft.com/en-us/office/vba/language/reference/functions-visual-basic-for-applications) |
+| StrReverse | `(expression)` | Implemented; reverses UTF-16 code units; Null error policy is engine error 94 | S6 | No direct counterpart; UTF-16 code unit and surrogate behavior | [VBA](https://learn.microsoft.com/en-us/office/vba/language/reference/user-interface-help/strreverse-function) |
 | StrConv | `(string, conversion, [LCID])` | Absent | Required S2; locale/code-page provider | PROPER/width conversions; conversion flags and LCID | [VBA index](https://learn.microsoft.com/en-us/office/vba/language/reference/functions-visual-basic-for-applications) |
 | Asc | `(string)` | Partial: ASCII only | Required S2; code-page provider | CODE is not code-page compatible | [VBA index](https://learn.microsoft.com/en-us/office/vba/language/reference/functions-visual-basic-for-applications) |
 | AscW | `(string)` | Absent | Required S2 | UNICODE; UTF-16 code unit, including surrogate behavior | [VBA index](https://learn.microsoft.com/en-us/office/vba/language/reference/functions-visual-basic-for-applications) |
@@ -150,9 +150,9 @@ Every scenario not explicitly listed as an executed test remains `NOT_RUN`.
 | Array | `([arglist])` | Partial: Variant array construction | Required A1; lower-bound behavior | Array constants/ROWS; explicit bounds and subtype | [VBA index](https://learn.microsoft.com/en-us/office/vba/language/reference/functions-visual-basic-for-applications) |
 | LBound | `(arrayname, [dimension])` | Partial: array bounds | Required A1 | ROWS/COLUMNS do not report VBA subscripts | [VBA index](https://learn.microsoft.com/en-us/office/vba/language/reference/functions-visual-basic-for-applications) |
 | UBound | `(arrayname, [dimension])` | Partial: array bounds | Required A1 | ROWS/COLUMNS do not report VBA subscripts | [VBA index](https://learn.microsoft.com/en-us/office/vba/language/reference/functions-visual-basic-for-applications) |
-| Split | `(expression, [delimiter, [limit, [compare]]])` | Partial: binary split and array result | Required A2; comparison context | TEXTSPLIT; limit/lower bound/empty parts | [VBA index](https://learn.microsoft.com/en-us/office/vba/language/reference/functions-visual-basic-for-applications) |
-| Join | `(sourcearray, [delimiter])` | Partial: one-dimensional arrays | Required A2 | TEXTJOIN; array coercion and bounds | [VBA index](https://learn.microsoft.com/en-us/office/vba/language/reference/functions-visual-basic-for-applications) |
-| Filter | `(sourcearray, match, [include, [compare]])` | Absent | Required A2; comparison context | FILTER; substring filter and String array result | [VBA index](https://learn.microsoft.com/en-us/office/vba/language/reference/functions-visual-basic-for-applications) |
+| Split | `(expression, [delimiter, [limit, [compare]]])` | Implemented through IR 8; Text comparison requires injected provider | S4 | TEXTSPLIT; limit/lower bound/empty parts | [VBA](https://learn.microsoft.com/en-us/office/vba/language/reference/user-interface-help/split-function) |
+| Join | `(sourcearray, [delimiter])` | Implemented for one-dimensional arrays; String result; multidimensional arrays return Type mismatch | S4 | TEXTJOIN; array coercion and bounds | [VBA](https://learn.microsoft.com/en-us/office/vba/language/reference/user-interface-help/join-function) |
+| Filter | `(sourcearray, match, [include, [compare]])` | Implemented through IR 8; Text comparison requires injected provider | S5 | FILTER; VBA returns zero-based String array and filters by substring | [VBA](https://learn.microsoft.com/en-us/office/vba/language/reference/user-interface-help/filter-function) |
 | Choose | `(index, choice-1, [choice-2, ...])` | Absent | Required A2; conditional argument evaluation | CHOOSE; VBA index coercion/evaluation | [VBA index](https://learn.microsoft.com/en-us/office/vba/language/reference/functions-visual-basic-for-applications) |
 | IIf | `(expr, truepart, falsepart)` | Partial: selection; eager values supplied | Required A2; preserve eager side effects | IF; both branches are evaluated | [VBA](https://learn.microsoft.com/en-us/office/vba/language/reference/user-interface-help/iif-function) |
 | Switch | `(expr-1, value-1, [expr-2, value-2, ...])` | Absent | Required A2; conditional evaluation contract | IFS/SWITCH differ in match form and evaluation | [VBA index](https://learn.microsoft.com/en-us/office/vba/language/reference/functions-visual-basic-for-applications) |
@@ -412,5 +412,46 @@ rows cannot silently disappear from the inventory or become implicit M7 work.
    authored, inherited and fresh Office evidence distinct. Fresh Excel/Word
    observations remain M8.5 under ADR 0032; this milestone does not claim them.
 
-Next task: S2 InStr/InStrRev. S1 uses authored deterministic service tests; no
-Office macros were executed and no fresh Office observation is claimed.
+S2 implements `InStr` and `InStrRev` through the verified IR 8 call plan. `InStr`
+defaults its omitted compare argument to the caller's `Option Compare`; `InStrRev`
+defaults to Binary, as documented. Explicit `-1`, `0` and `1` select caller,
+Binary and Text modes; Access database mode is unavailable. Comparison tests
+use a deterministic service double, not a production locale provider. Both
+functions return Long values representing the documented Variant(Long) result.
+This engine maps invalid starts/compare modes to error 5 and Null start/compare
+to error 94; Microsoft documents errors but does not establish those numbers or
+their precedence. Long searches have a fixed work cap and return Resource when
+it is exceeded. No Office macros were executed and no fresh Office observation
+is claimed.
+
+S3 implements Replace with the documented start/count behavior and contextual
+compare mode, using the same injected Text provider and bounded search work as
+InStr. Its result is the UTF-16 substring beginning at `start`, with replacements
+applied to that suffix. Count defaults to -1; an empty find returns the suffix
+unchanged, and an empty replacement deletes matches. Engine policy maps invalid
+start/count/compare to error 5 and Null input/compare to error 94; Microsoft
+documents the errors but not these numbers or validation precedence. The
+reference page's count-zero return table and start-sliced return description do
+not fully specify their interaction; the engine follows the start-sliced rule.
+Text matching has a 1,048,576-unit work budget. No Office observation is claimed.
+
+S4 routes Split through IR 8 for module comparison. It defaults to a space
+delimiter, unlimited parts and caller `Option Compare`; it returns a zero-based
+String array, preserves empty fields, and treats empty source or limit zero as
+an empty array. Join remains a pure String operation over one-dimensional arrays,
+uses a space delimiter by default, and iterates elements in array order
+independent of the lower bound. Text splitting uses the injected provider and
+shared bounded comparison budget. The engine maps invalid limits to error 5 and
+Null comparison to 94; exact Office error numbers and competing-error precedence
+are not claimed. Tests do not establish locale behavior or an Office observation.
+
+S5 implements Filter through IR 8 for caller comparison context. It requires a
+one-dimensional String or Variant array containing only strings, filters by
+substring, defaults `include` to True and `compare` to the caller's `Option
+Compare`, and returns matching items in a zero-based String array. An empty
+match selects every item; no matches produce an empty String array. Text matching
+requires the injected provider and shares the bounded comparison budget. Access
+database comparison is unsupported. Tests use the deterministic test double and
+make no Office locale or error-number claim.
+
+Next task: S6 string edge/case/reverse/repetition functions.

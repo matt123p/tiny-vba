@@ -56,16 +56,30 @@ impl StringComparisonService for VmCompareProvider {
         assert_eq!(locale, "test-locale");
         assert_eq!(code_page, "test-code-page");
         self.0.fetch_add(1, AtomicOrdering::SeqCst);
-        if mode == IntrinsicComparisonMode::Text
-            && left.units().len() == 1
-            && right.units().len() == 1
-            && left
+        if mode == IntrinsicComparisonMode::Text {
+            let left_folded = left
                 .units()
-                .first()
-                .zip(right.units().first())
-                .is_some_and(|(left, right)| (left | 0x20) == (right | 0x20))
-        {
-            return Ok(Ordering::Equal);
+                .iter()
+                .map(|unit| {
+                    if (65..=90).contains(unit) {
+                        unit + 32
+                    } else {
+                        *unit
+                    }
+                })
+                .collect::<Vec<_>>();
+            let right_folded = right
+                .units()
+                .iter()
+                .map(|unit| {
+                    if (65..=90).contains(unit) {
+                        unit + 32
+                    } else {
+                        *unit
+                    }
+                })
+                .collect::<Vec<_>>();
+            return Ok(left_folded.cmp(&right_folded));
         }
         Ok(left.units().cmp(right.units()))
     }
@@ -253,6 +267,160 @@ fn strcomp_source_calls_preserve_variant_result_and_use_the_injected_mode() -> R
         Value::Long(7),
     )?;
     Ok(())
+}
+
+#[test]
+fn instr_search_calls_use_module_context_and_instrrev_keeps_binary_default() -> R {
+    let calls = Arc::new(AtomicUsize::new(0));
+    let mut session = session_with_comparison_service(
+        "Option Compare Text\nFunction Answer() As Long\nAnswer=InStr(string1:=\"xAx\",string2:=\"a\")*100+InStrRev(\"xAx\",\"a\")*10+InStrRev(\"xAx\",\"a\",-1,vbUseCompareOption)\nEnd Function",
+        calls.clone(),
+    )?;
+    assert_eq!(
+        drive(&mut session)?,
+        Outcome::Completed(ReturnValue::Function(Value::Long(202)))
+    );
+    assert_eq!(calls.load(AtomicOrdering::SeqCst), 4);
+
+    answer(
+        "Function Answer() As Long\nAnswer=InStr(4,\"banana\",\"na\")+InStrRev(\"banana\",\"na\",4)\nEnd Function",
+        Value::Long(8),
+    )?;
+    Ok(())
+}
+
+#[test]
+fn instr_compare_requires_start_and_errors_remain_catchable() -> R {
+    assert!(compile(
+        &SourceFile::new(
+            SourceId(94),
+            "invalid-instr.bas".into(),
+            "Function Answer() As Long\nAnswer=InStr(string1:=\"abc\",string2:=\"a\",compare:=0)\nEnd Function".into(),
+        )?,
+        &CompileOptions {
+            capabilities: vm::capabilities(),
+            ..Default::default()
+        },
+    )
+    .is_err());
+
+    answer(
+        "Function Answer() As Long\nOn Error Resume Next\nAnswer=InStr(1,\"abc\",\"a\",Null)\nAnswer=Err.Number\nEnd Function",
+        Value::Long(94),
+    )?;
+    answer(
+        "Function Answer() As Long\nOn Error Resume Next\nAnswer=InStr(0,\"abc\",\"a\")\nAnswer=Err.Number\nEnd Function",
+        Value::Long(5),
+    )?;
+    Ok(())
+}
+
+#[test]
+fn replace_uses_module_compare_start_count_and_named_argument_plans() -> R {
+    let calls = Arc::new(AtomicUsize::new(0));
+    let mut session = session_with_comparison_service(
+        "Option Compare Text\nFunction Answer() As String\nAnswer=Replace(\"AaA\",\"a\",\"x\") & \"|\" & Replace(\"AaA\",\"a\",\"x\",1,1,vbBinaryCompare) & \"|\" & Replace(compare:=0,find:=\"a\",replace:=\"x\",expression:=\"AaA\",count:=1,start:=1)\nEnd Function",
+        calls.clone(),
+    )?;
+    assert_eq!(
+        drive(&mut session)?,
+        Outcome::Completed(ReturnValue::Function(Value::String(VbaString::from_utf8(
+            "xxx|AxA|AxA",
+        )?)))
+    );
+    assert_eq!(calls.load(AtomicOrdering::SeqCst), 3);
+    Ok(())
+}
+
+#[test]
+fn replace_errors_flow_through_on_error_and_resume() -> R {
+    answer(
+        "Function Answer() As Long\nOn Error Resume Next\nAnswer=Len(Replace(\"a\",\"a\",\"x\",1,-2))\nAnswer=Err.Number\nEnd Function",
+        Value::Long(5),
+    )?;
+    answer(
+        "Function Answer() As Long\nOn Error Resume Next\nAnswer=Len(Replace(\"a\",\"a\",\"x\",1,-1,Null))\nAnswer=Err.Number\nEnd Function",
+        Value::Long(94),
+    )?;
+    Ok(())
+}
+
+#[test]
+fn split_and_join_use_module_comparison_and_string_array_results() -> R {
+    let calls = Arc::new(AtomicUsize::new(0));
+    let mut session = session_with_comparison_service(
+        "Option Compare Text\nFunction Answer() As String\nAnswer=Join(Split(\"aBba\",\"b\"),\"/\") & \"|\" & Join(Split(\"aBba\",\"b\",,-1),\"/\") & \"|\" & Join(Split(\"aBba\",\"b\",,vbBinaryCompare),\"/\")\nEnd Function",
+        calls.clone(),
+    )?;
+    assert_eq!(
+        drive(&mut session)?,
+        Outcome::Completed(ReturnValue::Function(Value::String(VbaString::from_utf8(
+            "a//a|a//a|aB/a",
+        )?)))
+    );
+    assert_eq!(calls.load(AtomicOrdering::SeqCst), 8);
+    Ok(())
+}
+
+#[test]
+fn split_invalid_limit_and_compare_are_numbered_and_catchable() -> R {
+    answer(
+        r#"Function Answer() As Long
+On Error Resume Next
+Answer=UBound(Split("a,b",",",-2))+1
+Answer=Err.Number
+End Function"#,
+        Value::Long(5),
+    )?;
+    answer(
+        r#"Function Answer() As Long
+On Error Resume Next
+Answer=UBound(Split("a,b",",",-1,Null))+1
+Answer=Err.Number
+End Function"#,
+        Value::Long(94),
+    )?;
+    Ok(())
+}
+
+#[test]
+fn filter_returns_string_subsets_with_include_and_compare_options() -> R {
+    let calls = Arc::new(AtomicUsize::new(0));
+    let mut session = session_with_comparison_service(
+        "Option Compare Text\nFunction Answer() As String\nAnswer=Join(Filter(Array(\"Alpha\",\"beta\",\"ALPINE\"),\"alp\"),\"|\") & \"/\" & Join(Filter(Array(\"Alpha\",\"beta\",\"ALPINE\"),\"alp\",False,0),\"|\")\nEnd Function",
+        calls,
+    )?;
+    assert_eq!(
+        drive(&mut session)?,
+        Outcome::Completed(ReturnValue::Function(Value::String(VbaString::from_utf8(
+            "Alpha|ALPINE/Alpha|beta|ALPINE"
+        )?)))
+    );
+    answer(
+        "Function Answer() As Long\nAnswer=UBound(Filter(Array(\"a\",\"b\"),\"z\"))+1\nEnd Function",
+        Value::Long(0),
+    )?;
+    Ok(())
+}
+
+#[test]
+fn filter_errors_flow_through_on_error() -> R {
+    answer(
+        "Function Answer() As Long\nOn Error Resume Next\nAnswer=UBound(Filter(Array(\"a\"),\"a\",True,Null))\nAnswer=Err.Number\nEnd Function",
+        Value::Long(94),
+    )
+}
+
+#[test]
+fn trim_edges_and_strreverse_are_executable_intrinsics() -> R {
+    answer(
+        "Function Answer() As String\nAnswer=LTrim(\"  x  \") & \"|\" & RTrim(\"  x  \") & \"|\" & StrReverse(\"abc\")\nEnd Function",
+        Value::String(VbaString::from_utf8("x  |  x|cba")?),
+    )?;
+    answer(
+        "Function Answer() As Long\nOn Error Resume Next\nAnswer=Len(StrReverse(Null))\nAnswer=Err.Number\nEnd Function",
+        Value::Long(94),
+    )
 }
 
 #[test]
