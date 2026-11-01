@@ -1801,6 +1801,21 @@ impl Ide {
         if prefix.contains('.') {
             if let Some((owner, member)) = prefix.rsplit_once('.') {
                 let receiver_type = self.receiver_expression_type(owner);
+                let vba_shadowed = self
+                    .source_completions()
+                    .iter()
+                    .any(|(name, _)| name.eq_ignore_ascii_case("VBA"));
+                if owner.eq_ignore_ascii_case("VBA") && !vba_shadowed {
+                    for descriptor in vba_values::INTRINSIC_DESCRIPTORS {
+                        if descriptor
+                            .spelling
+                            .to_ascii_lowercase()
+                            .starts_with(&member.to_ascii_lowercase())
+                        {
+                            names.insert(descriptor.spelling.to_owned());
+                        }
+                    }
+                }
                 if owner.eq_ignore_ascii_case("Debug")
                     && "print".starts_with(&member.to_ascii_lowercase())
                 {
@@ -1825,6 +1840,23 @@ impl Ide {
                     .starts_with(&prefix.to_ascii_lowercase())
                 {
                     names.insert(name);
+                }
+            }
+            for descriptor in vba_values::INTRINSIC_DESCRIPTORS {
+                if descriptor
+                    .spelling
+                    .to_ascii_lowercase()
+                    .starts_with(&prefix.to_ascii_lowercase())
+                {
+                    names.insert(descriptor.spelling.to_owned());
+                }
+                for alias in descriptor.aliases {
+                    if alias
+                        .to_ascii_lowercase()
+                        .starts_with(&prefix.to_ascii_lowercase())
+                    {
+                        names.insert((*alias).to_owned());
+                    }
                 }
             }
             for (name, _, _) in self.locals() {

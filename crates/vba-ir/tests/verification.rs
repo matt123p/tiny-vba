@@ -104,7 +104,9 @@ fn replace(p: &mut Program, pc: usize, instruction: Instruction) -> TestResult {
     Ok(())
 }
 fn check(p: Program) -> Result<VerifiedProgram, vba_diagnostics::Diagnostic> {
-    let caps = if p.ir_version == IR7_VERSION {
+    let caps = if p.ir_version == IR8_VERSION {
+        Capabilities::ir8_structural()
+    } else if p.ir_version == IR7_VERSION {
         Capabilities::ir7_structural()
     } else if p.ir_version == IR4_VERSION {
         Capabilities::ir4_structural()
@@ -116,6 +118,134 @@ fn check(p: Program) -> Result<VerifiedProgram, vba_diagnostics::Diagnostic> {
         Capabilities::ir1_structural()
     };
     verify(p, &caps, &VerifyLimits::default())
+}
+
+fn extended_intrinsic_program() -> TestResult<Program> {
+    let mut p = base()?;
+    p.ir_version = IR8_VERSION;
+    p.profile = "ir8-structural".into();
+    p.required_features.insert("intrinsics-m6a-v1".into());
+    p.constants = vec![Value::String(VbaString::from_utf8("abc")?)];
+    replace(&mut p, 1, Instruction::Const(ConstantId(0)))?;
+    proc_mut(&mut p)?.max_stack = 1;
+    replace(
+        &mut p,
+        2,
+        Instruction::IntrinsicCall {
+            function: vba_values::Intrinsic::Len,
+            return_variant: vba_values::IntrinsicReturn::Fixed(ScalarKind::Long),
+            supplied_arguments: 1,
+            bindings: vec![IntrinsicArgumentBinding::Evaluated(0)],
+            compare_mode: vba_values::IntrinsicComparisonMode::Binary,
+        },
+    )?;
+    replace(&mut p, 3, Instruction::DropValue)?;
+    Ok(p)
+}
+
+#[test]
+fn ir8_intrinsic_call_verifies_disassembles_and_refuses_legacy_targets() -> TestResult {
+    let program = extended_intrinsic_program()?;
+    let verified = check(program.clone())?;
+    let disassembly = disassemble(&verified)?;
+    assert!(disassembly.contains("IntrinsicCall Len"));
+    assert!(disassembly.contains("compare=Binary"));
+    assert!(
+        verify(
+            program.clone(),
+            &Capabilities::ir7_structural(),
+            &VerifyLimits::default()
+        )
+        .is_err()
+    );
+    let mut old_version = program;
+    old_version.ir_version = IR7_VERSION;
+    old_version.required_features.remove("intrinsics-m6a-v1");
+    assert!(check(old_version).is_err());
+    Ok(())
+}
+
+#[test]
+fn ir8_intrinsic_call_rejects_bad_mappings_before_execution() -> TestResult {
+    let mut cases: Vec<ProgramMutation> = Vec::new();
+    cases.push(Box::new(|program| {
+        replace(
+            program,
+            2,
+            Instruction::IntrinsicCall {
+                function: vba_values::Intrinsic::Len,
+                return_variant: vba_values::IntrinsicReturn::Fixed(ScalarKind::Integer),
+                supplied_arguments: 1,
+                bindings: vec![IntrinsicArgumentBinding::Evaluated(0)],
+                compare_mode: vba_values::IntrinsicComparisonMode::Binary,
+            },
+        )
+    }));
+    cases.push(Box::new(|program| {
+        replace(
+            program,
+            2,
+            Instruction::IntrinsicCall {
+                function: vba_values::Intrinsic::Len,
+                return_variant: vba_values::IntrinsicReturn::Fixed(ScalarKind::Long),
+                supplied_arguments: 1,
+                bindings: vec![IntrinsicArgumentBinding::Evaluated(1)],
+                compare_mode: vba_values::IntrinsicComparisonMode::Binary,
+            },
+        )
+    }));
+    cases.push(Box::new(|program| {
+        replace(
+            program,
+            2,
+            Instruction::IntrinsicCall {
+                function: vba_values::Intrinsic::Len,
+                return_variant: vba_values::IntrinsicReturn::Fixed(ScalarKind::Long),
+                supplied_arguments: 0,
+                bindings: vec![IntrinsicArgumentBinding::Omitted],
+                compare_mode: vba_values::IntrinsicComparisonMode::Binary,
+            },
+        )
+    }));
+    cases.push(Box::new(|program| {
+        replace(
+            program,
+            2,
+            Instruction::IntrinsicCall {
+                function: vba_values::Intrinsic::DebugPrint,
+                return_variant: vba_values::IntrinsicReturn::Variant,
+                supplied_arguments: 1,
+                bindings: vec![IntrinsicArgumentBinding::Evaluated(0)],
+                compare_mode: vba_values::IntrinsicComparisonMode::Binary,
+            },
+        )
+    }));
+    cases.push(Box::new(|program| {
+        replace(
+            program,
+            2,
+            Instruction::IntrinsicCall {
+                function: vba_values::Intrinsic::Array,
+                return_variant: vba_values::IntrinsicReturn::Array,
+                supplied_arguments: 2,
+                bindings: vec![
+                    IntrinsicArgumentBinding::Evaluated(0),
+                    IntrinsicArgumentBinding::Evaluated(0),
+                ],
+                compare_mode: vba_values::IntrinsicComparisonMode::Binary,
+            },
+        )
+    }));
+    for mutation in cases {
+        assert!(check(mutate_extended(mutation)?).is_err());
+    }
+    Ok(())
+}
+
+fn mutate_extended(mutation: ProgramMutation) -> TestResult<Program> {
+    let mut program = extended_intrinsic_program()?;
+    mutation(&mut program)?;
+    Ok(program)
 }
 #[test]
 fn malformed_indexes_blocks_stacks_and_metadata_are_rejected() -> TestResult {

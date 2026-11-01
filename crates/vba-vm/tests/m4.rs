@@ -1,7 +1,8 @@
 use std::error::Error;
 use vba_compiler::{CompileOptions, compile};
 use vba_diagnostics::{SourceFile, SourceId};
-use vba_values::{Value, VbaString};
+use vba_ir::{self as ir, Instruction};
+use vba_values::{IntrinsicComparisonMode, IntrinsicReturn, ScalarKind, Value, VbaString};
 use vba_vm::{self as vm, Limits, NoHost, Outcome, PauseReason, ReturnValue, Session};
 type R<T = ()> = Result<T, Box<dyn Error>>;
 fn session(text: &str) -> R<Session> {
@@ -38,6 +39,101 @@ fn number(source: &str, expected: i32) -> R {
     };
     assert_eq!(f.kind, vm::FailureKind::Runtime);
     assert_eq!(f.number, Some(expected));
+    Ok(())
+}
+
+#[test]
+fn ir8_extended_intrinsic_executes_through_the_runtime_adapter() -> R {
+    let source = SourceFile::new(
+        SourceId(49),
+        "ir8-intrinsic.bas".into(),
+        "Function Answer() As Long\nAnswer=Len(\"abc\")\nEnd Function".into(),
+    )?;
+    let compiled = compile(
+        &source,
+        &CompileOptions {
+            capabilities: vm::capabilities(),
+            ..Default::default()
+        },
+    )?;
+    let mut program = compiled.program().clone();
+    program.ir_version = ir::IR8_VERSION;
+    program.profile = vm::PROFILE.into();
+    program.required_features.insert("intrinsics-m6a-v1".into());
+    let mut replaced = false;
+    for procedure in &mut program.procedures {
+        for instruction in &mut procedure.code {
+            if matches!(
+                instruction,
+                Instruction::Intrinsic {
+                    function: vba_values::Intrinsic::Len,
+                    arguments: 1
+                }
+            ) {
+                *instruction = Instruction::IntrinsicCall {
+                    function: vba_values::Intrinsic::Len,
+                    return_variant: IntrinsicReturn::Fixed(ScalarKind::Long),
+                    supplied_arguments: 1,
+                    bindings: vec![ir::IntrinsicArgumentBinding::Evaluated(0)],
+                    compare_mode: IntrinsicComparisonMode::Binary,
+                };
+                replaced = true;
+            }
+        }
+    }
+    assert!(replaced);
+    let verified = ir::verify(program, &vm::capabilities(), &ir::VerifyLimits::default())?;
+    let mut session = Session::new(verified, 49, vec![], None, Limits::default())?;
+    assert_eq!(
+        drive(&mut session)?,
+        Outcome::Completed(ReturnValue::Function(Value::Long(3)))
+    );
+    Ok(())
+}
+
+#[test]
+fn named_intrinsics_evaluate_in_source_order_and_qualification_respects_shadowing() -> R {
+    answer(
+        "Dim n As Long\nFunction Answer() As Long\nAnswer=Round(numdecimalplaces:=Tick(),expression:=Tick())*10+n\nEnd Function\nFunction Tick() As Long\nn=n+1\nTick=n\nEnd Function",
+        Value::Long(22),
+    )?;
+    answer(
+        "Function Answer() As Double\nAnswer=VBA.Round(numdecimalplaces:=1,expression:=2.25)\nEnd Function",
+        Value::Double(2.2),
+    )?;
+    answer(
+        "Function Answer() As Double\nAnswer=Round(expression:=2.25)\nEnd Function",
+        Value::Double(2.0),
+    )?;
+    answer(
+        "Function Answer() As Long\nAnswer=InStr(string1:=\"abc\",string2:=\"b\")\nEnd Function",
+        Value::Long(2),
+    )?;
+    let source = SourceFile::new(
+        SourceId(50),
+        "shadow-vba.bas".into(),
+        "Function Answer() As Long\nDim VBA As Object\nAnswer=VBA.Round(1)\nEnd Function".into(),
+    )?;
+    let program = compile(
+        &source,
+        &CompileOptions {
+            capabilities: vm::capabilities(),
+            ..Default::default()
+        },
+    )?;
+    let mut instructions = program
+        .program()
+        .procedures
+        .iter()
+        .flat_map(|procedure| &procedure.code);
+    assert!(
+        instructions
+            .clone()
+            .any(|instruction| matches!(instruction, Instruction::Invoke(_)))
+    );
+    assert!(
+        !instructions.any(|instruction| matches!(instruction, Instruction::IntrinsicCall { .. }))
+    );
     Ok(())
 }
 #[test]

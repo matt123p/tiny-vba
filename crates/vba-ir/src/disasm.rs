@@ -149,7 +149,25 @@ fn render(out: &mut Output, p: &Program) -> fmt::Result {
             )?;
         }
         for (pc, instruction) in proc.code.iter().enumerate() {
-            writeln!(out, "  {pc:04} {instruction:?}")?;
+            if let Instruction::IntrinsicCall {
+                function,
+                return_variant,
+                supplied_arguments,
+                bindings,
+                compare_mode,
+            } = instruction
+            {
+                let spelling = function
+                    .descriptor()
+                    .map(|descriptor| descriptor.spelling)
+                    .unwrap_or("<invalid>");
+                writeln!(
+                    out,
+                    "  {pc:04} IntrinsicCall {spelling} return={return_variant:?} supplied={supplied_arguments} bindings={bindings:?} compare={compare_mode:?}"
+                )?;
+            } else {
+                writeln!(out, "  {pc:04} {instruction:?}")?;
+            }
         }
     }
     Ok(())

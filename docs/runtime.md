@@ -1,6 +1,6 @@
 # M3/M4 runtime and debugger
 
-Implemented 2026-10-26, extended by new M1.1. The current consumer is `m5-host-v1`, using verified IR 1/2/3/4/5/6/7.
+Implemented 2026-10-26, extended by new M1.1. The current consumer is `m5-host-v1`, using verified IR 1/2/3/4/5/6/7/8.
 The [M4 language contract](m4-language.md) and [ADR 0011](decisions/0011-m4-language-extension.md)
 define scalar coercions, arrays, arguments, persistent state, builtins and VBA handlers.
 [ADR 0013](decisions/0013-m5-host-contract.md) adds the versioned native host protocol and hidden
@@ -45,6 +45,7 @@ cloning the source payload. A caller's capability set cannot enable an unimpleme
 | Errors/builtins | On Error, Resume, Err/Erl and deterministic intrinsic registry; see M4 contract for exact boundaries |
 | Host roots/protocol | IR 4 hidden `HostRoot` slots bound by `HostBinding.roots`; `vba_foreign::check_protocol` refuses other protocol majors/minors before any dispatch |
 | Generic host/debugger | Existing permitted calls, waits, typed patches, checkpoint stops, stepping, inspection and edits |
+| IR 8 extended intrinsics | Descriptor-verified stack mapping and execution for existing descriptors; named/omitted source calls use IR 8; descriptor defaults resolve supported optional gaps; Text comparison remains Unsupported pending a deterministic provider |
 
 The M4 contract lists explicit unsupported forms and profile limits. Source literals retain the
 reviewed decimal forms; additional suffix/radix, locale and class/default-member behavior is refused.

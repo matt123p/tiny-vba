@@ -119,6 +119,7 @@ pub enum ExprKind {
     Intrinsic {
         function: vba_values::Intrinsic,
         arguments: Vec<Expr>,
+        plan: Option<IntrinsicCallPlan>,
     },
     Foreign {
         target: Box<Expr>,
@@ -141,6 +142,14 @@ pub enum ExprKind {
         procedure: usize,
         arguments: Vec<Argument>,
     },
+}
+#[derive(Clone, Debug)]
+pub struct IntrinsicCallPlan {
+    /// Declaration-order argument slots; the expressions themselves remain in
+    /// source evaluation order in `ExprKind::Intrinsic::arguments`.
+    pub bindings: Vec<vba_values::IntrinsicArgumentBinding>,
+    pub argument_modes: Vec<vba_values::IntrinsicArgumentMode>,
+    pub return_variant: vba_values::IntrinsicReturn,
 }
 #[derive(Clone, Debug)]
 pub enum Argument {
@@ -1665,6 +1674,7 @@ impl Binder<'_> {
                             kind: ExprKind::Intrinsic {
                                 function: vba_values::Intrinsic::Array,
                                 arguments: values,
+                                plan: None,
                             },
                         })),
                     },
@@ -1819,6 +1829,7 @@ impl Binder<'_> {
                             kind: ExprKind::Intrinsic {
                                 function: vba_values::Intrinsic::Array,
                                 arguments: Vec::new(),
+                                plan: None,
                             },
                         })),
                     },
@@ -2396,6 +2407,179 @@ impl Binder<'_> {
             },
         })
     }
+    fn intrinsic_call(
+        &mut self,
+        function: vba_values::Intrinsic,
+        arguments: &[ast::Argument],
+        span: Span,
+    ) -> Result<Expr> {
+        let descriptor = function
+            .descriptor()
+            .ok_or_else(|| unsupported("intrinsic is not executable", span))?;
+        if !function.accepts(arguments.len()) {
+            return Err(err("intrinsic argument count", span));
+        }
+        let extended = arguments
+            .iter()
+            .any(|argument| argument.name.is_some() || argument.value.is_none());
+        if !extended {
+            let mut values = Vec::new();
+            for (index, argument) in arguments.iter().enumerate() {
+                let value = argument
+                    .value
+                    .as_ref()
+                    .ok_or_else(|| err("missing intrinsic argument", argument.span))?;
+                let mode = if descriptor.variadic {
+                    descriptor.variadic_mode
+                } else if function == vba_values::Intrinsic::InStr && arguments.len() == 2 {
+                    descriptor
+                        .parameters
+                        .get(index + 1)
+                        .map_or(vba_values::IntrinsicArgumentMode::Value, |parameter| {
+                            parameter.mode
+                        })
+                } else {
+                    descriptor
+                        .parameters
+                        .get(index)
+                        .map_or(vba_values::IntrinsicArgumentMode::Value, |parameter| {
+                            parameter.mode
+                        })
+                };
+                let value = match mode {
+                    vba_values::IntrinsicArgumentMode::Value => self.value_expr(value)?,
+                    vba_values::IntrinsicArgumentMode::RawVariant
+                    | vba_values::IntrinsicArgumentMode::Object => self.expr(value)?,
+                };
+                push(&mut values, value, argument.span)?;
+            }
+            return Ok(Expr {
+                span,
+                kind: ExprKind::Intrinsic {
+                    function,
+                    arguments: values,
+                    plan: None,
+                },
+            });
+        }
+        if descriptor.variadic {
+            return Err(unsupported(
+                "named/omitted variadic intrinsic arguments",
+                span,
+            ));
+        }
+        let mut start_form = false;
+        let mut positional_count = 0usize;
+        for argument in arguments {
+            if let Some(name) = &argument.name {
+                if name.spelling.eq_ignore_ascii_case("start") {
+                    start_form = true;
+                }
+            } else {
+                positional_count += 1;
+                if argument.value.is_none() {
+                    start_form = true;
+                }
+            }
+        }
+        if function == vba_values::Intrinsic::InStr && positional_count >= 3 {
+            start_form = true;
+        }
+        let mut bindings = Vec::new();
+        let mut assigned = Vec::new();
+        let mut modes = Vec::new();
+        let mut argument_parameters = Vec::new();
+        let mut evaluated_count = 0usize;
+        bindings
+            .try_reserve_exact(descriptor.parameters.len())
+            .map_err(|_| limit(span))?;
+        assigned
+            .try_reserve_exact(descriptor.parameters.len())
+            .map_err(|_| limit(span))?;
+        for _ in descriptor.parameters {
+            bindings.push(vba_values::IntrinsicArgumentBinding::Omitted);
+            assigned.push(false);
+        }
+        let mut named_seen = false;
+        let mut positional_slot = 0usize;
+        for argument in arguments {
+            let parameter_index = if let Some(name) = &argument.name {
+                named_seen = true;
+                descriptor
+                    .parameters
+                    .iter()
+                    .position(|parameter| parameter.name.eq_ignore_ascii_case(&name.spelling))
+                    .ok_or_else(|| err("unknown intrinsic argument name", argument.span))?
+            } else {
+                if named_seen {
+                    return Err(err(
+                        "positional intrinsic argument after named",
+                        argument.span,
+                    ));
+                }
+                let index = if function == vba_values::Intrinsic::InStr && !start_form {
+                    positional_slot.saturating_add(1)
+                } else {
+                    positional_slot
+                };
+                positional_slot = positional_slot.saturating_add(1);
+                index
+            };
+            let Some(parameter) = descriptor.parameters.get(parameter_index) else {
+                return Err(err("intrinsic argument position", argument.span));
+            };
+            if assigned.get(parameter_index).copied().unwrap_or(false) {
+                return Err(err("duplicate intrinsic argument", argument.span));
+            }
+            if argument.value.is_none() && parameter.required {
+                return Err(err("required intrinsic argument omitted", argument.span));
+            }
+            if argument.value.is_some() {
+                let index = u16::try_from(evaluated_count).map_err(|_| limit(argument.span))?;
+                evaluated_count = evaluated_count.saturating_add(1);
+                push(&mut modes, parameter.mode, argument.span)?;
+                if let Some(binding) = bindings.get_mut(parameter_index) {
+                    *binding = vba_values::IntrinsicArgumentBinding::Evaluated(index);
+                }
+            }
+            push(&mut argument_parameters, parameter_index, argument.span)?;
+            if let Some(slot) = assigned.get_mut(parameter_index) {
+                *slot = true;
+            }
+        }
+        for (index, parameter) in descriptor.parameters.iter().enumerate() {
+            if parameter.required && !assigned.get(index).copied().unwrap_or(false) {
+                return Err(err("missing required intrinsic argument", span));
+            }
+        }
+        let mut values = Vec::new();
+        for (argument, parameter_index) in arguments.iter().zip(argument_parameters) {
+            if let Some(source) = &argument.value {
+                let parameter = descriptor
+                    .parameters
+                    .get(parameter_index)
+                    .ok_or_else(|| err("intrinsic parameter layout", argument.span))?;
+                let expression = match parameter.mode {
+                    vba_values::IntrinsicArgumentMode::Value => self.value_expr(source)?,
+                    vba_values::IntrinsicArgumentMode::RawVariant
+                    | vba_values::IntrinsicArgumentMode::Object => self.expr(source)?,
+                };
+                push(&mut values, expression, argument.span)?;
+            }
+        }
+        Ok(Expr {
+            span,
+            kind: ExprKind::Intrinsic {
+                function,
+                arguments: values,
+                plan: Some(IntrinsicCallPlan {
+                    bindings,
+                    argument_modes: modes,
+                    return_variant: descriptor.return_variant,
+                }),
+            },
+        })
+    }
     fn expr(&mut self, expr: &ast::Expr) -> Result<Expr> {
         self.budget.charge(256, expr.span)?;
         if let Some(path) = reference_path(expr)
@@ -2508,50 +2692,22 @@ impl Binder<'_> {
                     name,
                 } = &target.kind
                 {
-                    if matches!(&object.kind,ast::ExprKind::Name(n) if n.key()=="vba")
+                    let vba_shadowed = self.symbols.contains_key("vba")
+                        || self
+                            .lookup
+                            .local
+                            .contains_key(&(self.signature.module, "vba".into()))
+                        || self.lookup.public.contains_key("vba")
+                        || self
+                            .imports
+                            .iter()
+                            .any(|import| import.name.eq_ignore_ascii_case("VBA"))
+                        || matches!(&object.kind, ast::ExprKind::Name(name) if self.implicit_me_member(name));
+                    if !vba_shadowed
+                        && matches!(&object.kind, ast::ExprKind::Name(n) if n.key()=="vba")
                         && let Some(function) = vba_values::Intrinsic::from_name(&name.spelling)
                     {
-                        if !function.accepts(arguments.len()) {
-                            return Err(err("intrinsic argument count", expr.span));
-                        }
-                        let mut values = Vec::new();
-                        for argument in arguments {
-                            if argument.name.is_some() {
-                                return Err(unsupported("named intrinsic argument", argument.span));
-                            }
-                            let value = argument
-                                .value
-                                .as_ref()
-                                .ok_or_else(|| err("missing intrinsic argument", argument.span))?;
-                            push(
-                                &mut values,
-                                if matches!(
-                                    function,
-                                    vba_values::Intrinsic::IsObject
-                                        | vba_values::Intrinsic::Array
-                                        | vba_values::Intrinsic::ArrayBaseOne
-                                        | vba_values::Intrinsic::IIf
-                                        | vba_values::Intrinsic::IsArray
-                                        | vba_values::Intrinsic::LBound
-                                        | vba_values::Intrinsic::UBound
-                                        | vba_values::Intrinsic::IsMissing
-                                        | vba_values::Intrinsic::VarType
-                                        | vba_values::Intrinsic::TypeName
-                                ) {
-                                    self.expr(value)?
-                                } else {
-                                    self.value_expr(value)?
-                                },
-                                argument.span,
-                            )?;
-                        }
-                        return Ok(Expr {
-                            span: expr.span,
-                            kind: ExprKind::Intrinsic {
-                                function,
-                                arguments: values,
-                            },
-                        });
+                        return self.intrinsic_call(function, arguments, expr.span);
                     }
                     return self.foreign(object, name, arguments, ForeignKind::Call, None);
                 }
@@ -2625,50 +2781,25 @@ impl Binder<'_> {
                     if function == vba_values::Intrinsic::Array && self.base == 1 {
                         function = vba_values::Intrinsic::ArrayBaseOne;
                     }
-                    if !function.accepts(arguments.len()) {
-                        return Err(err("intrinsic argument count", expr.span));
-                    }
-                    let mut values = Vec::new();
-                    for argument in arguments {
-                        if argument.name.is_some() || argument.value.is_none() {
-                            return Err(err(
-                                "intrinsic requires present positional arguments",
-                                argument.span,
-                            ));
+                    if function == vba_values::Intrinsic::ArrayBaseOne {
+                        let mut values = Vec::new();
+                        for argument in arguments {
+                            let value = argument
+                                .value
+                                .as_ref()
+                                .ok_or_else(|| err("missing intrinsic argument", argument.span))?;
+                            push(&mut values, self.expr(value)?, argument.span)?;
                         }
-                        let value = argument
-                            .value
-                            .as_ref()
-                            .ok_or_else(|| err("intrinsic argument missing", argument.span))?;
-                        push(
-                            &mut values,
-                            if matches!(
+                        return Ok(Expr {
+                            span: expr.span,
+                            kind: ExprKind::Intrinsic {
                                 function,
-                                vba_values::Intrinsic::IsObject
-                                    | vba_values::Intrinsic::Array
-                                    | vba_values::Intrinsic::ArrayBaseOne
-                                    | vba_values::Intrinsic::IIf
-                                    | vba_values::Intrinsic::IsArray
-                                    | vba_values::Intrinsic::LBound
-                                    | vba_values::Intrinsic::UBound
-                                    | vba_values::Intrinsic::IsMissing
-                                    | vba_values::Intrinsic::VarType
-                                    | vba_values::Intrinsic::TypeName
-                            ) {
-                                self.expr(value)?
-                            } else {
-                                self.value_expr(value)?
+                                arguments: values,
+                                plan: None,
                             },
-                            argument.span,
-                        )?;
+                        });
                     }
-                    return Ok(Expr {
-                        span: expr.span,
-                        kind: ExprKind::Intrinsic {
-                            function,
-                            arguments: values,
-                        },
-                    });
+                    return self.intrinsic_call(function, arguments, expr.span);
                 }
                 let id = self.callee(name)?;
                 if self
@@ -3220,6 +3351,7 @@ impl Binder<'_> {
                                 kind: ExprKind::Intrinsic {
                                     function: vba_values::Intrinsic::DebugPrint,
                                     arguments: values,
+                                    plan: None,
                                 },
                             }),
                         });

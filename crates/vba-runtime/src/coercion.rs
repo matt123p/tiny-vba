@@ -1,5 +1,8 @@
 use super::{Error, Result, overflow};
-use vba_values::{Intrinsic as I, ScalarKind as K, Value as V, VbaString};
+use vba_values::{
+    Intrinsic as I, IntrinsicFamily, IntrinsicOmittedDefault, ScalarKind as K, Value as V,
+    VbaString,
+};
 pub(crate) fn error(number: i32, message: &str) -> Error {
     Error::Vba {
         number,
@@ -213,7 +216,7 @@ pub fn intrinsic(function: I, args: &[V]) -> Result<V> {
             Some(V::Object(_) | V::Nothing)
         )));
     }
-    if matches!(function, I::InStr | I::Replace | I::Split | I::Join) {
+    if function.family() == Some(IntrinsicFamily::StringSearch) {
         return string_function(function, args);
     }
     if matches!(function, I::Array | I::ArrayBaseOne) {
@@ -485,6 +488,87 @@ pub fn intrinsic(function: I, args: &[V]) -> Result<V> {
         }
         _ => return Err(mismatch()),
     })
+}
+
+/// Compatibility adapter for verified extended intrinsic calls. Omitted
+/// optional slots stay structural metadata; only trailing omissions are
+/// representable by the legacy runtime entry point.
+pub fn intrinsic_extended(
+    function: I,
+    arguments: &[Option<V>],
+    compare_mode: vba_values::IntrinsicComparisonMode,
+) -> Result<V> {
+    if arguments.len() > 256 {
+        return Err(error(450, "Wrong number of arguments"));
+    }
+    let descriptor = function
+        .descriptor()
+        .ok_or_else(|| Error::Unsupported("intrinsic descriptor unavailable".into()))?;
+    let mut resolved = Vec::new();
+    resolved
+        .try_reserve(arguments.len())
+        .map_err(|_| Error::Resource("intrinsic argument allocation failed".into()))?;
+    for (index, argument) in arguments.iter().enumerate() {
+        let Some(parameter) = descriptor.parameters.get(index) else {
+            if descriptor.variadic {
+                if let Some(value) = argument {
+                    resolved.push(Some(value.clone()));
+                    continue;
+                }
+                return Err(Error::Unsupported(
+                    "variadic intrinsic argument omitted".into(),
+                ));
+            }
+            return Err(error(450, "Wrong number of arguments"));
+        };
+        let value = match argument {
+            Some(value) => Some(value.clone()),
+            None => match parameter.omitted_default {
+                IntrinsicOmittedDefault::None => {
+                    return Err(error(450, "Wrong number of arguments"));
+                }
+                IntrinsicOmittedDefault::Zero => Some(V::Integer(0)),
+                IntrinsicOmittedDefault::One => Some(V::Integer(1)),
+                IntrinsicOmittedDefault::MinusOne => Some(V::Integer(-1)),
+                IntrinsicOmittedDefault::Space => {
+                    Some(V::String(VbaString::from_utf8(" ").map_err(|_| {
+                        Error::Resource("string budget exceeded".into())
+                    })?))
+                }
+                IntrinsicOmittedDefault::ModuleCompare => Some(V::Integer(
+                    if compare_mode == vba_values::IntrinsicComparisonMode::Binary {
+                        0
+                    } else {
+                        1
+                    },
+                )),
+                IntrinsicOmittedDefault::ToEnd => None,
+                IntrinsicOmittedDefault::FunctionSpecific => {
+                    return Err(Error::Unsupported(
+                        "intrinsic omitted default is not implemented".into(),
+                    ));
+                }
+            },
+        };
+        resolved.push(value);
+    }
+    let mut values = Vec::new();
+    values
+        .try_reserve(resolved.len())
+        .map_err(|_| Error::Resource("intrinsic argument allocation failed".into()))?;
+    let mut omitted = false;
+    for argument in &resolved {
+        match argument {
+            Some(value) if !omitted => values.push(value.clone()),
+            Some(_) => {
+                return Err(Error::Unsupported(
+                    "intrinsic optional argument gap needs the contextual executor".into(),
+                ));
+            }
+            None => omitted = true,
+        }
+    }
+    intrinsic(function, &values)
 }
 
 fn find_units(haystack: &[u16], needle: &[u16]) -> Option<usize> {

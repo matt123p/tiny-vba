@@ -16,6 +16,12 @@ they are not aliases for Object. See
 The nominal extension and legacy-consumer refusal are in
 [ADR 0021](decisions/0021-nominal-host-object-types.md).
 
+IR 8 defines and verifies the M6A `IntrinsicCall` operand under
+`intrinsics-m6a-v1`; the VM executes the current descriptor subset. The source
+binder and compiler lower named or omitted intrinsic calls to explicit plans;
+fully positional calls retain legacy instructions. F4 still needs to capture
+the calling module's comparison mode. See the [IR 8 contract](bytecode-vm-specification.md#ir-8-extended-intrinsic-calls).
+
 # M2 binding and verified bytecode
 
 Updated for [M4 / IR 2](m4-language.md), adopted by [ADR 0011](decisions/0011-m4-language-extension.md).

@@ -309,7 +309,9 @@ pub fn compile_modules(
     let mut ir = ir::Program {
         classes,
         nominal_locals,
-        ir_version: if features.iter().any(|f| f.ends_with("-v7")) {
+        ir_version: if features.contains("intrinsics-m6a-v1") {
+            ir::IR8_VERSION
+        } else if features.iter().any(|f| f.ends_with("-v7")) {
             ir::IR7_VERSION
         } else if features.iter().any(|f| f.ends_with("-v6")) {
             ir::IR6_VERSION
@@ -1011,24 +1013,68 @@ impl Builder<'_> {
             bound::ExprKind::Intrinsic {
                 function,
                 arguments,
+                plan,
             } => {
-                if matches!(
-                    function,
-                    vba_values::Intrinsic::IIf | vba_values::Intrinsic::ArrayBaseOne
-                ) {
-                    self.feature("intrinsics-v3");
+                if let Some(plan) = plan {
+                    self.feature("intrinsics-v2");
+                    self.feature("intrinsics-m6a-v1");
+                    for argument in arguments {
+                        self.expr(block, argument)?;
+                    }
+                    self.emit(
+                        block,
+                        ir::Instruction::IntrinsicCall {
+                            function: *function,
+                            return_variant: plan.return_variant,
+                            supplied_arguments: u16::try_from(arguments.len())
+                                .map_err(|_| resource())?,
+                            bindings: plan.bindings.clone(),
+                            compare_mode: {
+                                let module_index = self
+                                    .program
+                                    .procedures
+                                    .get(self.procedure.0 as usize)
+                                    .map(|procedure| procedure.signature.module)
+                                    .ok_or_else(|| error("intrinsic caller module invariant"))?;
+                                if self
+                                    .program
+                                    .modules
+                                    .get(module_index)
+                                    .is_some_and(|module| {
+                                        module.options.iter().any(|option| {
+                                            matches!(
+                                                option,
+                                                ast::ModuleOption::Compare { text: true, .. }
+                                            )
+                                        })
+                                    })
+                                {
+                                    vba_values::IntrinsicComparisonMode::Text
+                                } else {
+                                    vba_values::IntrinsicComparisonMode::Binary
+                                }
+                            },
+                        },
+                    )
+                } else {
+                    if matches!(
+                        function,
+                        vba_values::Intrinsic::IIf | vba_values::Intrinsic::ArrayBaseOne
+                    ) {
+                        self.feature("intrinsics-v3");
+                    }
+                    self.feature("intrinsics-v2");
+                    for argument in arguments {
+                        self.expr(block, argument)?;
+                    }
+                    self.emit(
+                        block,
+                        ir::Instruction::Intrinsic {
+                            function: *function,
+                            arguments: u16::try_from(arguments.len()).map_err(|_| resource())?,
+                        },
+                    )
                 }
-                self.feature("intrinsics-v2");
-                for argument in arguments {
-                    self.expr(block, argument)?;
-                }
-                self.emit(
-                    block,
-                    ir::Instruction::Intrinsic {
-                        function: *function,
-                        arguments: u16::try_from(arguments.len()).map_err(|_| resource())?,
-                    },
-                )
             }
             bound::ExprKind::Foreign {
                 target,

@@ -16,7 +16,7 @@ use vba_values::{Location, Locations, ScalarKind, Value};
 type Result<T> = std::result::Result<T, Diagnostic>;
 pub const PROFILE: &str = runtime::PROFILE;
 pub fn capabilities() -> ir::Capabilities {
-    let mut c = ir::Capabilities::ir7_structural();
+    let mut c = ir::Capabilities::ir8_structural();
     c.profile = PROFILE.into();
 
     c
@@ -2932,6 +2932,39 @@ impl Session {
                 } else {
                     runtime::intrinsic(function, &values).map_err(runtime_diagnostic)?
                 };
+                self.push(Operand::Value(value))?;
+                self.advance()?;
+            }
+            I::IntrinsicCall {
+                function,
+                supplied_arguments,
+                bindings,
+                compare_mode,
+                ..
+            } => {
+                let supplied = usize::from(supplied_arguments);
+                let mut values = Vec::new();
+                reserve(&mut values, supplied)?;
+                for _ in 0..supplied {
+                    values.push(self.pop_value()?);
+                }
+                values.reverse();
+                let mut arguments = Vec::new();
+                reserve(&mut arguments, bindings.len())?;
+                for binding in &bindings {
+                    match binding {
+                        ir::IntrinsicArgumentBinding::Evaluated(index) => {
+                            let value = values
+                                .get(usize::from(*index))
+                                .ok_or_else(|| invariant("verified intrinsic index"))?;
+                            arguments.push(Some(value.clone()));
+                        }
+                        ir::IntrinsicArgumentBinding::Omitted => arguments.push(None),
+                    }
+                }
+                self.charge(supplied.saturating_add(1))?;
+                let value = runtime::intrinsic_extended(function, &arguments, compare_mode)
+                    .map_err(runtime_diagnostic)?;
                 self.push(Operand::Value(value))?;
                 self.advance()?;
             }

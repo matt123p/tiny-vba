@@ -129,6 +129,7 @@ fn validate(
             | IR5_VERSION
             | IR6_VERSION
             | IR7_VERSION
+            | IR8_VERSION
     ) || p.profile != caps.profile
         || !caps.ir_versions.contains(&p.ir_version)
     {
@@ -1189,6 +1190,93 @@ fn procedure(
                     return Err(invalid("intrinsic arity"));
                 }
                 for _ in 0..*arguments {
+                    value(&mut stack)?;
+                }
+                stack.push(Stack::Value);
+            }
+            Instruction::IntrinsicCall {
+                function,
+                return_variant,
+                supplied_arguments,
+                bindings,
+                compare_mode: _,
+            } => {
+                if p.ir_version < IR8_VERSION {
+                    return Err(invalid("extended intrinsic requires IR 8"));
+                }
+                feature(p, caps, "intrinsics-m6a-v1")?;
+                let descriptor = function
+                    .descriptor()
+                    .ok_or_else(|| invalid("extended intrinsic is not executable"))?;
+                if descriptor.return_variant != *return_variant {
+                    return Err(invalid("extended intrinsic return variant mismatch"));
+                }
+                let supplied = usize::from(*supplied_arguments);
+                if supplied > 256
+                    || supplied < descriptor.minimum_arguments
+                    || supplied > descriptor.maximum_arguments
+                {
+                    return Err(invalid("extended intrinsic supplied argument count"));
+                }
+                if descriptor.variadic {
+                    if bindings.len() != supplied || bindings.len() > 256 {
+                        return Err(invalid("extended intrinsic variadic layout"));
+                    }
+                } else if bindings.len() != descriptor.parameters.len() {
+                    return Err(invalid("extended intrinsic parameter layout"));
+                }
+                let mut used = Vec::new();
+                used.try_reserve_exact(supplied)
+                    .map_err(|_| invalid("extended intrinsic mapping allocation"))?;
+                used.resize(supplied, false);
+                if descriptor.variadic {
+                    for binding in bindings {
+                        match binding {
+                            IntrinsicArgumentBinding::Evaluated(index) => {
+                                let index = usize::from(*index);
+                                if index >= supplied {
+                                    return Err(invalid("extended intrinsic argument index"));
+                                }
+                                let Some(seen) = used.get_mut(index) else {
+                                    return Err(invalid("extended intrinsic argument index"));
+                                };
+                                if *seen {
+                                    return Err(invalid("extended intrinsic duplicate mapping"));
+                                }
+                                *seen = true;
+                            }
+                            IntrinsicArgumentBinding::Omitted => {
+                                return Err(invalid("variadic intrinsic cannot omit an argument"));
+                            }
+                        }
+                    }
+                } else {
+                    for (parameter, binding) in descriptor.parameters.iter().zip(bindings) {
+                        match binding {
+                            IntrinsicArgumentBinding::Evaluated(index) => {
+                                let index = usize::from(*index);
+                                if index >= supplied {
+                                    return Err(invalid("extended intrinsic argument index"));
+                                }
+                                let Some(seen) = used.get_mut(index) else {
+                                    return Err(invalid("extended intrinsic argument index"));
+                                };
+                                if *seen {
+                                    return Err(invalid("extended intrinsic duplicate mapping"));
+                                }
+                                *seen = true;
+                            }
+                            IntrinsicArgumentBinding::Omitted if parameter.required => {
+                                return Err(invalid("required intrinsic parameter omitted"));
+                            }
+                            IntrinsicArgumentBinding::Omitted => (),
+                        }
+                    }
+                }
+                if used.iter().any(|seen| !seen) {
+                    return Err(invalid("extended intrinsic argument is unmapped"));
+                }
+                for _ in 0..supplied {
                     value(&mut stack)?;
                 }
                 stack.push(Stack::Value);

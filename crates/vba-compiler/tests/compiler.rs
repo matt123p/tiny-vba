@@ -13,6 +13,84 @@ fn source(text: &str) -> Result<SourceFile, Box<dyn Error>> {
 fn build(text: &str) -> Result<ir::VerifiedProgram, Box<dyn Error>> {
     Ok(compile(&source(text)?, &CompileOptions::default())?)
 }
+
+#[test]
+fn named_intrinsic_arguments_lower_to_ir8_source_order_plans() -> Result<(), Box<dyn Error>> {
+    let options = CompileOptions {
+        capabilities: ir::Capabilities::ir8_structural(),
+        ..Default::default()
+    };
+    let program = compile(
+        &source(
+            "Function Answer() As Double\nAnswer=Round(numdecimalplaces:=1,expression:=2.25)\nEnd Function",
+        )?,
+        &options,
+    )?;
+    assert_eq!(program.program().ir_version, ir::IR8_VERSION);
+    assert!(
+        program
+            .program()
+            .required_features
+            .contains("intrinsics-m6a-v1")
+    );
+    let call = program
+        .program()
+        .procedures
+        .iter()
+        .flat_map(|procedure| &procedure.code)
+        .find_map(|instruction| match instruction {
+            I::IntrinsicCall {
+                function,
+                supplied_arguments,
+                bindings,
+                compare_mode,
+                ..
+            } if *function == vba_values::Intrinsic::Round => {
+                Some((*supplied_arguments, bindings, *compare_mode))
+            }
+            _ => None,
+        })
+        .ok_or("IR 8 Round call")?;
+    assert_eq!(call.0, 2);
+    assert_eq!(call.2, vba_values::IntrinsicComparisonMode::Binary);
+    assert_eq!(
+        call.1,
+        &[
+            vba_values::IntrinsicArgumentBinding::Evaluated(1),
+            vba_values::IntrinsicArgumentBinding::Evaluated(0),
+        ]
+    );
+    assert!(
+        compile(
+            &source("Function Answer() As Double\nAnswer=Round(expression:=2.25)\nEnd Function")?,
+            &CompileOptions::default()
+        )
+        .is_err()
+    );
+    Ok(())
+}
+
+#[test]
+fn intrinsic_binding_rejects_invalid_names_order_and_required_omission()
+-> Result<(), Box<dyn Error>> {
+    let options = CompileOptions {
+        capabilities: ir::Capabilities::ir8_structural(),
+        ..Default::default()
+    };
+    for expression in [
+        "Round(unknown:=1)",
+        "Round(expression:=1,expression:=2)",
+        "Round(expression:=1,2)",
+        "Round(numdecimalplaces:=1)",
+    ] {
+        let source_text = format!("Function Answer() As Double\nAnswer={expression}\nEnd Function");
+        assert!(
+            compile(&source(&source_text)?, &options).is_err(),
+            "{expression}"
+        );
+    }
+    Ok(())
+}
 #[test]
 fn answer_golden_is_verified_and_deterministic() -> Result<(), Box<dyn Error>> {
     let file = SourceFile::new(

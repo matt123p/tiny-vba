@@ -473,6 +473,26 @@ impl Ide {
                 crate::display_value(&c.value)
             ));
         }
+        let (intrinsic_name, is_vba_qualification) = name
+            .rsplit_once('.')
+            .map_or((name, false), |(owner, member)| {
+                (member, owner.eq_ignore_ascii_case("VBA"))
+            });
+        let vba_shadowed = self
+            .source_completions()
+            .iter()
+            .any(|(symbol, _)| symbol.eq_ignore_ascii_case("VBA"));
+        if (!is_vba_qualification || !vba_shadowed)
+            && let Some(descriptor) = vba_values::INTRINSIC_DESCRIPTORS.iter().find(|descriptor| {
+                descriptor.spelling.eq_ignore_ascii_case(intrinsic_name)
+                    || descriptor
+                        .aliases
+                        .iter()
+                        .any(|alias| alias.eq_ignore_ascii_case(intrinsic_name))
+            })
+        {
+            return Some(descriptor.signature.to_owned());
+        }
         let (owner, member) = name.rsplit_once('.')?;
         let ty = self.receiver_expression_type(owner);
         self.catalog

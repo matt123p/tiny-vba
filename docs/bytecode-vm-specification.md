@@ -1,6 +1,6 @@
 # Bytecode and explicit-state VM specification
 
-Version: IR 1. Date: 2026-10-26. Status: adopted implementation contract under
+Version: IR 1 base with versioned extensions through IR 8. Date: 2026-10-26. Status: adopted implementation contract under
 [ADR 0004](decisions/0004-bytecode-vm-contract.md). M2 structural IR/verifier/lowering and M3 execution subset implemented. See [compiler](compiler.md) and [runtime](runtime.md).
 
 This document defines the M2/M3 instruction representation, verifier, calling convention and execution
@@ -603,3 +603,30 @@ Array/UDT l-values, optional/named direct calls, error handlers, callbacks, fore
 error writebacks need additional explicit contracts and evidence at their milestones. Passing this
 subset must not mark all 20 M0 fixtures or external corpus candidates PASS. Update compatibility and
 progress only from actual compilation/execution results.
+
+## IR 8 extended intrinsic calls
+
+IR 8 adds `IntrinsicCall` under the `intrinsics-m6a-v1` feature. IR 1–7
+`Intrinsic` operands and their v2/v3 gates retain their prior meaning. An
+extended call records the executable descriptor identity, declared result
+variant, number of supplied expressions, declaration-order bindings, and the
+effective Binary/Text comparison mode. Arguments are already on the ordinary
+value stack in source evaluation order; `Evaluated(i)` maps expression `i` into
+one parameter slot. `Omitted` is structural metadata and is never a
+`Value::Missing`, Empty, or Null. The opcode consumes exactly the supplied count
+and produces one value.
+
+Verification requires IR >= 8 and `intrinsics-m6a-v1`, a registered executable
+descriptor, matching return metadata, <= 256 parameters/supplied expressions,
+complete unique use of every evaluated index, required parameters present,
+only optional parameters omitted, and a legal variadic layout. Reordered named
+parameters therefore cannot duplicate, drop, or re-evaluate an expression.
+Malformed mappings fail before VM or host dispatch. Targets capped at IR 7
+refuse the opcode explicitly.
+
+The compiler emits IR 8 calls for named or omitted intrinsic arguments and
+retains legacy opcodes for fully positional calls. F4 still needs to capture the
+calling module's comparison mode; until then emitted calls carry Binary mode.
+The adapter materializes descriptor defaults, including optional gaps where a
+function contract supplies a concrete default. Text comparison remains explicitly
+unsupported until a deterministic provider is available.

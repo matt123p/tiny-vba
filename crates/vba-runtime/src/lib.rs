@@ -1,7 +1,7 @@
 //! Shared M4 scalar coercion, operator and deterministic intrinsic rules.
 #![forbid(unsafe_code)]
 mod coercion;
-pub use coercion::intrinsic;
+pub use coercion::{intrinsic, intrinsic_extended};
 use vba_values::{ScalarKind, Value, VbaString};
 pub const PROFILE: &str = "m5-host-v1";
 #[derive(Clone, Debug, PartialEq, Eq)]

@@ -37,6 +37,24 @@ fn nested_parameter_info_tracks_outer_argument_and_ignores_string_commas() -> R 
     );
     Ok(())
 }
+
+#[test]
+fn intrinsic_completion_and_signature_help_use_executable_descriptors() -> R {
+    let mut ide = Ide::new();
+    let source = "Sub Main()\nRound(\nEnd Sub\n";
+    let id = ide.add_module("Intrinsic.bas", source)?;
+    ide.navigate(id, source.find("Round(").ok_or("call")? + "Round(".len())?;
+    let info = ide.parameter_info().ok_or("intrinsic signature")?;
+    assert_eq!(info.signature, "Round(expression, [numdecimalplaces])");
+    assert!(ide.completions("InS").contains(&"InStr".into()));
+    assert_eq!(ide.completions("VBA.Ro"), vec!["Round"]);
+    assert_eq!(
+        ide.quick_info("VBA.Round").as_deref(),
+        Some("Round(expression, [numdecimalplaces])")
+    );
+    assert!(ide.quick_info("StrComp").is_none());
+    Ok(())
+}
 #[test]
 fn reference_configuration_is_bounded_and_does_not_grant_binding() -> R {
     let mut ide = Ide::demo()?;

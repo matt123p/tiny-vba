@@ -1,11 +1,12 @@
-//! IR 1/2/3: immutable programs, bounded structural verification and diagnostic disassembly.
+//! Versioned immutable programs, bounded structural verification and diagnostic disassembly.
 #![forbid(unsafe_code)]
 mod disasm;
 mod verify;
 pub use disasm::disassemble;
 use std::collections::BTreeSet;
 use vba_diagnostics::{SourceFile, Span, StatementId};
-use vba_values::{ScalarKind, Value};
+pub use vba_values::IntrinsicArgumentBinding;
+use vba_values::{Intrinsic, IntrinsicComparisonMode, IntrinsicReturn, ScalarKind, Value};
 pub use verify::{VerifyLimits, measure_stack, recheck, verify};
 
 macro_rules! index {
@@ -31,7 +32,8 @@ pub const IR4_VERSION: u32 = 4;
 pub const IR5_VERSION: u32 = 5;
 pub const IR6_VERSION: u32 = 6;
 pub const IR7_VERSION: u32 = 7;
-pub const FEATURES: [&str; 21] = [
+pub const IR8_VERSION: u32 = 8;
+pub const FEATURES: [&str; 22] = [
     "host-events-v1",
     "project-classes-v7",
     "default-members-v6",
@@ -53,6 +55,7 @@ pub const FEATURES: [&str; 21] = [
     "array-layout-v3",
     "argument-captures-v3",
     "intrinsics-v3",
+    "intrinsics-m6a-v1",
 ];
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
@@ -123,6 +126,7 @@ pub enum Opcode {
     ErrClear,
     Raise,
     Intrinsic,
+    IntrinsicCall,
     Checkpoint,
     Const,
     ReadLocal,
@@ -141,7 +145,7 @@ pub enum Opcode {
     Stop,
     Return,
 }
-pub const OPCODES: [Opcode; 33] = [
+pub const OPCODES: [Opcode; 34] = [
     Opcode::DefaultInstance,
     Opcode::NewInstance,
     Opcode::EnumerationInit,
@@ -150,6 +154,7 @@ pub const OPCODES: [Opcode; 33] = [
     Opcode::SaveReference,
     Opcode::LoadReference,
     Opcode::Intrinsic,
+    Opcode::IntrinsicCall,
     Opcode::RefElement,
     Opcode::ArrayResize,
     Opcode::ArrayErase,
@@ -226,6 +231,13 @@ pub enum Instruction {
         function: vba_values::Intrinsic,
         arguments: u16,
     },
+    IntrinsicCall {
+        function: Intrinsic,
+        return_variant: IntrinsicReturn,
+        supplied_arguments: u16,
+        bindings: Vec<IntrinsicArgumentBinding>,
+        compare_mode: IntrinsicComparisonMode,
+    },
     Checkpoint(SiteId),
     Const(ConstantId),
     ReadLocal(LocalSlot),
@@ -269,6 +281,7 @@ impl Instruction {
             Self::ErrClear => Opcode::ErrClear,
             Self::Raise(_) => Opcode::Raise,
             Self::Intrinsic { .. } => Opcode::Intrinsic,
+            Self::IntrinsicCall { .. } => Opcode::IntrinsicCall,
             Self::Checkpoint(_) => Opcode::Checkpoint,
             Self::Const(_) => Opcode::Const,
             Self::ReadLocal(_) => Opcode::ReadLocal,
@@ -551,7 +564,7 @@ impl Capabilities {
         caps
     }
     pub fn ir7_structural() -> Self {
-        Self {
+        let mut caps = Self {
             profile: "ir7-structural".into(),
             ir_versions: BTreeSet::from([
                 IR_VERSION,
@@ -571,7 +584,18 @@ impl Capabilities {
                 .filter(|k| *k != ScalarKind::Object)
                 .collect(),
             declarations: ScalarKind::ALL.into_iter().collect(),
-        }
+        };
+        caps.features.remove("intrinsics-m6a-v1");
+        caps.instructions.remove(&Opcode::IntrinsicCall);
+        caps
+    }
+    pub fn ir8_structural() -> Self {
+        let mut caps = Self::ir7_structural();
+        caps.profile = "ir8-structural".into();
+        caps.ir_versions.insert(IR8_VERSION);
+        caps.features.insert("intrinsics-m6a-v1".into());
+        caps.instructions.insert(Opcode::IntrinsicCall);
+        caps
     }
 }
 #[derive(Clone, Debug)]

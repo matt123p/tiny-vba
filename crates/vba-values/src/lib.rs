@@ -305,32 +305,607 @@ pub enum Intrinsic {
     Asc,
     Chr,
 }
+
+/// Whether an intrinsic returns its historical VBA Variant subtype or a fixed
+/// public String result. Extended return variants are represented explicitly so
+/// `$` spellings cannot accidentally collapse into their Variant forms.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum IntrinsicReturn {
+    Variant,
+    Fixed(ScalarKind),
+    Array,
+    Polymorphic,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum IntrinsicEffect {
+    Pure,
+    Contextual,
+    HostEffect,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum IntrinsicFamily {
+    Arrays,
+    Conversion,
+    Inspection,
+    Numeric,
+    Selection,
+    StringSearch,
+    StringValue,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum IntrinsicComparisonMode {
+    Binary,
+    Text,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub enum IntrinsicArgumentBinding {
+    Evaluated(u16),
+    Omitted,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum IntrinsicArgumentMode {
+    Value,
+    RawVariant,
+    Object,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct IntrinsicParameter {
+    pub name: &'static str,
+    pub required: bool,
+    pub mode: IntrinsicArgumentMode,
+    pub omitted_default: IntrinsicOmittedDefault,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum IntrinsicOmittedDefault {
+    None,
+    Zero,
+    One,
+    MinusOne,
+    Space,
+    ModuleCompare,
+    ToEnd,
+    FunctionSpecific,
+}
+
+/// Metadata for an executable public intrinsic spelling. This catalogue is
+/// deliberately limited to entries implemented by the current runtime; planned
+/// names remain in the M6A audit inventory and do not resolve as executable.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct IntrinsicDescriptor {
+    pub intrinsic: Intrinsic,
+    pub spelling: &'static str,
+    pub aliases: &'static [&'static str],
+    pub family: IntrinsicFamily,
+    pub parameters: &'static [IntrinsicParameter],
+    pub variadic: bool,
+    pub variadic_mode: IntrinsicArgumentMode,
+    pub minimum_arguments: usize,
+    pub maximum_arguments: usize,
+    pub return_variant: IntrinsicReturn,
+    pub effect: IntrinsicEffect,
+    pub read_only_inspection: bool,
+    pub minimum_ir: u32,
+    pub capability: &'static str,
+    pub signature: &'static str,
+    pub platform_requirements: &'static str,
+}
+
 impl Intrinsic {
+    pub fn descriptor(self) -> Option<&'static IntrinsicDescriptor> {
+        INTRINSIC_DESCRIPTORS
+            .iter()
+            .find(|item| item.intrinsic == self)
+    }
+}
+
+const VALUE: IntrinsicArgumentMode = IntrinsicArgumentMode::Value;
+const RAW: IntrinsicArgumentMode = IntrinsicArgumentMode::RawVariant;
+const OBJECT: IntrinsicArgumentMode = IntrinsicArgumentMode::Object;
+const fn parameter(name: &'static str, required: bool) -> IntrinsicParameter {
+    IntrinsicParameter {
+        name,
+        required,
+        mode: VALUE,
+        omitted_default: if required {
+            IntrinsicOmittedDefault::None
+        } else {
+            IntrinsicOmittedDefault::FunctionSpecific
+        },
+    }
+}
+const fn raw_parameter(name: &'static str, required: bool) -> IntrinsicParameter {
+    IntrinsicParameter {
+        name,
+        required,
+        mode: RAW,
+        omitted_default: if required {
+            IntrinsicOmittedDefault::None
+        } else {
+            IntrinsicOmittedDefault::FunctionSpecific
+        },
+    }
+}
+const fn object_parameter(name: &'static str, required: bool) -> IntrinsicParameter {
+    IntrinsicParameter {
+        name,
+        required,
+        mode: OBJECT,
+        omitted_default: if required {
+            IntrinsicOmittedDefault::None
+        } else {
+            IntrinsicOmittedDefault::FunctionSpecific
+        },
+    }
+}
+const fn with_default(
+    mut parameter: IntrinsicParameter,
+    omitted_default: IntrinsicOmittedDefault,
+) -> IntrinsicParameter {
+    parameter.omitted_default = omitted_default;
+    parameter
+}
+
+const ONE_VALUE: &[IntrinsicParameter] = &[parameter("expression", true)];
+const ONE_RAW: &[IntrinsicParameter] = &[raw_parameter("expression", true)];
+const ONE_OBJECT: &[IntrinsicParameter] = &[object_parameter("expression", true)];
+const INSTR_PARAMS: &[IntrinsicParameter] = &[
+    with_default(parameter("start", false), IntrinsicOmittedDefault::One),
+    parameter("string1", true),
+    parameter("string2", true),
+    with_default(
+        parameter("compare", false),
+        IntrinsicOmittedDefault::ModuleCompare,
+    ),
+];
+const REPLACE_PARAMS: &[IntrinsicParameter] = &[
+    parameter("expression", true),
+    parameter("find", true),
+    parameter("replace", true),
+    with_default(parameter("start", false), IntrinsicOmittedDefault::One),
+    with_default(parameter("count", false), IntrinsicOmittedDefault::MinusOne),
+    with_default(
+        parameter("compare", false),
+        IntrinsicOmittedDefault::ModuleCompare,
+    ),
+];
+const SPLIT_PARAMS: &[IntrinsicParameter] = &[
+    parameter("expression", true),
+    with_default(
+        parameter("delimiter", false),
+        IntrinsicOmittedDefault::Space,
+    ),
+    with_default(parameter("limit", false), IntrinsicOmittedDefault::MinusOne),
+    with_default(
+        parameter("compare", false),
+        IntrinsicOmittedDefault::ModuleCompare,
+    ),
+];
+const JOIN_PARAMS: &[IntrinsicParameter] = &[
+    raw_parameter("sourcearray", true),
+    with_default(
+        parameter("delimiter", false),
+        IntrinsicOmittedDefault::Space,
+    ),
+];
+const BOUND_PARAMS: &[IntrinsicParameter] = &[
+    raw_parameter("arrayname", true),
+    with_default(parameter("dimension", false), IntrinsicOmittedDefault::One),
+];
+const ROUND_PARAMS: &[IntrinsicParameter] = &[
+    parameter("expression", true),
+    with_default(
+        parameter("numdecimalplaces", false),
+        IntrinsicOmittedDefault::Zero,
+    ),
+];
+const MID_PARAMS: &[IntrinsicParameter] = &[
+    parameter("string", true),
+    parameter("start", true),
+    with_default(parameter("length", false), IntrinsicOmittedDefault::ToEnd),
+];
+const LEFT_RIGHT_PARAMS: &[IntrinsicParameter] =
+    &[parameter("string", true), parameter("length", true)];
+const IIF_PARAMS: &[IntrinsicParameter] = &[
+    parameter("expr", true),
+    raw_parameter("truepart", true),
+    raw_parameter("falsepart", true),
+];
+const ARRAY_PARAMS: &[IntrinsicParameter] = &[];
+
+const fn descriptor(
+    intrinsic: Intrinsic,
+    spelling: &'static str,
+    parameters: &'static [IntrinsicParameter],
+    variadic: bool,
+    signature: &'static str,
+) -> IntrinsicDescriptor {
+    let (minimum_ir, capability) = if matches!(intrinsic, Intrinsic::IIf) {
+        (3, "intrinsics-v3")
+    } else {
+        (2, "intrinsics-v2")
+    };
+    let minimum_arguments = match intrinsic {
+        Intrinsic::IIf => 3,
+        Intrinsic::InStr => 2,
+        Intrinsic::Replace => 3,
+        Intrinsic::Split => 1,
+        Intrinsic::Join => 1,
+        Intrinsic::Array => 0,
+        Intrinsic::LBound | Intrinsic::UBound => 1,
+        Intrinsic::Round => 1,
+        Intrinsic::Mid => 2,
+        Intrinsic::Left | Intrinsic::Right => 2,
+        _ => 1,
+    };
+    IntrinsicDescriptor {
+        intrinsic,
+        spelling,
+        aliases: &[],
+        family: match intrinsic {
+            Intrinsic::Array | Intrinsic::ArrayBaseOne | Intrinsic::LBound | Intrinsic::UBound => {
+                IntrinsicFamily::Arrays
+            }
+            Intrinsic::IIf => IntrinsicFamily::Selection,
+            Intrinsic::InStr | Intrinsic::Replace | Intrinsic::Split | Intrinsic::Join => {
+                IntrinsicFamily::StringSearch
+            }
+            Intrinsic::IsObject
+            | Intrinsic::IsArray
+            | Intrinsic::IsMissing
+            | Intrinsic::IsEmpty
+            | Intrinsic::IsNull
+            | Intrinsic::IsError
+            | Intrinsic::VarType
+            | Intrinsic::TypeName => IntrinsicFamily::Inspection,
+            Intrinsic::CInt
+            | Intrinsic::CLng
+            | Intrinsic::CLngLng
+            | Intrinsic::CByte
+            | Intrinsic::CSng
+            | Intrinsic::CDbl
+            | Intrinsic::CCur
+            | Intrinsic::CDate
+            | Intrinsic::CBool
+            | Intrinsic::CStr
+            | Intrinsic::CVar
+            | Intrinsic::CVErr => IntrinsicFamily::Conversion,
+            Intrinsic::Len
+            | Intrinsic::Left
+            | Intrinsic::Right
+            | Intrinsic::Mid
+            | Intrinsic::Trim
+            | Intrinsic::LCase
+            | Intrinsic::UCase
+            | Intrinsic::Asc
+            | Intrinsic::Chr => IntrinsicFamily::StringValue,
+            _ => IntrinsicFamily::Numeric,
+        },
+        parameters,
+        variadic,
+        variadic_mode: if matches!(intrinsic, Intrinsic::Array) {
+            RAW
+        } else {
+            VALUE
+        },
+        minimum_arguments,
+        maximum_arguments: if variadic { 256 } else { parameters.len() },
+        return_variant: return_variant(intrinsic),
+        effect: IntrinsicEffect::Pure,
+        read_only_inspection: true,
+        minimum_ir,
+        capability,
+        signature,
+        platform_requirements: "portable core",
+    }
+}
+
+const fn return_variant(intrinsic: Intrinsic) -> IntrinsicReturn {
+    use Intrinsic as I;
+    use IntrinsicReturn as R;
+    use ScalarKind as K;
+    match intrinsic {
+        I::Array | I::ArrayBaseOne | I::Split => R::Array,
+        I::IIf | I::Abs | I::Int | I::Fix => R::Polymorphic,
+        I::InStr | I::Len | I::LBound | I::UBound => R::Fixed(K::Long),
+        I::IsObject | I::IsArray | I::IsMissing | I::IsEmpty | I::IsNull | I::IsError => {
+            R::Fixed(K::Boolean)
+        }
+        I::VarType | I::Sgn | I::Asc => R::Fixed(K::Integer),
+        I::TypeName
+        | I::Replace
+        | I::Join
+        | I::Left
+        | I::Right
+        | I::Mid
+        | I::Trim
+        | I::LCase
+        | I::UCase
+        | I::Chr => R::Fixed(K::String),
+        I::CInt => R::Fixed(K::Integer),
+        I::CLng => R::Fixed(K::Long),
+        I::CLngLng => R::Fixed(K::LongLong),
+        I::CByte => R::Fixed(K::Byte),
+        I::CSng => R::Fixed(K::Single),
+        I::CDbl | I::Round => R::Fixed(K::Double),
+        I::CCur => R::Fixed(K::Currency),
+        I::CDate => R::Fixed(K::Date),
+        I::CBool => R::Fixed(K::Boolean),
+        I::CStr => R::Fixed(K::String),
+        I::CVar | I::CVErr | I::DebugPrint => R::Variant,
+    }
+}
+
+/// Executable legacy intrinsic metadata. F1 keeps the old arity ranges and
+/// identities; later packets add new spellings only when their semantics exist.
+pub const INTRINSIC_DESCRIPTORS: &[IntrinsicDescriptor] = &[
+    descriptor(
+        Intrinsic::IIf,
+        "IIf",
+        IIF_PARAMS,
+        false,
+        "IIf(expr, truepart, falsepart)",
+    ),
+    instr_descriptor(),
+    descriptor(
+        Intrinsic::Replace,
+        "Replace",
+        REPLACE_PARAMS,
+        false,
+        "Replace(expression, find, replace, [start, [count, [compare]]])",
+    ),
+    descriptor(
+        Intrinsic::Split,
+        "Split",
+        SPLIT_PARAMS,
+        false,
+        "Split(expression, [delimiter, [limit, [compare]]])",
+    ),
+    descriptor(
+        Intrinsic::Join,
+        "Join",
+        JOIN_PARAMS,
+        false,
+        "Join(sourcearray, [delimiter])",
+    ),
+    descriptor(
+        Intrinsic::IsObject,
+        "IsObject",
+        ONE_OBJECT,
+        false,
+        "IsObject(expression)",
+    ),
+    descriptor(
+        Intrinsic::Array,
+        "Array",
+        ARRAY_PARAMS,
+        true,
+        "Array([arglist])",
+    ),
+    descriptor(
+        Intrinsic::LBound,
+        "LBound",
+        BOUND_PARAMS,
+        false,
+        "LBound(arrayname, [dimension])",
+    ),
+    descriptor(
+        Intrinsic::UBound,
+        "UBound",
+        BOUND_PARAMS,
+        false,
+        "UBound(arrayname, [dimension])",
+    ),
+    descriptor(
+        Intrinsic::IsArray,
+        "IsArray",
+        ONE_RAW,
+        false,
+        "IsArray(varname)",
+    ),
+    descriptor(
+        Intrinsic::CVErr,
+        "CVErr",
+        ONE_VALUE,
+        false,
+        "CVErr(errornumber)",
+    ),
+    descriptor(
+        Intrinsic::IsMissing,
+        "IsMissing",
+        ONE_RAW,
+        false,
+        "IsMissing(argname)",
+    ),
+    descriptor(
+        Intrinsic::IsEmpty,
+        "IsEmpty",
+        ONE_RAW,
+        false,
+        "IsEmpty(expression)",
+    ),
+    descriptor(
+        Intrinsic::IsNull,
+        "IsNull",
+        ONE_RAW,
+        false,
+        "IsNull(expression)",
+    ),
+    descriptor(
+        Intrinsic::IsError,
+        "IsError",
+        ONE_RAW,
+        false,
+        "IsError(expression)",
+    ),
+    descriptor(
+        Intrinsic::VarType,
+        "VarType",
+        ONE_RAW,
+        false,
+        "VarType(varname)",
+    ),
+    descriptor(
+        Intrinsic::TypeName,
+        "TypeName",
+        ONE_RAW,
+        false,
+        "TypeName(varname)",
+    ),
+    descriptor(
+        Intrinsic::CInt,
+        "CInt",
+        ONE_VALUE,
+        false,
+        "CInt(expression)",
+    ),
+    descriptor(
+        Intrinsic::CLng,
+        "CLng",
+        ONE_VALUE,
+        false,
+        "CLng(expression)",
+    ),
+    descriptor(
+        Intrinsic::CLngLng,
+        "CLngLng",
+        ONE_VALUE,
+        false,
+        "CLngLng(expression)",
+    ),
+    descriptor(
+        Intrinsic::CByte,
+        "CByte",
+        ONE_VALUE,
+        false,
+        "CByte(expression)",
+    ),
+    descriptor(
+        Intrinsic::CSng,
+        "CSng",
+        ONE_VALUE,
+        false,
+        "CSng(expression)",
+    ),
+    descriptor(
+        Intrinsic::CDbl,
+        "CDbl",
+        ONE_VALUE,
+        false,
+        "CDbl(expression)",
+    ),
+    descriptor(
+        Intrinsic::CCur,
+        "CCur",
+        ONE_VALUE,
+        false,
+        "CCur(expression)",
+    ),
+    descriptor(
+        Intrinsic::CDate,
+        "CDate",
+        ONE_VALUE,
+        false,
+        "CDate(expression)",
+    ),
+    descriptor(
+        Intrinsic::CBool,
+        "CBool",
+        ONE_VALUE,
+        false,
+        "CBool(expression)",
+    ),
+    descriptor(
+        Intrinsic::CStr,
+        "CStr",
+        ONE_VALUE,
+        false,
+        "CStr(expression)",
+    ),
+    descriptor(Intrinsic::CVar, "CVar", ONE_RAW, false, "CVar(expression)"),
+    descriptor(Intrinsic::Len, "Len", ONE_VALUE, false, "Len(expression)"),
+    descriptor(Intrinsic::Abs, "Abs", ONE_VALUE, false, "Abs(number)"),
+    descriptor(Intrinsic::Int, "Int", ONE_VALUE, false, "Int(number)"),
+    descriptor(Intrinsic::Fix, "Fix", ONE_VALUE, false, "Fix(number)"),
+    descriptor(Intrinsic::Sgn, "Sgn", ONE_VALUE, false, "Sgn(number)"),
+    descriptor(
+        Intrinsic::Round,
+        "Round",
+        ROUND_PARAMS,
+        false,
+        "Round(expression, [numdecimalplaces])",
+    ),
+    descriptor(
+        Intrinsic::Left,
+        "Left",
+        LEFT_RIGHT_PARAMS,
+        false,
+        "Left(string, length)",
+    ),
+    descriptor(
+        Intrinsic::Right,
+        "Right",
+        LEFT_RIGHT_PARAMS,
+        false,
+        "Right(string, length)",
+    ),
+    descriptor(
+        Intrinsic::Mid,
+        "Mid",
+        MID_PARAMS,
+        false,
+        "Mid(string, start, [length])",
+    ),
+    descriptor(Intrinsic::Trim, "Trim", ONE_VALUE, false, "Trim(string)"),
+    descriptor(Intrinsic::LCase, "LCase", ONE_VALUE, false, "LCase(string)"),
+    descriptor(Intrinsic::UCase, "UCase", ONE_VALUE, false, "UCase(string)"),
+    descriptor(Intrinsic::Asc, "Asc", ONE_VALUE, false, "Asc(string)"),
+    descriptor(Intrinsic::Chr, "Chr", ONE_VALUE, false, "Chr(charcode)"),
+];
+
+const fn instr_descriptor() -> IntrinsicDescriptor {
+    descriptor(
+        Intrinsic::InStr,
+        "InStr",
+        INSTR_PARAMS,
+        false,
+        "InStr([start,] string1, string2, [compare])",
+    )
+}
+
+impl Intrinsic {
+    pub fn family(self) -> Option<IntrinsicFamily> {
+        self.descriptor().map(|item| item.family)
+    }
     pub fn from_name(name: &str) -> Option<Self> {
-        use Intrinsic::*;
-        [
-            IIf, DebugPrint, InStr, Replace, Split, Join, IsObject, Array, LBound, UBound, IsArray,
-            CVErr, IsMissing, IsEmpty, IsNull, IsError, VarType, TypeName, CInt, CLng, CLngLng,
-            CByte, CSng, CDbl, CCur, CDate, CBool, CStr, CVar, Len, Abs, Int, Fix, Sgn, Round,
-            Left, Right, Mid, Trim, LCase, UCase, Asc, Chr,
-        ]
-        .into_iter()
-        .find(|v| format!("{v:?}").eq_ignore_ascii_case(name))
+        INTRINSIC_DESCRIPTORS
+            .iter()
+            .find(|item| {
+                item.spelling.eq_ignore_ascii_case(name)
+                    || item
+                        .aliases
+                        .iter()
+                        .any(|alias| alias.eq_ignore_ascii_case(name))
+            })
+            .map(|item| item.intrinsic)
     }
     pub fn accepts(self, count: usize) -> bool {
-        match self {
-            Self::IIf => count == 3,
-            Self::Array | Self::ArrayBaseOne | Self::DebugPrint => count <= 256,
-            Self::InStr => (2..=4).contains(&count),
-            Self::Replace => (3..=6).contains(&count),
-            Self::Split => (1..=4).contains(&count),
-            Self::Join => (1..=2).contains(&count),
-            Self::LBound | Self::UBound => (1..=2).contains(&count),
-            Self::Round => (1..=2).contains(&count),
-            Self::Mid => (2..=3).contains(&count),
-            Self::Left | Self::Right => count == 2,
-            _ => count == 1,
+        if matches!(self, Self::DebugPrint | Self::ArrayBaseOne) {
+            return count <= 256;
         }
+        let Some(item) = INTRINSIC_DESCRIPTORS
+            .iter()
+            .find(|item| item.intrinsic == self)
+        else {
+            return false;
+        };
+        count >= item.minimum_arguments && count <= item.maximum_arguments
     }
 }
 
