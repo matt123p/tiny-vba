@@ -78,12 +78,15 @@ check](m6-context-resolution-check.md) as the scope-driving record:
   `Me`/code-name document types; each fork declares the member/result types it supports in its
   catalogue. Code aids stay read-only and metadata-driven; they never invoke host members.
 
-Remaining before M6 closes (M6.2/M6.3/M6.4 partials in WordCraft, plus evidence): the
-shared-renderer localization bridge so WordCraft's translation audit passes with the editor
-open (M6.2), an ordinary-run `ThisDocument` binding proof (M6.3), permitted Microsoft Office
-reference-build observations while no Office session is available — recorded NOT_RUN (M6.4) —
-and each fork's full CI gate on the updated immutable pin. These are tracked in the check and
-the forks' M6 documents, not silently dropped.
+Remaining before M6 closes (recorded honestly rather than silently dropped): permitted
+Microsoft Office reference-build observations stay NOT_RUN while no Office session is
+available (M6.4), WordCraft's end-to-end browser runtime source-transfer observation remains
+open (M6.2), and standard Word Application event routing stays absent from the declared
+profile (M6.3). Fork gates: GridCraft's full `cargo xtask ci` ran on the M6 pin with the two
+craft-fonts-dependent UI tests environment-blocked (no `CRAFT_FONTS_DIR` on this machine;
+both fail identically on the pre-M6 commit), re-verified on the final pin with the adapter
+and UI suites, both Clippy paths and fmt; WordCraft's full `cargo xtask ci` passes all eight
+stages on its pin.
 
 Acceptance: both forks reuse the same editor and shared interpreter repository.
 Real document workflows verify effects and lifecycle without replay or retained
