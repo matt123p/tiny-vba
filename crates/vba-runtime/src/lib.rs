@@ -1,5 +1,6 @@
 //! Shared M4 scalar coercion, operator and deterministic intrinsic rules.
 #![forbid(unsafe_code)]
+use std::cmp::Ordering;
 mod coercion;
 pub use coercion::{intrinsic, intrinsic_extended};
 use vba_values::{ScalarKind, Value, VbaString};
@@ -11,6 +12,120 @@ pub enum Error {
     Resource(String),
 }
 pub type Result<T> = std::result::Result<T, Error>;
+
+/// Immutable per-call comparison configuration. Providers are injected by the
+/// embedding VM; the runtime never consults ambient OS locale state.
+pub struct IntrinsicContext<'a> {
+    comparison_mode: vba_values::IntrinsicComparisonMode,
+    locale: &'a str,
+    calendar: &'a str,
+    code_page: &'a str,
+    target_width_bits: u8,
+    string_comparison: Option<&'a dyn StringComparisonService>,
+}
+
+/// A deterministic target service for VBA binary/text string ordering.
+/// Implementations identify their algorithm and configuration in `service_id`.
+pub trait StringComparisonService {
+    fn service_id(&self) -> &str;
+    fn compare(
+        &self,
+        mode: vba_values::IntrinsicComparisonMode,
+        left: &VbaString,
+        right: &VbaString,
+        locale: &str,
+        code_page: &str,
+    ) -> Result<Ordering>;
+}
+
+/// Evaluate a verified extended call using the immutable execution context.
+/// This is the contextual entry point for new intrinsic families; the legacy
+/// `intrinsic_extended` function remains for existing VM callers.
+pub fn intrinsic_extended_with_context(
+    function: vba_values::Intrinsic,
+    arguments: &[Option<Value>],
+    context: &IntrinsicContext<'_>,
+) -> Result<Value> {
+    intrinsic_extended(function, arguments, context.comparison_mode())
+}
+
+impl<'a> IntrinsicContext<'a> {
+    pub const fn no_services(
+        comparison_mode: vba_values::IntrinsicComparisonMode,
+        locale: &'a str,
+        calendar: &'a str,
+        code_page: &'a str,
+        target_width_bits: u8,
+    ) -> Self {
+        Self {
+            comparison_mode,
+            locale,
+            calendar,
+            code_page,
+            target_width_bits,
+            string_comparison: None,
+        }
+    }
+
+    pub const fn with_string_comparison(
+        comparison_mode: vba_values::IntrinsicComparisonMode,
+        locale: &'a str,
+        calendar: &'a str,
+        code_page: &'a str,
+        target_width_bits: u8,
+        service: &'a dyn StringComparisonService,
+    ) -> Self {
+        Self {
+            comparison_mode,
+            locale,
+            calendar,
+            code_page,
+            target_width_bits,
+            string_comparison: Some(service),
+        }
+    }
+
+    pub const fn comparison_mode(&self) -> vba_values::IntrinsicComparisonMode {
+        self.comparison_mode
+    }
+
+    pub const fn locale(&self) -> &'a str {
+        self.locale
+    }
+
+    pub const fn calendar(&self) -> &'a str {
+        self.calendar
+    }
+
+    pub const fn code_page(&self) -> &'a str {
+        self.code_page
+    }
+
+    pub const fn target_width_bits(&self) -> u8 {
+        self.target_width_bits
+    }
+
+    pub fn string_comparison_service_id(&self) -> Option<&str> {
+        self.string_comparison
+            .map(StringComparisonService::service_id)
+    }
+
+    pub fn compare_strings(&self, left: &VbaString, right: &VbaString) -> Result<Ordering> {
+        let service = self.string_comparison.ok_or_else(|| {
+            Error::Unsupported(format!(
+                "string-comparison-service-unavailable:{}:{}:{:?}",
+                self.locale, self.code_page, self.comparison_mode
+            ))
+        })?;
+        service.compare(
+            self.comparison_mode,
+            left,
+            right,
+            self.locale,
+            self.code_page,
+        )
+    }
+}
 fn unsupported() -> Error {
     Error::Unsupported(format!("operand/conversion combination outside {PROFILE}"))
 }

@@ -1534,6 +1534,10 @@ impl Binder<'_> {
             self.budget.charge(256 + payload(value), name.span)?;
             return Ok(Symbol::Constant(value.clone()));
         }
+        if let Some(value) = comparison_constant(&name.key()) {
+            self.budget.charge(256, name.span)?;
+            return Ok(Symbol::Constant(value));
+        }
         if self.explicit {
             return Err(err(format!("undeclared name {}", name.spelling), name.span));
         }
@@ -3580,6 +3584,18 @@ impl Binder<'_> {
             ast::StatementKind::Stop => StatementKind::Stop,
         };
         Ok(Statement { site, kind: bound })
+    }
+}
+
+/// VBA comparison constants are fallback names: local, project, imported and
+/// referenced declarations are resolved first by `symbol`.
+fn comparison_constant(name: &str) -> Option<Value> {
+    match name {
+        "vbusecompareoption" => Some(Value::Integer(-1)),
+        "vbbinarycompare" => Some(Value::Integer(0)),
+        "vbtextcompare" => Some(Value::Integer(1)),
+        "vbdatabasecompare" => Some(Value::Integer(2)),
+        _ => None,
     }
 }
 pub fn module_name(module: &ast::Module) -> String {

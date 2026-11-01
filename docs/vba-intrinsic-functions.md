@@ -264,6 +264,15 @@ Reference basis: [Microsoft StrComp](https://learn.microsoft.com/en-us/office/vb
 [MS-VBAL StrComp](https://learn.microsoft.com/en-us/openspecs/microsoft_general_purpose_programming_languages/ms-vbal/9541f02a-e173-47a7-8c0f-4d91813c1c88),
 [Option Compare](https://learn.microsoft.com/en-us/office/vba/language/reference/user-interface-help/option-compare-statement),
 [comparison constants](https://learn.microsoft.com/en-us/office/vba/language/reference/user-interface-help/comparison-constants).
+The semantic binder now resolves `vbUseCompareOption`, `vbBinaryCompare`,
+`vbTextCompare`, and `vbDatabaseCompare` as Integer constants after user/project
+and reference declarations, so normal shadowing applies. `IntrinsicContext`
+provides a per-call configuration and injected comparison-service interface;
+without a provider, comparison requests fail with a named Unsupported capability.
+The current compiled profile still accepts only Option Compare Binary, because
+module string operators do not yet consume an injected provider. The test provider
+is a deterministic seam test, not a VBA locale implementation or compatibility
+claim.
 
 ## Worksheet equivalents and semantic differences
 

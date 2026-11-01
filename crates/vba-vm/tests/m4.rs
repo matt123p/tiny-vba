@@ -136,6 +136,20 @@ fn named_intrinsics_evaluate_in_source_order_and_qualification_respects_shadowin
     );
     Ok(())
 }
+
+#[test]
+fn comparison_constants_are_available_and_local_declarations_shadow_them() -> R {
+    answer(
+        "Option Explicit\nFunction Answer() As Long\nAnswer=vbUseCompareOption+vbBinaryCompare+vbTextCompare+vbDatabaseCompare\nEnd Function",
+        Value::Long(2),
+    )?;
+    answer(
+        "Option Explicit\nFunction Answer() As Long\nDim vbTextCompare As Long\nvbTextCompare=8\nAnswer=vbTextCompare\nEnd Function",
+        Value::Long(8),
+    )?;
+    Ok(())
+}
+
 #[test]
 fn optional_defaults_missing_named_and_parenthesized_byref() -> R {
     answer(
