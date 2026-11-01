@@ -270,6 +270,49 @@ fn document_implicit_me_members_precede_host_globals() -> Result<(), Box<dyn Err
     };
     let receiver = proc.locals.get(*slot).ok_or("local")?;
     assert!(receiver.receiver, "bare Range dispatches on Me");
+    // A member applied to an implicit member keeps the write: `Content.Text = x`
+    // binds `Content` as `Me.Content` and applies the Let on the result.
+    let source = parse(
+        &SourceFile::new(
+            SourceId(11),
+            "Doc.cls".into(),
+            "Attribute VB_Name = \"ThisDocument\"\nSub Changed()\nContent.Text=\"x\"\nEnd Sub"
+                .into(),
+        )?,
+        ModuleKind::Document,
+    )?;
+    let main = parse(
+        &SourceFile::new(
+            SourceId(12),
+            "Main.bas".into(),
+            "Sub Main()\nEnd Sub".into(),
+        )?,
+        ModuleKind::Standard,
+    )?;
+    let mut content_members = std::collections::BTreeMap::new();
+    content_members.insert("thisdocument".to_string(), vec!["Content".to_string()]);
+    let p = vba_semantics::bind_with_references(
+        &[source, main],
+        "Main",
+        &[],
+        &vba_foreign::ReferenceSet::default(),
+        &content_members,
+    )?;
+    let proc = p
+        .procedures
+        .iter()
+        .find(|p| p.signature.name == "Changed")
+        .ok_or("Changed")?;
+    let StatementKind::Foreign(expr) = &proc.body.first().ok_or("statement")?.kind else {
+        return Err("member statement".into());
+    };
+    let ExprKind::Foreign { member, .. } = &expr.kind else {
+        return Err("outer member".into());
+    };
+    assert_eq!(
+        member, "Text",
+        "the member write is retained on the implicit receiver"
+    );
     // Without the declaration the same name falls back to the host import.
     let p = vba_semantics::bind_with_references(
         &[
