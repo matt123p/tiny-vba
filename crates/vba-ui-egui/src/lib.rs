@@ -418,9 +418,9 @@ impl EditorUi {
                 egui::MenuBar::new().ui(ui,|ui|self.menus(ui,ide,&mut commands, theme));
                 ui.separator();ui.horizontal_wrapped(|ui|{
                     for action in self.toolbar_actions.iter().copied().take(16) {
-                        let glyph=match action{Action::Save=>"Save",Action::Run=>"Run",Action::Pause=>"Break",Action::Reset=>"Reset",Action::StepInto=>"Into",Action::StepOver=>"Over",Action::StepOut=>"Out",_=>action.label()};
+                        let glyph=theme.label(match action{Action::Save=>"Save",Action::Run=>"Run",Action::Pause=>"Break",Action::Reset=>"Reset",Action::StepInto=>"Into",Action::StepOver=>"Over",Action::StepOut=>"Out",_=>action.label()});
                         let label=format!("{}  {}",match action{Action::Run=>">",Action::Pause=>"||",Action::Reset=>"[]",Action::Save=>"M",_=>"->"},glyph);
-                        if ui.add_enabled(ide.enabled(action),egui::Button::new(label)).on_hover_text(format!("{} ({})",action.label(),action.shortcut())).clicked(){commands.push(Command::Action(action));}
+                        if ui.add_enabled(ide.enabled(action),egui::Button::new(label)).on_hover_text(format!("{} ({})",theme.label(action.label()),action.shortcut())).clicked(){commands.push(Command::Action(action));}
                     }
                     ui.separator();
                     egui::ComboBox::new("run.entry", theme.label("Entry")).selected_text(ide.entry.clone()).width(125.0).show_ui(ui,|ui|{for m in &ide.modules{for p in &m.procedures{if ui.selectable_label(ide.entry==p.name,&p.name).on_hover_text(&p.signature).clicked(){commands.push(Command::Entry(p.name.clone()));}}}});
@@ -429,7 +429,7 @@ impl EditorUi {
                 });
             });
             egui::Panel::bottom("vba.status").frame(egui::Frame::new().fill(theme.chrome).inner_margin(5)).show(ui,|ui|{
-                ui.horizontal(|ui|{ui.label(RichText::new(format!("* {}",ide.mode().label())).strong().color(theme.accent));ui.separator();if let Some(m)=ide.active_module(){ui.label(format!("Ln {}   {}{}",m.line_at(m.caret),m.name,if m.dirty() || ide.form(m.id).is_some_and(|d|d.dirty()){" *"}else{""}));}ui.with_layout(egui::Layout::right_to_left(egui::Align::Center),|ui|{ui.label(RichText::new(theme.label("Craft VBA Editor")).small().color(theme.muted));});});
+                ui.horizontal(|ui|{ui.label(RichText::new(format!("* {}",theme.label(ide.mode().label()))).strong().color(theme.accent));ui.separator();if let Some(m)=ide.active_module(){ui.label(format!("Ln {}   {}{}",m.line_at(m.caret),m.name,if m.dirty() || ide.form(m.id).is_some_and(|d|d.dirty()){" *"}else{""}));}ui.with_layout(egui::Layout::right_to_left(egui::Align::Center),|ui|{ui.label(RichText::new(theme.label("Craft VBA Editor")).small().color(theme.muted));});});
             });
             let mut project_rect=None;
             if self.project_visible {
@@ -443,7 +443,7 @@ if ui.add_enabled(ide.active_module().is_some_and(|m|ide.form(m.id).is_some()),e
                         egui::CollapsingHeader::new(&ide.title).default_open(true).show(ui,|ui|{
                             for (kind, label, glyph, form_group) in [(vba_ide::ModuleKind::Standard,"Modules","M",false),(vba_ide::ModuleKind::Class,"Class Modules","C",false),(vba_ide::ModuleKind::Document,"Document Modules","D",false),(vba_ide::ModuleKind::Class,"Forms","F",true)] {
 if ide.modules.iter().any(|m|m.kind==kind && ide.form(m.id).is_some()==form_group) {
-egui::CollapsingHeader::new(label).default_open(true).show(ui,|ui|{
+egui::CollapsingHeader::new(theme.label(label)).default_open(true).show(ui,|ui|{
                                 for (i,m) in ide.modules.iter().enumerate().filter(|(_,m)|m.kind==kind && ide.form(m.id).is_some()==form_group){let response=ui.selectable_label(ide.active==i,format!("{glyph} {}{}",m.name,if m.dirty() || ide.form(m.id).is_some_and(|d|d.dirty()){" *"}else{""}));if self.focus_project && ide.active==i {response.request_focus();self.focus_project=false;}
 if response.clicked(){commands.push(Command::SelectModule(i));self.navigate=true;}
 if response.double_clicked(){self.focus_editor=true;self.form_view=false;}response.context_menu(|ui|{if ui.button(theme.label("View Code")).clicked(){commands.push(Command::SelectModule(i));self.focus_editor=true;self.form_view=false;ui.close();}self.action_button(ui,ide,Action::Export,&mut commands, theme);});}
@@ -452,13 +452,13 @@ if response.double_clicked(){self.focus_editor=true;self.form_view=false;}respon
                     });
                     if ui.button(theme.label("Insert Module")).clicked(){commands.push(Command::AddModule);}
                     ui.separator();
-                    if self.properties_visible {heading(ui,"Properties Window",theme);ui.horizontal(|ui|{ui.selectable_label(true,theme.label("Alphabetic")).on_hover_text(theme.label("Alphabetic properties"));ui.add_enabled(false,egui::Button::new(theme.label("Categorized"))).on_hover_text(theme.label("Only module metadata is available"));});if let Some(m)=ide.active_module(){egui::Grid::new("properties").striped(true).show(ui,|ui|{ui.label(theme.label("(Name)"));if ui.button(&m.name).on_hover_text(theme.label("Rename module")).clicked(){self.rename_module=Some((m.id,m.name.clone()));}ui.end_row();ui.label(theme.label("Type"));ui.label(if ide.form(m.id).is_some() {"UserForm"} else {match m.kind {vba_ide::ModuleKind::Standard=>"Standard module",vba_ide::ModuleKind::Class=>"Class module",vba_ide::ModuleKind::Document=>"Document module"}});ui.end_row();ui.label(theme.label("Status"));ui.label(if m.dirty() || ide.form(m.id).is_some_and(|d|d.dirty()){"Modified"}else{"Saved"});ui.end_row();});ui.label(RichText::new(theme.label("Select (Name) to rename the module.")).small().color(theme.muted));}}
+                    if self.properties_visible {heading(ui,"Properties Window",theme);ui.horizontal(|ui|{ui.selectable_label(true,theme.label("Alphabetic")).on_hover_text(theme.label("Alphabetic properties"));ui.add_enabled(false,egui::Button::new(theme.label("Categorized"))).on_hover_text(theme.label("Only module metadata is available"));});if let Some(m)=ide.active_module(){egui::Grid::new("properties").striped(true).show(ui,|ui|{ui.label(theme.label("(Name)"));if ui.button(&m.name).on_hover_text(theme.label("Rename module")).clicked(){self.rename_module=Some((m.id,m.name.clone()));}ui.end_row();ui.label(theme.label("Type"));ui.label(if ide.form(m.id).is_some() {theme.label("UserForm").into_owned()} else {match m.kind {vba_ide::ModuleKind::Standard=>theme.label("Standard module").into_owned(),vba_ide::ModuleKind::Class=>theme.label("Class module").into_owned(),vba_ide::ModuleKind::Document=>theme.label("Document module").into_owned()}});ui.end_row();ui.label(theme.label("Status"));ui.label(if m.dirty() || ide.form(m.id).is_some_and(|d|d.dirty()){theme.label("Modified").into_owned()}else{theme.label("Saved").into_owned()});ui.end_row();});ui.label(RichText::new(theme.label("Select (Name) to rename the module.")).small().color(theme.muted));}}
                 });project_rect=Some(p.response.rect);
             }
             let right=self.debugger_right && ui.available_width()>700.0;
             let debug_panel=if right {egui::Panel::right("vba.debugger.right").default_size(320.0).min_size(180.0).max_size((ui.available_width()*0.5).max(180.0))} else {egui::Panel::bottom("vba.debugger").default_size(220.0).min_size(135.0).max_size((ui.available_height()*0.65).max(135.0))};
             let debug=debug_panel.resizable(true).show(ui,|ui|{
-                ui.horizontal_wrapped(|ui|{for (pane,name) in [(Pane::Locals,"Locals"),(Pane::Immediate,"Immediate"),(Pane::Watches,"Watches"),(Pane::Stack,"Call Stack"),(Pane::Output,"Output")] {if ui.selectable_label(self.pane==pane,name).clicked(){self.pane=pane;}}});ui.separator();
+                ui.horizontal_wrapped(|ui|{for (pane,name) in [(Pane::Locals,"Locals"),(Pane::Immediate,"Immediate"),(Pane::Watches,"Watches"),(Pane::Stack,"Call Stack"),(Pane::Output,"Output")] {if ui.selectable_label(self.pane==pane,theme.label(name)).clicked(){self.pane=pane;}}});ui.separator();
                 egui::ScrollArea::both().id_salt("debug.content").auto_shrink([false,false]).show(ui,|ui|self.debug_pane(ui,ide,&mut commands,theme));
             });
             let editor=egui::CentralPanel::default().frame(egui::Frame::new().fill(theme.editor).inner_margin(6)).show(ui,|ui|{
@@ -768,7 +768,7 @@ if response.double_clicked(){self.focus_editor=true;self.form_view=false;}respon
                 (Pane::Stack, "Call Stack...    Ctrl+L"),
                 (Pane::Output, "Output"),
             ] {
-                if ui.button(label).clicked() {
+                if ui.button(theme.label(label)).clicked() {
                     self.pane = pane;
                     self.focus_pane = true;
                     ui.close();
@@ -1605,18 +1605,21 @@ if response.double_clicked(){self.focus_editor=true;self.form_view=false;}respon
         match self.pane {
             Pane::Locals => {
                 ui.label(
-                    RichText::new(ide.execution().map_or("Not in break mode".into(), |s| {
-                        format!("{} • current scope", s.procedure)
-                    }))
+                    RichText::new(
+                        ide.execution()
+                            .map_or(theme.label("Not in break mode").into_owned(), |s| {
+                                format!("{} • {}", s.procedure, theme.label("current scope"))
+                            }),
+                    )
                     .color(theme.muted),
                 );
                 egui::Grid::new("locals.grid")
                     .striped(true)
                     .min_col_width(110.0)
                     .show(ui, |ui| {
-                        ui.strong("Expression");
-                        ui.strong("Value");
-                        ui.strong("Type");
+                        ui.strong(theme.label("Expression"));
+                        ui.strong(theme.label("Value"));
+                        ui.strong(theme.label("Type"));
                         ui.end_row();
                         for (name, kind, value) in ide.locals() {
                             if let vba_ide::Value::Array(array) = &value {
@@ -1730,10 +1733,10 @@ if response.double_clicked(){self.focus_editor=true;self.form_view=false;}respon
                 egui::Grid::new("watches.grid")
                     .striped(true)
                     .show(ui, |ui| {
-                        ui.strong("Expression");
-                        ui.strong("Value / status");
-                        ui.strong("Type");
-                        ui.strong("Context");
+                        ui.strong(theme.label("Expression"));
+                        ui.strong(theme.label("Value / status"));
+                        ui.strong(theme.label("Type"));
+                        ui.strong(theme.label("Context"));
                         ui.end_row();
                         for (i, w) in ide.watches.iter().enumerate() {
                             ui.monospace(&w.expression);

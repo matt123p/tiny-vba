@@ -935,3 +935,67 @@ fn m8_edit_menu_select_cut_undo_redo() -> R {
     );
     Ok(())
 }
+
+#[test]
+fn drawn_chrome_text_goes_through_the_injected_localizer() -> R {
+    // The host-owned localization bridge: every chrome string the editor draws is
+    // offered to the localizer; authored source, names and project titles are not.
+    // ASCII sentinels: the harness fonts may lack the pseudo-locale brackets.
+    let marked = |english: &str| std::borrow::Cow::Owned(format!("#{english}#"));
+    let mut fixture = Fixture::new()?;
+    fixture.theme.localize = marked;
+    let mut h = Harness::builder()
+        .with_size(egui::vec2(1200.0, 800.0))
+        .build_ui_state(draw, fixture);
+    h.run();
+    let mut raw = Vec::new();
+    // Authored data never goes through the localizer: the demo project's source,
+    // its module file names, the entry procedure and the project title.
+    let state = h.state();
+    let mut authored: Vec<String> = vec![state.ide.title.clone(), state.ide.entry.clone()];
+    for module in &state.ide.modules {
+        authored.push(module.name.clone());
+        authored.extend(
+            module
+                .text
+                .split(|c: char| !(c.is_alphanumeric() || c == '_'))
+                .map(str::to_owned),
+        );
+    }
+    let mut shapes: Vec<_> = h.output().shapes.iter().map(|s| &s.shape).collect();
+    while let Some(shape) = shapes.pop() {
+        match shape {
+            egui::Shape::Vec(children) => shapes.extend(children),
+            egui::Shape::Text(text) => {
+                let job = &text.galley.job;
+                for section in &job.sections {
+                    let whole = job
+                        .text
+                        .get(
+                            usize::from(section.byte_range.start)
+                                ..usize::from(section.byte_range.end),
+                        )
+                        .unwrap_or_default();
+                    let letters = whole
+                        .chars()
+                        .zip(whole.chars().skip(1))
+                        .any(|(a, b)| a.is_ascii_alphabetic() && b.is_ascii_alphabetic());
+                    if letters
+                        && !whole.contains('#')
+                        && !authored
+                            .iter()
+                            .any(|token| !token.trim().is_empty() && whole.contains(token.as_str()))
+                    {
+                        raw.push(whole.to_owned());
+                    }
+                }
+            }
+            _ => (),
+        }
+    }
+    assert!(
+        raw.is_empty(),
+        "chrome text drawn without the localizer: {raw:?}"
+    );
+    Ok(())
+}
