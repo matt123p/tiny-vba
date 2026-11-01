@@ -82,10 +82,11 @@ The [M6 acceptance record](m6-acceptance.md) supersedes the earlier gap list.
 Standard Word Application event delivery and actual browser source transfer are now
 implemented and locally exercised. Fresh Microsoft Office observations remain
 NOT_RUN (M6.4): the owner has no Word/Excel installation, and no connected session
-is available. This requirement has not been waived. Dependency publication and the
-final fork pin are tracked separately in that record. M7 must wait for M6 acceptance.
+is available. This requirement has not been waived. Shared revision `d40a283`
+is published on main and pinned in both forks. Shared/fork implementation and
+local checks pass; M7 must wait for M6 acceptance.
 
-### Attribute and document-module corrections (2026-11-01; implemented locally)
+### Attribute and document-module corrections (2026-11-01; implemented)
 
 The [attribute/editor investigation](vba-attributes-and-editor-projection.md)
 records online sources, the two screenshot failures and local code findings.

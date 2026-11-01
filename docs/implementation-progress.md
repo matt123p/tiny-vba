@@ -30,8 +30,10 @@ WordCraft/GridCraft sessions. See [ADR 0029](decisions/0029-host-event-subscript
 Shared CI, WASM, actual WASI, UI, native UI and web-build gates pass. Fresh Office
 observations remain NOT_RUN: no connected session or owner installation exists.
 This is an unfulfilled acceptance requirement, not an inferred pass or waiver.
-M7 remains untouched. Next step: finish the dependency pin and outstanding
-acceptance evidence described in the M6 record.
+M7 remains untouched. The shared code is published at `d40a283` on main; both forks pin it without
+local overrides. Both forks’ full CI, final Git-pinned adapter suites and
+optional-feature checks pass. The only remaining M6 acceptance requirement is
+fresh Office reference evidence (or an explicit change to that requirement).
 
 ## Plan addition — hidden VBA attributes and document code view (2026-11-01)
 

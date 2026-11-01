@@ -2,9 +2,9 @@
 
 Updated 2026-11-01. **Local implementation is complete for the declared profile;
 M6 is not yet fully accepted.** Fresh Microsoft Office reference observations
-remain NOT_RUN and have not been waived. The shared changes also require
-publication and an immutable dependency pin in both application forks. M7 has
-not started.
+remain NOT_RUN and have not been waived. Shared implementation revision
+`d40a283699ce0eb0e998493d3443731622050b3c` is published on main and pinned in
+both application forks, with no local Cargo overrides. M7 has not started.
 
 ## Implemented scope
 
@@ -44,20 +44,26 @@ Shared implementation:
 - Inspected original light/dark blank-document, paused recorded-macro and raw
   metadata screenshots under ignored `reports/ui/m6-*.png`.
 
-Forks are currently verified using a temporary local Cargo patch, not a published
-shared revision. No machine-specific patch should remain in the deliverable.
+Initial integration checks used a temporary Cargo patch. Final fork manifests
+and lockfiles pin the published revision above; temporary overrides are removed.
+Adapter suites are rechecked against that immutable Git source. Fork changes are
+committed locally: WordCraft `067a053f`, GridCraft `a191e84d`.
 
 - WordCraft: 3 position-map tests and **25 actual document workflows PASS**;
   optional VBA UI suite **1035 PASS, 2 existing ignored**. New cases include
   Application events, source-save completion, metadata-preserving real execution,
   resumed selection notifications and multi-slice native undo. Full CI and the
-  rebuilt VBA-enabled browser application are in progress.
-- GridCraft: complete VBA adapter suite PASS, including **5 context-resolution
+  VBA-enabled browser application build PASS. Strict optional-feature Clippy
+  PASS against the final Git pin. Full CI passes all eight stages, including
+  its 17-crate WASM check.
+- GridCraft: **75 VBA adapter tests PASS** against the published pin, including **5 context-resolution
   workflows**. The new workflow imports blank ThisWorkbook metadata, runs the
   exact authored recorded-attribute shape with explicit consent, checks A1=42,
-  retains raw source and undoes the workbook change. Full CI is being rerun with
-  the existing optional craft-fonts checkout to resolve the earlier font-dependent
-  environment failures.
+  retains raw source and undoes the workbook change. Full ten-stage CI PASS with
+  the cached optional craft-fonts checkout, resolving the earlier font-dependent
+  environment failures. All **21 optional VBA UI workflows PASS** after preserving
+  selected macro/shape context in the host Macros dialog; strict optional-feature
+  Clippy and the VBA-enabled WASM host check also PASS.
 
 ## Explicit boundaries and remaining acceptance
 
@@ -79,3 +85,25 @@ Binary VBA project writeback, signatures and unchanged-package round trips belon
 to M7. Source import remains inert. The README describes tiny-vba as shared
 ArtCraft Office infrastructure; the standalone shell exists only for development
 and testing.
+
+## Rebuilt WordCraft browser acceptance
+
+Chromium drove the actual VBA-enabled WordCraft WASM app. Importing the authored
+attribute-only ThisDocument source was inert and produced a blank code pane,
+code-name explorer/Properties and a separate `.cls` source filename. An authored
+Recorded.bas with CRLF, Unicode and the exact invocation attribute exported
+byte-identically. Renaming Macro2 to Main through ordinary visible editing also
+updated its hidden member target; export retained the other bytes.
+
+The browser's OS save-picker boundary was mocked with JavaScript promises; the
+WordCraft UI, download service, asynchronous tickets and shared IDE remained real.
+A pending save retained Modified; AbortError cancellation retained Modified; a
+successful writable handle received exact expected raw bytes and the component
+became Saved only after write/close completion. No page errors occurred. Original
+captures are ignored `reports/ui/m6-word-*.png`. These are local browser results,
+not Microsoft Word observations.
+
+Attempting the host mutation against WordCraft's rich sample document correctly
+returned the declared plain-main-story profile refusal (VBA error 5). Successful
+actual document mutations and undo are established by the 25 native fork
+workflows on supported plain documents; no richer Word object support is claimed.

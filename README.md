@@ -19,7 +19,7 @@ Fresh Microsoft Office reference observations remain NOT_RUN; M7 has not started
 All **44 authored scenarios and 153 reviewed ReflexGrid cases pass**. The latter match published
 Microsoft Excel Mac oracle expectations; this is inherited evidence, not a new local Excel run.
 See [the acceptance report](docs/m4-oracle-report.md) and [language scope](docs/m4-language.md).
-[M6 project import](docs/project-import.md) extracts bounded source/metadata without execution.
+[Read-only project import](docs/project-import.md) extracts bounded source/metadata without execution.
 The [embeddable editor/debugger and standalone test tools](docs/ui/embedding.md) are implemented, with
 [corrected M8 completion audit](docs/ui/m8-completion-audit.md) and
 [classic tools/DAP acceptance](docs/ui/m10-implementation.md).
@@ -48,7 +48,7 @@ The commands below exercise the shared engine and UI in isolation. Microsoft Off
 the ArtCraft host applications are not required for these tests.
 
 Rust is pinned by `rust-toolchain.toml`; Python 3.11+ and Git support repository checks only.
-M6 uses pinned cfb and encoding_rs dependencies; Office is not required. Node 18+ runs the WASI smoke test.
+Project decoding uses pinned cfb and encoding_rs dependencies; Office is not required. Node 18+ runs the WASI smoke test.
 
 ```sh
 cargo run -p vba-ide-app
