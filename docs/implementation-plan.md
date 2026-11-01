@@ -1,9 +1,12 @@
 # Remaining implementation plan
 
-Updated 2026-11-01. This plan contains **remaining work only**, using stable M7–M8 IDs
-in implementation order after completed M1–M6 for their declared profiles.
+Updated 2026-11-01. This plan contains **remaining work only**: M6A, then stable
+M7–M8 IDs, after completed M1–M6 for their declared profiles.
 [M6 sign-off](m6-acceptance.md) records the owner-approved move of fresh Office
-comparisons to M8.5; they no longer block M7. Completed work and the old-to-new milestone mapping
+comparisons to M8.5; they no longer block M7. The subsequently requested
+[M6A intrinsic milestone](vba-intrinsic-functions.md) must be accepted before M7
+starts ([ADR 0033](decisions/0033-intrinsics-before-package-acceptance.md)).
+Completed work and the old-to-new milestone mapping
 belong in [implementation progress](implementation-progress.md#plan-renumbering--2026-10-28).
 Historical reports and ADRs retain their original milestone numbers; use this
 document's numbers for new work.
@@ -18,22 +21,72 @@ separate and native host dispatch in Rust.
 
 | Milestone | Remaining work | Prerequisites |
 |---|---|---|
-| M7 | Unchanged-document and package acceptance | Applicable M1–M6 capabilities and explicit writeback design |
-| M8 | Expanded conformance, hardening and release | M1–M7 acceptance for the declared release profile |
+| M6A | VBA intrinsic-function inventory, implementation and acceptance | Existing shared language/runtime and explicit host-service boundaries |
+| M7 | Unchanged-document and package acceptance | M6A acceptance, applicable M1–M6 capabilities and explicit writeback design |
+| M8 | Expanded conformance, hardening and release | M1–M6, M6A and M7 acceptance for the declared release profile |
 
 Implement shared language foundations before consumers, range references before
 range-dependent value/event behavior, and runtime semantics before form events.
-M1–M6 are signed off for their declared profiles. **M7 is next**, beginning
-with M7.1 specimen curation and capability classification. Completed task details
+M1–M6 are signed off for their declared profiles. **M6A is next**, beginning
+with M6A.1 intrinsic inventory and contract audit, followed by StrComp. M7 starts
+only after M6A acceptance. Completed task details
 are retained in [progress](implementation-progress.md#completed-m5m6-plan-scope)
 and the owning acceptance records.
 Build tests and collect lawful evidence throughout every milestone. M8 is the
 final release gate, not a reason to postpone fuzzing, benchmarks or regression tests.
 
+## M6A — VBA intrinsic-function coverage
+
+Owner: tiny-vba language/runtime and shared IDE; embedding shells/forks supply
+explicit environmental services. Scope and acceptance are defined in
+[VBA intrinsic functions](vba-intrinsic-functions.md). Existing milestone IDs
+are retained; M6A does not reopen accepted M6.
+
+Implementation follows the [framework and Luna handoff](m6a-implementation-framework.md)
+and [ADR 0034](decisions/0034-intrinsic-implementation-framework.md): descriptor
+catalogue, one argument binder, IR 8 extended calls with legacy refusal rules,
+explicit context/services and small dependent function packets. Begin with F0;
+record packet evidence in the [ledger](m6a-work-ledger.md). These are planned
+contracts, not implemented runtime capabilities.
+
+- **M6A.1:** Reconcile the public VBA function catalogue, related variants and
+  actual implementation into the per-function inventory. Record signatures,
+  exact types/errors, worksheet overlap, platform/locale dependencies, current
+  limitations, ownership and required implementation versus explicit refusal.
+  Include the intrinsic document's worksheet-counterpart matrix: different names,
+  same-name semantic differences and discriminating acceptance cases are required.
+- **M6A.2:** Implement StrComp first, including comparison constants, module
+  Option Compare, Null/coercion/error rules and exact typed results. Audit
+  string/search/comparison, character/byte/wide and `$` variants together.
+- **M6A.3:** Complete conversion/formatting and value/type inspection groups;
+  preserve shared coercion, numeric widths, locale and scalar-state distinctions.
+- **M6A.4:** Complete array/selection, numeric and financial groups; audit
+  existing partial support, eager argument evaluation, bounds and work budgets.
+- **M6A.5:** Complete date/time and deterministic clock/random/locale services;
+  establish calendar, platform and pointer-width contracts without ambient IO.
+- **M6A.6:** Complete colour/dynamic invocation and required bounded host-service
+  paths for prompts, environment, files/settings and contextual output. Publish
+  per-function platform/policy refusals for facilities outside current scope;
+  do not add arbitrary COM/DLL/shell authority to the VM.
+- **M6A.7:** Align binding, argument variants, qualification/shadowing, verified
+  lowering, runtime errors and shared IDE completion/signature/safe-evaluation
+  behaviour. Preserve legacy capability refusals and pause/resume without replay.
+- **M6A.8:** Run shared native/WASM/WASI and affected UI gates, publish/pin the
+  shared revision and verify real GridCraft/WordCraft adapter and application
+  gates. Publish the per-function acceptance record before starting M7.
+
+Acceptance: every inventory row has an audited disposition and evidence;
+required portable core and injected-service implementation rows pass typed
+positive/negative/boundary tests. Explicit platform/policy refusals are listed
+separately and are not compatibility passes. Include StrComp through both hosts
+and a GridCraft worksheet UDF. Preserve prior regressions. Fresh Office
+observations remain M8.5, distinct from authored/inherited evidence.
+
 ## M7 — Unchanged-document and package acceptance
 
 Owner: fork acceptance/package layers, coordinated with tiny-vba source-import
-and evidence contracts. Depends on each specimen's M1–M6 capabilities; form
+and evidence contracts. Starts after M6A acceptance and depends on each
+specimen's M1–M6 and intrinsic capabilities; form
 specimens require M2 and the corresponding host event/persistence integration.
 
 - **M7.1:** Curate licensed, reviewed Excel workbooks and Word documents with
@@ -94,7 +147,7 @@ document results. Evidence work starts alongside M1 and feeds this final gate.
   inherited and fresh evidence distinct. Until Office is available these checks
   remain NOT_RUN; they block this release-validation gate, not M6 sign-off or M7.
 
-Acceptance: the declared release profile meets its applicable M1–M7 gates,
+Acceptance: the declared release profile meets its applicable M1–M6, M6A and M7 gates,
 retains prior regressions and reports PASS, MISMATCH, UNSUPPORTED,
 BLOCKED_BY_POLICY, INVALID_FIXTURE, CRASH, TIMEOUT and NOT_RUN accurately.
 M8.5 must be satisfied for the declared release comparison profile; unavailable

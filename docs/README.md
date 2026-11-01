@@ -1,12 +1,23 @@
 # Documentation index
 
 M1–M6 are signed off for their declared profiles; the remaining plan starts at
-M7. Fresh Excel/Word comparison is deferred to M8.5. The plan uses new M1–M8 numbering. Earlier implementation reports,
+M6A, whose acceptance is required before M7. Fresh Excel/Word comparison is
+deferred to M8.5. The plan retains M1–M8 numbering with inserted M6A. Earlier implementation reports,
 specifications and ADRs retain historical IDs; see the
 [mapping](implementation-progress.md#plan-renumbering--2026-10-28).
 
 Read [architecture](architecture.md), [implementation plan](implementation-plan.md),
 [scope decision](decisions/0001-repository-scope.md) and [progress](implementation-progress.md) first.
+
+[VBA intrinsic functions — M6A](vba-intrinsic-functions.md) defines the intrinsic
+inventory, implementation groups starting with StrComp, semantic/host boundaries
+and acceptance before M7. [ADR 0033](decisions/0033-intrinsics-before-package-acceptance.md)
+records the inserted milestone; this is planned work, not implemented support.
+
+[M6A framework and Luna handoff](m6a-implementation-framework.md) specifies the
+code extension points, shared contracts, small work packets and validation.
+[ADR 0034](decisions/0034-intrinsic-implementation-framework.md) records the design;
+the [M6A work ledger](m6a-work-ledger.md) identifies the next packet (F0).
 
 [VBA attributes and Excel code-view investigation](vba-attributes-and-editor-projection.md)
 documents hidden module/member metadata, recorded-macro attributes, the blank

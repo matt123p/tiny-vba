@@ -5,6 +5,21 @@ description: Implement or review tiny-vba changes using the project design contr
 
 # tiny-vba development
 
+The next milestone is **M6A — VBA intrinsic-function coverage**, inserted before
+M7 by owner direction on 2026-11-01. Read
+[the intrinsic scope](../../../docs/vba-intrinsic-functions.md) and
+[ADR 0033](../../../docs/decisions/0033-intrinsics-before-package-acceptance.md).
+Audit the inventory in M6A.1, implement StrComp first in M6A.2 and complete M6A
+acceptance before starting M7. Preserve M6 sign-off and existing M7/M8 task IDs;
+fresh Office comparisons remain M8.5. Planned coverage is not implemented support.
+
+For M6A implementation, start with F0 in the
+[framework/Luna handoff](../../../docs/m6a-implementation-framework.md) and
+update [the ledger](../../../docs/m6a-work-ledger.md) per completed packet.
+[ADR 0034](../../../docs/decisions/0034-intrinsic-implementation-framework.md)
+specifies descriptors, one argument binder and future IR 8 extended calls;
+these are not yet implemented capabilities. Preserve the existing planning work.
+
 Read [AGENTS.md](../../../AGENTS.md), [progress](../../../docs/implementation-progress.md)
 and the relevant [implementation gate](../../../docs/implementation-plan.md). Inspect actual code
 before choosing a change; planned crates and APIs are not implemented capabilities.
