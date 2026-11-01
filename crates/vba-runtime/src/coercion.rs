@@ -238,6 +238,9 @@ pub fn intrinsic(function: I, args: &[V]) -> Result<V> {
             Some(V::Object(_) | V::Nothing)
         )));
     }
+    if matches!(function, I::Space | I::String) {
+        return string_repeat(function, args);
+    }
     if function.family() == Some(IntrinsicFamily::StringSearch) {
         return string_function(function, args);
     }
@@ -524,6 +527,66 @@ pub fn intrinsic(function: I, args: &[V]) -> Result<V> {
         }
         _ => return Err(mismatch()),
     })
+}
+
+fn string_repeat(function: I, arguments: &[V]) -> Result<V> {
+    let number = arguments.first().ok_or_else(mismatch)?;
+    if function == I::String && arguments.iter().any(|value| matches!(value, V::Null)) {
+        return Ok(V::Null);
+    }
+    if function == I::Space && matches!(number, V::Null) {
+        return Ok(V::Null);
+    }
+    let count = integral(number, i128::from(i32::MIN), i128::from(i32::MAX))?;
+    if count < 0 {
+        return Err(error(5, "Invalid procedure call or argument"));
+    }
+    let count = usize::try_from(count).map_err(|_| overflow())?;
+    if count > VbaString::MAX_UNITS {
+        return Err(Error::Resource("string budget exceeded".into()));
+    }
+    let character = if function == I::Space {
+        vec![32]
+    } else {
+        match arguments.get(1).ok_or_else(mismatch)? {
+            V::String(value) => {
+                let units = value.units();
+                let Some(first) = units.first() else {
+                    return Err(error(5, "Invalid procedure call or argument"));
+                };
+                let width = if (0xd800..=0xdbff).contains(first)
+                    && units
+                        .get(1)
+                        .is_some_and(|next| (0xdc00..=0xdfff).contains(next))
+                {
+                    2
+                } else {
+                    1
+                };
+                units.get(..width).ok_or_else(mismatch)?.to_vec()
+            }
+            value => {
+                let code = integral(value, 0, i128::MAX)?;
+                vec![u16::try_from(code % 256).map_err(|_| overflow())?]
+            }
+        }
+    };
+    let length = count
+        .checked_mul(character.len())
+        .ok_or_else(|| Error::Resource("string budget exceeded".into()))?;
+    if length > VbaString::MAX_UNITS {
+        return Err(Error::Resource("string budget exceeded".into()));
+    }
+    let mut output = Vec::new();
+    output
+        .try_reserve_exact(length)
+        .map_err(|_| Error::Resource("string allocation failed".into()))?;
+    for _ in 0..count {
+        output.extend_from_slice(&character);
+    }
+    Ok(V::String(VbaString::from_units(output).map_err(|_| {
+        Error::Resource("string budget exceeded".into())
+    })?))
 }
 
 /// Compatibility adapter for verified extended intrinsic calls. Omitted

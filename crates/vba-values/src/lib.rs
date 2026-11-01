@@ -307,6 +307,8 @@ pub enum Intrinsic {
     StrReverse,
     LCase,
     UCase,
+    Space,
+    String,
     Asc,
     Chr,
     StrComp,
@@ -546,6 +548,9 @@ const STRCOMP_PARAMS: &[IntrinsicParameter] = &[
 ];
 const LEFT_RIGHT_PARAMS: &[IntrinsicParameter] =
     &[parameter("string", true), parameter("length", true)];
+const SPACE_PARAMS: &[IntrinsicParameter] = &[parameter("number", true)];
+const STRING_PARAMS: &[IntrinsicParameter] =
+    &[parameter("number", true), parameter("character", true)];
 const IIF_PARAMS: &[IntrinsicParameter] = &[
     parameter("expr", true),
     raw_parameter("truepart", true),
@@ -588,7 +593,7 @@ const fn descriptor(
         Intrinsic::Round => 1,
         Intrinsic::StrComp => 2,
         Intrinsic::Mid => 2,
-        Intrinsic::Left | Intrinsic::Right => 2,
+        Intrinsic::Left | Intrinsic::Right | Intrinsic::String => 2,
         _ => 1,
     };
     IntrinsicDescriptor {
@@ -637,6 +642,8 @@ const fn descriptor(
             | Intrinsic::StrReverse
             | Intrinsic::LCase
             | Intrinsic::UCase
+            | Intrinsic::Space
+            | Intrinsic::String
             | Intrinsic::Asc
             | Intrinsic::Chr => IntrinsicFamily::StringValue,
             _ => IntrinsicFamily::Numeric,
@@ -708,8 +715,8 @@ const fn return_variant(intrinsic: Intrinsic) -> IntrinsicReturn {
         | I::RTrim
         | I::StrReverse
         | I::LCase
-        | I::UCase
         | I::Chr => R::Fixed(K::String),
+        I::UCase | I::Space | I::String => R::Variant,
         I::CInt => R::Fixed(K::Integer),
         I::CLng => R::Fixed(K::Long),
         I::CLngLng => R::Fixed(K::LongLong),
@@ -971,6 +978,20 @@ pub const INTRINSIC_DESCRIPTORS: &[IntrinsicDescriptor] = &[
     ),
     descriptor(Intrinsic::LCase, "LCase", ONE_VALUE, false, "LCase(string)"),
     descriptor(Intrinsic::UCase, "UCase", ONE_VALUE, false, "UCase(string)"),
+    descriptor(
+        Intrinsic::Space,
+        "Space",
+        SPACE_PARAMS,
+        false,
+        "Space(number)",
+    ),
+    descriptor(
+        Intrinsic::String,
+        "String",
+        STRING_PARAMS,
+        false,
+        "String(number, character)",
+    ),
     descriptor(Intrinsic::Asc, "Asc", ONE_VALUE, false, "Asc(string)"),
     descriptor(Intrinsic::Chr, "Chr", ONE_VALUE, false, "Chr(charcode)"),
 ];

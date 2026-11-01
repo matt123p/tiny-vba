@@ -1045,3 +1045,48 @@ fn trim_edges_and_reverse_preserve_the_documented_boundaries() -> TestResult {
     ));
     Ok(())
 }
+
+#[test]
+fn space_and_string_repeat_with_null_and_resource_boundaries() -> TestResult {
+    assert_eq!(
+        vba_runtime::intrinsic(I::Space, &[V::Integer(3)])
+            .map_err(|error| std::io::Error::other(format!("{error:?}")))?,
+        string("   ")?
+    );
+    assert_eq!(
+        vba_runtime::intrinsic(I::String, &[V::Integer(4), string("ABC")?])
+            .map_err(|error| std::io::Error::other(format!("{error:?}")))?,
+        string("AAAA")?
+    );
+    assert_eq!(
+        vba_runtime::intrinsic(I::String, &[V::Integer(3), V::Integer(298)])
+            .map_err(|error| std::io::Error::other(format!("{error:?}")))?,
+        string("***")?
+    );
+    assert_eq!(
+        vba_runtime::intrinsic(I::String, &[V::Integer(2), V::Null]),
+        Ok(V::Null)
+    );
+    assert!(matches!(
+        vba_runtime::intrinsic(I::Space, &[V::Integer(-1)]),
+        Err(Error::Vba { number: 5, .. })
+    ));
+    assert!(matches!(
+        vba_runtime::intrinsic(I::Space, &[V::Long(32769)]),
+        Err(Error::Resource(_))
+    ));
+    Ok(())
+}
+
+#[test]
+fn ascii_case_conversion_refuses_unimplemented_non_ascii_mapping() -> TestResult {
+    assert!(matches!(
+        vba_runtime::intrinsic(I::LCase, &[string("é")?]),
+        Err(Error::Unsupported(_))
+    ));
+    assert!(matches!(
+        vba_runtime::intrinsic(I::UCase, &[string("ß")?]),
+        Err(Error::Unsupported(_))
+    ));
+    Ok(())
+}

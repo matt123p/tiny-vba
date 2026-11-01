@@ -234,3 +234,37 @@ fn string_edge_descriptors_have_one_string_argument() -> Result<(), Box<dyn std:
     }
     Ok(())
 }
+
+#[test]
+fn repetition_descriptors_retain_variant_string_returns() -> Result<(), Box<dyn std::error::Error>>
+{
+    let space = Intrinsic::Space
+        .descriptor()
+        .ok_or_else(|| std::io::Error::other("Space descriptor"))?;
+    let string = Intrinsic::String
+        .descriptor()
+        .ok_or_else(|| std::io::Error::other("String descriptor"))?;
+    assert_eq!(space.minimum_arguments, 1);
+    assert_eq!(space.return_variant, IntrinsicReturn::Variant);
+    assert_eq!(string.minimum_arguments, 2);
+    assert_eq!(string.return_variant, IntrinsicReturn::Variant);
+    Ok(())
+}
+
+#[test]
+fn case_descriptors_match_their_documented_return_contracts()
+-> Result<(), Box<dyn std::error::Error>> {
+    assert_eq!(
+        Intrinsic::LCase
+            .descriptor()
+            .map(|descriptor| descriptor.return_variant),
+        Some(IntrinsicReturn::Fixed(ScalarKind::String))
+    );
+    assert_eq!(
+        Intrinsic::UCase
+            .descriptor()
+            .map(|descriptor| descriptor.return_variant),
+        Some(IntrinsicReturn::Variant)
+    );
+    Ok(())
+}

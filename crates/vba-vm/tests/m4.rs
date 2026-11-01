@@ -424,6 +424,30 @@ fn trim_edges_and_strreverse_are_executable_intrinsics() -> R {
 }
 
 #[test]
+fn space_and_string_are_variant_string_repetition_intrinsics() -> R {
+    answer(
+        "Function Answer() As String\nAnswer=Space(2) & String(3,\"xy\") & \"|\" & String(2,42)\nEnd Function",
+        Value::String(VbaString::from_utf8("  xxx|**")?),
+    )?;
+    answer(
+        "Function Answer() As Long\nOn Error Resume Next\nAnswer=Len(Space(-1))\nAnswer=Err.Number\nEnd Function",
+        Value::Long(5),
+    )
+}
+
+#[test]
+fn lcase_ucase_ascii_and_null_contracts_are_explicit() -> R {
+    answer(
+        "Function Answer() As String\nAnswer=LCase(\"ABC 123\") & \"|\" & UCase(\"abc 123\")\nEnd Function",
+        Value::String(VbaString::from_utf8("abc 123|ABC 123")?),
+    )?;
+    answer(
+        "Function Answer() As Variant\nAnswer=IsNull(LCase(Null)) And IsNull(UCase(Null))\nEnd Function",
+        Value::Boolean(true),
+    )
+}
+
+#[test]
 fn strcomp_named_arguments_evaluate_once_in_source_order_and_resume_cleanly() -> R {
     let calls = Arc::new(AtomicUsize::new(0));
     let source = "Dim n As Long\nFunction Answer() As Variant\nAnswer=StrComp(string2:=NextText(),string1:=NextText(),compare:=0)*10+n\nEnd Function\nFunction NextText() As String\nn=n+1\nNextText=CStr(n)\nEnd Function";
