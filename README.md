@@ -1,7 +1,13 @@
-# tiny-vba
+# Tiny VBA
 
-A new, standalone VBA interpreter, editor and debugger in Rust, intended to run natively and in WebAssembly.
-Develop, run and test the language engine without Gridcraft, Wordcraft, Microsoft Office or a graphical interface.
+Tiny VBA is the shared VBA implementation for the ArtCraft Office applications:
+GridCraft, WordCraft and DeckCraft. Written in Rust for native and WebAssembly use,
+it provides the language engine, runtime, editor and debugger for embedding in those
+applications.
+
+The standalone graphical shell and command-line tools exist only to develop and test
+the shared components without launching a host application. A standalone VBA editor
+is not the project's goal.
 
 **Current status:** M4 acceptance is complete; the M5 host contract, M6 read-only project
 decoder, M7 callback/lifecycle contract and M8 embeddable editor/debugger are implemented. The Rust engine includes verified IR 1/2/3/4, explicit-frame execution, a headless debugger, scalar
@@ -13,7 +19,7 @@ All **44 authored scenarios and 153 reviewed ReflexGrid cases pass**. The latter
 Microsoft Excel Mac oracle expectations; this is inherited evidence, not a new local Excel run.
 See [the acceptance report](docs/m4-oracle-report.md) and [language scope](docs/m4-language.md).
 [M6 project import](docs/project-import.md) extracts bounded source/metadata without execution.
-The [native/web graphical editor and CLI debugger](docs/ui/embedding.md) are implemented, with
+The [embeddable editor/debugger and standalone test tools](docs/ui/embedding.md) are implemented, with
 [corrected M8 completion audit](docs/ui/m8-completion-audit.md) and
 [classic tools/DAP acceptance](docs/ui/m10-implementation.md).
 The [remaining plan](docs/implementation-plan.md) uses new M1–M8 numbering for
@@ -22,13 +28,23 @@ Historical reports retain their original milestone IDs; see the
 [numbering map](docs/implementation-progress.md#plan-renumbering--2026-10-28).
 
 
-The Excel/Word compatibility layers, Office metadata and application adapters belong in the
-Gridcraft and Wordcraft forks. This repo owns language semantics, bytecode, execution,
-debugging, a reusable egui editor/debugger UI, a standalone IDE application, a generic foreign-call
-contract, and read-only VBA project decoding. Gridcraft embeds this UI using its existing UI stack
-and design conventions. See the [editor/debugger UI contract](docs/editor-debugger-ui.md).
+## Shared components and application integration
 
-## Start here
+This repository owns language semantics, bytecode, execution, debugging, the reusable egui
+editor/debugger UI, a generic foreign-call contract and read-only VBA project decoding.
+The ArtCraft applications own their Office compatibility objects, member catalogues,
+document state, host adapters, storage, trust, events, undo/recalculation and application UI.
+The Excel and Word compatibility layers live in GridCraft and WordCraft respectively.
+
+Applications embed the shared editor/debugger in their existing UI stack and supply their
+own host integration. The standalone shell exercises the same shared components for testing.
+See the [editor/debugger UI contract](docs/editor-debugger-ui.md) and
+[embedding guide](docs/ui/embedding.md).
+
+## Development and standalone testing
+
+The commands below exercise the shared engine and UI in isolation. Microsoft Office and
+the ArtCraft host applications are not required for these tests.
 
 Rust is pinned by `rust-toolchain.toml`; Python 3.11+ and Git support repository checks only.
 M6 uses pinned cfb and encoding_rs dependencies; Office is not required. Node 18+ runs the WASI smoke test.
@@ -73,7 +89,8 @@ Two workbook sources have unresolved licensing; every specimen still requires cl
 ## Layout
 
 ```text
-apps/vba-cli/src/     standalone command-line frontend
+apps/vba-ide-app/     standalone native/web shell for development and testing
+apps/vba-cli/src/     command-line development and test frontend
 crates/*/src/        compiler, values/runtime, VM, debugger, foreign protocol, importer
 crates/*/tests/      owning crate's Rust integration tests as they are implemented
 apps/vba-cli/tests/  executable CLI checks
@@ -112,7 +129,7 @@ that change remains a maintainer decision. External submodules retain their own 
 ## UI, embedding and provenance
 
 The [M8 plan](docs/ui/m8-implementation-plan.md), [embedding guide](docs/ui/embedding.md) and
-[acceptance/compatibility report](docs/ui/m8-acceptance.md) describe the delivered Classic shell.
+[acceptance/compatibility report](docs/ui/m8-acceptance.md) describe the shared Classic editor/debugger and its embedding interfaces.
 `cargo xtask ui` generates original screenshots in ignored `reports/ui/`; `ui-native` runs a real
 window/capture and `web` builds the browser bundle. The optional Chromium harness is in
 `tools/ui-browser`. Core and IDE model consumers remain free of GUI dependencies.
