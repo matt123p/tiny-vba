@@ -482,3 +482,87 @@ fn m4_requires_recompilation_from_the_previous_execution_profile() -> R {
     assert_eq!(error.code, "VBA0022");
     Ok(())
 }
+
+#[test]
+fn variant_for_counters_cover_implicit_explicit_nested_and_exit_paths() -> R {
+    for declarations in ["", "Dim Index As Variant, d As Variant, t As Variant\n"] {
+        let source = format!(
+            "Function Answer() As Long\n{declarations}For Index=1 To 4\nFor d=1 To 5\nFor t=1 To 40\nAnswer=Answer+1\nNext\nNext\nNext\nEnd Function"
+        );
+        let mut s = session(&source, Limits::default())?;
+        assert_eq!(
+            drive(&mut s, &Controller::new())?,
+            Outcome::Completed(ReturnValue::Function(Value::Long(800)))
+        );
+    }
+    for (body, expected) in [
+        ("For i=3 To 1\nAnswer=99\nNext\nAnswer=i", 3),
+        (
+            "For i=1 To 4 Step 2\nAnswer=Answer+i\nNext\nAnswer=Answer+i",
+            9,
+        ),
+        ("For i=1 To 4\nExit For\nNext\nAnswer=i", 1),
+        ("For i=\"1\" To \"3\"\nAnswer=Answer+1\nNext", 3),
+    ] {
+        let mut s = session(
+            &format!("Function Answer() As Long\n{body}\nEnd Function"),
+            Limits::default(),
+        )?;
+        assert_eq!(
+            drive(&mut s, &Controller::new())?,
+            Outcome::Completed(ReturnValue::Function(Value::Long(expected)))
+        );
+    }
+    Ok(())
+}
+
+#[test]
+fn variant_for_checkpoint_resumes_without_reinitializing_and_keeps_numeric_tags() -> R {
+    let mut s = session(
+        "Function Answer() As Long\nFor i=1 To 3\nAnswer=Answer+i\nStop\nNext\nEnd Function",
+        Limits::default(),
+    )?;
+    for expected in 1..=3 {
+        let Outcome::Paused(p) = drive(&mut s, &Controller::new())? else {
+            return Err("Stop must pause each iteration".into());
+        };
+        assert_eq!(s.read_local(p.handle, "i")?, Value::Integer(expected));
+        s.continue_execution()?;
+    }
+    assert_eq!(
+        drive(&mut s, &Controller::new())?,
+        Outcome::Completed(ReturnValue::Function(Value::Long(6)))
+    );
+    Ok(())
+}
+
+#[test]
+fn invalid_variant_for_bounds_are_catchable_before_counter_assignment() -> R {
+    for (start, limit, expected) in [("\"bad\"", "3", 13), ("1", "Null", 94)] {
+        let source = format!(
+            "Function Answer() As Long\nDim i As Variant\ni=77\nOn Error GoTo Failed\nFor i={start} To {limit}\nNext\nExit Function\nFailed:\nAnswer=Err.Number\nIf i<>77 Then Answer=999\nEnd Function"
+        );
+        let mut s = session(&source, Limits::default())?;
+        assert_eq!(
+            drive(&mut s, &Controller::new())?,
+            Outcome::Completed(ReturnValue::Function(Value::Long(expected)))
+        );
+    }
+    for declaration in [
+        "Dim i As Boolean",
+        "Dim i As String",
+        "Dim i(1 To 2) As Long",
+        "Dim i As Object",
+    ] {
+        assert!(
+            session(
+                &format!(
+                    "Function Answer() As Long\n{declaration}\nFor i=1 To 3\nNext\nEnd Function"
+                ),
+                Limits::default()
+            )
+            .is_err()
+        );
+    }
+    Ok(())
+}

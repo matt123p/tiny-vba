@@ -133,3 +133,9 @@ Keep raw source canonical; use CodeProjection for visible edits/coordinates and
 preserve hidden metadata/newline bytes through history and export. Attribute
 records never create executable checkpoints. Document rename requires host
 validation and revision-checked acknowledgement; unsupported hosts refuse.
+
+Numeric For controls include implicit/explicit scalar Variant for the existing
+positive integral literal-Step profile. Preserve numeric bound validation and
+once-only capture before counter assignment; reuse shared arithmetic, exact
+numeric tags, catchable errors and debugger checkpoints. Do not reintroduce the
+legacy Integer/Long-only binder guard or accept arrays as scalar controls.

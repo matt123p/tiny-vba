@@ -564,6 +564,28 @@ impl Builder<'_> {
             }),
         )
     }
+    fn store_for_bound(
+        &mut self,
+        block: usize,
+        slot: usize,
+        value: &bound::Expr,
+        variant: bool,
+    ) -> Result<()> {
+        if !variant {
+            return self.store(block, slot, value, false);
+        }
+        self.emit(block, ir::Instruction::RefLocal(ir::LocalSlot(idx(slot)?)))?;
+        self.expr(block, value)?;
+        // Validate through the shared numeric conversion without discarding its
+        // original width. Adding numeric zero then normalizes numeric strings
+        // and Empty using the ordinary runtime arithmetic path.
+        self.emit(block, ir::Instruction::DupValue)?;
+        self.emit(block, ir::Instruction::Convert(ScalarKind::Double))?;
+        self.emit(block, ir::Instruction::DropValue)?;
+        self.constant(block, &Value::Integer(0))?;
+        self.binary(block, "+", value.span)?;
+        self.emit(block, ir::Instruction::WriteRef(ir::AssignmentKind::Value))
+    }
     fn capture_argument(&mut self, block: usize, slot: usize, value: &bound::Expr) -> Result<()> {
         self.feature("argument-defaults-v2");
         self.emit(block, ir::Instruction::RefLocal(ir::LocalSlot(idx(slot)?)))?;
@@ -1271,9 +1293,10 @@ impl Builder<'_> {
                 )?;
                 self.jump(advance, later_test)?;
                 let init = self.block(site, ir::SiteRole::LoopInit, true)?;
-                self.store(init, start_slot, start, false)?;
-                self.store(init, limit_slot, limit, false)?;
-                self.store(init, step_slot, step, false)?;
+                let variant = counter_kind == ScalarKind::Variant;
+                self.store_for_bound(init, start_slot, start, variant)?;
+                self.store_for_bound(init, limit_slot, limit, variant)?;
+                self.store_for_bound(init, step_slot, step, variant)?;
                 self.emit(
                     init,
                     ir::Instruction::RefLocal(ir::LocalSlot(idx(*counter)?)),

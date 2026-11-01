@@ -142,6 +142,8 @@ fn run() -> Result<(), Box<dyn Error>> {
                     "classes",
                     "--test",
                     "attribute_execution",
+                    "--test",
+                    "execution",
                     "--locked",
                     "--target",
                     "wasm32-wasip1",

@@ -90,3 +90,10 @@ the published immutable shared dependency without development path overrides. Se
 
 See [M6 acceptance](m6-acceptance.md). Binary project writeback, third-party
 controls and Excel Macro Options remain outside this implemented profile.
+
+2026-11-01 For-counter correction: explicit/implicit scalar Variant controls now
+compile and execute for the existing positive integral literal-Step profile.
+Nested loops, Next without a name, Exit For, zero iterations, numeric-string
+bounds, catchable invalid bounds and checkpoint resume have authored regressions.
+Food.xlsm was inspected read-only to identify its implicit counters; no workbook
+macro was executed, and this does not claim its clipboard/sort workflows run.

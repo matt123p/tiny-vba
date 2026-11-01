@@ -8,6 +8,26 @@ context work (M6.5–M6.8 plus the fork acceptance for M6.7) is implemented**; t
 remaining acceptance gates are recorded in the [M6 audit](m6-acceptance.md).
 Office objects, document events, trust and packaging remain fork-owned.
 
+## Reported Food.xlsm For-counter correction (2026-11-01)
+
+Read-only source extraction confirmed CopyIngredients uses implicit Variant
+counters Index, d and t. The binder's legacy Integer/Long-only guard rejected
+those valid numeric loop controls. It now accepts scalar Variant controls while
+rejecting arrays and nonnumeric declared control types. Lowering evaluates and
+normalizes Variant bounds once through shared numeric conversion/arithmetic
+before writing the counter; no IR opcode/profile change or host-specific code.
+Authored regressions cover 4×5×40 nested iterations, explicit/implicit controls,
+Next, Exit For, zero iterations, numeric strings, invalid/Null bounds and
+checkpoint pause/resume with exact counter tags. The existing positive integral
+literal-Step limitation and numeric arithmetic limits remain explicit.
+
+The user workbook was not executed or modified. Clipboard/selection/sort host
+operations in its source remain separate compatibility work. This is a targeted
+language correction; M7 remains untouched. Validation: `cargo xtask ci` PASS
+(419 workspace tests), `cargo xtask wasm` PASS, `cargo xtask wasm-run` PASS
+(222 actual WASI tests, including the full execution regression suite).
+See [ADR 0031](decisions/0031-variant-for-counters.md).
+
 ## M6 implementation and acceptance audit (2026-11-01)
 
 Implemented generic live host-object WithEvents subscriptions (IR capability

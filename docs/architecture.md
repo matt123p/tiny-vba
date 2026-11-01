@@ -213,3 +213,7 @@ signatures, then delivers each through existing bounded instance callbacks.
 The toolkit-independent IDE exposes that path. Applications own event names,
 trust, sequential ByRef propagation, cancellation and document lifecycle ordering;
 no Office names or ambient subscriptions enter the shared crates.
+
+[ADR 0031](decisions/0031-variant-for-counters.md) extends shared numeric For
+controls to scalar Variant, using binder validation and existing verified
+instructions/runtime arithmetic; host-specific execution remains outside the engine.

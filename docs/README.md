@@ -124,3 +124,5 @@ names and document effects remain fork-owned; Office reference observations are
 separate from authored acceptance.
 
 - [M6 acceptance audit](m6-acceptance.md): shared/fork evidence and unavailable Office observations.
+
+- [ADR 0031: scalar Variant For controls](decisions/0031-variant-for-counters.md).

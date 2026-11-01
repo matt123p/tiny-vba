@@ -69,7 +69,7 @@ of an operation in `Capabilities::ir1_structural()` claims runtime support.
 | Calls | Exact positional present arity, Sub/value distinction, ByVal expressions, exact-declared-kind local ByRef; Function results used as statements are dropped explicitly |
 | Expressions | Decimal nonnegative Integer/Long literals (including % and & suffixes within range), strings, Boolean, Empty/Null/Nothing, local/constant names, parentheses, unary minus/Not and the IR 1 binary operator tags |
 | Assignment | Local/result value assignment and explicit Set mode; Set targets must be Object/Variant; dynamic assignment/conversion rules remain runtime work |
-| Control | If/ElseIf/Else including inline forms, Exit in a matching context, Stop, numeric For with Integer/Long counter and positive integral literal step (default 1); matching Next name |
+| Control | If/ElseIf/Else including inline forms, Exit in a matching context, Stop, numeric For with scalar Integer/Long/Variant counter and positive integral literal step (default 1); matching Next name |
 | Constants | Literal untyped module/procedure Const only; exact tags retained; cross-module Const lookup, typed Const and computed constant expressions fail explicitly |
 
 Rejected M2 forms include persistent module variables, classes/properties, default-member
@@ -239,3 +239,14 @@ Foreign nominal WithEvents fields require `host-events-v1`; older capability
 sets refuse them. The host supplies and validates actual event signatures before
 any callback runs. See [ADR 0029](decisions/0029-host-event-subscriptions.md) and
 [ADR 0030](decisions/0030-attribute-metadata-and-code-projection.md).
+
+## Variant For counters (2026-11-01)
+
+Explicit or implicit scalar Variant loop counters use the existing numeric loop
+lowering and shared arithmetic. Variant bounds are evaluated once and validated
+through shared numeric conversion before assigning the counter. Numeric addition
+with zero normalizes strings/Empty while retaining supported numeric widths;
+invalid/Null bounds raise ordinary catchable VBA errors. Integer/Long counters
+keep their existing conversions. Array, Boolean, String and Object controls
+remain refused. Positive integral literal Step (default 1) remains the declared
+profile; this change does not add dynamic or negative Step support.

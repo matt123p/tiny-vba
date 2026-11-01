@@ -3378,13 +3378,15 @@ impl Binder<'_> {
             }
             ast::StatementKind::For(loop_) => {
                 let counter = self.slot(&loop_.counter)?;
-                if self
-                    .locals
-                    .get(counter)
-                    .is_none_or(|l| !matches!(l.kind, ScalarKind::Integer | ScalarKind::Long))
-                {
+                if self.locals.get(counter).is_none_or(|l| {
+                    l.array.is_some()
+                        || !matches!(
+                            l.kind,
+                            ScalarKind::Integer | ScalarKind::Long | ScalarKind::Variant
+                        )
+                }) {
                     return Err(unsupported(
-                        "For counter must be Integer or Long",
+                        "For counter must be a scalar Integer, Long or Variant",
                         site.span,
                     ));
                 }

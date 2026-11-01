@@ -324,3 +324,8 @@ remain session-bound. Scheduling uses the existing callback/debugger machinery;
 reset, disconnect and stale receivers cannot revive a subscription. The host owns
 trusted event routing, sequential ByRef propagation and its document undo batch.
 [ADR 0029](decisions/0029-host-event-subscriptions.md) defines the capability.
+
+Numeric For loops now accept scalar Variant counters, including implicit locals
+without Option Explicit. Initialization, Next, Exit For and pause/resume retain
+the normal checkpoint/alias/budget machinery. Variant bounds are validated before
+the counter is written; existing numeric operations own coercion and overflow.
