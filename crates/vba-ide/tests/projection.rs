@@ -172,3 +172,15 @@ fn invalid_metadata_values_remain_visible_and_mixed_newlines_survive() {
         assert_eq!(projection.to_view(projection.to_source(byte)), byte);
     }
 }
+
+#[test]
+fn member_metadata_retains_identity_through_a_temporarily_empty_name() {
+    let projection = CodeProjection::new(RAW);
+    let incomplete = projection.apply(&projection.text.replacen("Sub Macro2()", "Sub ()", 1));
+    let projection = CodeProjection::new(&incomplete);
+    let renamed = projection.apply(&projection.text.replacen("Sub ()", "Sub Renamed()", 1));
+    assert!(
+        renamed.contains("Attribute Renamed.VB_ProcData"),
+        "{renamed}"
+    );
+}

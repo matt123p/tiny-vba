@@ -16,7 +16,7 @@ not started.
 | M6.4 | Authored fork workflows pass; **fresh Word/Excel observations NOT_RUN** |
 | M6.5–M6.8 | Existing [per-layer/context acceptance](m6-context-resolution-check.md): staged resolution, With, fork globals/implicit Me and read-only receiver completion |
 | M6.9 | Owned module/member metadata, exact procedure-local invocation attribute, signed IDs, known-value validation and bounded class export envelope; metadata has no executable checkpoints |
-| M6.10 | Canonical raw source plus reversible code projection; raw/view coordinates, newline/Unicode preservation, hidden-record edits/history/search/export, mapped debugger gutters and procedure views; read-only raw inspector |
+| M6.10 | Canonical raw source plus reversible code projection; raw/view coordinates, newline/Unicode preservation, hidden-record edits/history/search/export (including a temporarily erased procedure name), mapped debugger gutters and procedure views; read-only raw inspector |
 | M6.11 | Attribute-only document module has blank code, code-name explorer/Properties and separate source filename; descriptions/Instancing read-only; host-validated, revision-checked rename acknowledgement API |
 | M6.12 | Shared native/WASM/WASI/UI checks and actual WordCraft/GridCraft metadata workflows; actual browser acceptance tracked below; Office observations remain separate |
 
@@ -29,10 +29,10 @@ live document/workbook effects remain in the forks.
 
 Shared implementation:
 
-- `cargo xtask ci`: PASS, 415 workspace tests, formatting, strict Clippy,
+- `cargo xtask ci`: PASS, 416 workspace tests, formatting, strict Clippy,
   layers, assets, source/provenance and corpus checks.
 - `cargo xtask wasm`: PASS.
-- `cargo xtask wasm-run`: PASS, 204 actual WASI tests across 31 groups,
+- `cargo xtask wasm-run`: PASS, 205 actual WASI tests across 31 groups,
   including syntax attributes, attribute execution, host events and projection.
 - `cargo xtask ui`: PASS; `xvfb-run -a cargo xtask ui-native`: PASS;
   `cargo xtask web`: PASS.

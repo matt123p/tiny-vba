@@ -177,6 +177,21 @@ impl CodeProjection {
                 .collect();
             projection.members.sort_by_key(|member| member.start);
         }
+        // A user can temporarily erase a name while replacing it. Retain its
+        // metadata identity only at an immediately preceding empty signature;
+        // do not attach arbitrary orphan metadata to another valid procedure.
+        for record in &projection.hidden {
+            if let Some(owner) = &record.owner
+                && !projection
+                    .members
+                    .iter()
+                    .any(|m| m.name.eq_ignore_ascii_case(owner))
+                && let Some(member) = incomplete_member(&projection.text, record.anchor, owner)
+            {
+                projection.members.push(member);
+            }
+        }
+        projection.members.sort_by_key(|member| member.start);
         projection
     }
     pub fn to_view(&self, byte: usize) -> usize {
@@ -380,4 +395,50 @@ fn separator(source: &str) -> &str {
                 "\n"
             }
         })
+}
+
+fn incomplete_member(source: &str, anchor: usize, owner: &str) -> Option<Member> {
+    let before = source.get(..anchor)?.strip_suffix('\n')?;
+    let line_start = before.rfind('\n').map_or(0, |at| at + 1);
+    let line = before.get(line_start..)?;
+    let trimmed = line.trim_start();
+    let start = line_start + line.len() - trimmed.len();
+    let lower = trimmed.to_ascii_lowercase();
+    let mut signature = lower.as_str();
+    while let Some((modifier, rest)) = signature.split_once(char::is_whitespace) {
+        if !matches!(modifier, "public" | "private" | "friend" | "static") {
+            break;
+        }
+        signature = rest.trim_start();
+    }
+    let (kind, rest) = signature.split_once(char::is_whitespace)?;
+    let rest = rest.trim_start();
+    let rest = if kind == "property" {
+        let (accessor, rest) = rest.split_once(char::is_whitespace)?;
+        if !matches!(accessor, "get" | "let" | "set") {
+            return None;
+        }
+        rest.trim_start()
+    } else if matches!(kind, "sub" | "function") {
+        rest
+    } else {
+        return None;
+    };
+    if !rest.starts_with('(') {
+        return None;
+    }
+    let ending = format!("end {kind}");
+    let mut end = anchor;
+    for line in source.get(anchor..)?.split_inclusive('\n') {
+        end += line.len();
+        if line.trim().eq_ignore_ascii_case(&ending) {
+            break;
+        }
+    }
+    Some(Member {
+        name: owner.into(),
+        start,
+        end,
+        procedure: true,
+    })
 }
