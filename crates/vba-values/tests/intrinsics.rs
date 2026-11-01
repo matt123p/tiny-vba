@@ -86,3 +86,28 @@ fn descriptor_arities_preserve_legacy_ranges_and_parameter_defaults() {
     assert!(Intrinsic::Mid.accepts(3));
     assert!(!Intrinsic::Mid.accepts(1));
 }
+
+#[test]
+fn strcomp_descriptor_is_contextual_ir8_variant_with_module_default()
+-> Result<(), Box<dyn std::error::Error>> {
+    let descriptor = Intrinsic::StrComp
+        .descriptor()
+        .ok_or_else(|| std::io::Error::other("StrComp descriptor"))?;
+    assert_eq!(descriptor.spelling, "StrComp");
+    assert_eq!(descriptor.minimum_arguments, 2);
+    assert_eq!(descriptor.maximum_arguments, 3);
+    assert_eq!(descriptor.return_variant, IntrinsicReturn::Variant);
+    assert_eq!(descriptor.minimum_ir, 8);
+    assert_eq!(descriptor.capability, "intrinsics-m6a-v1");
+    assert_eq!(descriptor.effect, vba_values::IntrinsicEffect::Contextual);
+    assert!(!descriptor.platform_requirements.is_empty());
+    let compare = descriptor
+        .parameters
+        .get(2)
+        .ok_or_else(|| std::io::Error::other("StrComp compare parameter"))?;
+    assert_eq!(
+        compare.omitted_default,
+        vba_values::IntrinsicOmittedDefault::ModuleCompare
+    );
+    Ok(())
+}

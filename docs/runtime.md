@@ -45,7 +45,7 @@ cloning the source payload. A caller's capability set cannot enable an unimpleme
 | Errors/builtins | On Error, Resume, Err/Erl and deterministic intrinsic registry; see M4 contract for exact boundaries |
 | Host roots/protocol | IR 4 hidden `HostRoot` slots bound by `HostBinding.roots`; `vba_foreign::check_protocol` refuses other protocol majors/minors before any dispatch |
 | Generic host/debugger | Existing permitted calls, waits, typed patches, checkpoint stops, stepping, inspection and edits |
-| IR 8 extended intrinsics | Descriptor-verified stack mapping and execution for existing descriptors; named/omitted source calls use IR 8; descriptor defaults resolve supported optional gaps; `IntrinsicContext` provides immutable mode/locale/calendar/code-page/target-width metadata and an identified comparison-service seam. Text mode remains unavailable to compiled modules because no target provider is configured; the explicit no-service path returns Unsupported. |
+| IR 8 extended intrinsics | Descriptor-verified stack mapping; named/omitted source calls and StrComp use IR 8; descriptor defaults resolve supported optional gaps; `IntrinsicContext` provides immutable mode/locale/calendar/code-page/target-width metadata and an identified comparison-service seam. Option Compare Text and explicit textual StrComp execute when the embedding supplies a provider; the no-service path returns Unsupported. |
 
 The M4 contract lists explicit unsupported forms and profile limits. Source literals retain the
 reviewed decimal forms; additional suffix/radix, locale and class/default-member behavior is refused.

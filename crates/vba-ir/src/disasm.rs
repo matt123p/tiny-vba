@@ -165,6 +165,8 @@ fn render(out: &mut Output, p: &Program) -> fmt::Result {
                     out,
                     "  {pc:04} IntrinsicCall {spelling} return={return_variant:?} supplied={supplied_arguments} bindings={bindings:?} compare={compare_mode:?}"
                 )?;
+            } else if let Instruction::BinaryCompare { op, compare_mode } = instruction {
+                writeln!(out, "  {pc:04} BinaryCompare {op:?} mode={compare_mode:?}")?;
             } else {
                 writeln!(out, "  {pc:04} {instruction:?}")?;
             }

@@ -658,9 +658,6 @@ pub fn bind_with_references(
                 }
                 base_seen = true;
             }
-            if let ast::ModuleOption::Compare { text: true, span } = option {
-                return Err(unsupported("Option Compare Text compilation", *span));
-            }
         }
         let mut declaration_names = BTreeSet::new();
         for declaration in &module.declarations {
@@ -2425,7 +2422,8 @@ impl Binder<'_> {
         }
         let extended = arguments
             .iter()
-            .any(|argument| argument.name.is_some() || argument.value.is_none());
+            .any(|argument| argument.name.is_some() || argument.value.is_none())
+            || function == vba_values::Intrinsic::StrComp;
         if !extended {
             let mut values = Vec::new();
             for (index, argument) in arguments.iter().enumerate() {

@@ -26,7 +26,7 @@ pub struct IntrinsicContext<'a> {
 
 /// A deterministic target service for VBA binary/text string ordering.
 /// Implementations identify their algorithm and configuration in `service_id`.
-pub trait StringComparisonService {
+pub trait StringComparisonService: Send + Sync {
     fn service_id(&self) -> &str;
     fn compare(
         &self,
@@ -46,6 +46,9 @@ pub fn intrinsic_extended_with_context(
     arguments: &[Option<Value>],
     context: &IntrinsicContext<'_>,
 ) -> Result<Value> {
+    if function == vba_values::Intrinsic::StrComp {
+        return coercion::strcomp(arguments, context);
+    }
     intrinsic_extended(function, arguments, context.comparison_mode())
 }
 
@@ -111,19 +114,22 @@ impl<'a> IntrinsicContext<'a> {
     }
 
     pub fn compare_strings(&self, left: &VbaString, right: &VbaString) -> Result<Ordering> {
+        self.compare_strings_in_mode(self.comparison_mode, left, right)
+    }
+
+    pub fn compare_strings_in_mode(
+        &self,
+        mode: vba_values::IntrinsicComparisonMode,
+        left: &VbaString,
+        right: &VbaString,
+    ) -> Result<Ordering> {
         let service = self.string_comparison.ok_or_else(|| {
             Error::Unsupported(format!(
                 "string-comparison-service-unavailable:{}:{}:{:?}",
-                self.locale, self.code_page, self.comparison_mode
+                self.locale, self.code_page, mode
             ))
         })?;
-        service.compare(
-            self.comparison_mode,
-            left,
-            right,
-            self.locale,
-            self.code_page,
-        )
+        service.compare(mode, left, right, self.locale, self.code_page)
     }
 }
 fn unsupported() -> Error {
@@ -181,6 +187,58 @@ pub fn bind(kind: ScalarKind, value: &Value) -> Result<Value> {
         matches!(kind, ScalarKind::Object | ScalarKind::Variant)
             && matches!(value, Value::Nothing | Value::Object(_)),
     )
+}
+pub fn binary_with_context(
+    op: &str,
+    left: &Value,
+    right: &Value,
+    context: &IntrinsicContext<'_>,
+) -> Result<Value> {
+    if matches!(op, "=" | "<>" | "<" | "<=" | ">" | ">=") {
+        if context.comparison_mode() == vba_values::IntrinsicComparisonMode::Binary
+            && context.string_comparison_service_id().is_none()
+        {
+            return binary(op, left, right);
+        }
+        let empty = || VbaString::from_units(Vec::new()).map_err(|_| unsupported());
+        let left_string = match left {
+            Value::String(value) => Some(value),
+            Value::Empty if matches!(right, Value::String(_)) => None,
+            _ => return binary(op, left, right),
+        };
+        let right_string = match right {
+            Value::String(value) => Some(value),
+            Value::Empty if matches!(left, Value::String(_)) => None,
+            _ => return binary(op, left, right),
+        };
+        let left_empty;
+        let right_empty;
+        let left_string = match left_string {
+            Some(value) => value,
+            None => {
+                left_empty = empty()?;
+                &left_empty
+            }
+        };
+        let right_string = match right_string {
+            Some(value) => value,
+            None => {
+                right_empty = empty()?;
+                &right_empty
+            }
+        };
+        let ordering = context.compare_strings(left_string, right_string)?;
+        return Ok(Value::Boolean(match op {
+            "=" => ordering.is_eq(),
+            "<>" => !ordering.is_eq(),
+            "<" => ordering.is_lt(),
+            "<=" => !ordering.is_gt(),
+            ">" => ordering.is_gt(),
+            ">=" => !ordering.is_lt(),
+            _ => return Err(unsupported()),
+        }));
+    }
+    binary(op, left, right)
 }
 pub fn condition(value: &Value) -> Result<bool> {
     match value {

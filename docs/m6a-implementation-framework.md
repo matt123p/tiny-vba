@@ -28,11 +28,11 @@ on line numbers. These facts were checked against the working tree on 2026-11-01
 |---|---|---|
 | `crates/vba-values/src/lib.rs`: `Intrinsic`, `from_name`, `accepts` | Enum plus hand-maintained name/arity list; internal ArrayBaseOne exists | Central descriptor catalogue; retain enum identities and compatibility entry points |
 | `crates/vba-runtime/src/coercion.rs`: `intrinsic`, `string_function`, `convert`, `text`, `integral` | Central pure evaluation/coercion, partial string functions | Reuse conversions; extract family modules without changing public legacy behaviour |
-| `crates/vba-semantics/src/lib.rs`: module options and Apply binding | Rejects Option Compare Text; separate qualified/bare intrinsic argument loops reject names/omissions | One intrinsic binder and explicit call plan, preserving surrounding lookup precedence |
+| `crates/vba-semantics/src/lib.rs`: module options and Apply binding | Shared bare/qualified intrinsic binder; Option Compare Text is captured for IR 8 contextual operations | Keep one intrinsic binder and preserve project/local/implicit-Me/import precedence |
 | `crates/vba-syntax/src/ast.rs` / `parser.rs`: ModuleOption | Compare option already represented | Retain source/spans; audit `$`/byte/zero-argument syntax before adding new parsing |
 | `crates/vba-compiler/src/lib.rs`: ExprKind::Intrinsic | Emits argument expressions in order and Intrinsic opcode; special-cases v3 intrinsics | Lower the explicit call plan; feature-gate extended calls |
-| `crates/vba-ir/src/lib.rs`, `verify.rs` | Legacy opcode verifies arity and v2/v3 requirements | Preserve old contract; add verified IR 8 extended-call form described below |
-| `crates/vba-vm/src/lib.rs`: intrinsic instruction arm | Pops/reverses arguments, handles DebugPrint specially, calls runtime | Extended call dispatch with context and no duplicate evaluation/effects |
+| `crates/vba-ir/src/lib.rs`, `verify.rs` | Legacy opcode verifies arity and v2/v3 requirements; IR 8 verifies IntrinsicCall and contextual BinaryCompare | Preserve old contract; retain verifier gates on IR 8 context operations |
+| `crates/vba-vm/src/lib.rs`: intrinsic instruction arm | Pops/reverses arguments, handles DebugPrint specially, calls runtime; accepts injected string-comparison service | Keep extended calls/context read-only and avoid duplicate evaluation/effects |
 | `crates/vba-ide/src/code_aids.rs`, `metadata.rs`, `lib.rs` | Source/host metadata and safe evaluation paths | Derive intrinsic code aids from descriptors; audit each evaluation entry point |
 | `crates/vba-runtime/tests/m4_matrix.rs`, `crates/vba-vm/tests/m4.rs` | Direct typed runtime tests and source-to-VM helpers | Models for new focused family tests; preserve historical suites |
 | `xtask/src/main.rs`: wasm-run | Explicit WASI suite commands, not an automatic guarantee for every new test target | Add new targets to real WASI execution and inspect logged test counts |

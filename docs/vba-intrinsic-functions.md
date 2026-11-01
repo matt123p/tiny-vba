@@ -86,7 +86,7 @@ Every scenario not explicitly listed as an executed test remains `NOT_RUN`.
 
 | Public spelling | Signature / call shape (reference form) | Current code audit | Disposition / packet | Worksheet counterpart and required discriminator | Evidence |
 |---|---|---|---|---|---|
-| StrComp | `(string1, string2, [compare])` | Absent; Option Compare Text rejected | Required S1; F4 prerequisite | EXACT; ordering and Null result | [VBA](https://learn.microsoft.com/en-us/office/vba/language/reference/user-interface-help/strcomp-function) |
+| StrComp | `(string1, string2, [compare])` | Implemented through IR 8; comparison requires an injected provider | S1 | EXACT; Variant(Integer) -1/0/1 or Null for Null string | [VBA](https://learn.microsoft.com/en-us/office/vba/language/reference/user-interface-help/strcomp-function) |
 | InStr | `([start,] string1, string2, [compare])` | Partial: binary search only | Required S2 | FIND/SEARCH; no match returns 0, reverse not supported | [VBA index](https://learn.microsoft.com/en-us/office/vba/language/reference/functions-visual-basic-for-applications) |
 | InStrRev | `(stringcheck, stringmatch, [start, [compare]])` | Absent | Required S2 | Reverse composed search; reverse indexing and no-match 0 | [VBA index](https://learn.microsoft.com/en-us/office/vba/language/reference/functions-visual-basic-for-applications) |
 | Replace | `(expression, find, replace, [start, [count, [compare]]])` | Partial: binary only; incomplete Null/error precedence | Required S2 | SUBSTITUTE/REPLACE; substring replacement, start/count and compare | [VBA](https://learn.microsoft.com/en-us/office/vba/language/reference/user-interface-help/replace-function) |
@@ -268,11 +268,11 @@ The semantic binder now resolves `vbUseCompareOption`, `vbBinaryCompare`,
 `vbTextCompare`, and `vbDatabaseCompare` as Integer constants after user/project
 and reference declarations, so normal shadowing applies. `IntrinsicContext`
 provides a per-call configuration and injected comparison-service interface;
-without a provider, comparison requests fail with a named Unsupported capability.
-The current compiled profile still accepts only Option Compare Binary, because
-module string operators do not yet consume an injected provider. The test provider
-is a deterministic seam test, not a VBA locale implementation or compatibility
-claim.
+Option Compare Text is captured per procedure in IR 8, and relational string
+operators use the same injected provider as StrComp. Without a provider,
+contextual string comparison fails with a named Unsupported capability. The
+test provider is a deterministic test double, not a VBA locale or code-page
+implementation and not an Office compatibility observation.
 
 ## Worksheet equivalents and semantic differences
 
@@ -344,7 +344,7 @@ These comparisons guide required contract tests; no differential Office run is c
   Integrate cancellation, pause/resume and runtime error propagation without
   repeating effects. Inspection/watch evaluation must remain read-only.
 
-### First implementation slice: StrComp
+### S1 implementation: StrComp
 
 Implement `StrComp(string1, string2, [compare])` through normal shared binding,
 lowering and execution. The documented result is a Variant containing an Integer
@@ -352,11 +352,20 @@ lowering and execution. The documented result is a Variant containing an Integer
 the module's Option Compare; -1 requests that option explicitly, 0 is binary and
 1 is text. Null comparison raises an error; value 2 is Access-specific.
 
-Tests must cover equal/less/greater, empty strings, mixed case, non-ASCII and
-UTF-16 boundaries, coercion, Null operands, invalid/Null comparison, module
-defaults and explicit comparison constants. Establish exact error numbers and
-error precedence from the applicable reference/evidence. Do not guess locale
-ordering or silently implement Access database comparison in Excel/Word profiles.
+The shared implementation returns Variant(Integer), preserves Null for Null
+string operands, maps -1 to the caller's module mode, supports 0 and 1 through
+the injected provider, and refuses Access mode 2. The no-provider path is an
+explicit Unsupported result. Its deterministic tests cover ordering, empty and
+unpaired UTF-16 strings, mixed case, argument coercion, Null operands, invalid
+and Null compare values, source-order evaluation, qualification/shadowing,
+module defaults, cross-module mode capture, error trapping and pause/resume.
+
+The runtime currently maps invalid compare values to error 5 and Null compare
+to error 94 by its authored coercion policy. Microsoft references establish
+that both error, but do not establish these numbers or competing-error
+precedence. These numbers are engine behavior pending profile-tagged Office
+evidence; tests do not present them as Microsoft observations. The test provider
+also does not establish real locale or code-page collation.
 
 ## Ownership and platform boundaries
 
@@ -403,5 +412,5 @@ rows cannot silently disappear from the inventory or become implicit M7 work.
    authored, inherited and fresh Office evidence distinct. Fresh Excel/Word
    observations remain M8.5 under ADR 0032; this milestone does not claim them.
 
-Next task: M6A.1 inventory and contract audit, followed by M6A.2 StrComp. This
-planning change adds no runtime support and does not execute user workbooks.
+Next task: S2 InStr/InStrRev. S1 uses authored deterministic service tests; no
+Office macros were executed and no fresh Office observation is claimed.

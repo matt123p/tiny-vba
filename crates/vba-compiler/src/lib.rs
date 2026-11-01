@@ -119,6 +119,18 @@ pub fn compile_modules(
         }
         let mut builder = Builder {
             procedure: ir::ProcedureId(idx(procedure_index)?),
+            contextual_comparison_target: options
+                .capabilities
+                .ir_versions
+                .contains(&ir::IR8_VERSION)
+                && options
+                    .capabilities
+                    .features
+                    .contains("string-comparison-context-v1")
+                && options
+                    .capabilities
+                    .instructions
+                    .contains(&ir::Opcode::BinaryCompare),
             nominal_locals: &mut nominal_locals,
             program: &program,
             constants: &mut constants,
@@ -309,7 +321,9 @@ pub fn compile_modules(
     let mut ir = ir::Program {
         classes,
         nominal_locals,
-        ir_version: if features.contains("intrinsics-m6a-v1") {
+        ir_version: if features.contains("intrinsics-m6a-v1")
+            || features.contains("string-comparison-context-v1")
+        {
             ir::IR8_VERSION
         } else if features.iter().any(|f| f.ends_with("-v7")) {
             ir::IR7_VERSION
@@ -388,6 +402,7 @@ struct Block {
 }
 struct Builder<'a> {
     procedure: ir::ProcedureId,
+    contextual_comparison_target: bool,
     nominal_locals: &'a mut Vec<ir::NominalLocal>,
     program: &'a bound::BoundProgram,
     constants: &'a mut Vec<Value>,
@@ -1029,31 +1044,7 @@ impl Builder<'_> {
                             supplied_arguments: u16::try_from(arguments.len())
                                 .map_err(|_| resource())?,
                             bindings: plan.bindings.clone(),
-                            compare_mode: {
-                                let module_index = self
-                                    .program
-                                    .procedures
-                                    .get(self.procedure.0 as usize)
-                                    .map(|procedure| procedure.signature.module)
-                                    .ok_or_else(|| error("intrinsic caller module invariant"))?;
-                                if self
-                                    .program
-                                    .modules
-                                    .get(module_index)
-                                    .is_some_and(|module| {
-                                        module.options.iter().any(|option| {
-                                            matches!(
-                                                option,
-                                                ast::ModuleOption::Compare { text: true, .. }
-                                            )
-                                        })
-                                    })
-                                {
-                                    vba_values::IntrinsicComparisonMode::Text
-                                } else {
-                                    vba_values::IntrinsicComparisonMode::Binary
-                                }
-                            },
+                            compare_mode: self.compare_mode()?,
                         },
                     )
                 } else {
@@ -1141,7 +1132,48 @@ impl Builder<'_> {
             "imp" => ir::BinaryOp::Imp,
             _ => return Err(error("binary operator invariant").at(span)),
         };
-        self.emit(block, ir::Instruction::Binary(op))
+        let compare_mode = self.compare_mode()?;
+        if matches!(
+            op,
+            ir::BinaryOp::Equal
+                | ir::BinaryOp::NotEqual
+                | ir::BinaryOp::Less
+                | ir::BinaryOp::LessEqual
+                | ir::BinaryOp::Greater
+                | ir::BinaryOp::GreaterEqual
+        ) && (compare_mode == vba_values::IntrinsicComparisonMode::Text
+            || self.contextual_comparison_target)
+        {
+            self.feature("string-comparison-context-v1");
+            self.emit(block, ir::Instruction::BinaryCompare { op, compare_mode })
+        } else {
+            self.emit(block, ir::Instruction::Binary(op))
+        }
+    }
+
+    fn compare_mode(&self) -> Result<vba_values::IntrinsicComparisonMode> {
+        let module_index = self
+            .program
+            .procedures
+            .get(self.procedure.0 as usize)
+            .map(|procedure| procedure.signature.module)
+            .ok_or_else(|| error("comparison caller module invariant"))?;
+        Ok(
+            if self
+                .program
+                .modules
+                .get(module_index)
+                .is_some_and(|module| {
+                    module.options.iter().any(|option| {
+                        matches!(option, ast::ModuleOption::Compare { text: true, .. })
+                    })
+                })
+            {
+                vba_values::IntrinsicComparisonMode::Text
+            } else {
+                vba_values::IntrinsicComparisonMode::Binary
+            },
+        )
     }
     fn sequence(
         &mut self,

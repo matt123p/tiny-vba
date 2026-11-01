@@ -200,6 +200,11 @@ pub fn intrinsic(function: I, args: &[V]) -> Result<V> {
     if !function.accepts(args.len()) {
         return Err(error(450, "Wrong number of arguments"));
     }
+    if function == I::StrComp {
+        return Err(Error::Unsupported(
+            "StrComp requires an injected comparison context".into(),
+        ));
+    }
     if function == I::IIf {
         return args
             .get(if super::condition(args.first().ok_or_else(mismatch)?)? {
@@ -735,6 +740,46 @@ fn string_function(function: I, args: &[V]) -> Result<V> {
     Ok(V::String(
         VbaString::from_units(output).map_err(|_| mismatch())?,
     ))
+}
+
+pub(crate) fn strcomp(arguments: &[Option<V>], context: &super::IntrinsicContext<'_>) -> Result<V> {
+    if !(2..=3).contains(&arguments.len()) {
+        return Err(error(450, "Wrong number of arguments"));
+    }
+    let left = arguments
+        .first()
+        .and_then(Option::as_ref)
+        .ok_or_else(|| error(450, "Wrong number of arguments"))?;
+    let right = arguments
+        .get(1)
+        .and_then(Option::as_ref)
+        .ok_or_else(|| error(450, "Wrong number of arguments"))?;
+    let mode = match arguments.get(2).and_then(Option::as_ref) {
+        None => context.comparison_mode(),
+        Some(V::Null) => return Err(error(94, "Invalid use of Null")),
+        Some(value) => match integral(value, i128::MIN, i128::MAX)? {
+            -1 => context.comparison_mode(),
+            0 => vba_values::IntrinsicComparisonMode::Binary,
+            1 => vba_values::IntrinsicComparisonMode::Text,
+            2 => {
+                return Err(Error::Unsupported(
+                    "StrComp vbDatabaseCompare is Access-only".into(),
+                ));
+            }
+            _ => return Err(error(5, "Invalid procedure call or argument")),
+        },
+    };
+    if matches!(left, V::Null) || matches!(right, V::Null) {
+        return Ok(V::Null);
+    }
+    let left = text(left)?;
+    let right = text(right)?;
+    let ordering = context.compare_strings_in_mode(mode, &left, &right)?;
+    Ok(V::Integer(match ordering {
+        std::cmp::Ordering::Less => -1,
+        std::cmp::Ordering::Equal => 0,
+        std::cmp::Ordering::Greater => 1,
+    }))
 }
 
 fn decimal_currency(text: &str) -> Result<Option<i128>> {

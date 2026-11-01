@@ -606,7 +606,8 @@ progress only from actual compilation/execution results.
 
 ## IR 8 extended intrinsic calls
 
-IR 8 adds `IntrinsicCall` under the `intrinsics-m6a-v1` feature. IR 1–7
+IR 8 adds `IntrinsicCall` under `intrinsics-m6a-v1` and `BinaryCompare`
+under `string-comparison-context-v1`. IR 1–7
 `Intrinsic` operands and their v2/v3 gates retain their prior meaning. An
 extended call records the executable descriptor identity, declared result
 variant, number of supplied expressions, declaration-order bindings, and the
@@ -624,9 +625,9 @@ parameters therefore cannot duplicate, drop, or re-evaluate an expression.
 Malformed mappings fail before VM or host dispatch. Targets capped at IR 7
 refuse the opcode explicitly.
 
-The compiler emits IR 8 calls for named or omitted intrinsic arguments and
-retains legacy opcodes for fully positional calls. F4 still needs to capture the
-calling module's comparison mode; until then emitted calls carry Binary mode.
-The adapter materializes descriptor defaults, including optional gaps where a
-function contract supplies a concrete default. Text comparison remains explicitly
-unsupported until a deterministic provider is available.
+The compiler emits IR 8 calls for named or omitted intrinsic arguments and for
+StrComp, retaining legacy opcodes for unchanged fully positional calls. Both
+contextual instructions capture the calling module's comparison mode. The
+adapter materializes descriptor defaults, including optional gaps where a
+function contract supplies a concrete default. Contextual string comparison
+uses an injected provider; without one the VM returns named Unsupported.

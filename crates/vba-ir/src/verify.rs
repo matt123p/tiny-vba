@@ -1366,6 +1366,30 @@ fn procedure(
                 value(&mut stack)?;
                 stack.push(Stack::Value);
             }
+            Instruction::BinaryCompare {
+                op,
+                compare_mode: _,
+            } => {
+                if p.ir_version < IR8_VERSION {
+                    return Err(invalid("contextual string comparison requires IR 8"));
+                }
+                feature(p, caps, "string-comparison-context-v1")?;
+                if !matches!(
+                    op,
+                    BinaryOp::Equal
+                        | BinaryOp::NotEqual
+                        | BinaryOp::Less
+                        | BinaryOp::LessEqual
+                        | BinaryOp::Greater
+                        | BinaryOp::GreaterEqual
+                ) || !caps.binary.contains(op)
+                {
+                    return Err(invalid("contextual string comparison operator"));
+                }
+                value(&mut stack)?;
+                value(&mut stack)?;
+                stack.push(Stack::Value);
+            }
             Instruction::Call {
                 procedure: callee_id,
                 site,

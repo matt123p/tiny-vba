@@ -304,6 +304,7 @@ pub enum Intrinsic {
     UCase,
     Asc,
     Chr,
+    StrComp,
 }
 
 /// Whether an intrinsic returns its historical VBA Variant subtype or a fixed
@@ -510,6 +511,14 @@ const MID_PARAMS: &[IntrinsicParameter] = &[
     parameter("start", true),
     with_default(parameter("length", false), IntrinsicOmittedDefault::ToEnd),
 ];
+const STRCOMP_PARAMS: &[IntrinsicParameter] = &[
+    parameter("string1", true),
+    parameter("string2", true),
+    with_default(
+        parameter("compare", false),
+        IntrinsicOmittedDefault::ModuleCompare,
+    ),
+];
 const LEFT_RIGHT_PARAMS: &[IntrinsicParameter] =
     &[parameter("string", true), parameter("length", true)];
 const IIF_PARAMS: &[IntrinsicParameter] = &[
@@ -526,7 +535,9 @@ const fn descriptor(
     variadic: bool,
     signature: &'static str,
 ) -> IntrinsicDescriptor {
-    let (minimum_ir, capability) = if matches!(intrinsic, Intrinsic::IIf) {
+    let (minimum_ir, capability) = if matches!(intrinsic, Intrinsic::StrComp) {
+        (8, "intrinsics-m6a-v1")
+    } else if matches!(intrinsic, Intrinsic::IIf) {
         (3, "intrinsics-v3")
     } else {
         (2, "intrinsics-v2")
@@ -540,6 +551,7 @@ const fn descriptor(
         Intrinsic::Array => 0,
         Intrinsic::LBound | Intrinsic::UBound => 1,
         Intrinsic::Round => 1,
+        Intrinsic::StrComp => 2,
         Intrinsic::Mid => 2,
         Intrinsic::Left | Intrinsic::Right => 2,
         _ => 1,
@@ -576,6 +588,7 @@ const fn descriptor(
             | Intrinsic::CStr
             | Intrinsic::CVar
             | Intrinsic::CVErr => IntrinsicFamily::Conversion,
+            Intrinsic::StrComp => IntrinsicFamily::StringSearch,
             Intrinsic::Len
             | Intrinsic::Left
             | Intrinsic::Right
@@ -597,12 +610,20 @@ const fn descriptor(
         minimum_arguments,
         maximum_arguments: if variadic { 256 } else { parameters.len() },
         return_variant: return_variant(intrinsic),
-        effect: IntrinsicEffect::Pure,
+        effect: if matches!(intrinsic, Intrinsic::StrComp) {
+            IntrinsicEffect::Contextual
+        } else {
+            IntrinsicEffect::Pure
+        },
         read_only_inspection: true,
         minimum_ir,
         capability,
         signature,
-        platform_requirements: "portable core",
+        platform_requirements: if matches!(intrinsic, Intrinsic::StrComp) {
+            "injected string-comparison service"
+        } else {
+            "portable core"
+        },
     }
 }
 
@@ -612,6 +633,7 @@ const fn return_variant(intrinsic: Intrinsic) -> IntrinsicReturn {
     use ScalarKind as K;
     match intrinsic {
         I::Array | I::ArrayBaseOne | I::Split => R::Array,
+        I::StrComp => R::Variant,
         I::IIf | I::Abs | I::Int | I::Fix => R::Polymorphic,
         I::InStr | I::Len | I::LBound | I::UBound => R::Fixed(K::Long),
         I::IsObject | I::IsArray | I::IsMissing | I::IsEmpty | I::IsNull | I::IsError => {
@@ -653,6 +675,13 @@ pub const INTRINSIC_DESCRIPTORS: &[IntrinsicDescriptor] = &[
         "IIf(expr, truepart, falsepart)",
     ),
     instr_descriptor(),
+    descriptor(
+        Intrinsic::StrComp,
+        "StrComp",
+        STRCOMP_PARAMS,
+        false,
+        "StrComp(string1, string2, [compare])",
+    ),
     descriptor(
         Intrinsic::Replace,
         "Replace",

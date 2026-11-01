@@ -1,7 +1,13 @@
+use std::cmp::Ordering;
 use std::error::Error;
-use vba_compiler::{CompileOptions, compile};
+use std::sync::{
+    Arc,
+    atomic::{AtomicUsize, Ordering as AtomicOrdering},
+};
+use vba_compiler::{CompileOptions, compile, compile_modules};
 use vba_diagnostics::{SourceFile, SourceId};
 use vba_ir::{self as ir, Instruction};
+use vba_runtime::StringComparisonService;
 use vba_values::{IntrinsicComparisonMode, IntrinsicReturn, ScalarKind, Value, VbaString};
 use vba_vm::{self as vm, Limits, NoHost, Outcome, PauseReason, ReturnValue, Session};
 type R<T = ()> = Result<T, Box<dyn Error>>;
@@ -32,6 +38,63 @@ fn answer(source: &str, expected: Value) -> R {
         "{source}"
     );
     Ok(())
+}
+
+struct VmCompareProvider(Arc<AtomicUsize>);
+impl StringComparisonService for VmCompareProvider {
+    fn service_id(&self) -> &str {
+        "vm-test-compare-v1"
+    }
+    fn compare(
+        &self,
+        mode: IntrinsicComparisonMode,
+        left: &VbaString,
+        right: &VbaString,
+        locale: &str,
+        code_page: &str,
+    ) -> vba_runtime::Result<Ordering> {
+        assert_eq!(locale, "test-locale");
+        assert_eq!(code_page, "test-code-page");
+        self.0.fetch_add(1, AtomicOrdering::SeqCst);
+        if mode == IntrinsicComparisonMode::Text
+            && left.units().len() == 1
+            && right.units().len() == 1
+            && left
+                .units()
+                .first()
+                .zip(right.units().first())
+                .is_some_and(|(left, right)| (left | 0x20) == (right | 0x20))
+        {
+            return Ok(Ordering::Equal);
+        }
+        Ok(left.units().cmp(right.units()))
+    }
+}
+
+fn session_with_comparison_service(source_text: &str, calls: Arc<AtomicUsize>) -> R<Session> {
+    let source = SourceFile::new(SourceId(91), "strcomp.bas".into(), source_text.into())?;
+    let program = compile(
+        &source,
+        &CompileOptions {
+            capabilities: vm::capabilities(),
+            ..Default::default()
+        },
+    )?;
+    let config = vm::IntrinsicContextConfig::new(
+        "test-locale".into(),
+        "test-calendar".into(),
+        "test-code-page".into(),
+        32,
+    )?;
+    Ok(Session::new_with_string_comparison_service(
+        program,
+        91,
+        vec![],
+        None,
+        Limits::default(),
+        Arc::new(VmCompareProvider(calls)),
+        config,
+    )?)
 }
 fn number(source: &str, expected: i32) -> R {
     let Outcome::Failed(f) = drive(&mut session(source)?)? else {
@@ -147,6 +210,166 @@ fn comparison_constants_are_available_and_local_declarations_shadow_them() -> R 
         "Option Explicit\nFunction Answer() As Long\nDim vbTextCompare As Long\nvbTextCompare=8\nAnswer=vbTextCompare\nEnd Function",
         Value::Long(8),
     )?;
+    Ok(())
+}
+
+#[test]
+fn strcomp_source_calls_preserve_variant_result_and_use_the_injected_mode() -> R {
+    let calls = Arc::new(AtomicUsize::new(0));
+    let mut session = session_with_comparison_service(
+        "Function Answer() As Variant\nAnswer=VBA.StrComp(string2:=\"b\",string1:=\"a\",compare:=vbBinaryCompare)\nEnd Function",
+        calls.clone(),
+    )?;
+    assert_eq!(
+        drive(&mut session)?,
+        Outcome::Completed(ReturnValue::Function(Value::Integer(-1)))
+    );
+    assert_eq!(calls.load(AtomicOrdering::SeqCst), 1);
+
+    let calls = Arc::new(AtomicUsize::new(0));
+    let mut session = session_with_comparison_service(
+        "Function Answer() As Variant\nAnswer=StrComp(\"A\",\"a\",vbTextCompare)\nEnd Function",
+        calls.clone(),
+    )?;
+    assert_eq!(
+        drive(&mut session)?,
+        Outcome::Completed(ReturnValue::Function(Value::Integer(0)))
+    );
+    assert_eq!(calls.load(AtomicOrdering::SeqCst), 1);
+
+    let calls = Arc::new(AtomicUsize::new(0));
+    let mut session = session_with_comparison_service(
+        "Function Answer() As Variant\nAnswer=StrComp(\"A\",\"a\")\nEnd Function",
+        calls.clone(),
+    )?;
+    assert_eq!(
+        drive(&mut session)?,
+        Outcome::Completed(ReturnValue::Function(Value::Integer(-1)))
+    );
+    assert_eq!(calls.load(AtomicOrdering::SeqCst), 1);
+
+    answer(
+        "Function StrComp(string1 As String, string2 As String) As Integer\nStrComp=7\nEnd Function\nFunction Answer() As Long\nAnswer=StrComp(\"a\",\"b\")\nEnd Function",
+        Value::Long(7),
+    )?;
+    Ok(())
+}
+
+#[test]
+fn strcomp_named_arguments_evaluate_once_in_source_order_and_resume_cleanly() -> R {
+    let calls = Arc::new(AtomicUsize::new(0));
+    let source = "Dim n As Long\nFunction Answer() As Variant\nAnswer=StrComp(string2:=NextText(),string1:=NextText(),compare:=0)*10+n\nEnd Function\nFunction NextText() As String\nn=n+1\nNextText=CStr(n)\nEnd Function";
+    let mut session = session_with_comparison_service(source, calls.clone())?;
+    session.request_pause();
+    let Outcome::Paused(paused) = drive(&mut session)? else {
+        return Err("expected statement pause before StrComp".into());
+    };
+    assert_eq!(paused.reason, PauseReason::Checkpoint);
+    session.continue_execution()?;
+    assert_eq!(
+        drive(&mut session)?,
+        Outcome::Completed(ReturnValue::Function(Value::Long(12)))
+    );
+    assert_eq!(calls.load(AtomicOrdering::SeqCst), 1);
+    Ok(())
+}
+
+#[test]
+fn strcomp_errors_flow_through_on_error_and_unavailable_service_is_explicit() -> R {
+    let calls = Arc::new(AtomicUsize::new(0));
+    let mut error_session = session_with_comparison_service(
+        "Function Answer() As Variant\nOn Error Resume Next\nAnswer=StrComp(\"a\",\"b\",Null)\nAnswer=Err.Number\nEnd Function",
+        calls.clone(),
+    )?;
+    assert_eq!(
+        drive(&mut error_session)?,
+        Outcome::Completed(ReturnValue::Function(Value::Long(94)))
+    );
+    assert_eq!(calls.load(AtomicOrdering::SeqCst), 0);
+
+    let calls = Arc::new(AtomicUsize::new(0));
+    let mut resumed = session_with_comparison_service(
+        "Dim compareMode As Variant\nFunction Answer() As Variant\ncompareMode=Null\nOn Error GoTo Recover\nAnswer=StrComp(\"a\",\"b\",compareMode)\nExit Function\nRecover:\ncompareMode=0\nResume\nEnd Function",
+        calls.clone(),
+    )?;
+    assert_eq!(
+        drive(&mut resumed)?,
+        Outcome::Completed(ReturnValue::Function(Value::Integer(-1)))
+    );
+    assert_eq!(calls.load(AtomicOrdering::SeqCst), 1);
+
+    let mut no_service =
+        session("Function Answer() As Variant\nAnswer=StrComp(\"a\",\"b\",0)\nEnd Function")?;
+    let Outcome::Failed(failure) = drive(&mut no_service)? else {
+        return Err("expected missing comparison service failure".into());
+    };
+    assert_eq!(failure.kind, vm::FailureKind::Unsupported);
+    assert!(
+        failure
+            .message
+            .contains("string-comparison-service-unavailable")
+    );
+
+    let mut no_text_service = session(
+        "Option Compare Text\nFunction Answer() As Boolean\nAnswer=\"A\"=\"a\"\nEnd Function",
+    )?;
+    let Outcome::Failed(failure) = drive(&mut no_text_service)? else {
+        return Err("expected missing Text comparison service failure".into());
+    };
+    assert_eq!(failure.kind, vm::FailureKind::Unsupported);
+    assert!(
+        failure
+            .message
+            .contains("string-comparison-service-unavailable")
+    );
+    Ok(())
+}
+
+#[test]
+fn strcomp_and_relational_comparisons_use_each_callers_module_option() -> R {
+    let text_module = SourceFile::new(
+        SourceId(92),
+        "TextModule.bas".into(),
+        "Option Compare Text\nFunction Answer() As Variant\nIf \"A\"=\"a\" Then\nAnswer=StrComp(\"A\",\"a\")*10+BinaryCheck()\nElse\nAnswer=99\nEnd If\nEnd Function".into(),
+    )?;
+    let binary_module = SourceFile::new(
+        SourceId(93),
+        "BinaryModule.bas".into(),
+        "Option Compare Binary\nFunction BinaryCheck() As Integer\nIf \"A\"<\"a\" Then\nBinaryCheck=StrComp(\"A\",\"a\")\nElse\nBinaryCheck=99\nEnd If\nEnd Function".into(),
+    )?;
+    let modules = [
+        vba_syntax::parse(&text_module, vba_syntax::ModuleKind::Standard)?,
+        vba_syntax::parse(&binary_module, vba_syntax::ModuleKind::Standard)?,
+    ];
+    let program = compile_modules(
+        &modules,
+        &CompileOptions {
+            capabilities: vm::capabilities(),
+            ..Default::default()
+        },
+    )?;
+    let calls = Arc::new(AtomicUsize::new(0));
+    let config = vm::IntrinsicContextConfig::new(
+        "test-locale".into(),
+        "test-calendar".into(),
+        "test-code-page".into(),
+        32,
+    )?;
+    let mut session = Session::new_with_string_comparison_service(
+        program,
+        92,
+        vec![],
+        None,
+        Limits::default(),
+        Arc::new(VmCompareProvider(calls.clone())),
+        config,
+    )?;
+    let outcome = drive(&mut session)?;
+    assert_eq!(calls.load(AtomicOrdering::SeqCst), 4, "{outcome:?}");
+    assert_eq!(
+        outcome,
+        Outcome::Completed(ReturnValue::Function(Value::Integer(-1)))
+    );
     Ok(())
 }
 

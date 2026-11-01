@@ -33,7 +33,7 @@ pub const IR5_VERSION: u32 = 5;
 pub const IR6_VERSION: u32 = 6;
 pub const IR7_VERSION: u32 = 7;
 pub const IR8_VERSION: u32 = 8;
-pub const FEATURES: [&str; 22] = [
+pub const FEATURES: [&str; 23] = [
     "host-events-v1",
     "project-classes-v7",
     "default-members-v6",
@@ -56,6 +56,7 @@ pub const FEATURES: [&str; 22] = [
     "argument-captures-v3",
     "intrinsics-v3",
     "intrinsics-m6a-v1",
+    "string-comparison-context-v1",
 ];
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
@@ -127,6 +128,7 @@ pub enum Opcode {
     Raise,
     Intrinsic,
     IntrinsicCall,
+    BinaryCompare,
     Checkpoint,
     Const,
     ReadLocal,
@@ -145,7 +147,7 @@ pub enum Opcode {
     Stop,
     Return,
 }
-pub const OPCODES: [Opcode; 34] = [
+pub const OPCODES: [Opcode; 35] = [
     Opcode::DefaultInstance,
     Opcode::NewInstance,
     Opcode::EnumerationInit,
@@ -155,6 +157,7 @@ pub const OPCODES: [Opcode; 34] = [
     Opcode::LoadReference,
     Opcode::Intrinsic,
     Opcode::IntrinsicCall,
+    Opcode::BinaryCompare,
     Opcode::RefElement,
     Opcode::ArrayResize,
     Opcode::ArrayErase,
@@ -238,6 +241,10 @@ pub enum Instruction {
         bindings: Vec<IntrinsicArgumentBinding>,
         compare_mode: IntrinsicComparisonMode,
     },
+    BinaryCompare {
+        op: BinaryOp,
+        compare_mode: IntrinsicComparisonMode,
+    },
     Checkpoint(SiteId),
     Const(ConstantId),
     ReadLocal(LocalSlot),
@@ -282,6 +289,7 @@ impl Instruction {
             Self::Raise(_) => Opcode::Raise,
             Self::Intrinsic { .. } => Opcode::Intrinsic,
             Self::IntrinsicCall { .. } => Opcode::IntrinsicCall,
+            Self::BinaryCompare { .. } => Opcode::BinaryCompare,
             Self::Checkpoint(_) => Opcode::Checkpoint,
             Self::Const(_) => Opcode::Const,
             Self::ReadLocal(_) => Opcode::ReadLocal,
@@ -586,7 +594,9 @@ impl Capabilities {
             declarations: ScalarKind::ALL.into_iter().collect(),
         };
         caps.features.remove("intrinsics-m6a-v1");
+        caps.features.remove("string-comparison-context-v1");
         caps.instructions.remove(&Opcode::IntrinsicCall);
+        caps.instructions.remove(&Opcode::BinaryCompare);
         caps
     }
     pub fn ir8_structural() -> Self {
@@ -594,7 +604,9 @@ impl Capabilities {
         caps.profile = "ir8-structural".into();
         caps.ir_versions.insert(IR8_VERSION);
         caps.features.insert("intrinsics-m6a-v1".into());
+        caps.features.insert("string-comparison-context-v1".into());
         caps.instructions.insert(Opcode::IntrinsicCall);
+        caps.instructions.insert(Opcode::BinaryCompare);
         caps
     }
 }

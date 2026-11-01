@@ -16,11 +16,11 @@ they are not aliases for Object. See
 The nominal extension and legacy-consumer refusal are in
 [ADR 0021](decisions/0021-nominal-host-object-types.md).
 
-IR 8 defines and verifies the M6A `IntrinsicCall` operand under
-`intrinsics-m6a-v1`; the VM executes the current descriptor subset. The source
-binder and compiler lower named or omitted intrinsic calls to explicit plans;
-fully positional calls retain legacy instructions. F4 still needs to capture
-the calling module's comparison mode. See the [IR 8 contract](bytecode-vm-specification.md#ir-8-extended-intrinsic-calls).
+IR 8 defines and verifies M6A `IntrinsicCall` and contextual `BinaryCompare`
+instructions. Named or omitted intrinsic calls and StrComp lower to explicit
+plans; unchanged fully positional calls retain legacy instructions. Contextual
+comparisons capture the calling module's Option Compare mode and require an
+injected provider when string operands need collation. See the [IR 8 contract](bytecode-vm-specification.md#ir-8-extended-intrinsic-calls).
 
 # M2 binding and verified bytecode
 
@@ -78,11 +78,13 @@ of an operation in `Capabilities::ir1_structural()` claims runtime support.
 | Control | If/ElseIf/Else including inline forms, Exit in a matching context, Stop, numeric For with scalar Integer/Long/Variant counter and positive integral literal step (default 1); matching Next name |
 | Constants | Literal untyped module/procedure Const only; exact tags retained; cross-module Const lookup, typed Const and computed constant expressions fail explicitly |
 
-Rejected M2 forms include persistent module variables, classes/properties, default-member
+The historical M2 subset rejected persistent module variables, classes/properties, default-member
 binding, arrays, optional/default/named/omitted direct VBA arguments, parenthesized direct arguments,
 nonlocal ByRef, identifier type suffix binding, unknown types, unary plus, Is/Like, nondecimal/wider/
 floating/Currency literals, Option Compare Text, computed/nonpositive/nonintegral For steps, and
 all syntax outside M1. All procedures are bound, even if the selected entry never calls them.
+A later M6A extension implements Option Compare Text through IR 8 contextual
+comparisons, retaining the required-provider refusal at runtime.
 A ByRef entry is rejected; a ByVal entry records its required launch kinds but receives no values
 until M3. Dynamic operand combinations are deliberately not inferred from structural verification.
 

@@ -466,6 +466,50 @@ fn all_binary_and_unary_tags_and_stack_instructions_have_structural_evidence() -
     check(p)?;
     Ok(())
 }
+
+#[test]
+fn ir8_contextual_string_comparison_verifies_and_is_feature_gated() -> TestResult {
+    let mut program = base()?;
+    program.ir_version = IR8_VERSION;
+    program.profile = "ir8-structural".into();
+    program.required_features.insert("integer-long-ops".into());
+    program
+        .required_features
+        .insert("string-comparison-context-v1".into());
+    let procedure = proc_mut(&mut program)?;
+    procedure.code = vec![
+        Instruction::Checkpoint(SiteId(0)),
+        Instruction::Const(ConstantId(0)),
+        Instruction::Const(ConstantId(0)),
+        Instruction::BinaryCompare {
+            op: BinaryOp::Equal,
+            compare_mode: vba_values::IntrinsicComparisonMode::Text,
+        },
+        Instruction::DropValue,
+        Instruction::Jump(Pc(6)),
+        Instruction::Checkpoint(SiteId(1)),
+        Instruction::Return,
+    ];
+    procedure.checkpoints.get_mut(1).ok_or("site")?.enter_pc = Pc(6);
+    procedure.max_stack = 2;
+    let verified = check(program.clone())?;
+    assert!(disassemble(&verified)?.contains("BinaryCompare Equal mode=Text"));
+
+    let mut no_feature = program.clone();
+    no_feature
+        .required_features
+        .remove("string-comparison-context-v1");
+    assert!(check(no_feature).is_err());
+
+    let mut bad_op = program;
+    let comparison = proc_mut(&mut bad_op)?.code.get_mut(3).ok_or("comparison")?;
+    *comparison = Instruction::BinaryCompare {
+        op: BinaryOp::Add,
+        compare_mode: vba_values::IntrinsicComparisonMode::Text,
+    };
+    assert!(check(bad_op).is_err());
+    Ok(())
+}
 fn direct() -> TestResult<Program> {
     let mut p = base()?;
     p.required_features

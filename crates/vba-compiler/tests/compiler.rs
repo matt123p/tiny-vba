@@ -2,7 +2,7 @@ use std::error::Error;
 use vba_compiler::{CompileOptions, compile, compile_modules};
 use vba_diagnostics::{SourceFile, SourceId};
 use vba_ir::{self as ir, Instruction as I};
-use vba_values::{ScalarKind, Value};
+use vba_values::{Intrinsic, IntrinsicReturn, ScalarKind, Value};
 fn source(text: &str) -> Result<SourceFile, Box<dyn Error>> {
     Ok(SourceFile::new(
         SourceId(17),
@@ -91,6 +91,105 @@ fn intrinsic_binding_rejects_invalid_names_order_and_required_omission()
     }
     Ok(())
 }
+
+#[test]
+fn strcomp_is_always_lowered_to_ir8_with_variant_result_and_context_mode()
+-> Result<(), Box<dyn Error>> {
+    let options = CompileOptions {
+        capabilities: ir::Capabilities::ir8_structural(),
+        ..Default::default()
+    };
+    let program = compile(
+        &source("Function Answer() As Variant\nAnswer=StrComp(\"a\",\"b\")\nEnd Function")?,
+        &options,
+    )?;
+    assert_eq!(program.program().ir_version, ir::IR8_VERSION);
+    let call = program
+        .program()
+        .procedures
+        .iter()
+        .flat_map(|procedure| &procedure.code)
+        .find_map(|instruction| match instruction {
+            I::IntrinsicCall {
+                function,
+                return_variant,
+                compare_mode,
+                supplied_arguments,
+                bindings,
+            } if *function == Intrinsic::StrComp => Some((
+                *return_variant,
+                *compare_mode,
+                *supplied_arguments,
+                bindings,
+            )),
+            _ => None,
+        })
+        .ok_or("IR 8 StrComp call")?;
+    assert_eq!(call.0, IntrinsicReturn::Variant);
+    assert_eq!(call.1, vba_values::IntrinsicComparisonMode::Binary);
+    assert_eq!(call.2, 2);
+    assert_eq!(
+        call.3,
+        &[
+            vba_values::IntrinsicArgumentBinding::Evaluated(0),
+            vba_values::IntrinsicArgumentBinding::Evaluated(1),
+            vba_values::IntrinsicArgumentBinding::Omitted,
+        ]
+    );
+    Ok(())
+}
+
+#[test]
+fn strcomp_rejects_invalid_argument_shapes() -> Result<(), Box<dyn Error>> {
+    let options = CompileOptions {
+        capabilities: ir::Capabilities::ir8_structural(),
+        ..Default::default()
+    };
+    for text in [
+        "Function Answer() As Variant\nAnswer=StrComp(\"a\")\nEnd Function",
+        "Function Answer() As Variant\nAnswer=StrComp(,\"b\")\nEnd Function",
+        "Function Answer() As Variant\nAnswer=StrComp(\"a\",\"b\",0,1)\nEnd Function",
+        "Function Answer() As Variant\nAnswer=StrComp(string1:=\"a\",string1:=\"b\",string2:=\"c\")\nEnd Function",
+        "Function Answer() As Variant\nAnswer=StrComp(string1:=\"a\",mystery:=\"b\")\nEnd Function",
+        "Function Answer() As Variant\nAnswer=StrComp(string1:=\"a\",\"b\")\nEnd Function",
+    ] {
+        assert!(compile(&source(text)?, &options).is_err(), "{text}");
+    }
+    Ok(())
+}
+
+#[test]
+fn local_strcomp_name_shadows_the_intrinsic() -> Result<(), Box<dyn Error>> {
+    let options = CompileOptions {
+        capabilities: ir::Capabilities::ir8_structural(),
+        ..Default::default()
+    };
+    let program = compile(
+        &source(
+            "Function Answer() As Variant\nDim StrComp As Object\nAnswer=StrComp(\"a\",\"b\")\nEnd Function",
+        )?,
+        &options,
+    )?;
+    let mut instructions = program
+        .program()
+        .procedures
+        .iter()
+        .flat_map(|procedure| &procedure.code);
+    assert!(
+        instructions
+            .clone()
+            .any(|instruction| matches!(instruction, I::Invoke(_)))
+    );
+    assert!(!instructions.any(|instruction| matches!(
+        instruction,
+        I::IntrinsicCall {
+            function: Intrinsic::StrComp,
+            ..
+        }
+    )));
+    Ok(())
+}
+
 #[test]
 fn answer_golden_is_verified_and_deterministic() -> Result<(), Box<dyn Error>> {
     let file = SourceFile::new(

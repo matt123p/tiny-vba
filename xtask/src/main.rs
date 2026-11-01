@@ -141,6 +141,21 @@ fn run() -> Result<(), Box<dyn Error>> {
                 &[
                     "test",
                     "-p",
+                    "vba-runtime",
+                    "--test",
+                    "intrinsics_strings",
+                    "--locked",
+                    "--target",
+                    "wasm32-wasip1",
+                    "--config",
+                    &import_runner,
+                ],
+            )?;
+            command(
+                "cargo",
+                &[
+                    "test",
+                    "-p",
                     "vba-syntax",
                     "--test",
                     "attributes",
@@ -158,6 +173,21 @@ fn run() -> Result<(), Box<dyn Error>> {
                     "test",
                     "-p",
                     "vba-project",
+                    "--locked",
+                    "--target",
+                    "wasm32-wasip1",
+                    "--config",
+                    &import_runner,
+                ],
+            )?;
+            command(
+                "cargo",
+                &[
+                    "test",
+                    "-p",
+                    "vba-compiler",
+                    "--test",
+                    "compiler",
                     "--locked",
                     "--target",
                     "wasm32-wasip1",

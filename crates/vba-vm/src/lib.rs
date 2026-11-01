@@ -48,6 +48,39 @@ impl Default for Limits {
         }
     }
 }
+
+#[derive(Clone, Debug)]
+pub struct IntrinsicContextConfig {
+    locale: String,
+    calendar: String,
+    code_page: String,
+    target_width_bits: u8,
+}
+impl IntrinsicContextConfig {
+    pub fn new(
+        locale: String,
+        calendar: String,
+        code_page: String,
+        target_width_bits: u8,
+    ) -> Result<Self> {
+        if locale.is_empty()
+            || calendar.is_empty()
+            || code_page.is_empty()
+            || locale.len() > 128
+            || calendar.len() > 128
+            || code_page.len() > 128
+            || !matches!(target_width_bits, 16 | 32 | 64)
+        {
+            return Err(command("invalid intrinsic context configuration"));
+        }
+        Ok(Self {
+            locale,
+            calendar,
+            code_page,
+            target_width_bits,
+        })
+    }
+}
 #[derive(Clone, Debug)]
 pub struct HostBinding {
     pub roots: BTreeMap<String, vba_values::ObjectRef>,
@@ -248,6 +281,8 @@ pub struct Session {
     nominal_declarations: BTreeMap<(ir::ProcedureId, ir::LocalSlot), vba_values::NominalType>,
     nominal_types: BTreeMap<Location, vba_values::NominalType>,
     type_resolver: Option<std::sync::Arc<dyn foreign::ObjectTypeResolver>>,
+    string_comparison_service: Option<std::sync::Arc<dyn runtime::StringComparisonService>>,
+    intrinsic_context_config: Option<IntrinsicContextConfig>,
     array_types: BTreeMap<Location, ScalarKind>,
     output: Vec<vba_values::VbaString>,
     persistent: BTreeMap<u32, Location>,
@@ -301,6 +336,29 @@ fn reserve<T>(v: &mut Vec<T>, n: usize) -> Result<()> {
 fn value_bytes(v: &Value) -> usize {
     v.payload_bytes()
 }
+fn intrinsic_context<'a>(
+    mode: vba_values::IntrinsicComparisonMode,
+    service: Option<&'a dyn runtime::StringComparisonService>,
+    config: Option<&'a IntrinsicContextConfig>,
+) -> runtime::IntrinsicContext<'a> {
+    match (service, config) {
+        (Some(service), Some(config)) => runtime::IntrinsicContext::with_string_comparison(
+            mode,
+            &config.locale,
+            &config.calendar,
+            &config.code_page,
+            config.target_width_bits,
+            service,
+        ),
+        _ => runtime::IntrinsicContext::no_services(
+            mode,
+            "unconfigured",
+            "unconfigured",
+            "unconfigured",
+            0,
+        ),
+    }
+}
 fn nominal_bytes(ty: &vba_values::NominalType) -> usize {
     128 + ty.library().len() + ty.version().len() + ty.name().len()
 }
@@ -314,6 +372,24 @@ impl Session {
         limits: Limits,
     ) -> Result<Self> {
         Self::new_with_type_resolver(program, identity, arguments, binding, limits, None)
+    }
+    pub fn new_with_string_comparison_service(
+        program: ir::VerifiedProgram,
+        identity: u64,
+        arguments: Vec<Value>,
+        binding: Option<HostBinding>,
+        limits: Limits,
+        service: std::sync::Arc<dyn runtime::StringComparisonService>,
+        context: IntrinsicContextConfig,
+    ) -> Result<Self> {
+        let service_id = service.service_id();
+        if service_id.is_empty() || service_id.len() > 128 {
+            return Err(command("invalid string-comparison service identity"));
+        }
+        let mut session = Self::new(program, identity, arguments, binding, limits)?;
+        session.string_comparison_service = Some(service);
+        session.intrinsic_context_config = Some(context);
+        Ok(session)
     }
     pub fn new_with_type_resolver(
         program: ir::VerifiedProgram,
@@ -470,6 +546,8 @@ impl Session {
             nominal_declarations,
             nominal_types: BTreeMap::new(),
             type_resolver,
+            string_comparison_service: None,
+            intrinsic_context_config: None,
             program,
             identity,
             instance,
@@ -2963,8 +3041,14 @@ impl Session {
                     }
                 }
                 self.charge(supplied.saturating_add(1))?;
-                let value = runtime::intrinsic_extended(function, &arguments, compare_mode)
-                    .map_err(runtime_diagnostic)?;
+                let context = intrinsic_context(
+                    compare_mode,
+                    self.string_comparison_service.as_deref(),
+                    self.intrinsic_context_config.as_ref(),
+                );
+                let value =
+                    runtime::intrinsic_extended_with_context(function, &arguments, &context)
+                        .map_err(runtime_diagnostic)?;
                 self.push(Operand::Value(value))?;
                 self.advance()?;
             }
@@ -2994,6 +3078,19 @@ impl Session {
                 let v =
                     runtime::binary(binary_name(op), &left, &right).map_err(runtime_diagnostic)?;
                 self.push(Operand::Value(v))?;
+                self.advance()?;
+            }
+            I::BinaryCompare { op, compare_mode } => {
+                let right = self.pop_value()?;
+                let left = self.pop_value()?;
+                let context = intrinsic_context(
+                    compare_mode,
+                    self.string_comparison_service.as_deref(),
+                    self.intrinsic_context_config.as_ref(),
+                );
+                let value = runtime::binary_with_context(binary_name(op), &left, &right, &context)
+                    .map_err(runtime_diagnostic)?;
+                self.push(Operand::Value(value))?;
                 self.advance()?;
             }
             I::Jump(pc) => self.top_mut()?.pc = pc,
