@@ -31,7 +31,8 @@ pub const IR4_VERSION: u32 = 4;
 pub const IR5_VERSION: u32 = 5;
 pub const IR6_VERSION: u32 = 6;
 pub const IR7_VERSION: u32 = 7;
-pub const FEATURES: [&str; 20] = [
+pub const FEATURES: [&str; 21] = [
+    "host-events-v1",
     "project-classes-v7",
     "default-members-v6",
     "enumeration-v6",
@@ -543,6 +544,7 @@ impl Capabilities {
         caps.profile = "ir6-structural".into();
         caps.ir_versions.remove(&IR7_VERSION);
         caps.features.remove("project-classes-v7");
+        caps.features.remove("host-events-v1");
         caps.instructions.remove(&Opcode::NewInstance);
         caps.instructions.remove(&Opcode::DefaultInstance);
         caps.binary.remove(&BinaryOp::Is);

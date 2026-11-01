@@ -72,3 +72,12 @@ caps input at 4 MiB and requested output at 8 MiB.
 native CI and WASI execution. No external workbook acceptance or Office observation is claimed.
 Format authority: [MS-OVBA](https://learn.microsoft.com/en-us/openspecs/office_file_formats/ms-ovba/575462ba-bf67-4190-9fac-c275523c75fc)
 and [MS-CFB](https://learn.microsoft.com/en-us/openspecs/windows_protocols/ms-cfb/53989ce4-7b05-4f8d-829b-d08d6148375b).
+
+## Metadata presentation
+
+Import remains read-only and preserves canonical extracted source. The shared
+editor projects recognized attributes/class headers out of its normal code view;
+it does not strip importer output. Attribute-only document modules remain visible
+components with a blank code pane. Raw metadata is available through the shared
+read-only inspector. No binary writeback or Macro Options policy is implied.
+See [ADR 0030](decisions/0030-attribute-metadata-and-code-projection.md).

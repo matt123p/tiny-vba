@@ -25,6 +25,7 @@ const assert = require('node:assert/strict');
     browser = await chromium.launch({ headless: true, args: ['--use-angle=swiftshader', '--enable-unsafe-swiftshader'] });
     const page = await browser.newPage({ viewport: { width: 1200, height: 800 } });
     const settle = () => page.evaluate(() => new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve))));
+    let retainedHeader = '';
     const typeSource = async source => {
       const lines = source.split('\n');
       let expected = '';
@@ -32,19 +33,19 @@ const assert = require('node:assert/strict');
         if (lines[i]) {
           await page.keyboard.insertText(lines[i]);
           expected += lines[i];
-          await page.waitForFunction(value => document.querySelector('#vba-source').textContent === value, expected);
+          await page.waitForFunction(value => document.querySelector('#vba-source').textContent === value, retainedHeader + expected);
         }
         if (i + 1 < lines.length) {
           await page.keyboard.press('Escape');
           await page.keyboard.press('Enter');
           expected += '\n';
           const indent = lines[i].match(/^[ \t]*/)[0];
-          await page.waitForFunction(value => document.querySelector('#vba-source').textContent === value, expected + indent);
+          await page.waitForFunction(value => document.querySelector('#vba-source').textContent === value, retainedHeader + expected + indent);
           if (indent) {
             await page.keyboard.press('Shift+Home');
             await page.keyboard.press('Backspace');
           }
-          await page.waitForFunction(value => document.querySelector('#vba-source').textContent === value, expected);
+          await page.waitForFunction(value => document.querySelector('#vba-source').textContent === value, retainedHeader + expected);
         }
       }
     };
@@ -65,13 +66,14 @@ const assert = require('node:assert/strict');
     // Fresh project for real editor typing, completion and correction (no test-only model mutation).
     await page.reload();
     await page.waitForFunction(() => document.querySelector('#vba-source').textContent.includes('Attribute VB_Name'));
+    retainedHeader = (await page.locator('#vba-source').textContent()).match(/^Attribute VB_Name[^\n]*\n/)[0];
     await page.locator('#vba-canvas').click({ position: { x: 500, y: 230 } });
     await page.keyboard.press('F7');
     await settle();
     await page.keyboard.press('Control+a');
     await settle();
     await typeSource('Sub Main()\n    Debug\nEnd Sub\n');
-    await page.waitForFunction(() => document.querySelector('#vba-source').textContent === 'Sub Main()\n    Debug\nEnd Sub\n');
+    assert.equal(await page.locator('#vba-source').textContent(), retainedHeader + 'Sub Main()\n    Debug\nEnd Sub\n');
     await page.keyboard.press('Control+Home');
     await page.keyboard.press('ArrowDown');
     await page.keyboard.press('End');
@@ -85,9 +87,9 @@ const assert = require('node:assert/strict');
     const typedSource = await page.locator('#vba-source').textContent();
     await page.keyboard.press('Control+a'); await settle();
     await page.keyboard.press('Control+c');
-    await page.waitForFunction(async expected => await navigator.clipboard.readText() === expected, typedSource);
+    await page.waitForFunction(async expected => await navigator.clipboard.readText() === expected, typedSource.slice(retainedHeader.length));
     await page.keyboard.press('Control+x');
-    await page.waitForFunction(() => document.querySelector('#vba-source').textContent === '');
+    await page.waitForFunction(header => document.querySelector('#vba-source').textContent === header, retainedHeader);
     await page.keyboard.press('Control+v');
     await page.waitForFunction(expected => document.querySelector('#vba-source').textContent === expected, typedSource);
     await page.keyboard.press('F5');
@@ -124,12 +126,27 @@ const assert = require('node:assert/strict');
     await settle();await page.waitForTimeout(250);
     const choosing=page.waitForEvent('filechooser');
     await page.locator('#vba-canvas').click({position:{x:100,y:140}});
-    const uploaded="' λ\r\nSub Main()\r\nDebug.Print 11\r\nEnd Sub\r\n";
+    const uploaded='Attribute VB_Name = "AuthoredUpload"\r\n\' λ 😀\r\nSub Macro2()\r\nAttribute Macro2.VB_ProcData.VB_Invoke_Func = " \\n14"\r\nDebug.Print 11\r\nEnd Sub\r\n';
     await (await choosing).setFiles({name:'AuthoredUpload.bas',mimeType:'text/plain',buffer:Buffer.from(uploaded,'utf8')});
     await page.waitForFunction(value=>document.querySelector('#vba-source').textContent===value,uploaded);
     assert.notEqual(await page.locator('#vba-status').textContent(),'Running');
     assert.doesNotMatch(await page.locator('#vba-output').textContent(),/11/);
     await page.screenshot({path:path.join(report,'m10-browser-upload.png')});
+    await page.locator('#vba-canvas').click({position:{x:235,y:51}}); await settle();
+    await page.locator('#vba-canvas').click({position:{x:530,y:51}}); await settle();
+    await page.screenshot({path:path.join(report,'m6-entry-menu.png')});
+    await page.locator('#vba-canvas').click({position:{x:511,y:91}}); await settle();
+    await page.keyboard.press('F5');
+    await page.waitForFunction(() => document.querySelector('#vba-status').textContent === 'Completed');
+    assert.match(await page.locator('#vba-output').textContent(), /11/);
+    assert.equal(await page.locator('#vba-source').textContent(), uploaded);
+    await page.screenshot({path:path.join(report,'m6-browser-recorded-attribute.png')});
+    await page.keyboard.press('Control+e'); await settle();
+    const metadataDownloading=page.waitForEvent('download');
+    await page.locator('#vba-canvas').click({position:{x:90,y:140}});
+    const metadataDownload=await metadataDownloading;
+    const metadataChunks=[];for await(const chunk of await metadataDownload.createReadStream()) metadataChunks.push(chunk);
+    assert.equal(Buffer.concat(metadataChunks).toString('utf8'),uploaded);
     assert.deepEqual(errors,[]);
     console.log('BROWSER_UI_PASS: F8/F5 debugger; completion/output; clipboard; syntax recovery; exact UTF-8 download and Unicode/CRLF file upload without execution; no page errors');
   } finally {

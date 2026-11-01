@@ -303,6 +303,39 @@ impl Ide {
             .strip_suffix(".bas")
             .or_else(|| name.strip_suffix(".cls"))
             .unwrap_or(name);
+        if kind == vba_syntax::ModuleKind::Document {
+            if self.session.is_some() {
+                return Err(error("reset before requesting a document code-name change"));
+            }
+            if !valid_code_name(stem) {
+                return Err(error("invalid document code name"));
+            }
+            if self
+                .modules
+                .iter()
+                .any(|module| module.id != id && module.component_name().eq_ignore_ascii_case(stem))
+            {
+                return Err(error("duplicate component name"));
+            }
+            if self.requests.len() >= 64 {
+                return Err(error("host request limit"));
+            }
+            let module = self
+                .modules
+                .iter()
+                .find(|module| module.id == id)
+                .ok_or_else(|| error("unknown module"))?;
+            self.requests.push(crate::HostRequest::RenameDocument {
+                id,
+                revision: module.revision,
+                old_name: module
+                    .code_name
+                    .clone()
+                    .ok_or_else(|| error("document code name unavailable"))?,
+                new_name: stem.into(),
+            });
+            return Ok(());
+        }
         let name = format!(
             "{stem}.{}",
             if kind != vba_syntax::ModuleKind::Standard {
@@ -365,6 +398,111 @@ impl Ide {
             .checked_add(1)
             .ok_or_else(|| error("buffer revision exhausted"))?;
         self.changed()
+    }
+    /// A host calls this only after authorizing the corresponding code-name change.
+    /// Source/export file names stay independent of the document component identity.
+    pub fn acknowledge_document_rename(
+        &mut self,
+        id: SourceId,
+        revision: u64,
+        old_name: &str,
+        new_name: &str,
+    ) -> Result<()> {
+        if self.session.is_some() || !valid_code_name(new_name) {
+            return Err(error(
+                "document rename requires an idle project and valid code name",
+            ));
+        }
+        let index = self
+            .modules
+            .iter()
+            .position(|module| module.id == id)
+            .ok_or_else(|| error("unknown document component"))?;
+        let module = self
+            .modules
+            .get(index)
+            .ok_or_else(|| error("unknown document component"))?;
+        if module.kind != vba_syntax::ModuleKind::Document
+            || module.revision != revision
+            || module.code_name.as_deref() != Some(old_name)
+        {
+            return Err(error("stale document rename acknowledgement"));
+        }
+        if self
+            .modules
+            .iter()
+            .any(|module| module.id != id && module.component_name().eq_ignore_ascii_case(new_name))
+        {
+            return Err(error("duplicate component name"));
+        }
+        self.revision
+            .checked_add(1)
+            .ok_or_else(|| error("source revision exhausted"))?;
+        module
+            .revision
+            .checked_add(1)
+            .ok_or_else(|| error("buffer revision exhausted"))?;
+        let parsed = vba_syntax::parse(&module.source()?, module.kind)?;
+        let attribute = parsed
+            .module
+            .attributes
+            .iter()
+            .find(|attribute| {
+                attribute.path.len() == 1
+                    && attribute
+                        .path
+                        .first()
+                        .is_some_and(|name| name.spelling.eq_ignore_ascii_case("VB_Name"))
+            })
+            .ok_or_else(|| error("missing document identity attribute"))?;
+        let mut text = module.text.clone();
+        let range = attribute.value.span.start() as usize..attribute.value.span.end() as usize;
+        if text.get(range.clone()).is_none() {
+            return Err(error("invalid document identity span"));
+        }
+        text.replace_range(range, &format!("\"{new_name}\""));
+        if text.len() > crate::SourceFile::MAX_BYTES
+            || self
+                .modules
+                .iter()
+                .map(|module| module.text.len())
+                .sum::<usize>()
+                .saturating_sub(module.text.len())
+                .saturating_add(text.len())
+                > crate::MAX_PROJECT_BYTES
+        {
+            return Err(error("source budget exceeded"));
+        }
+        let previous = self.active;
+        self.active = index;
+        self.modules
+            .get_mut(index)
+            .ok_or_else(|| error("document disappeared"))?
+            .code_name = Some(new_name.into());
+        self.replaying_edit = true;
+        let result = self.set_text(text);
+        self.replaying_edit = false;
+        self.active = previous;
+        if let Err(error) = result {
+            self.modules
+                .get_mut(index)
+                .ok_or_else(|| crate::error("document disappeared"))?
+                .code_name = Some(old_name.into());
+            return Err(error);
+        }
+        // Identity changes are host operations. Old source-only undo entries cannot rename the host.
+        self.undo_edits.retain(|state| state.id != id);
+        self.redo_edits.retain(|state| state.id != id);
+        let old_key = old_name.to_ascii_lowercase();
+        if let Some(members) = self.document_members.remove(&old_key) {
+            self.document_members
+                .insert(new_name.to_ascii_lowercase(), members);
+        }
+        if let Some(ty) = self.document_types.remove(&old_key) {
+            self.document_types
+                .insert(new_name.to_ascii_lowercase(), ty);
+        }
+        Ok(())
     }
     pub fn remove_module(&mut self, id: SourceId, discard_modified: bool) -> Result<()> {
         if self.forms.contains_key(&id) && self.session.is_some() {
@@ -499,4 +637,13 @@ impl Ide {
         .ok_or_else(|| error("no bookmarks"))?;
         self.navigate(target.0, target.1)
     }
+}
+
+fn valid_code_name(name: &str) -> bool {
+    !name.is_empty()
+        && name.chars().count() <= 31
+        && name
+            .chars()
+            .enumerate()
+            .all(|(index, c)| c.is_alphabetic() || index > 0 && (c.is_alphanumeric() || c == '_'))
 }

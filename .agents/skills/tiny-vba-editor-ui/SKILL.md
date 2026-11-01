@@ -99,3 +99,9 @@ third-party controls, binary Office form/resource compatibility or package write
 Office document bindings/events, storage, trust and package persistence stay in forks.
 Run CI/WASM/WASI plus UI/native/web and both Chromium smoke/form acceptance gates
 when changing these surfaces. M3 range/worksheet work is GridCraft-owned.
+
+M6 metadata/code projection is defined by [ADR 0030](../../../docs/decisions/0030-attribute-metadata-and-code-projection.md).
+Keep raw source canonical; use CodeProjection for visible edits/coordinates and
+preserve hidden metadata/newline bytes through history and export. Attribute
+records never create executable checkpoints. Document rename requires host
+validation and revision-checked acknowledgement; unsupported hosts refuse.

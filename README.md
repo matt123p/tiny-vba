@@ -9,11 +9,12 @@ The standalone graphical shell and command-line tools exist only to develop and 
 the shared components without launching a host application. A standalone VBA editor
 is not the project's goal.
 
-**Current status:** M4 acceptance is complete; the M5 host contract, M6 read-only project
-decoder, M7 callback/lifecycle contract and M8 embeddable editor/debugger are implemented. The Rust engine includes verified IR 1/2/3/4, explicit-frame execution, a headless debugger, scalar
-conversions, Currency/Date, arrays, optional/named calls, whole-array ByRef, ParamArray,
-Option Base, static/module state, VBA handlers and host-root imports with a versioned native host
-protocol. The current execution profile is `m5-host-v1` ([ADR 0013](docs/decisions/0013-m5-host-contract.md)).
+**Current status:** the shared engine, editor/debugger and read-only project importer
+are implemented, with verified IR 1–7 and the `m5-host-v1` runtime profile.
+The current M6 work adds host-event subscriptions, VBA attribute metadata and a
+lossless code view for embedding in GridCraft and WordCraft. See the
+[M6 acceptance record](docs/m6-acceptance.md) for tested behavior and remaining gates.
+Fresh Microsoft Office reference observations remain NOT_RUN; M7 has not started.
 
 All **44 authored scenarios and 153 reviewed ReflexGrid cases pass**. The latter match published
 Microsoft Excel Mac oracle expectations; this is inherited evidence, not a new local Excel run.

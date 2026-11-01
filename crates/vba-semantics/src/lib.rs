@@ -509,6 +509,67 @@ pub fn bind_with_references(
     if parsed.is_empty() || parsed.len() > 256 {
         return Err(Diagnostic::new("VBA0111", "source count limit"));
     }
+    for parsed in parsed {
+        let mut default_member: Option<String> = None;
+        for attribute in &parsed.module.attributes {
+            let key = attribute
+                .path
+                .last()
+                .map(|name| name.key())
+                .unwrap_or_default();
+            if matches!(key.as_str(), "vb_creatable" | "vb_globalnamespace")
+                && matches!(attribute.value.kind, ast::ExprKind::Boolean(true))
+            {
+                return Err(unsupported(
+                    "source-project creatability/global namespace attributes",
+                    attribute.span,
+                ));
+            }
+            if matches!(key.as_str(), "vb_usermemid" | "vb_varusermemid") {
+                let id = ast::attribute_integer(attribute)
+                    .ok_or_else(|| err("invalid member ID", attribute.span))?;
+                if id == -4 {
+                    return Err(unsupported(
+                        "project-class enumerator attributes",
+                        attribute.span,
+                    ));
+                }
+                if id == 0 {
+                    let owner = attribute
+                        .path
+                        .first()
+                        .map(|name| name.spelling.as_str())
+                        .unwrap_or_default();
+                    if key == "vb_varusermemid"
+                        || !parsed.module.procedures.iter().any(|procedure| {
+                            procedure.name.spelling.eq_ignore_ascii_case(owner)
+                                && matches!(procedure.property, Some(ast::PropertyKind::Get))
+                        })
+                    {
+                        return Err(unsupported(
+                            "default-member attributes require a supported Property Get",
+                            attribute.span,
+                        ));
+                    }
+                    let target = attribute
+                        .path
+                        .first()
+                        .map(|name| name.key())
+                        .ok_or_else(|| err("missing default-member target", attribute.span))?;
+                    if default_member.as_ref().is_some_and(|name| name != &target) {
+                        return Err(err("multiple default members", attribute.span));
+                    }
+                    default_member = Some(target);
+                }
+                if id == 0 && parsed.module.kind == ast::ModuleKind::Standard {
+                    return Err(unsupported(
+                        "default-member attribute on a standard module",
+                        attribute.span,
+                    ));
+                }
+            }
+        }
+    }
     let mut libraries = references.libraries().to_vec();
     let class_names = parsed
         .iter()
@@ -659,12 +720,10 @@ pub fn bind_with_references(
                 }
                 budget.charge(1024 + d.name.spelling.len(), d.span)?;
                 if d.with_events
-                    && (d.dimensions.is_some()
-                        || nominal(d.ty.as_ref(), references)?
-                            .is_none_or(|ty| !ty.library().eq_ignore_ascii_case("VBAProject")))
+                    && (d.dimensions.is_some() || nominal(d.ty.as_ref(), references)?.is_none())
                 {
                     return Err(unsupported(
-                        "WithEvents requires a scalar project class",
+                        "WithEvents requires a scalar nominal object type",
                         d.span,
                     ));
                 }

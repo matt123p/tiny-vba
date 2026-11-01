@@ -1,12 +1,56 @@
 # Implementation progress
 
-Updated 2026-10-31. The classic-editor/debugger profile is implemented; its
+Updated 2026-11-01. The classic-editor/debugger profile is implemented; its
 historical milestone is M10. Runtime remains m5-host-v1 with verified IR 1/2/3/4/5/6/7.
 The [remaining plan](implementation-plan.md) retains stable **M6–M8** task IDs.
 **M1–M5 are complete for their declared profiles, and M6's shared and fork-owned
 context work (M6.5–M6.8 plus the fork acceptance for M6.7) is implemented**; the
-remaining M6 items are recorded in the [M6.5 check](m6-context-resolution-check.md).
+remaining acceptance gates are recorded in the [M6 audit](m6-acceptance.md).
 Office objects, document events, trust and packaging remain fork-owned.
+
+## M6 implementation and acceptance audit (2026-11-01)
+
+Implemented generic live host-object WithEvents subscriptions (IR capability
+`host-events-v1`), and WordCraft delivery for DocumentBeforeClose,
+DocumentBeforeSave and WindowSelectionChange. Delivery validates all signatures
+before effects, retains connection order/ByRef state through pause/resume and
+uses one host undo batch. WordCraft also fixes Alt+F11 double handling, asynchronous
+source-save acknowledgements and selection-event recursion after debugger pauses.
+
+M6.9–M6.11 now parse owned module/member metadata and bounded class headers,
+retain canonical raw source, project metadata out of normal code views and map
+editing/debugging back to raw coordinates. Component code names, descriptions,
+read-only Instancing and a raw metadata inspector use the same shared editor.
+The forks refuse document code-name renames explicitly. The exact authored Macro2
+invocation attribute executes without metadata checkpoints in shared and real
+WordCraft/GridCraft sessions. See [ADR 0029](decisions/0029-host-event-subscriptions.md),
+[ADR 0030](decisions/0030-attribute-metadata-and-code-projection.md) and the
+[M6 acceptance record](m6-acceptance.md) for evidence and current integration gates.
+
+Shared CI, WASM, actual WASI, UI, native UI and web-build gates pass. Fresh Office
+observations remain NOT_RUN: no connected session or owner installation exists.
+This is an unfulfilled acceptance requirement, not an inferred pass or waiver.
+M7 remains untouched. Next step: finish the dependency pin and outstanding
+acceptance evidence described in the M6 record.
+
+## Plan addition — hidden VBA attributes and document code view (2026-11-01)
+
+Completed the [online investigation](vba-attributes-and-editor-projection.md)
+of the reported procedure `Attribute` diagnostic and raw `ThisWorkbook.cls`
+header display. Microsoft documents stored workbook attributes, module headers,
+code names and Macro Options; the VBE_Extras author's first-hand account documents
+hidden-member metadata and Excel's invocation-string encoding. Local inspection
+found top-level attribute parsing but no matching procedure-body path, plus raw
+source presentation and filename-based Properties display.
+
+Originally added M6.9–M6.12 tasks to the [remaining plan](implementation-plan.md):
+metadata parsing/ownership, lossless code-view mapping, document-component
+presentation/properties and native/WASM/UI/fork regression evidence. M7.2 now
+includes hidden metadata preservation. The investigation identified M6.9 first: a minimal
+authored procedure carrying the exact invocation attribute, with no executable
+metadata checkpoint. That investigation was documentation only; the implementation update above
+records the subsequent runtime work. No new Excel oracle observation is claimed. Existing unrelated working-tree implementation edits
+were left untouched.
 
 ## M6 fix — real-world document-module cookies decode (2026-11-01)
 

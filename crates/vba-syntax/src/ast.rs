@@ -14,6 +14,8 @@ pub struct Module {
     pub tokens: Vec<Token>,
     pub kind: ModuleKind,
     pub attributes: Vec<Attribute>,
+    /// Recognized class-export envelope, separate from authored VBA.
+    pub export_header: Option<Span>,
     pub options: Vec<ModuleOption>,
     pub declarations: Vec<Declaration>,
     pub procedures: Vec<Procedure>,
@@ -30,9 +32,16 @@ impl Name {
 }
 #[derive(Clone, Debug)]
 pub struct Attribute {
+    pub owner: AttributeOwner,
+    pub additional_values: Vec<Expr>,
     pub path: Vec<Name>,
     pub value: Expr,
     pub span: Span,
+}
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub enum AttributeOwner {
+    Module,
+    Member(String),
 }
 #[derive(Clone, Debug)]
 pub enum ModuleOption {

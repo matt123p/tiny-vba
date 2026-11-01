@@ -202,69 +202,73 @@ fn validate(
                 let ty = field
                     .nominal
                     .as_ref()
-                    .filter(|ty| {
-                        ty.library().eq_ignore_ascii_case("VBAProject") && ty.version() == "1"
-                    })
-                    .ok_or_else(|| invalid("WithEvents project type"))?;
+                    .ok_or_else(|| invalid("WithEvents nominal type"))?;
                 if field.kind != ScalarKind::Object || field.array.is_some() {
                     return Err(invalid("WithEvents scalar shape"));
                 }
-                let publisher = p
-                    .classes
-                    .iter()
-                    .find(|c| c.name.eq_ignore_ascii_case(ty.name()))
-                    .ok_or_else(|| invalid("WithEvents class"))?;
-                budget.table(p.classes.len())?;
-                budget.table(publisher.events.len())?;
-                for event in &publisher.events {
-                    let event_proc = p
-                        .procedures
-                        .get(event.0 as usize)
-                        .ok_or_else(|| invalid("event signature"))?;
-                    let event_name = event_proc
-                        .name
-                        .strip_prefix("Event ")
-                        .ok_or_else(|| invalid("event name"))?;
-                    let handler_name = format!("{}_{}", field.name, event_name);
-                    budget.table(class.methods.len())?;
-                    if let Some(handler) = class
-                        .methods
+                if !ty.library().eq_ignore_ascii_case("VBAProject") {
+                    feature(p, caps, "host-events-v1")?;
+                } else {
+                    if ty.version() != "1" {
+                        return Err(invalid("WithEvents project version"));
+                    }
+                    let publisher = p
+                        .classes
                         .iter()
-                        .find(|m| m.name.eq_ignore_ascii_case(&handler_name))
-                    {
-                        let handler_proc = p
+                        .find(|c| c.name.eq_ignore_ascii_case(ty.name()))
+                        .ok_or_else(|| invalid("WithEvents class"))?;
+                    budget.table(p.classes.len())?;
+                    budget.table(publisher.events.len())?;
+                    for event in &publisher.events {
+                        let event_proc = p
                             .procedures
-                            .get(handler.procedure.0 as usize)
-                            .ok_or_else(|| invalid("handler procedure"))?;
-                        if handler.kind != ForeignKind::Call
-                            || handler_proc.kind != ProcedureKind::Sub
-                            || handler_proc.parameters.len() != event_proc.parameters.len()
-                        {
-                            return Err(invalid("event handler signature"));
-                        }
-                        for (index, (a, b)) in event_proc
-                            .parameters
+                            .get(event.0 as usize)
+                            .ok_or_else(|| invalid("event signature"))?;
+                        let event_name = event_proc
+                            .name
+                            .strip_prefix("Event ")
+                            .ok_or_else(|| invalid("event name"))?;
+                        let handler_name = format!("{}_{}", field.name, event_name);
+                        budget.table(class.methods.len())?;
+                        if let Some(handler) = class
+                            .methods
                             .iter()
-                            .zip(&handler_proc.parameters)
-                            .enumerate()
+                            .find(|m| m.name.eq_ignore_ascii_case(&handler_name))
                         {
-                            budget.table(
-                                p.nominal_locals.len().checked_mul(2).ok_or_else(resource)?,
-                            )?;
-                            let nominal = |procedure, slot| {
-                                p.nominal_locals
-                                    .iter()
-                                    .find(|n| n.procedure == procedure && n.slot == slot)
-                                    .map(|n| &n.ty)
-                            };
-                            if a.kind != b.kind
-                                || a.mode != b.mode
-                                || !b.required
-                                || a.array != b.array
-                                || nominal(*event, LocalSlot(index as u32))
-                                    != nominal(handler.procedure, LocalSlot(index as u32))
+                            let handler_proc = p
+                                .procedures
+                                .get(handler.procedure.0 as usize)
+                                .ok_or_else(|| invalid("handler procedure"))?;
+                            if handler.kind != ForeignKind::Call
+                                || handler_proc.kind != ProcedureKind::Sub
+                                || handler_proc.parameters.len() != event_proc.parameters.len()
                             {
-                                return Err(invalid("event handler parameter mismatch"));
+                                return Err(invalid("event handler signature"));
+                            }
+                            for (index, (a, b)) in event_proc
+                                .parameters
+                                .iter()
+                                .zip(&handler_proc.parameters)
+                                .enumerate()
+                            {
+                                budget.table(
+                                    p.nominal_locals.len().checked_mul(2).ok_or_else(resource)?,
+                                )?;
+                                let nominal = |procedure, slot| {
+                                    p.nominal_locals
+                                        .iter()
+                                        .find(|n| n.procedure == procedure && n.slot == slot)
+                                        .map(|n| &n.ty)
+                                };
+                                if a.kind != b.kind
+                                    || a.mode != b.mode
+                                    || !b.required
+                                    || a.array != b.array
+                                    || nominal(*event, LocalSlot(index as u32))
+                                        != nominal(handler.procedure, LocalSlot(index as u32))
+                                {
+                                    return Err(invalid("event handler parameter mismatch"));
+                                }
                             }
                         }
                     }

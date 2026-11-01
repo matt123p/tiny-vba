@@ -1,6 +1,8 @@
 //! Bounded, source-preserving M1 frontend. Parsing never implies binding or execution.
 #![forbid(unsafe_code)]
 mod ast;
+mod attributes;
+pub use attributes::attribute_integer;
 mod lexer;
 mod parser;
 

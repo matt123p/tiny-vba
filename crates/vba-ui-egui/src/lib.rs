@@ -86,11 +86,15 @@ pub fn apply(
                         "replacement exceeds source budget",
                     ));
                 }
-                let mut text = module.text.clone();
-                text.replace_range(found.range.clone(), &replacement);
+                let projection = vba_ide::CodeProjection::new(&module.text);
+                let start = projection.to_view(found.range.start);
+                let mut display = projection.text.clone();
+                display.replace_range(start..projection.to_view(found.range.end), &replacement);
+                let text = projection.apply(&display);
+                let caret = vba_ide::source_byte(&text, start + replacement.len());
                 ide.set_text(text)?;
                 if let Some(m) = ide.active_module_mut() {
-                    m.caret = found.range.start + replacement.len();
+                    m.caret = caret;
                 }
             } else {
                 ide.message("Text was not found.");
@@ -267,6 +271,7 @@ pub struct EditorUi {
     quick_watch: bool,
     info: Option<String>,
     references_open: bool,
+    pub raw_metadata_open: bool,
     constants_open: bool,
     pub auto_indent: bool,
     pub correct_case: bool,
@@ -341,6 +346,7 @@ impl Default for EditorUi {
             quick_watch: false,
             info: None,
             references_open: false,
+            raw_metadata_open: false,
             constants_open: false,
             auto_indent: true,
             correct_case: true,
@@ -429,7 +435,7 @@ impl EditorUi {
                 });
             });
             egui::Panel::bottom("vba.status").frame(egui::Frame::new().fill(theme.chrome).inner_margin(5)).show(ui,|ui|{
-                ui.horizontal(|ui|{ui.label(RichText::new(format!("* {}",theme.label(ide.mode().label()))).strong().color(theme.accent));ui.separator();if let Some(m)=ide.active_module(){ui.label(format!("Ln {}   {}{}",m.line_at(m.caret),m.name,if m.dirty() || ide.form(m.id).is_some_and(|d|d.dirty()){" *"}else{""}));}ui.with_layout(egui::Layout::right_to_left(egui::Align::Center),|ui|{ui.label(RichText::new(theme.label("Craft VBA Editor")).small().color(theme.muted));});});
+                ui.horizontal(|ui|{ui.label(RichText::new(format!("* {}",theme.label(ide.mode().label()))).strong().color(theme.accent));ui.separator();if let Some(m)=ide.active_module(){ui.label(format!("Ln {}   {}{}",m.code_line_at(m.caret),m.name,if m.dirty() || ide.form(m.id).is_some_and(|d|d.dirty()){" *"}else{""}));}ui.with_layout(egui::Layout::right_to_left(egui::Align::Center),|ui|{ui.label(RichText::new(theme.label("Craft VBA Editor")).small().color(theme.muted));});});
             });
             let mut project_rect=None;
             if self.project_visible {
@@ -444,7 +450,7 @@ if ui.add_enabled(ide.active_module().is_some_and(|m|ide.form(m.id).is_some()),e
                             for (kind, label, glyph, form_group) in [(vba_ide::ModuleKind::Standard,"Modules","M",false),(vba_ide::ModuleKind::Class,"Class Modules","C",false),(vba_ide::ModuleKind::Document,"Document Modules","D",false),(vba_ide::ModuleKind::Class,"Forms","F",true)] {
 if ide.modules.iter().any(|m|m.kind==kind && ide.form(m.id).is_some()==form_group) {
 egui::CollapsingHeader::new(theme.label(label)).default_open(true).show(ui,|ui|{
-                                for (i,m) in ide.modules.iter().enumerate().filter(|(_,m)|m.kind==kind && ide.form(m.id).is_some()==form_group){let response=ui.selectable_label(ide.active==i,format!("{glyph} {}{}",m.name,if m.dirty() || ide.form(m.id).is_some_and(|d|d.dirty()){" *"}else{""}));if self.focus_project && ide.active==i {response.request_focus();self.focus_project=false;}
+                                for (i,m) in ide.modules.iter().enumerate().filter(|(_,m)|m.kind==kind && ide.form(m.id).is_some()==form_group){let response=ui.selectable_label(ide.active==i,format!("{glyph} {}{}",m.component_name(),if m.dirty() || ide.form(m.id).is_some_and(|d|d.dirty()){" *"}else{""}));if self.focus_project && ide.active==i {response.request_focus();self.focus_project=false;}
 if response.clicked(){commands.push(Command::SelectModule(i));self.navigate=true;}
 if response.double_clicked(){self.focus_editor=true;self.form_view=false;}response.context_menu(|ui|{if ui.button(theme.label("View Code")).clicked(){commands.push(Command::SelectModule(i));self.focus_editor=true;self.form_view=false;ui.close();}self.action_button(ui,ide,Action::Export,&mut commands, theme);});}
                             });}}
@@ -452,7 +458,8 @@ if response.double_clicked(){self.focus_editor=true;self.form_view=false;}respon
                     });
                     if ui.button(theme.label("Insert Module")).clicked(){commands.push(Command::AddModule);}
                     ui.separator();
-                    if self.properties_visible {heading(ui,"Properties Window",theme);ui.horizontal(|ui|{ui.selectable_label(true,theme.label("Alphabetic")).on_hover_text(theme.label("Alphabetic properties"));ui.add_enabled(false,egui::Button::new(theme.label("Categorized"))).on_hover_text(theme.label("Only module metadata is available"));});if let Some(m)=ide.active_module(){egui::Grid::new("properties").striped(true).show(ui,|ui|{ui.label(theme.label("(Name)"));if ui.button(&m.name).on_hover_text(theme.label("Rename module")).clicked(){self.rename_module=Some((m.id,m.name.clone()));}ui.end_row();ui.label(theme.label("Type"));ui.label(if ide.form(m.id).is_some() {theme.label("UserForm").into_owned()} else {match m.kind {vba_ide::ModuleKind::Standard=>theme.label("Standard module").into_owned(),vba_ide::ModuleKind::Class=>theme.label("Class module").into_owned(),vba_ide::ModuleKind::Document=>theme.label("Document module").into_owned()}});ui.end_row();ui.label(theme.label("Status"));ui.label(if m.dirty() || ide.form(m.id).is_some_and(|d|d.dirty()){theme.label("Modified").into_owned()}else{theme.label("Saved").into_owned()});ui.end_row();});ui.label(RichText::new(theme.label("Select (Name) to rename the module.")).small().color(theme.muted));}}
+                    if self.properties_visible {heading(ui,"Properties Window",theme);ui.horizontal(|ui|{ui.selectable_label(true,theme.label("Alphabetic")).on_hover_text(theme.label("Alphabetic properties"));ui.add_enabled(false,egui::Button::new(theme.label("Categorized"))).on_hover_text(theme.label("Only module metadata is available"));});if let Some(m)=ide.active_module(){egui::Grid::new("properties").striped(true).show(ui,|ui|{ui.label(theme.label("(Name)"));if ui.button(m.component_name()).on_hover_text(theme.label("Rename module")).clicked(){self.rename_module=Some((m.id,m.component_name()));}ui.end_row();ui.label(theme.label("Source file"));ui.label(&m.name);ui.end_row();if let Some(description)=m.description(){ui.label(theme.label("Description"));ui.label(description);ui.end_row();}
+if let Some(instancing)=m.instancing(){ui.label(theme.label("Instancing"));ui.label(instancing);ui.end_row();}ui.label(theme.label("Type"));ui.label(if ide.form(m.id).is_some() {theme.label("UserForm").into_owned()} else {match m.kind {vba_ide::ModuleKind::Standard=>theme.label("Standard module").into_owned(),vba_ide::ModuleKind::Class=>theme.label("Class module").into_owned(),vba_ide::ModuleKind::Document=>theme.label("Document module").into_owned()}});ui.end_row();ui.label(theme.label("Status"));ui.label(if m.dirty() || ide.form(m.id).is_some_and(|d|d.dirty()){theme.label("Modified").into_owned()}else{theme.label("Saved").into_owned()});ui.end_row();});ui.label(RichText::new(theme.label("Select (Name) to rename the module.")).small().color(theme.muted));}}
                 });project_rect=Some(p.response.rect);
             }
             let right=self.debugger_right && ui.available_width()>700.0;
@@ -601,7 +608,7 @@ if response.double_clicked(){self.focus_editor=true;self.form_view=false;}respon
             ui.separator();
             if let Some(m) = ide.active_module() {
                 if ui.button(theme.label("Rename Module...")).clicked() {
-                    self.rename_module = Some((m.id, m.name.clone()));
+                    self.rename_module = Some((m.id, m.component_name()));
                     ui.close();
                 }
                 if ui.button(theme.label("Remove Module...")).clicked() {
@@ -727,6 +734,10 @@ if response.double_clicked(){self.focus_editor=true;self.form_view=false;}respon
             }
         });
         ui.menu_button(theme.label("View"), |ui| {
+            ui.checkbox(
+                &mut self.raw_metadata_open,
+                theme.label("Raw Source / Metadata"),
+            );
             ui.checkbox(&mut self.procedure_view, theme.label("Procedure View"));
             ui.checkbox(&mut self.split_view, theme.label("Split Code View"));
             if ui.button(theme.label("Toggle Bookmark")).clicked() {
@@ -1141,7 +1152,8 @@ if response.double_clicked(){self.focus_editor=true;self.form_view=false;}respon
             .into_iter()
             .map(|r| vba_ide::editor_byte(&m.text, r.start)..vba_ide::editor_byte(&m.text, r.end))
             .collect();
-        let mut text = vba_ide::editor_text(&m.text);
+        let projection = vba_ide::CodeProjection::new(&m.text);
+        let mut text = projection.text.clone();
         let font = FontId::monospace(self.font_size);
         let row_height = ui.fonts_mut(|f| f.row_height(&font));
         let stop = ide
@@ -1173,10 +1185,16 @@ if response.double_clicked(){self.focus_editor=true;self.form_view=false;}respon
                     ui.vertical(|ui| {
                         ui.spacing_mut().item_spacing.y = 0.0;
                         ui.add_space(2.0);
-                        for (line_start, line) in vba_ide::line_starts(&m.text).zip(1usize..) {
-                            let breakpoint =
-                                m.breakpoints.iter().any(|b| m.line_at(*b as usize) == line);
-                            let current = stop.as_ref().is_some_and(|s| s.line == line);
+                        for (view_start, line) in
+                            vba_ide::line_starts(&projection.text).zip(1usize..)
+                        {
+                            let line_start = projection.to_source(view_start);
+                            let raw_line = m.line_at(line_start);
+                            let breakpoint = m
+                                .breakpoints
+                                .iter()
+                                .any(|b| m.line_at(*b as usize) == raw_line);
+                            let current = stop.as_ref().is_some_and(|s| s.line == raw_line);
                             let (rect, response) = ui.allocate_exact_size(
                                 Vec2::new(58.0, row_height),
                                 egui::Sense::click(),
@@ -1270,32 +1288,24 @@ if response.double_clicked(){self.focus_editor=true;self.form_view=false;}respon
                                     });
                                 let byte =
                                     |at| text.char_indices().nth(at).map_or(text.len(), |(b, _)| b);
-                                let start =
-                                    vba_ide::source_byte(&m.text, byte(selection.start.into()));
-                                let end = vba_ide::source_byte(&m.text, byte(selection.end.into()));
+                                let start = byte(selection.start.into());
+                                let end = byte(selection.end.into());
                                 match vba_ide::edit_block(
-                                    &m.text,
+                                    &projection.text,
                                     start..end,
                                     operation,
                                     self.tab_width,
                                 ) {
                                     Ok(edited) => {
-                                        let display = vba_ide::editor_text(&edited.text);
+                                        let display = edited.text;
+                                        let source = projection.apply(&display);
+                                        let source_projection =
+                                            vba_ide::CodeProjection::new(&source);
                                         let a = display
-                                            .get(
-                                                ..vba_ide::editor_byte(
-                                                    &edited.text,
-                                                    edited.selection.start,
-                                                ),
-                                            )
+                                            .get(..edited.selection.start)
                                             .map_or(0, |s| s.chars().count());
                                         let b = display
-                                            .get(
-                                                ..vba_ide::editor_byte(
-                                                    &edited.text,
-                                                    edited.selection.end,
-                                                ),
-                                            )
+                                            .get(..edited.selection.end)
                                             .map_or(0, |s| s.chars().count());
                                         let range = egui::text::CCursorRange::two(
                                             egui::text::CCursor::new(a),
@@ -1308,8 +1318,10 @@ if response.double_clicked(){self.focus_editor=true;self.form_view=false;}respon
                                             state.store(ui.ctx(), id);
                                         }
                                         self.source_selection = Some((m.id, range));
-                                        commands.push(Command::Caret(edited.selection.start));
-                                        commands.push(Command::Text(edited.text));
+                                        commands.push(Command::Caret(
+                                            source_projection.to_source(edited.selection.start),
+                                        ));
+                                        commands.push(Command::Text(source));
                                         text = display;
                                     }
                                     Err(d) => commands.push(Command::Report(d.to_string())),
@@ -1585,7 +1597,7 @@ if response.double_clicked(){self.focus_editor=true;self.form_view=false;}respon
                         let target = output.response.rect.min
                             + Vec2::new(
                                 0.0,
-                                row_height * m.line_at(m.caret).saturating_sub(1) as f32,
+                                row_height * m.code_line_at(m.caret).saturating_sub(1) as f32,
                             );
                         ui.scroll_to_rect(
                             egui::Rect::from_min_size(target, Vec2::new(30.0, row_height)),
@@ -1838,6 +1850,27 @@ if response.double_clicked(){self.focus_editor=true;self.form_view=false;}respon
         }
     }
     fn windows(&mut self, ui: &mut egui::Ui, ide: &Ide, commands: &mut Vec<Command>, theme: Theme) {
+        if self.raw_metadata_open {
+            egui::Window::new(theme.label("Raw Source / Metadata"))
+                .id(self.scope.unwrap_or(ui.scope_id()).with("raw.metadata"))
+                .open(&mut self.raw_metadata_open)
+                .default_size([680.0, 480.0])
+                .show(ui.ctx(), |ui| {
+                    if let Some(module) = ide.active_module() {
+                        ui.label(format!("{} — {}", module.component_name(), module.name));
+                        let mut raw = module.text.as_str();
+                        egui::ScrollArea::both().show(ui, |ui| {
+                            ui.add(
+                                egui::TextEdit::multiline(&mut raw)
+                                    .code_editor()
+                                    .desired_width(f32::INFINITY)
+                                    .desired_rows(20),
+                            )
+                            .on_hover_text(theme.label("Read-only raw source / metadata"));
+                        });
+                    }
+                });
+        }
         let ctx = ui.ctx();
         let scope = self.scope.unwrap_or(ui.scope_id());
         let frame = egui::Frame::new()
@@ -1926,12 +1959,17 @@ if response.double_clicked(){self.focus_editor=true;self.form_view=false;}respon
                                     .to_ascii_lowercase()
                                     .contains(&self.browser_search.to_ascii_lowercase())
                                 {
-                                    ui.label(&m.name);
+                                    ui.label(m.component_name());
                                     if ui.selectable_label(false, &p.signature).clicked() {
                                         commands.push(Command::Navigate(m.id, p.start));
                                         self.navigate = true;
                                     }
                                     ui.end_row();
+                                    if let Some(description) = m.member_description(&p.name) {
+                                        ui.label("");
+                                        ui.label(description);
+                                        ui.end_row();
+                                    }
                                 }
                             }
                         }

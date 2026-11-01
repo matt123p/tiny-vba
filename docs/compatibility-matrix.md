@@ -75,3 +75,18 @@ pass; unsupported statuses require actual execution evidence before changing.
 Current host M3/M4 are complete for their declared GridCraft profiles, using
 the published immutable shared dependency without development path overrides. See the
 [M3/M4 acceptance record](m3-m4-host-acceptance.md) for exact profiles/evidence.
+
+## M6 metadata and event audit (2026-11-01)
+
+| Surface | Implemented profile / refusal |
+|---|---|
+| Module/member attributes | Owned literal metadata, procedure-local invocation records, signed IDs, bounded class header; no executable checkpoints |
+| Metadata semantics | Property Get default supported; enumerators, default fields/functions and unsupported activation requests refuse |
+| Code view | Lossless projected editing/debugging/search, raw inspector, code-name Properties and preserved source filenames |
+| Document rename | Host validation/acknowledgement API; current forks refuse code-name changes |
+| Host WithEvents | Capability-gated live foreign subscriptions with signature/identity validation and bounded ordered delivery |
+| Word Application events | Trusted BeforeClose/BeforeSave/WindowSelectionChange in WordCraft; authored workflow evidence |
+| Microsoft Office reference observations | NOT_RUN; no available installation/session; not waived |
+
+See [M6 acceptance](m6-acceptance.md). Binary project writeback, third-party
+controls and Excel Macro Options remain outside this implemented profile.

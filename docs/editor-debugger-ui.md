@@ -95,3 +95,18 @@ Historical M10's implemented profile and boundaries remain in
 forms; M5 owns Excel events/UDFs; M6/M7 own remaining host/package acceptance.
 Third-party ActiveX/OLE controls not supplied with Office applications are out of
 scope. Native extensions, translation and AI assistance are removed from the plan.
+
+## Canonical source and normal code view (M6.10–M6.11)
+
+Canonical source retains exact metadata and newline bytes. The normal code view
+omits recognized attribute/export-header records; the View menu provides a
+read-only raw source/metadata inspector. CodeProjection maps visible UTF-8 byte
+positions to raw source for edits, search, completion, diagnostics, breakpoints,
+stepping and full/procedure/split views. First insertion into an attribute-only
+document preserves its header. Undo/redo and plain-source export retain metadata.
+
+Explorer and Properties show component code names, with export filenames in a
+separate Source file row. Description and supported Instancing are read-only.
+Document code-name changes require host validation and revision-checked
+acknowledgement; unsupported fork renames refuse without changing identity.
+See [ADR 0030](decisions/0030-attribute-metadata-and-code-projection.md).

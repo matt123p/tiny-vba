@@ -1,7 +1,9 @@
 //! M3 explicit-frame execution, single-use continuations and generation-checked inspection.
 #![forbid(unsafe_code)]
 mod classes;
+mod host_events;
 use classes::{ClassReturn, Instance};
+pub use host_events::{HostEventHandler, HostEventParameter};
 use std::{
     collections::{BTreeMap, BTreeSet, VecDeque},
     sync::atomic::{AtomicU32, Ordering},

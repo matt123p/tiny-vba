@@ -314,3 +314,13 @@ Getter aliases resolve before chained member Get/Call/Let/Set under
 [ADR 0025](decisions/0025-getter-alias-member-dispatch.md). Method aliases retain
 the existing fixed-call shortcut. Hosts can therefore expose dynamic roots while
 objects captured by source retain their identity. No IR version changes.
+
+## Live host-object subscriptions (M6)
+
+`Session::host_event_handlers` resolves actual live foreign WithEvents fields by
+host/object identity and validates every matching Sub signature before effects.
+Connection order is stable, enumeration is budgeted, and opaque callback handles
+remain session-bound. Scheduling uses the existing callback/debugger machinery;
+reset, disconnect and stale receivers cannot revive a subscription. The host owns
+trusted event routing, sequential ByRef propagation and its document undo batch.
+[ADR 0029](decisions/0029-host-event-subscriptions.md) defines the capability.

@@ -149,6 +149,7 @@ impl App {
     fn requests(&mut self) {
         for request in self.ide.take_requests() {
             match request {
+                HostRequest::RenameDocument { .. } => self.ide.message("Document code names are owned by the embedding application; the test shell cannot rename them."),
                 HostRequest::ConfirmClose => self.confirm_close = true,
                 HostRequest::ReturnToHost => self.ide.message(
                     "Standalone editor: there is no workbook/document window to return to.",

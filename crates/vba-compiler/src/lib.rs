@@ -238,6 +238,15 @@ pub fn compile_modules(
     let mut classes = Vec::new();
     for class in &program.classes {
         features.insert("project-classes-v7".into());
+        if class.fields.iter().any(|field| {
+            field.with_events
+                && field
+                    .nominal
+                    .as_ref()
+                    .is_some_and(|ty| !ty.library().eq_ignore_ascii_case("VBAProject"))
+        }) {
+            features.insert("host-events-v1".into());
+        }
         classes.push(ir::Class {
             events: program
                 .procedures
@@ -253,7 +262,7 @@ pub fn compile_modules(
                     if a.path
                         .get(1)
                         .is_some_and(|n| n.spelling.eq_ignore_ascii_case("VB_UserMemId"))
-                        && matches!(&a.value.kind,ast::ExprKind::Number(n) if n=="0")
+                        && ast::attribute_integer(a) == Some(0)
                     {
                         a.path.first().map(|n| n.spelling.clone())
                     } else {

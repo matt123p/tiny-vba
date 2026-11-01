@@ -34,19 +34,46 @@ pub fn parse(source: &SourceFile, kind: ModuleKind) -> PResult<ParseResult> {
         depth: 0,
         ordinal: 0,
         diagnostics: lexed.diagnostics,
+        member_attributes: Vec::new(),
     };
     let mut module = Module {
         source: source.clone(),
         tokens: lexed.tokens,
         kind,
         attributes: Vec::new(),
+        export_header: None,
         options: Vec::new(),
         declarations: Vec::new(),
         procedures: Vec::new(),
     };
     // Lexical failures retain the lossless token stream, without claiming a valid recovered AST.
-    if parser.diagnostics.is_empty() {
-        parser.module(&mut module);
+    parser.module(&mut module);
+    module.attributes.append(&mut parser.member_attributes);
+    for attribute in &module.attributes {
+        if let AttributeOwner::Member(name) = &attribute.owner
+            && !module
+                .procedures
+                .iter()
+                .any(|p| p.name.spelling.eq_ignore_ascii_case(name))
+            && !module
+                .declarations
+                .iter()
+                .any(|d| d.name.spelling.eq_ignore_ascii_case(name))
+        {
+            parser.record(
+                Diagnostic::new(
+                    "VBA0101",
+                    "attribute target is not a declared module member",
+                )
+                .at(attribute.span),
+            );
+        }
+    }
+    module
+        .attributes
+        .sort_by_key(|attribute| attribute.span.start());
+    for diagnostic in crate::attributes::validate(&module) {
+        parser.record(diagnostic);
     }
     Ok(ParseResult {
         module,
@@ -61,6 +88,7 @@ struct Parser<'a> {
     depth: usize,
     ordinal: u32,
     diagnostics: Vec<Diagnostic>,
+    member_attributes: Vec<Attribute>,
 }
 impl Parser<'_> {
     fn token(&self) -> &Token {
@@ -261,36 +289,35 @@ impl Parser<'_> {
             if module.kind == ModuleKind::Standard || self.pos != 0 {
                 return Err(self.error("VERSION is only supported at the start of a class export"));
             }
-            self.bump();
+            let start = self.bump().span;
             self.require("1.0")?;
             self.require("CLASS")?;
-            self.boundary()?;
-            // Designer/property blocks are deliberately outside the source-only M1 export subset.
-            if self.at("BEGIN") {
-                return Err(self.unsupported("class designer/property block"));
+            self.metadata_boundary()?;
+            self.separators();
+            if self.eat("BEGIN") {
+                self.metadata_boundary()?;
+                self.separators();
+                let mut properties = 0usize;
+                while !self.at("END") && self.token().kind != TokenKind::Eof {
+                    if properties >= 128 {
+                        return Err(self.error("class export property limit"));
+                    }
+                    self.name()?;
+                    self.require("=")?;
+                    self.attribute_literal()?;
+                    self.metadata_boundary()?;
+                    self.separators();
+                    properties += 1;
+                }
+                self.require("END")?;
+                self.metadata_boundary()?;
             }
+            module.export_header = Some(self.span(start)?);
             return Ok(());
         }
-        if self.eat("Attribute") {
-            let start = self
-                .tokens
-                .get(self.pos.saturating_sub(1))
-                .map_or(self.eof.span, |t| t.span);
-            let mut path = vec![self.name()?];
-            while self.eat(".") {
-                path.push(self.name()?);
-            }
-            self.require("=")?;
-            let value = self.expr(0)?;
-            if !matches!(
-                value.kind,
-                ExprKind::String(_) | ExprKind::Number(_) | ExprKind::Boolean(_)
-            ) {
-                return Err(self.error("attribute requires a literal value"));
-            }
-            let span = self.span(start)?;
-            self.boundary()?;
-            module.attributes.push(Attribute { path, value, span });
+        if self.at("Attribute") {
+            let attribute = self.attribute()?;
+            module.attributes.push(attribute);
             return Ok(());
         }
         if self.at("Option") {
@@ -362,6 +389,79 @@ impl Parser<'_> {
             return Ok(());
         }
         Err(self.unsupported("module declaration"))
+    }
+    fn metadata_boundary(&mut self) -> PResult<()> {
+        if self.token().kind == TokenKind::Newline {
+            self.bump();
+            Ok(())
+        } else if self.token().kind == TokenKind::Eof {
+            Ok(())
+        } else {
+            Err(self.error("metadata requires a standalone physical line"))
+        }
+    }
+    fn attribute_literal(&mut self) -> PResult<Expr> {
+        let value = self.expr(0)?;
+        let valid = matches!(
+            value.kind,
+            ExprKind::String(_) | ExprKind::Number(_) | ExprKind::Boolean(_)
+        ) || matches!(&value.kind, ExprKind::Unary { op, value } if (op == "-" || op == "+") && matches!(value.kind, ExprKind::Number(_)));
+        if !valid {
+            return Err(
+                Diagnostic::new("VBA0101", "attribute requires a literal value").at(value.span),
+            );
+        }
+        Ok(value)
+    }
+    fn attribute(&mut self) -> PResult<Attribute> {
+        let start = self.require("Attribute")?.span;
+        let before = self
+            .source
+            .text()
+            .get(..start.start() as usize)
+            .unwrap_or_default();
+        if !before
+            .rsplit(['\r', '\n'])
+            .next()
+            .unwrap_or_default()
+            .trim()
+            .is_empty()
+        {
+            return Err(
+                Diagnostic::new("VBA0101", "attribute requires its own physical line").at(start),
+            );
+        }
+        let mut path = vec![self.name()?];
+        while self.eat(".") {
+            path.push(self.name()?);
+        }
+        self.require("=")?;
+        let value = self.attribute_literal()?;
+        let mut additional_values = Vec::new();
+        while self.eat(",") {
+            if additional_values.len() >= 15 {
+                return Err(self.error("attribute value limit"));
+            }
+            additional_values.push(self.attribute_literal()?);
+        }
+        let owner = if path.len() == 1 {
+            AttributeOwner::Module
+        } else {
+            AttributeOwner::Member(
+                path.first()
+                    .map(|name| name.spelling.clone())
+                    .unwrap_or_default(),
+            )
+        };
+        let span = self.span(start)?;
+        self.metadata_boundary()?;
+        Ok(Attribute {
+            owner,
+            path,
+            value,
+            additional_values,
+            span,
+        })
     }
     fn declarations(
         &mut self,
@@ -518,6 +618,20 @@ impl Parser<'_> {
                 span,
                 end,
             });
+        }
+        self.separators();
+        while self.at("Attribute") {
+            let attribute = self.attribute()?;
+            if !matches!(&attribute.owner, AttributeOwner::Member(target) if target.eq_ignore_ascii_case(&name.spelling))
+            {
+                return Err(Diagnostic::new(
+                    "VBA0101",
+                    "procedure attribute must target its containing member",
+                )
+                .at(attribute.span));
+            }
+            self.member_attributes.push(attribute);
+            self.separators();
         }
         let body = self.block()?;
         let end_start = self.require("End")?.span;

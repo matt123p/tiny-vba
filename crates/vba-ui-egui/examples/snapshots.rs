@@ -254,5 +254,54 @@ fn main() -> Result<(), Box<dyn Error>> {
         image.save(&path)?;
         println!("UI_SNAPSHOT {} original-code-assistance", path.display());
     }
+    for (name, theme, blank, raw) in [
+        ("m6-document-blank-light", Theme::light(), true, false),
+        ("m6-document-blank-dark", Theme::dark(), true, false),
+        ("m6-recorded-code", Theme::light(), false, false),
+        ("m6-recorded-metadata", Theme::dark(), false, true),
+    ] {
+        let mut ide = Ide::new();
+        if blank {
+            ide.add_document_module("ThisWorkbook.cls","ThisWorkbook","Attribute VB_Name = \"ThisWorkbook\"\r\nAttribute VB_PredeclaredId = True\r\nAttribute VB_Base = \"host-owned\"\r\n")?;
+        } else {
+            ide.add_module("Recorded.bas","Attribute VB_Name = \"Recorded\"\r\nSub Macro2()\r\nAttribute Macro2.VB_ProcData.VB_Invoke_Func = \" \\n14\"\r\nDim amount As Long\r\namount=42\r\nStop\r\nDebug.Print amount\r\nEnd Sub\r\n")?;
+            ide.entry = "Macro2".into();
+            ide.dispatch(Action::Run, &mut NoHost)?;
+            for _ in 0..100 {
+                if ide.mode() != Mode::Running {
+                    break;
+                }
+                ide.tick(&mut NoHost)?;
+            }
+            if ide.mode() != Mode::Break {
+                return Err("metadata snapshot must use a real paused VM".into());
+            }
+        }
+        let mut view = EditorUi::default();
+        view.raw_metadata_open = raw;
+        let fixture = Fixture { ide, view, theme };
+        let mut harness = Harness::builder()
+            .with_size(egui::vec2(1200.0, 800.0))
+            .wgpu()
+            .build_ui_state(
+                |ui, state: &mut Fixture| {
+                    for command in state.view.show(ui, &state.ide, state.theme) {
+                        if let Err(error) = vba_ui_egui::apply(&mut state.ide, command, &mut NoHost)
+                        {
+                            state.ide.message(error.to_string());
+                        }
+                    }
+                },
+                fixture,
+            );
+        harness.run();
+        let image = harness.render().map_err(std::io::Error::other)?;
+        let path = root.join(format!("{name}.png"));
+        image.save(&path)?;
+        println!(
+            "UI_SNAPSHOT {} original-metadata-projection",
+            path.display()
+        );
+    }
     Ok(())
 }

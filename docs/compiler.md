@@ -229,3 +229,13 @@ Getter aliases resolve before chained member Get/Call/Let/Set under
 [ADR 0025](decisions/0025-getter-alias-member-dispatch.md). Method aliases retain
 the existing fixed-call shortcut. Hosts can therefore expose dynamic roots while
 objects captured by source retain their identity. No IR version changes.
+
+## M6 metadata and host-event capability
+
+Owned attributes are nonexecutable. The supported `Property Get` default member
+uses integer attribute IDs (including signed zero); project enumerators, default
+fields/functions and unsupported activation requests diagnose explicitly.
+Foreign nominal WithEvents fields require `host-events-v1`; older capability
+sets refuse them. The host supplies and validates actual event signatures before
+any callback runs. See [ADR 0029](decisions/0029-host-event-subscriptions.md) and
+[ADR 0030](decisions/0030-attribute-metadata-and-code-projection.md).

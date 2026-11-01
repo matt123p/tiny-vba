@@ -157,3 +157,11 @@ ADR 0025 distinguishes fixed getter aliases from method aliases. Getter aliases
 resolve before chained member dispatch; captured results retain identity. Keep
 method shortcuts and root-object imports unchanged. Dynamic Office roots remain
 fork-owned; do not substitute mutable proxy handles for captured objects.
+
+M6 host-object WithEvents delivery uses [ADR 0029](../../../docs/decisions/0029-host-event-subscriptions.md)
+and the explicit `host-events-v1` capability. Discover only live matching publisher
+connections, validate every handler before any effect, and deliver snapshot members
+sequentially through ordinary callbacks. Host-supplied signatures must include
+scalar kind, ByRef mode and nominal type. Carry completed ByRef outputs to the next
+sink; preserve pending delivery through pause/wait and discard it on Reset/close/trust
+loss. Office names, event signatures and save/close ordering stay in forks.

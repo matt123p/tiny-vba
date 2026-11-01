@@ -6,6 +6,10 @@ specifications and ADRs retain historical IDs; see the
 
 Read [architecture](architecture.md), [implementation plan](implementation-plan.md),
 [scope decision](decisions/0001-repository-scope.md) and [progress](implementation-progress.md) first.
+
+[VBA attributes and Excel code-view investigation](vba-attributes-and-editor-projection.md)
+documents hidden module/member metadata, recorded-macro attributes, the blank
+`ThisWorkbook` code view, related declarations and planned M6.9–M6.12 fixes.
 [UI ownership decision](decisions/0002-editor-debugger-ui.md),
 [editor/debugger UI contract](editor-debugger-ui.md), [developer guide](developer-guide.md),
 [debugger](debugger.md), [conformance](conformance-methodology.md)
@@ -113,3 +117,10 @@ split (shared binding in tiny-vba; Excel host globals and active state in the
 forks), M6.8 to bring host-object member completion to the shared IDE, and M7.4
 to run their matrices as unchanged-document acceptance. That work is implemented;
 see the [M6.5 check](m6-context-resolution-check.md).
+
+[M6 host-event subscriptions](decisions/0029-host-event-subscriptions.md) defines
+bounded host-neutral delivery to nominal WithEvents fields. Word Application event
+names and document effects remain fork-owned; Office reference observations are
+separate from authored acceptance.
+
+- [M6 acceptance audit](m6-acceptance.md): shared/fork evidence and unavailable Office observations.

@@ -203,3 +203,13 @@ with no UI/control dependency. Existing terminal-only callbacks are unchanged.
 The reviewed 19-crate dependency graph is unchanged. See
 [contracts and acceptance](m2-acceptance.md) and
 [ADR 0024](decisions/0024-standard-form-execution-and-exchange.md).
+
+## Host-object event subscriptions (M6)
+
+[ADR 0029](decisions/0029-host-event-subscriptions.md) adds the explicit
+`host-events-v1` capability for nominal host-object WithEvents fields. The VM
+snapshots and validates live subscriptions against host-supplied generic parameter
+signatures, then delivers each through existing bounded instance callbacks.
+The toolkit-independent IDE exposes that path. Applications own event names,
+trust, sequential ByRef propagation, cancellation and document lifecycle ordering;
+no Office names or ambient subscriptions enter the shared crates.

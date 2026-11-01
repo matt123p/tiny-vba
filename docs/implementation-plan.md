@@ -1,6 +1,6 @@
 # Remaining implementation plan
 
-Updated 2026-10-31. This plan contains **remaining work only**, using stable M6–M8 IDs
+Updated 2026-11-01. This plan contains **remaining work only**, using stable M6–M8 IDs
 in implementation order after completed M1, the [selected M2 profile](m2-acceptance.md),
 and the [M3/M4 host profiles](m3-m4-host-acceptance.md). Completed work and the old-to-new milestone mapping
 belong in [implementation progress](implementation-progress.md#plan-renumbering--2026-10-28).
@@ -17,7 +17,7 @@ separate and native host dispatch in Rust.
 
 | Milestone | Remaining work | Prerequisites |
 |---|---|---|
-| M6 | Remaining GridCraft and WordCraft integration; module-context and name-resolution conformance | M1; M2–M5 for corresponding form/event/Excel workflows |
+| M6 | Remaining fork integration; attribute parsing, code-view projection and document-module presentation | M1; M2–M5 for corresponding form/event/Excel workflows |
 | M7 | Unchanged-document and package acceptance | Applicable M1–M6 capabilities and explicit writeback design |
 | M8 | Expanded conformance, hardening and release | M1–M7 acceptance for the declared release profile |
 
@@ -78,15 +78,51 @@ check](m6-context-resolution-check.md) as the scope-driving record:
   `Me`/code-name document types; each fork declares the member/result types it supports in its
   catalogue. Code aids stay read-only and metadata-driven; they never invoke host members.
 
-Remaining before M6 closes (recorded honestly rather than silently dropped): permitted
-Microsoft Office reference-build observations stay NOT_RUN while no Office session is
-available (M6.4), WordCraft's end-to-end browser runtime source-transfer observation remains
-open (M6.2), and standard Word Application event routing stays absent from the declared
-profile (M6.3). Fork gates: GridCraft's full `cargo xtask ci` ran on the M6 pin with the two
-craft-fonts-dependent UI tests environment-blocked (no `CRAFT_FONTS_DIR` on this machine;
-both fail identically on the pre-M6 commit), re-verified on the final pin with the adapter
-and UI suites, both Clippy paths and fmt; WordCraft's full `cargo xtask ci` passes all eight
-stages on its pin.
+The [M6 acceptance record](m6-acceptance.md) supersedes the earlier gap list.
+Standard Word Application event delivery and actual browser source transfer are now
+implemented and locally exercised. Fresh Microsoft Office observations remain
+NOT_RUN (M6.4): the owner has no Word/Excel installation, and no connected session
+is available. This requirement has not been waived. Dependency publication and the
+final fork pin are tracked separately in that record. M7 must wait for M6 acceptance.
+
+### Attribute and document-module corrections (2026-11-01; implemented locally)
+
+The [attribute/editor investigation](vba-attributes-and-editor-projection.md)
+records online sources, the two screenshot failures and local code findings.
+M6.9–M6.11 are implemented under [ADR 0030](decisions/0030-attribute-metadata-and-code-projection.md).
+M6.12 has native/WASM/WASI, GUI and actual fork regression evidence, recorded in
+[acceptance](m6-acceptance.md). Office observations remain unavailable.
+Document code-name renames use a host acknowledgement contract; the current forks
+explicitly refuse them because binary project writeback is outside this profile.
+
+- **M6.9:** tiny-vba syntax/semantics/compiler: parse module and member attributes
+  as owned metadata at their documented positions, including procedure-local
+  `Macro2.VB_ProcData.VB_Invoke_Func = " \n14"` and signed member IDs. Preserve raw
+  spans/values and associate targets; validate placement and literal forms.
+  Retain opaque metadata without claiming semantics; diagnose unsupported
+  semantic requirements. Generate no executable statements/checkpoints for
+  attributes. Ordinary unsupported VBA must keep its diagnostics.
+- **M6.10:** tiny-vba IDE/shared UI: default to a code view omitting recognized
+  attribute/export-header ranges while retaining canonical raw source. Provide
+  a bounded reversible mapping for edits, CR/LF/CRLF, Unicode, diagnostics,
+  completion, search/replace, navigation, breakpoints and full/procedure views.
+  Preserve hidden records through insertion, member rename/delete, undo/redo
+  and revision-checked plain-source save/export. Add a read-only raw metadata
+  inspector; do not strip source in the read-only importer.
+- **M6.11:** tiny-vba IDE/shared UI plus fork integration: an attribute-only
+  `ThisWorkbook` opens as blank code while the document component remains in
+  the explorer. Present its code name in explorer/Properties `(Name)`, separate
+  from `.cls` source/export filenames; preserve event navigation and host-bound
+  identity. Route rename through host validation and consistent metadata updates.
+  Expose supported descriptions/Instancing without making host-owned attributes
+  arbitrary editable code. GridCraft owns Excel Macro Options and shortcut policy.
+- **M6.12:** regress the exact member-attribute shape with a minimal independently
+  authored executable procedure, invalid/unknown metadata, signed IDs, default
+  member/enumerator semantics or explicit refusals, attribute-only documents,
+  mapped debugging/editing and exact raw-source retention. Run native/WASM/WASI,
+  shared UI/native/browser gates and real fork workflows. Keep the workbook's
+  unrelated host-method gaps separate. Office reference-build observations stay
+  NOT_RUN until actually collected; import never executes handlers.
 
 Acceptance: both forks reuse the same editor and shared interpreter repository.
 Real document workflows verify effects and lifecycle without replay or retained
@@ -109,6 +145,10 @@ specimens require M2 and the corresponding host event/persistence integration.
 - **M7.2:** Report load, compile, run and save separately for unchanged source.
   Verify source identity, typed values/errors, effects/events, code names,
   package relationships/payloads, trust and lifecycle for .xlsm/.docm workflows.
+  Include M6.9–M6.12 attribute retention and code-view/raw-source mapping:
+  unchanged headers/member metadata survive load and plain-source export,
+  and code edits preserve attached hidden records. Report these separately
+  from original-package preservation and edited binary writeback.
 - **M7.3:** Design binary VBA project writeback and signature preservation/
   invalidation as a separate reviewed contract before implementation. Distinguish
   original-byte preservation from edited-source writeback. No protection/P-code

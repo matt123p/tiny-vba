@@ -272,67 +272,103 @@ impl Ide {
     }
 }
 
-/// egui displays LF paragraphs. Keep source coordinates/bytes independent of that view.
+/// Normal code view: parsed metadata is hidden; canonical source is unchanged.
 pub fn editor_text(source: &str) -> String {
-    source.replace("\r\n", "\n").replace('\r', "\n")
+    crate::CodeProjection::new(source).text
 }
 pub fn editor_byte(source: &str, byte: usize) -> usize {
-    editor_text(source.get(..byte).unwrap_or_default()).len()
+    crate::CodeProjection::new(source).to_view(byte)
 }
 pub fn source_byte(source: &str, display_byte: usize) -> usize {
-    let mut display = 0;
-    let mut chars = source.char_indices().peekable();
-    while let Some((byte, c)) = chars.next() {
-        if display >= display_byte {
-            return byte;
-        }
-        if c == '\r' && chars.peek().is_some_and(|(_, c)| *c == '\n') {
-            chars.next();
-        }
-        display += if c == '\r' { 1 } else { c.len_utf8() };
-    }
-    source.len()
+    crate::CodeProjection::new(source).to_source(display_byte)
 }
 impl Module {
-    /// Apply one editor diff, retaining untouched mixed line endings and the first separator for new lines.
     pub fn edited_source(&self, display: &str) -> String {
-        let old = editor_text(&self.text);
-        let prefix = old
-            .chars()
-            .zip(display.chars())
-            .take_while(|(a, b)| a == b)
-            .map(|(c, _)| c.len_utf8())
-            .sum::<usize>();
-        let old_tail = old.get(prefix..).unwrap_or_default();
-        let new_tail = display.get(prefix..).unwrap_or_default();
-        let suffix = old_tail
-            .chars()
-            .rev()
-            .zip(new_tail.chars().rev())
-            .take_while(|(a, b)| a == b)
-            .map(|(c, _)| c.len_utf8())
-            .sum::<usize>();
-        let start = source_byte(&self.text, prefix);
-        let end = source_byte(&self.text, old.len().saturating_sub(suffix));
-        let separator = self
-            .text
-            .find(['\r', '\n'])
-            .and_then(|i| self.text.get(i..))
-            .map_or("\n", |s| {
-                if s.starts_with("\r\n") {
-                    "\r\n"
-                } else if s.starts_with('\r') {
-                    "\r"
-                } else {
-                    "\n"
-                }
-            });
-        let replacement = display
-            .get(prefix..display.len().saturating_sub(suffix))
-            .unwrap_or_default()
-            .replace('\n', separator);
-        let mut out = self.text.clone();
-        out.replace_range(start..end, &replacement);
-        out
+        crate::CodeProjection::new(&self.text).apply(display)
+    }
+}
+
+impl Module {
+    pub fn component_name(&self) -> String {
+        if let Some(code_name) = &self.code_name {
+            return code_name.clone();
+        }
+        self.source()
+            .ok()
+            .and_then(|source| vba_syntax::parse(&source, self.kind).ok())
+            .and_then(|parsed| {
+                parsed.module.attributes.into_iter().find_map(|attribute| {
+                    if attribute.path.len() == 1
+                        && attribute
+                            .path
+                            .first()
+                            .is_some_and(|name| name.spelling.eq_ignore_ascii_case("VB_Name"))
+                        && let vba_syntax::ExprKind::String(name) = attribute.value.kind
+                    {
+                        return Some(name);
+                    }
+                    None
+                })
+            })
+            .unwrap_or_else(|| {
+                self.name
+                    .rsplit_once('.')
+                    .map_or(self.name.clone(), |(stem, _)| stem.to_owned())
+            })
+    }
+    pub fn code_line_at(&self, raw: usize) -> usize {
+        let projection = crate::CodeProjection::new(&self.text);
+        line_starts(&projection.text)
+            .take_while(|start| *start <= projection.to_view(raw))
+            .count()
+            .max(1)
+    }
+    pub fn description(&self) -> Option<String> {
+        let source = self.source().ok()?;
+        let parsed = vba_syntax::parse(&source, self.kind).ok()?;
+        parsed.module.attributes.into_iter().find_map(|attribute| {
+            if attribute.path.len() == 1
+                && attribute
+                    .path
+                    .first()
+                    .is_some_and(|name| name.spelling.eq_ignore_ascii_case("VB_Description"))
+                && let vba_syntax::ExprKind::String(value) = attribute.value.kind
+            {
+                return Some(value);
+            }
+            None
+        })
+    }
+    pub fn member_description(&self, member: &str) -> Option<String> {
+        let parsed = vba_syntax::parse(&self.source().ok()?, self.kind).ok()?;
+        parsed.module.attributes.into_iter().find_map(|attribute| {
+            if matches!(&attribute.owner,vba_syntax::AttributeOwner::Member(owner) if owner.eq_ignore_ascii_case(member))
+                && attribute.path.last().is_some_and(|name| name.spelling.eq_ignore_ascii_case("VB_Description") || name.spelling.eq_ignore_ascii_case("VB_VarDescription"))
+                && let vba_syntax::ExprKind::String(value)=attribute.value.kind { return Some(value); }
+            None
+        })
+    }
+    pub fn instancing(&self) -> Option<&'static str> {
+        if self.kind != vba_syntax::ModuleKind::Class {
+            return None;
+        }
+        let exposed =
+            self.source()
+                .ok()
+                .and_then(|source| vba_syntax::parse(&source, self.kind).ok())
+                .is_some_and(|parsed| {
+                    parsed.module.attributes.iter().any(|attribute| {
+                        attribute.path.len() == 1
+                            && attribute.path.first().is_some_and(|name| {
+                                name.spelling.eq_ignore_ascii_case("VB_Exposed")
+                            })
+                            && matches!(attribute.value.kind, vba_syntax::ExprKind::Boolean(true))
+                    })
+                });
+        Some(if exposed {
+            "PublicNotCreatable"
+        } else {
+            "Private"
+        })
     }
 }

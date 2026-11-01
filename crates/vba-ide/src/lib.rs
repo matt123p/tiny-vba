@@ -2,6 +2,8 @@
 //! This layer never opens files, dialogs, network connections or Office documents.
 #![forbid(unsafe_code)]
 mod code_aids;
+mod projection;
+pub use projection::CodeProjection;
 mod editing;
 pub mod form_archive;
 mod form_project;
@@ -28,7 +30,8 @@ pub use vba_syntax::ModuleKind;
 use vba_syntax::parse;
 pub use vba_values::{ObjectRef, ScalarKind, Value, VbaString};
 pub use vba_vm::{
-    FrameSnapshot, Handle, HostBinding, NoHost, Outcome, Pause, PauseReason, ReturnValue,
+    FrameSnapshot, Handle, HostBinding, HostEventHandler, HostEventParameter, NoHost, Outcome,
+    Pause, PauseReason, ReturnValue,
 };
 use vba_vm::{Limits, Session};
 pub type Result<T> = std::result::Result<T, Diagnostic>;
@@ -247,6 +250,12 @@ pub enum HostRequest {
         revision: u64,
     },
     Import,
+    RenameDocument {
+        id: SourceId,
+        revision: u64,
+        old_name: String,
+        new_name: String,
+    },
     Export {
         name: String,
         text: String,
@@ -539,6 +548,9 @@ impl Ide {
             .ok_or_else(|| error("no active module"))?;
         if old.text == text {
             return Ok(());
+        }
+        if old.kind == ModuleKind::Document && document_code_name(&text) != old.code_name {
+            return Err(error("document identity changes require host validation"));
         }
         if text.len() > SourceFile::MAX_BYTES
             || self
@@ -1085,6 +1097,43 @@ impl Ide {
         self.refresh_watches();
         Ok(())
     }
+    /// Inspect live WithEvents subscriptions without invoking any host member.
+    pub fn host_event_handlers(
+        &mut self,
+        publisher: ObjectRef,
+        event: &str,
+        parameters: &[HostEventParameter],
+        host: &impl Host,
+    ) -> Result<Vec<HostEventHandler>> {
+        if self.stale || self.mode() != Mode::Completed {
+            return Err(error("host events require a completed current invocation"));
+        }
+        self.session
+            .as_mut()
+            .ok_or_else(|| error("no project session"))?
+            .host_event_handlers(publisher, event, parameters, host)
+    }
+    pub fn dispatch_host_event_handler(
+        &mut self,
+        handler: &HostEventHandler,
+        arguments: Vec<Value>,
+        host: &mut impl Host,
+    ) -> Result<()> {
+        if self.session_host != Some(host.identity())
+            || self.stale
+            || self.mode() != Mode::Completed
+        {
+            return Err(error("host event identity/lifecycle mismatch"));
+        }
+        let session = self
+            .session
+            .as_mut()
+            .ok_or_else(|| error("no project session"))?;
+        session.schedule_host_event_handler(handler, arguments)?;
+        session.start_next_callback(host)?;
+        self.selected_frame = 0;
+        self.tick(host)
+    }
     pub fn dispatch_instance_event(
         &mut self,
         project_object: &str,
@@ -1362,10 +1411,13 @@ impl Ide {
         else {
             return procedure.name.clone();
         };
-        let line = frame
-            .span
-            .and_then(|s| source.file.position(s).ok())
-            .map_or(0, |(l, _)| l);
+        let line = frame.span.map_or(0, |span| {
+            let projection = CodeProjection::new(source.file.text());
+            line_starts(&projection.text)
+                .take_while(|start| *start <= projection.to_view(span.start() as usize))
+                .count()
+                .max(1)
+        });
         format!("{}  {}:{line}", procedure.name, source.file.name())
     }
     pub fn frames(&self) -> Vec<FrameSnapshot> {
@@ -1722,37 +1774,27 @@ impl Ide {
         if query.is_empty() {
             return None;
         }
-        let start = from.min(module.text.len());
-        let start = if module.text.is_char_boundary(start) {
-            start
-        } else {
-            0
-        };
-        let byte = module
+        let projection = CodeProjection::new(&module.text);
+        let start = projection.to_view(from);
+        let byte = projection
             .text
             .get(start..)?
             .find(query)
             .map(|n| n + start)
-            .or_else(|| module.text.get(..start)?.find(query))?;
-        module.caret = byte;
-        Some((byte, byte + query.len()))
+            .or_else(|| projection.text.get(..start)?.find(query))?;
+        let raw = projection.to_source(byte);
+        module.caret = raw;
+        Some((raw, projection.to_source(byte + query.len())))
     }
     pub fn replace_all(&mut self, query: &str, replacement: &str) -> Result<usize> {
-        if query.is_empty() {
-            return Err(error("empty search text"));
-        }
-        let text = &self.active_module().ok_or_else(|| error("no module"))?.text;
-        let count = text.matches(query).count();
-        let projected = text
-            .len()
-            .saturating_sub(count.saturating_mul(query.len()))
-            .saturating_add(count.saturating_mul(replacement.len()));
-        if projected > SourceFile::MAX_BYTES {
-            return Err(error("replacement exceeds source budget"));
-        }
-        let replaced = text.replace(query, replacement);
-        self.set_text(replaced)?;
-        Ok(count)
+        self.replace_with(
+            query,
+            replacement,
+            FindOptions {
+                match_case: true,
+                ..Default::default()
+            },
+        )
     }
     pub fn completions(&self, prefix: &str) -> Vec<String> {
         let mut names = BTreeSet::new();

@@ -449,7 +449,10 @@ impl Ide {
                 .iter()
                 .find(|p| p.name.eq_ignore_ascii_case(name) && (module.id == m.id || p.public))
             {
-                return Some(p.signature.clone());
+                return Some(module.member_description(&p.name).map_or_else(
+                    || p.signature.clone(),
+                    |description| format!("{}\n{description}", p.signature),
+                ));
             }
         }
         if let Some((n, ty)) = self

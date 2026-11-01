@@ -57,7 +57,7 @@ unchanged-document acceptance.
 | Specification area | Status | Evidence / boundary |
 |---|---|---|
 | Document roots under the M6.1 profile | Implemented (M6.1) | Application/Document/Selection/Range with live UTF-16 position mapping; owner-bound `Me` forwarding during callbacks; stale-range refusal. WordCraft's `docs/vba-integration.md` records the exact member set and error behavior |
-| Document events against the M2 contract | Implemented (M6.3, declared profile) | Canonical `Document_Close()`, explicit `Document_Open`, explicit WordCraft BeforeClose/BeforeSave extensions with ByRef Cancel; reset/close cleanup and modal waits covered by authored workflows. Standard Application-level event routing and automatic package Open/New delivery remain absent and are recorded as absent |
+| Document events against the M2 contract | Implemented (M6.3, declared profile) | Canonical `Document_Close()`, explicit `Document_Open`, explicit WordCraft BeforeClose/BeforeSave extensions with ByRef Cancel; reset/close cleanup and modal waits covered by authored workflows. Trusted Application-level BeforeClose/BeforeSave/WindowSelectionChange routing is implemented with actual WithEvents subscriptions and authored fork workflows (2026-11-01); automatic package Open/New delivery remains absent |
 | Word host globals consulted at invocation | Implemented | Application/ActiveDocument/Selection resolve per dispatch against the live document session; imported projects stay inert until trust |
 | Word module-kind binding (`ThisDocument` implicit members) | Implemented (M6.7) | WordCraft declares the document profile's implicit members for `ThisDocument`; ordinary-run owner binding is exercised by the fork's M6 workflows added with this milestone |
 

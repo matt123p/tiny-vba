@@ -999,3 +999,116 @@ fn drawn_chrome_text_goes_through_the_injected_localizer() -> R {
     );
     Ok(())
 }
+
+#[test]
+fn m6_document_headers_are_blank_and_properties_use_the_code_name() -> R {
+    let raw = "Attribute VB_Name = \"ThisWorkbook\"\r\nAttribute VB_PredeclaredId = True\r\nAttribute VB_Base = \"host-owned\"\r\n";
+    let mut fixture = Fixture::new()?;
+    fixture.ide = Ide::new();
+    fixture
+        .ide
+        .add_document_module("ThisWorkbook.cls", "ThisWorkbook", raw)?;
+    let mut h = Harness::builder()
+        .with_size(egui::vec2(1200.0, 800.0))
+        .build_ui_state(draw, fixture);
+    h.run();
+    assert!(
+        h.query_by_label("ThisWorkbook").is_some(),
+        "Properties show the code name"
+    );
+    assert!(
+        h.query_by_label("ThisWorkbook.cls").is_some(),
+        "export name remains separately visible"
+    );
+    assert!(vba_ide::editor_text(&h.state().ide.active_module().ok_or("module")?.text).is_empty());
+    h.get_by_label("VBA source editor — F9 breakpoint, F8 step, Ctrl+F find")
+        .click();
+    h.event(egui::Event::Text("Option Explicit\n".into()));
+    h.run();
+    assert_eq!(
+        h.state().ide.active_module().ok_or("module")?.text,
+        format!("{raw}Option Explicit\r\n")
+    );
+    assert!(h.state().errors.is_empty(), "{:?}", h.state().errors);
+    Ok(())
+}
+
+#[test]
+fn m6_projected_gutter_breaks_on_the_correct_raw_statement() -> R {
+    let raw = "Attribute VB_Name = \"Recorded\"\r\nSub Main()\r\nAttribute Main.VB_ProcData.VB_Invoke_Func = \" \\n14\"\r\nDebug.Print 42\r\nEnd Sub\r\n";
+    let mut fixture = Fixture::new()?;
+    fixture.ide = Ide::new();
+    fixture.ide.add_module("Recorded.bas", raw)?;
+    let mut h = Harness::builder()
+        .with_size(egui::vec2(1200.0, 800.0))
+        .build_ui_state(draw, fixture);
+    h.run();
+    h.get_by_label("Toggle breakpoint on line 2").click();
+    h.run();
+    h.key_press(egui::Key::F5);
+    h.run();
+    assert_eq!(h.state().ide.mode(), Mode::Break);
+    let stop = h.state().ide.execution().ok_or("stop")?;
+    assert_eq!(
+        raw.get(stop.span.start() as usize..stop.span.end() as usize),
+        Some("Debug.Print 42")
+    );
+    let module = h.state().ide.active_module().ok_or("module")?;
+    assert_eq!(module.code_line_at(stop.span.start() as usize), 2);
+    assert_eq!(module.text, raw);
+    assert!(h.state().errors.is_empty(), "{:?}", h.state().errors);
+    Ok(())
+}
+
+#[test]
+fn m6_procedure_view_rename_keeps_hidden_attributes_and_other_members() -> R {
+    let raw = "Attribute VB_Name = \"Recorded\"\r\nSub Main()\r\nAttribute Main.VB_Description = \"retain 😀\"\r\nDebug.Print 1\r\nEnd Sub\r\nSub Other()\r\nAttribute Other.VB_Description = \"untouched\"\r\nDebug.Print 2\r\nEnd Sub\r\n";
+    let mut fixture = Fixture::new()?;
+    fixture.ide = Ide::new();
+    fixture.ide.add_module("Recorded.bas", raw)?;
+    fixture.view.procedure_view = true;
+    let mut h = Harness::builder()
+        .with_size(egui::vec2(1200.0, 800.0))
+        .build_ui_state(draw, fixture);
+    h.run();
+    h.get_by_label("Procedure source editor").click();
+    h.key_press_modifiers(
+        egui::Modifiers::CTRL | egui::Modifiers::COMMAND,
+        egui::Key::A,
+    );
+    h.event(egui::Event::Text(
+        "Sub Renamed()\nDebug.Print 7\nEnd Sub".into(),
+    ));
+    h.run();
+    let changed = &h.state().ide.active_module().ok_or("module")?.text;
+    assert!(
+        changed.contains("Attribute Renamed.VB_Description = \"retain 😀\"\r\n"),
+        "{changed:?}"
+    );
+    assert!(changed.ends_with("Sub Other()\r\nAttribute Other.VB_Description = \"untouched\"\r\nDebug.Print 2\r\nEnd Sub\r\n"),"{changed:?}");
+    assert!(h.state().errors.is_empty(), "{:?}", h.state().errors);
+    Ok(())
+}
+
+#[test]
+fn m6_raw_metadata_inspector_is_read_only() -> R {
+    let raw = "Attribute VB_Name = \"Recorded\"\nSub Main()\nAttribute Main.VB_Description = \"read only\"\nDebug.Print 1\nEnd Sub\n";
+    let mut fixture = Fixture::new()?;
+    fixture.ide = Ide::new();
+    fixture.ide.add_module("Recorded.bas", raw)?;
+    fixture.view.raw_metadata_open = true;
+    let mut h = Harness::builder()
+        .with_size(egui::vec2(1200.0, 800.0))
+        .build_ui_state(draw, fixture);
+    h.run();
+    h.get_by_label("Read-only raw source / metadata").click();
+    h.key_press_modifiers(
+        egui::Modifiers::CTRL | egui::Modifiers::COMMAND,
+        egui::Key::A,
+    );
+    h.event(egui::Event::Text("attempted overwrite".into()));
+    h.run();
+    assert_eq!(h.state().ide.active_module().ok_or("module")?.text, raw);
+    assert!(h.state().errors.is_empty(), "{:?}", h.state().errors);
+    Ok(())
+}

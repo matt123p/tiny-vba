@@ -127,3 +127,14 @@ Load and Unload accept a target expression and retain their own source statement
 checkpoint. Binding requires a statically resolved project form lifecycle member;
 parsing alone never loads or executes a form. Selected form/event generation and
 unsupported resource boundaries are documented in [M2 acceptance](m2-acceptance.md).
+
+## Owned VBA attributes (M6.9)
+
+The parser retains module/member attributes, literal values, raw spans and member
+owners, including procedure-local `VB_ProcData.VB_Invoke_Func` records immediately
+after a signature. Signed member IDs and bounded opaque multi-value metadata are
+accepted. Known attribute forms and physical-line placement are validated. A
+bounded `VERSION 1.0 CLASS` / `BEGIN` property envelope is nonexecutable metadata.
+Attributes never generate executable checkpoints. Unknown metadata has no implied
+semantics; unsupported enumerator/default-member/activation requirements refuse.
+See [ADR 0030](decisions/0030-attribute-metadata-and-code-projection.md).

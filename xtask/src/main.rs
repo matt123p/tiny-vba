@@ -91,6 +91,21 @@ fn run() -> Result<(), Box<dyn Error>> {
                 "target.wasm32-wasip1.runner=[\"node\", {:?}]",
                 root.join("tools/run_wasi.cjs")
             );
+            command(
+                "cargo",
+                &[
+                    "test",
+                    "-p",
+                    "vba-syntax",
+                    "--test",
+                    "attributes",
+                    "--locked",
+                    "--target",
+                    "wasm32-wasip1",
+                    "--config",
+                    &import_runner,
+                ],
+            )?;
             // Execute the same controlled project-import suite on the WASI target.
             command(
                 "cargo",
@@ -125,6 +140,8 @@ fn run() -> Result<(), Box<dyn Error>> {
                     "defaults_collections",
                     "--test",
                     "classes",
+                    "--test",
+                    "attribute_execution",
                     "--locked",
                     "--target",
                     "wasm32-wasip1",

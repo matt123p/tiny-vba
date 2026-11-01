@@ -22,8 +22,10 @@ impl EditorUi {
             .filter(|(id, _)| *id == m.id)
             .map(|(_, range)| range.clone())
             .unwrap_or(m.caret..m.caret);
-        match vba_ide::edit_block(&m.text, selection, operation, self.tab_width) {
-            Ok(edited) if edited.text != m.text => {
+        let projection = vba_ide::CodeProjection::new(&m.text);
+        let selection = projection.to_view(selection.start)..projection.to_view(selection.end);
+        match vba_ide::edit_block(&projection.text, selection, operation, self.tab_width) {
+            Ok(edited) if edited.text != projection.text => {
                 let caret = edited.selection.start
                     + edited
                         .text
@@ -33,14 +35,17 @@ impl EditorUi {
                         .take_while(|c| *c == ' ' || *c == '\t')
                         .map(char::len_utf8)
                         .sum::<usize>();
+                let source = projection.apply(&edited.text);
+                let new_projection = vba_ide::CodeProjection::new(&source);
                 self.pending_procedure_selection = Some((
                     m.id,
                     m.revision.saturating_add(1),
-                    edited.selection,
+                    new_projection.to_source(edited.selection.start)
+                        ..new_projection.to_source(edited.selection.end),
                     self.procedure_focus_split,
                 ));
-                commands.push(Command::Text(edited.text));
-                commands.push(Command::Caret(caret));
+                commands.push(Command::Text(source));
+                commands.push(Command::Caret(new_projection.to_source(caret)));
             }
             Ok(_) => {}
             Err(d) => commands.push(Command::Report(d.to_string())),
@@ -91,8 +96,16 @@ impl EditorUi {
         let Some(source) = m.text.get(p.start..p.end) else {
             return;
         };
-        let mut display = vba_ide::editor_text(source);
-        let start_display = vba_ide::editor_byte(&m.text, p.start);
+        let projection = vba_ide::CodeProjection::new(&m.text);
+        let start_display = projection.to_view(p.start);
+        let end_display = projection.to_view(p.end);
+        let mut display = projection
+            .text
+            .get(start_display..end_display)
+            .unwrap_or_default()
+            .to_owned();
+        let start_line =
+            vba_ide::line_starts(projection.text.get(..start_display).unwrap_or_default()).count();
         let stop = ide
             .execution()
             .filter(|s| {
@@ -258,11 +271,14 @@ impl EditorUi {
                 ui.horizontal_top(|ui| {
                     ui.vertical(|ui| {
                         ui.spacing_mut().item_spacing.y = 0.0;
-                        for offset in vba_ide::line_starts(source) {
-                            let at = p.start + offset;
-                            let line = m.line_at(at);
-                            let breakpoint =
-                                m.breakpoints.iter().any(|b| m.line_at(*b as usize) == line);
+                        for (line_index, offset) in vba_ide::line_starts(&display).enumerate() {
+                            let at = projection.to_source(start_display + offset);
+                            let line = start_line + line_index;
+                            let raw_line = m.line_at(at);
+                            let breakpoint = m
+                                .breakpoints
+                                .iter()
+                                .any(|b| m.line_at(*b as usize) == raw_line);
                             if ui
                                 .add_sized(
                                     [58.0, row_height],
@@ -427,9 +443,9 @@ impl EditorUi {
                     }
                     let full = format!(
                         "{}{}{}",
-                        vba_ide::editor_text(m.text.get(..p.start).unwrap_or_default()),
+                        projection.text.get(..start_display).unwrap_or_default(),
                         display,
-                        vba_ide::editor_text(m.text.get(p.end..).unwrap_or_default())
+                        projection.text.get(end_display..).unwrap_or_default()
                     );
                     let source = m.edited_source(&full);
                     if output.response.changed() {
@@ -488,7 +504,9 @@ impl EditorUi {
                         )));
                     }
                     if navigate {
-                        let line = m.line_at(m.caret).saturating_sub(m.line_at(p.start));
+                        let line = m
+                            .code_line_at(m.caret)
+                            .saturating_sub(m.code_line_at(p.start));
                         let target =
                             output.response.rect.min + egui::vec2(0.0, line as f32 * row_height);
                         ui.scroll_to_rect(

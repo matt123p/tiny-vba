@@ -49,7 +49,9 @@ impl Ide {
             } else {
                 0..module.text.len()
             };
-            let source = module
+            let projection = crate::CodeProjection::new(&module.text);
+            let range = projection.to_view(range.start)..projection.to_view(range.end);
+            let source = projection
                 .text
                 .get(range.clone())
                 .ok_or_else(|| error("invalid search scope"))?;
@@ -63,12 +65,12 @@ impl Ide {
                 let end = start + query.len();
                 let word = |c: char| c.is_alphanumeric() || c == '_';
                 if options.whole_word
-                    && (module
+                    && (projection
                         .text
                         .get(..start)
                         .and_then(|s| s.chars().next_back())
                         .is_some_and(word)
-                        || module
+                        || projection
                             .text
                             .get(end..)
                             .and_then(|s| s.chars().next())
@@ -81,7 +83,7 @@ impl Ide {
                 }
                 matches.push(SearchMatch {
                     source: module.id,
-                    range: start..end,
+                    range: projection.to_source(start)..projection.to_source(end),
                 });
             }
         }
@@ -156,9 +158,7 @@ impl Ide {
                 .len()
                 .saturating_sub(ranges.len().saturating_mul(query.len()))
                 .saturating_add(ranges.len().saturating_mul(replacement.len()));
-            project_bytes = project_bytes.saturating_add(projected);
-            if projected > crate::SourceFile::MAX_BYTES || project_bytes > crate::MAX_PROJECT_BYTES
-            {
+            if projected > crate::SourceFile::MAX_BYTES {
                 return Err(error("replacement exceeds project/source budget"));
             }
             if !ranges.is_empty() {
@@ -166,13 +166,34 @@ impl Ide {
                     .revision
                     .checked_add(1)
                     .ok_or_else(|| error("buffer revision exhausted"))?;
-                let mut text = module.text.clone();
+                let projection = crate::CodeProjection::new(&module.text);
+                let mut display = projection.text.clone();
                 for range in ranges.into_iter().rev() {
-                    text.replace_range(range, replacement);
+                    display.replace_range(
+                        projection.to_view(range.start)..projection.to_view(range.end),
+                        replacement,
+                    );
                 }
+                let text = projection.apply(&display);
+                if text.len() > crate::SourceFile::MAX_BYTES {
+                    return Err(error("replacement exceeds source budget"));
+                }
+                if module.kind == crate::ModuleKind::Document
+                    && crate::document_code_name(&text) != module.code_name
+                {
+                    return Err(error(
+                        "replacement would change a host-owned document identity",
+                    ));
+                }
+                project_bytes = project_bytes.saturating_add(text.len());
                 if text != module.text {
                     changes.push((module.id, text));
                 }
+            } else {
+                project_bytes = project_bytes.saturating_add(module.text.len());
+            }
+            if project_bytes > crate::MAX_PROJECT_BYTES {
+                return Err(error("replacement exceeds project budget"));
             }
         }
         self.revision
