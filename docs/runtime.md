@@ -64,6 +64,12 @@ never wraps or reuses a cancelled/dropped execution's token. IR 1 launch paramet
 result storage are frame-owned locations; direct ByRef slots are aliases of the caller's canonical
 location. Returning invalidates owned storage while retaining caller aliases. No Rust recursion
 implements VBA calls. Caller operand prefixes survive nested calls and pauses without evaluation replay.
+Embeddings using `vba-ide::Ide` may set bounded `Limits` with
+`configure_execution_limits` before launching. The validated snapshot is used by
+normal runs and idle callback sessions; an existing session keeps its captured
+limits. Work counters remain VM/session-owned across slices, debugger pauses and
+resume, so yielding does not replenish a host-call budget. The standalone IDE
+keeps `Limits::default()` unless its embedding chooses another profile.
 
 `run_slice(host, quota, predicate)` reports Yielded, Paused, Waiting, Completed, Failed or Cancelled.
 The initial Yielded state is ready/runnable. Invalid/zero/oversized quotas are command errors.

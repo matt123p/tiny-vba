@@ -29,11 +29,12 @@ use vba_ir::VerifiedProgram;
 pub use vba_syntax::ModuleKind;
 use vba_syntax::parse;
 pub use vba_values::{ObjectRef, ScalarKind, Value, VbaString};
+pub use vba_vm::Limits;
+use vba_vm::Session;
 pub use vba_vm::{
     FrameSnapshot, Handle, HostBinding, HostEventHandler, HostEventParameter, NoHost, Outcome,
     Pause, PauseReason, ReturnValue,
 };
-use vba_vm::{Limits, Session};
 pub type Result<T> = std::result::Result<T, Diagnostic>;
 pub const MAX_MODULES: usize = 64;
 pub const MAX_PROJECT_BYTES: usize = 4 * 1024 * 1024;
@@ -307,6 +308,7 @@ pub struct Ide {
     pub selected_frame: usize,
     pub break_on_errors: bool,
     pub break_in_class_modules: bool,
+    limits: Limits,
     next_source: u64,
     revision: u64,
     stale: bool,
@@ -359,6 +361,7 @@ impl Ide {
             selected_frame: 0,
             break_on_errors: false,
             break_in_class_modules: false,
+            limits: Limits::default(),
             next_source: 1,
             revision: 0,
             stale: false,
@@ -387,6 +390,35 @@ impl Ide {
             document_types: BTreeMap::new(),
             document_members: BTreeMap::new(),
         }
+    }
+    /// Set bounded VM work limits used by normal launches and idle callback sessions.
+    /// The configuration is copied into each session and cannot change a running one.
+    pub fn configure_execution_limits(&mut self, limits: Limits) -> Result<()> {
+        let positive = limits.instructions > 0
+            && limits.slice > 0
+            && limits.depth > 0
+            && limits.locations > 0
+            && limits.stack_entries > 0
+            && limits.host_calls > 0
+            && limits.host_polls > 0
+            && limits.payload > 0
+            && limits.callbacks > 0;
+        let bounded = limits.instructions <= 1_000_000_000
+            && limits.slice <= 1_000_000
+            && limits.depth <= 4096
+            && limits.locations <= 1_000_000
+            && limits.stack_entries <= 4_000_000
+            && limits.host_calls <= 1_000_000
+            && limits.host_polls <= 4_000_000
+            && limits.payload <= 1024 * 1024 * 1024
+            && limits.callbacks <= 1_000_000;
+        if !positive || !bounded {
+            return Err(error(
+                "execution limits must be positive and within the IDE safety caps",
+            ));
+        }
+        self.limits = limits;
+        Ok(())
     }
     pub fn demo() -> Result<Self> {
         let mut ide = Self::new();
@@ -913,7 +945,7 @@ impl Ide {
             1,
             vec![],
             binding,
-            Limits::default(),
+            self.limits.clone(),
             self.type_resolver.clone(),
         )?;
         if let (Some(service), Some(context)) = (
@@ -1227,7 +1259,7 @@ impl Ide {
                 program,
                 1,
                 binding,
-                Limits::default(),
+                self.limits.clone(),
                 self.type_resolver.clone(),
             )?);
             if let (Some(service), Some(context)) = (

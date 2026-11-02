@@ -1,7 +1,7 @@
 //! Generic embedding proof: the host owns object identity, side effects and wait-token cleanup.
 use std::{collections::BTreeMap, error::Error};
 use vba_foreign::{Completion, HostCall, InvokeKind, Reply};
-use vba_ide::{Action, ApiMember, Host, Ide, Import, Mode, ObjectRef, Value};
+use vba_ide::{Action, ApiMember, Host, Ide, Import, Limits, Mode, ObjectRef, Value};
 type R = Result<(), Box<dyn Error>>;
 const ROOT: ObjectRef = ObjectRef {
     host: 42,
@@ -179,5 +179,46 @@ fn successful_host_wait_resumes_exactly_once_in_bounded_ticks() -> R {
     assert_eq!(ide.mode(), Mode::Completed);
     assert_eq!(host.writes, 1);
     assert_eq!(host.polls, 1);
+    Ok(())
+}
+
+#[test]
+fn configured_host_call_budget_survives_pause_and_resume() -> R {
+    let (mut ide, mut host) = setup(false)?;
+    ide.set_text("Sub Main()\nDim counter As Long\ncounter = 1\nbridge.Record counter\ncounter = 2\nbridge.Record counter\nEnd Sub\n".into())?;
+    let second_call = ide
+        .active_module()
+        .and_then(|module| module.text.rfind("bridge.Record"))
+        .ok_or("second host call")?;
+    ide.toggle_breakpoint_at(second_call)?;
+    let limits = Limits {
+        host_calls: 1,
+        ..Limits::default()
+    };
+    ide.configure_execution_limits(limits.clone())?;
+    ide.dispatch(Action::Run, &mut host)?;
+    for _ in 0..100 {
+        ide.tick(&mut host)?;
+        if ide.mode() == Mode::Break {
+            break;
+        }
+    }
+    assert_eq!(ide.mode(), Mode::Break);
+    assert_eq!(host.writes, 1);
+    ide.dispatch(Action::Run, &mut host)?;
+    for _ in 0..100 {
+        ide.tick(&mut host)?;
+        if ide.mode() == Mode::Failed {
+            break;
+        }
+    }
+    assert_eq!(ide.mode(), Mode::Failed);
+    assert_eq!(host.writes, 1);
+
+    let invalid = Limits {
+        host_calls: 0,
+        ..Limits::default()
+    };
+    assert!(ide.configure_execution_limits(invalid).is_err());
     Ok(())
 }
