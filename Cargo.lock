@@ -3367,6 +3367,7 @@ dependencies = [
 name = "vba-runtime"
 version = "0.1.0"
 dependencies = [
+ "encoding_rs",
  "vba-diagnostics",
  "vba-values",
 ]

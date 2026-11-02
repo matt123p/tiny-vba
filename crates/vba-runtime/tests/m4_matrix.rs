@@ -484,14 +484,8 @@ fn builtin_domain_errors_and_locale_refusals_remain_explicit() -> R {
         r::intrinsic(I::Round, &[V::Double(1.2), V::Integer(-1)]),
         Ok(V::Double(0.0))
     );
-    assert!(matches!(
-        r::intrinsic(I::Asc, &[string("é")?]),
-        Err(Error::Unsupported(_))
-    ));
-    assert!(matches!(
-        r::intrinsic(I::Chr, &[V::Integer(233)]),
-        Err(Error::Unsupported(_))
-    ));
+    assert_eq!(r::intrinsic(I::Asc, &[string("é")?]), Ok(V::Integer(0xe9)));
+    assert_eq!(r::intrinsic(I::Chr, &[V::Integer(233)]), Ok(string("é")?));
     assert_eq!(r::intrinsic(I::Abs, &[V::Empty]), Ok(V::Integer(0)));
     assert_eq!(r::intrinsic(I::Int, &[V::Long(3)]), Ok(V::Long(3)));
     assert!(matches!(

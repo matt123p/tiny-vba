@@ -1531,7 +1531,7 @@ impl Binder<'_> {
             self.budget.charge(256 + payload(value), name.span)?;
             return Ok(Symbol::Constant(value.clone()));
         }
-        if let Some(value) = comparison_constant(&name.key()) {
+        if let Some(value) = intrinsic_constant(&name.key()) {
             self.budget.charge(256, name.span)?;
             return Ok(Symbol::Constant(value));
         }
@@ -3752,14 +3752,23 @@ impl Binder<'_> {
     }
 }
 
-/// VBA comparison constants are fallback names: local, project, imported and
+/// Intrinsic constants are fallback names: local, project, imported and
 /// referenced declarations are resolved first by `symbol`.
-fn comparison_constant(name: &str) -> Option<Value> {
+fn intrinsic_constant(name: &str) -> Option<Value> {
     match name {
         "vbusecompareoption" => Some(Value::Integer(-1)),
         "vbbinarycompare" => Some(Value::Integer(0)),
         "vbtextcompare" => Some(Value::Integer(1)),
         "vbdatabasecompare" => Some(Value::Integer(2)),
+        "vbuppercase" => Some(Value::Integer(1)),
+        "vblowercase" => Some(Value::Integer(2)),
+        "vbpropercase" => Some(Value::Integer(3)),
+        "vbwide" => Some(Value::Integer(4)),
+        "vbnarrow" => Some(Value::Integer(8)),
+        "vbkatakana" => Some(Value::Integer(16)),
+        "vbhiragana" => Some(Value::Integer(32)),
+        "vbunicode" => Some(Value::Integer(64)),
+        "vbfromunicode" => Some(Value::Integer(128)),
         _ => None,
     }
 }

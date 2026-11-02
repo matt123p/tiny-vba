@@ -148,6 +148,14 @@ pub fn intrinsic_extended_with_context(
     arguments: &[Option<Value>],
     context: &IntrinsicContext<'_>,
 ) -> Result<Value> {
+    if coercion::is_string_context_intrinsic(function) {
+        return coercion::string_intrinsic_with_context(
+            function,
+            arguments,
+            context.locale,
+            context.code_page,
+        );
+    }
     if matches!(
         function,
         vba_values::Intrinsic::Rgb | vba_values::Intrinsic::QbColor

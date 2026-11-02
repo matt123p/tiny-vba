@@ -477,6 +477,9 @@ impl Session {
         self.clock_service = Some(service);
         Ok(())
     }
+    pub fn set_intrinsic_context_config(&mut self, context: IntrinsicContextConfig) {
+        self.intrinsic_context_config = Some(context);
+    }
     pub fn set_string_comparison_service(
         &mut self,
         service: std::sync::Arc<dyn runtime::StringComparisonService>,

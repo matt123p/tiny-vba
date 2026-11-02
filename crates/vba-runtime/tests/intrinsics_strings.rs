@@ -1089,15 +1089,22 @@ fn space_and_string_repeat_with_null_and_resource_boundaries() -> TestResult {
 }
 
 #[test]
-fn ascii_case_conversion_refuses_unimplemented_non_ascii_mapping() -> TestResult {
-    assert!(matches!(
-        vba_runtime::intrinsic(I::LCase, &[string("é")?]),
-        Err(Error::Unsupported(_))
-    ));
-    assert!(matches!(
-        vba_runtime::intrinsic(I::UCase, &[string("ß")?]),
-        Err(Error::Unsupported(_))
-    ));
+fn unicode_case_conversion_maps_non_ascii_and_preserves_null() -> TestResult {
+    assert_eq!(
+        vba_runtime::intrinsic(I::LCase, &[string("É")?])
+            .map_err(|error| std::io::Error::other(format!("{error:?}")))?,
+        string("é")?
+    );
+    assert_eq!(
+        vba_runtime::intrinsic(I::UCase, &[string("ß")?])
+            .map_err(|error| std::io::Error::other(format!("{error:?}")))?,
+        string("SS")?
+    );
+    assert_eq!(
+        vba_runtime::intrinsic(I::LCase, &[V::Null])
+            .map_err(|error| std::io::Error::other(format!("{error:?}")))?,
+        V::Null
+    );
     Ok(())
 }
 
@@ -1177,5 +1184,287 @@ fn dollar_trim_forms_share_null_and_space_behavior() -> TestResult {
     assert_eq!(apply(LTrimDollar, &[string("  a  ")?])?, string("a  ")?);
     assert_eq!(apply(RTrimDollar, &[string("  a  ")?])?, string("  a")?);
     assert_eq!(apply(TrimDollar, &[V::Null])?, V::Null);
+    Ok(())
+}
+
+fn contextual_string_call(
+    function: I,
+    arguments: &[Option<V>],
+    locale: &str,
+    code_page: &str,
+) -> vba_runtime::Result<V> {
+    let context = IntrinsicContext::no_services(Mode::Binary, locale, "Gregorian", code_page, 64);
+    vba_runtime::intrinsic_extended_with_context(function, arguments, &context)
+}
+
+fn checked_string_call(
+    function: I,
+    arguments: &[Option<V>],
+    locale: &str,
+    code_page: &str,
+) -> TestResult<V> {
+    contextual_string_call(function, arguments, locale, code_page)
+        .map_err(|error| std::io::Error::other(format!("{error:?}")).into())
+}
+
+#[test]
+fn m6a8_len_lenb_coerce_values_and_count_utf16_representation() -> TestResult {
+    assert_eq!(
+        checked_string_call(I::Len, &[Some(string("A😀")?)], "en-US", "UTF-16")?,
+        V::Long(3)
+    );
+    assert_eq!(
+        checked_string_call(I::Len, &[Some(V::Empty)], "en-US", "UTF-16")?,
+        V::Long(0)
+    );
+    assert_eq!(
+        checked_string_call(I::Len, &[Some(V::Integer(42))], "en-US", "UTF-16")?,
+        V::Long(2)
+    );
+    assert_eq!(
+        checked_string_call(I::Len, &[Some(V::Null)], "en-US", "UTF-16")?,
+        V::Null
+    );
+    assert_eq!(
+        checked_string_call(I::LenB, &[Some(string("A😀")?)], "en-US", "UTF-16")?,
+        V::Long(6)
+    );
+    Ok(())
+}
+
+#[test]
+fn m6a8_unicode_case_maps_expansions_turkish_and_unpaired_surrogates() -> TestResult {
+    assert_eq!(
+        checked_string_call(I::UCase, &[Some(string("straße")?)], "de-DE", "UTF-16")?,
+        string("STRASSE")?
+    );
+    assert_eq!(
+        checked_string_call(I::LCase, &[Some(string("Iİ")?)], "tr-TR", "UTF-16")?,
+        string("ıi")?
+    );
+    assert_eq!(
+        checked_string_call(
+            I::UCaseDollar,
+            &[Some(V::String(VbaString::from_units(vec![0xd800])?))],
+            "en-US",
+            "UTF-16"
+        )?,
+        V::String(VbaString::from_units(vec![0xd800])?)
+    );
+    Ok(())
+}
+
+#[test]
+fn m6a8_codepage_character_and_byte_intrinsics_roundtrip_cp1252() -> TestResult {
+    assert_eq!(
+        checked_string_call(I::Asc, &[Some(string("€tail")?)], "en-US", "windows-1252")?,
+        V::Integer(128)
+    );
+    assert_eq!(
+        checked_string_call(
+            I::ChrDollar,
+            &[Some(V::Integer(128))],
+            "en-US",
+            "windows-1252"
+        )?,
+        string("€")?
+    );
+    assert_eq!(
+        checked_string_call(I::AscB, &[Some(string("é")?)], "en-US", "windows-1252")?,
+        V::Integer(233)
+    );
+    assert_eq!(
+        checked_string_call(
+            I::ChrBDollar,
+            &[Some(V::Integer(233))],
+            "en-US",
+            "windows-1252"
+        )?,
+        string("é")?
+    );
+    assert_eq!(
+        checked_string_call(
+            I::LeftB,
+            &[Some(string("café")?), Some(V::Integer(3))],
+            "en-US",
+            "windows-1252"
+        )?,
+        string("caf")?
+    );
+    assert_eq!(
+        checked_string_call(
+            I::RightBDollar,
+            &[Some(string("café")?), Some(V::Integer(2))],
+            "en-US",
+            "windows-1252"
+        )?,
+        string("fé")?
+    );
+    assert_eq!(
+        checked_string_call(
+            I::MidB,
+            &[
+                Some(string("café")?),
+                Some(V::Integer(4)),
+                Some(V::Integer(1))
+            ],
+            "en-US",
+            "windows-1252"
+        )?,
+        string("é")?
+    );
+    Ok(())
+}
+
+#[test]
+fn m6a8_dbcs_asc_chr_and_strconv_preserve_codepage_byte_pairs() -> TestResult {
+    assert_eq!(
+        checked_string_call(I::Asc, &[Some(string("あ")?)], "ja-JP", "shift_jis")?,
+        V::Integer(0x82a0u16 as i16)
+    );
+    assert_eq!(
+        checked_string_call(I::AscB, &[Some(string("あ")?)], "ja-JP", "shift_jis")?,
+        V::Integer(0x82)
+    );
+    assert_eq!(
+        checked_string_call(
+            I::ChrDollar,
+            &[Some(V::Integer(0x82a0u16 as i16))],
+            "ja-JP",
+            "shift_jis"
+        )?,
+        string("あ")?
+    );
+    let encoded = checked_string_call(
+        I::StrConv,
+        &[Some(string("あ")?), Some(V::Integer(128)), None],
+        "ja-JP",
+        "shift_jis",
+    )?;
+    assert_eq!(encoded, V::String(VbaString::from_units(vec![0x82, 0xa0])?));
+    let first_byte = checked_string_call(
+        I::MidBDollar,
+        &[
+            Some(encoded.clone()),
+            Some(V::Integer(1)),
+            Some(V::Integer(1)),
+        ],
+        "ja-JP",
+        "shift_jis",
+    )?;
+    assert_eq!(
+        checked_string_call(I::AscB, &[Some(first_byte)], "ja-JP", "shift_jis")?,
+        V::Integer(0x82)
+    );
+    assert_eq!(
+        checked_string_call(I::LenB, &[Some(encoded.clone())], "ja-JP", "shift_jis")?,
+        V::Long(2)
+    );
+    assert_eq!(
+        checked_string_call(
+            I::StrConv,
+            &[Some(encoded), Some(V::Integer(64)), None],
+            "ja-JP",
+            "shift_jis"
+        )?,
+        string("あ")?
+    );
+    Ok(())
+}
+
+#[test]
+fn m6a8_strconv_case_width_kana_and_codepage_flags() -> TestResult {
+    let upper = checked_string_call(
+        I::StrConv,
+        &[Some(string("über café")?), Some(V::Integer(1)), None],
+        "de-DE",
+        "windows-1252",
+    )?;
+    assert_eq!(upper, string("ÜBER CAFÉ")?);
+    let from_unicode = checked_string_call(
+        I::StrConv,
+        &[Some(string("€")?), Some(V::Integer(128)), None],
+        "en-US",
+        "windows-1252",
+    )?;
+    assert_eq!(from_unicode, V::String(VbaString::from_units(vec![0x80])?));
+    let to_unicode = checked_string_call(
+        I::StrConv,
+        &[
+            Some(V::String(VbaString::from_units(vec![0x80])?)),
+            Some(V::Integer(64)),
+            None,
+        ],
+        "en-US",
+        "windows-1252",
+    )?;
+    assert_eq!(to_unicode, string("€")?);
+    assert_eq!(
+        checked_string_call(
+            I::StrConv,
+            &[Some(string("Ab!")?), Some(V::Integer(4)), None],
+            "ja-JP",
+            "UTF-16"
+        )?,
+        string("Ａｂ！")?
+    );
+    assert_eq!(
+        checked_string_call(
+            I::StrConv,
+            &[Some(string("かな")?), Some(V::Integer(16)), None],
+            "ja-JP",
+            "UTF-16"
+        )?,
+        string("カナ")?
+    );
+    assert_eq!(
+        checked_string_call(
+            I::StrConv,
+            &[Some(string("ｶﾞ")?), Some(V::Integer(4)), None],
+            "ja-JP",
+            "UTF-16"
+        )?,
+        V::String(VbaString::from_units(vec![0x30ab, 0x3099])?)
+    );
+    assert_eq!(
+        checked_string_call(
+            I::StrConv,
+            &[Some(string("ガ")?), Some(V::Integer(8)), None],
+            "ja-JP",
+            "UTF-16"
+        )?,
+        string("ｶﾞ")?
+    );
+    assert_eq!(
+        checked_string_call(
+            I::StrConv,
+            &[Some(string("Ａｂ！")?), Some(V::Integer(8)), None],
+            "ja-JP",
+            "UTF-16"
+        )?,
+        string("Ab!")?
+    );
+    assert_eq!(
+        checked_string_call(
+            I::StrConv,
+            &[
+                Some(string("I")?),
+                Some(V::Integer(2)),
+                Some(V::Integer(1055))
+            ],
+            "en-US",
+            "UTF-16"
+        )?,
+        string("ı")?
+    );
+    assert!(matches!(
+        contextual_string_call(
+            I::StrConv,
+            &[Some(string("x")?), Some(V::Integer(4)), None],
+            "en-US",
+            "UTF-16"
+        ),
+        Err(Error::Vba { number: 5, .. })
+    ));
     Ok(())
 }

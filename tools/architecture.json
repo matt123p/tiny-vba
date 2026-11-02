@@ -35,6 +35,7 @@
       "vba-values"
     ],
     "vba-runtime": [
+      "encoding_rs",
       "vba-diagnostics",
       "vba-values"
     ],

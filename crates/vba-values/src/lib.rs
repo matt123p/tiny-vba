@@ -15,15 +15,27 @@ pub struct ObjectRef {
 }
 
 /// VBA strings preserve UTF-16 code units, including unpaired surrogates.
-#[derive(Clone, Debug, Eq, PartialEq)]
-pub struct VbaString(Vec<u16>);
+#[derive(Clone, Debug)]
+pub struct VbaString {
+    units: Vec<u16>,
+    byte_representation: Option<Vec<u8>>,
+}
+impl PartialEq for VbaString {
+    fn eq(&self, other: &Self) -> bool {
+        self.units == other.units
+    }
+}
+impl Eq for VbaString {}
 impl VbaString {
     pub const MAX_UNITS: usize = 32768;
     pub fn from_units(units: Vec<u16>) -> Result<Self, Diagnostic> {
         if units.len() > Self::MAX_UNITS {
             return Err(Diagnostic::new("VBA0003", "string budget exceeded"));
         }
-        Ok(Self(units))
+        Ok(Self {
+            units,
+            byte_representation: None,
+        })
     }
     pub fn from_utf8(text: &str) -> Result<Self, Diagnostic> {
         if text.len() > Self::MAX_UNITS * 4 || text.encode_utf16().count() > Self::MAX_UNITS {
@@ -32,7 +44,22 @@ impl VbaString {
         Self::from_units(text.encode_utf16().collect())
     }
     pub fn units(&self) -> &[u16] {
-        &self.0
+        &self.units
+    }
+    /// Construct a VBA byte string whose code units expose the corresponding byte values.
+    /// The byte payload remains available to byte-oriented intrinsics for lossless DBCS handling.
+    pub fn from_byte_representation(bytes: Vec<u8>) -> Result<Self, Diagnostic> {
+        if bytes.len() > Self::MAX_UNITS {
+            return Err(Diagnostic::new("VBA0003", "string budget exceeded"));
+        }
+        Ok(Self {
+            units: bytes.iter().copied().map(u16::from).collect(),
+            byte_representation: Some(bytes),
+        })
+    }
+    /// Return the preserved byte payload when this is a byte string.
+    pub fn byte_representation(&self) -> Option<&[u8]> {
+        self.byte_representation.as_deref()
     }
 }
 
@@ -154,7 +181,7 @@ impl Value {
     /// Bounded protocol values. Currency uses units of 1/10,000; Date uses VBA serial days.
     pub fn payload_bytes(&self) -> usize {
         match self {
-            Self::String(s) => s.units().len() * 2,
+            Self::String(s) => s.units().len() * 2 + s.byte_representation().map_or(0, <[u8]>::len),
             Self::Array(a) => a.payload,
             Self::Decimal(_) => 32,
             _ => 16,
@@ -346,7 +373,10 @@ impl ScalarKind {
             Self::Double => Value::Double(0.0),
             Self::Currency => Value::Currency(0),
             Self::Date => Value::Date(0.0),
-            Self::String => Value::String(VbaString(Vec::new())),
+            Self::String => Value::String(VbaString {
+                units: Vec::new(),
+                byte_representation: None,
+            }),
             Self::Object => Value::Nothing,
         }
     }
@@ -407,6 +437,7 @@ pub enum Intrinsic {
     ErrorMessage,
     ErrorMessageDollar,
     Len,
+    LenB,
     Abs,
     Int,
     Fix,
@@ -426,15 +457,28 @@ pub enum Intrinsic {
     RTrimDollar,
     StrReverse,
     LCase,
+    LCaseDollar,
     UCase,
+    UCaseDollar,
     Space,
     SpaceDollar,
     String,
     StringDollar,
     Asc,
+    AscB,
     AscW,
     Chr,
+    ChrDollar,
+    ChrB,
+    ChrBDollar,
     ChrW,
+    StrConv,
+    LeftB,
+    LeftBDollar,
+    RightB,
+    RightBDollar,
+    MidB,
+    MidBDollar,
     StrComp,
     Choose,
     Switch,
@@ -673,6 +717,8 @@ const fn with_default(
 }
 
 const ONE_VALUE: &[IntrinsicParameter] = &[parameter("expression", true)];
+const STRING_VALUE: &[IntrinsicParameter] = &[parameter("string", true)];
+const CHARCODE_VALUE: &[IntrinsicParameter] = &[parameter("charcode", true)];
 const ONE_RAW: &[IntrinsicParameter] = &[raw_parameter("expression", true)];
 const ONE_OBJECT: &[IntrinsicParameter] = &[object_parameter("expression", true)];
 const INSTR_PARAMS: &[IntrinsicParameter] = &[
@@ -747,6 +793,16 @@ const MID_PARAMS: &[IntrinsicParameter] = &[
     parameter("string", true),
     parameter("start", true),
     with_default(parameter("length", false), IntrinsicOmittedDefault::ToEnd),
+];
+const MID_B_PARAMS: &[IntrinsicParameter] = &[
+    parameter("string", true),
+    parameter("start", true),
+    with_default(parameter("length", false), IntrinsicOmittedDefault::ToEnd),
+];
+const STRCONV_PARAMS: &[IntrinsicParameter] = &[
+    parameter("string", true),
+    parameter("conversion", true),
+    with_default(parameter("LCID", false), IntrinsicOmittedDefault::Zero),
 ];
 const STRCOMP_PARAMS: &[IntrinsicParameter] = &[
     parameter("string1", true),
@@ -1075,6 +1131,24 @@ const fn descriptor(
             | Intrinsic::Minute
             | Intrinsic::Second
             | Intrinsic::Weekday
+            | Intrinsic::LenB
+            | Intrinsic::LCase
+            | Intrinsic::LCaseDollar
+            | Intrinsic::UCase
+            | Intrinsic::UCaseDollar
+            | Intrinsic::StrConv
+            | Intrinsic::Asc
+            | Intrinsic::AscB
+            | Intrinsic::Chr
+            | Intrinsic::ChrDollar
+            | Intrinsic::ChrB
+            | Intrinsic::ChrBDollar
+            | Intrinsic::LeftB
+            | Intrinsic::LeftBDollar
+            | Intrinsic::RightB
+            | Intrinsic::RightBDollar
+            | Intrinsic::MidB
+            | Intrinsic::MidBDollar
             | Intrinsic::Rgb
             | Intrinsic::QbColor
             | Intrinsic::CallByName
@@ -1144,6 +1218,7 @@ const fn descriptor(
         | Intrinsic::Now
         | Intrinsic::Timer => 0,
         Intrinsic::CallByName => 3,
+        Intrinsic::StrConv => 2,
         Intrinsic::GetSetting => 3,
         Intrinsic::GetAllSettings => 2,
         Intrinsic::Dir
@@ -1175,11 +1250,15 @@ const fn descriptor(
         Intrinsic::LBound | Intrinsic::UBound => 1,
         Intrinsic::Round => 1,
         Intrinsic::StrComp => 2,
-        Intrinsic::Mid | Intrinsic::MidDollar => 2,
+        Intrinsic::Mid | Intrinsic::MidDollar | Intrinsic::MidB | Intrinsic::MidBDollar => 2,
         Intrinsic::Left
         | Intrinsic::LeftDollar
         | Intrinsic::Right
         | Intrinsic::RightDollar
+        | Intrinsic::LeftB
+        | Intrinsic::LeftBDollar
+        | Intrinsic::RightB
+        | Intrinsic::RightBDollar
         | Intrinsic::String => 2,
         _ => 1,
     };
@@ -1296,12 +1375,19 @@ const fn descriptor(
             | Intrinsic::MonthName
             | Intrinsic::WeekdayName => IntrinsicFamily::Conversion,
             Intrinsic::Len
+            | Intrinsic::LenB
             | Intrinsic::Left
             | Intrinsic::LeftDollar
+            | Intrinsic::LeftB
+            | Intrinsic::LeftBDollar
             | Intrinsic::Right
             | Intrinsic::RightDollar
+            | Intrinsic::RightB
+            | Intrinsic::RightBDollar
             | Intrinsic::Mid
             | Intrinsic::MidDollar
+            | Intrinsic::MidB
+            | Intrinsic::MidBDollar
             | Intrinsic::Trim
             | Intrinsic::TrimDollar
             | Intrinsic::LTrim
@@ -1310,15 +1396,22 @@ const fn descriptor(
             | Intrinsic::RTrimDollar
             | Intrinsic::StrReverse
             | Intrinsic::LCase
+            | Intrinsic::LCaseDollar
             | Intrinsic::UCase
+            | Intrinsic::UCaseDollar
             | Intrinsic::Space
             | Intrinsic::SpaceDollar
             | Intrinsic::String
             | Intrinsic::StringDollar
             | Intrinsic::Asc
+            | Intrinsic::AscB
             | Intrinsic::AscW
             | Intrinsic::Chr
-            | Intrinsic::ChrW => IntrinsicFamily::StringValue,
+            | Intrinsic::ChrDollar
+            | Intrinsic::ChrB
+            | Intrinsic::ChrBDollar
+            | Intrinsic::ChrW
+            | Intrinsic::StrConv => IntrinsicFamily::StringValue,
             _ => IntrinsicFamily::Numeric,
         },
         parameters,
@@ -1524,8 +1617,18 @@ const fn return_variant(intrinsic: Intrinsic) -> IntrinsicReturn {
         | I::Weekday => R::Variant,
         I::Randomize => R::Variant,
         I::Val => R::Fixed(K::Double),
-        I::Left | I::Right | I::Mid | I::Trim | I::LTrim | I::RTrim => R::Variant,
-        I::InStr | I::InStrRev | I::Len | I::LBound | I::UBound | I::DateDiff => R::Fixed(K::Long),
+        I::Left
+        | I::Right
+        | I::Mid
+        | I::LeftB
+        | I::RightB
+        | I::MidB
+        | I::Trim
+        | I::LTrim
+        | I::RTrim => R::Variant,
+        I::InStr | I::InStrRev | I::Len | I::LenB | I::LBound | I::UBound | I::DateDiff => {
+            R::Fixed(K::Long)
+        }
         I::IsObject
         | I::IsArray
         | I::IsMissing
@@ -1534,18 +1637,22 @@ const fn return_variant(intrinsic: Intrinsic) -> IntrinsicReturn {
         | I::IsError
         | I::IsDate
         | I::IsNumeric => R::Fixed(K::Boolean),
-        I::VarType | I::Sgn | I::Asc | I::AscW => R::Fixed(K::Integer),
+        I::VarType | I::Sgn | I::Asc | I::AscB | I::AscW => R::Fixed(K::Integer),
         I::TypeName
         | I::Replace
         | I::Join
         | I::LeftDollar
+        | I::LeftBDollar
         | I::RightDollar
+        | I::RightBDollar
         | I::MidDollar
+        | I::MidBDollar
         | I::TrimDollar
         | I::LTrimDollar
         | I::RTrimDollar
         | I::StrReverse
         | I::LCase
+        | I::LCaseDollar
         | I::Chr => R::Fixed(K::String),
         I::StrDollar | I::HexDollar | I::OctDollar => R::Fixed(K::String),
         I::Str | I::Hex | I::Oct => R::Variant,
@@ -1556,8 +1663,9 @@ const fn return_variant(intrinsic: Intrinsic) -> IntrinsicReturn {
         | I::FormatPercent
         | I::ErrorMessage => R::Variant,
         I::FormatDollar | I::ErrorMessageDollar => R::Fixed(K::String),
-        I::ChrW => R::Fixed(K::String),
-        I::UCase | I::Space | I::String => R::Variant,
+        I::ChrW | I::ChrDollar | I::ChrB | I::ChrBDollar => R::Fixed(K::String),
+        I::UCase | I::Space | I::String | I::StrConv => R::Variant,
+        I::UCaseDollar => R::Fixed(K::String),
         I::SpaceDollar | I::StringDollar => R::Fixed(K::String),
         I::CInt => R::Fixed(K::Integer),
         I::CLng => R::Fixed(K::Long),
@@ -2359,6 +2467,13 @@ pub const INTRINSIC_DESCRIPTORS: &[IntrinsicDescriptor] = &[
         "Error$([errornumber])",
     ),
     descriptor(Intrinsic::Len, "Len", ONE_VALUE, false, "Len(expression)"),
+    descriptor(
+        Intrinsic::LenB,
+        "LenB",
+        ONE_VALUE,
+        false,
+        "LenB(expression)",
+    ),
     descriptor(Intrinsic::Abs, "Abs", ONE_VALUE, false, "Abs(number)"),
     descriptor(Intrinsic::Int, "Int", ONE_VALUE, false, "Int(number)"),
     descriptor(Intrinsic::Fix, "Fix", ONE_VALUE, false, "Fix(number)"),
@@ -2443,8 +2558,34 @@ pub const INTRINSIC_DESCRIPTORS: &[IntrinsicDescriptor] = &[
         false,
         "StrReverse(expression)",
     ),
-    descriptor(Intrinsic::LCase, "LCase", ONE_VALUE, false, "LCase(string)"),
-    descriptor(Intrinsic::UCase, "UCase", ONE_VALUE, false, "UCase(string)"),
+    descriptor(
+        Intrinsic::LCase,
+        "LCase",
+        STRING_VALUE,
+        false,
+        "LCase(string)",
+    ),
+    descriptor(
+        Intrinsic::LCaseDollar,
+        "LCase$",
+        STRING_VALUE,
+        false,
+        "LCase$(string)",
+    ),
+    descriptor(
+        Intrinsic::UCase,
+        "UCase",
+        STRING_VALUE,
+        false,
+        "UCase(string)",
+    ),
+    descriptor(
+        Intrinsic::UCaseDollar,
+        "UCase$",
+        STRING_VALUE,
+        false,
+        "UCase$(string)",
+    ),
     descriptor(
         Intrinsic::Space,
         "Space",
@@ -2473,10 +2614,93 @@ pub const INTRINSIC_DESCRIPTORS: &[IntrinsicDescriptor] = &[
         false,
         "String$(number, character)",
     ),
-    descriptor(Intrinsic::Asc, "Asc", ONE_VALUE, false, "Asc(string)"),
-    descriptor(Intrinsic::AscW, "AscW", ONE_VALUE, false, "AscW(string)"),
-    descriptor(Intrinsic::Chr, "Chr", ONE_VALUE, false, "Chr(charcode)"),
-    descriptor(Intrinsic::ChrW, "ChrW", ONE_VALUE, false, "ChrW(charcode)"),
+    descriptor(Intrinsic::Asc, "Asc", STRING_VALUE, false, "Asc(string)"),
+    descriptor(Intrinsic::AscB, "AscB", STRING_VALUE, false, "AscB(string)"),
+    descriptor(Intrinsic::AscW, "AscW", STRING_VALUE, false, "AscW(string)"),
+    descriptor(
+        Intrinsic::Chr,
+        "Chr",
+        CHARCODE_VALUE,
+        false,
+        "Chr(charcode)",
+    ),
+    descriptor(
+        Intrinsic::ChrDollar,
+        "Chr$",
+        CHARCODE_VALUE,
+        false,
+        "Chr$(charcode)",
+    ),
+    descriptor(
+        Intrinsic::ChrB,
+        "ChrB",
+        CHARCODE_VALUE,
+        false,
+        "ChrB(charcode)",
+    ),
+    descriptor(
+        Intrinsic::ChrBDollar,
+        "ChrB$",
+        CHARCODE_VALUE,
+        false,
+        "ChrB$(charcode)",
+    ),
+    descriptor(
+        Intrinsic::ChrW,
+        "ChrW",
+        CHARCODE_VALUE,
+        false,
+        "ChrW(charcode)",
+    ),
+    descriptor(
+        Intrinsic::StrConv,
+        "StrConv",
+        STRCONV_PARAMS,
+        false,
+        "StrConv(string, conversion, [LCID])",
+    ),
+    descriptor(
+        Intrinsic::LeftB,
+        "LeftB",
+        LEFT_RIGHT_PARAMS,
+        false,
+        "LeftB(string, length)",
+    ),
+    descriptor(
+        Intrinsic::LeftBDollar,
+        "LeftB$",
+        LEFT_RIGHT_PARAMS,
+        false,
+        "LeftB$(string, length)",
+    ),
+    descriptor(
+        Intrinsic::RightB,
+        "RightB",
+        LEFT_RIGHT_PARAMS,
+        false,
+        "RightB(string, length)",
+    ),
+    descriptor(
+        Intrinsic::RightBDollar,
+        "RightB$",
+        LEFT_RIGHT_PARAMS,
+        false,
+        "RightB$(string, length)",
+    ),
+    descriptor(
+        Intrinsic::MidB,
+        "MidB",
+        MID_B_PARAMS,
+        false,
+        "MidB(string, start, [length])",
+    ),
+    descriptor(
+        Intrinsic::MidBDollar,
+        "MidB$",
+        MID_B_PARAMS,
+        false,
+        "MidB$(string, start, [length])",
+    ),
 ];
 
 const fn instr_descriptor() -> IntrinsicDescriptor {

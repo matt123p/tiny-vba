@@ -40,7 +40,7 @@ See the [M2 compiler contract](compiler.md) for supported source, API and struct
 | vba-semantics | Scope/type/call binding | diagnostics, runtime, syntax, values |
 | vba-ir | Bytecode, verifier, constants and source maps | diagnostics, values |
 | vba-compiler | Parse/bind coordination and deterministic verified IR lowering | diagnostics, syntax, semantics, ir, values |
-| vba-runtime | Shared coercion/operators/builtins/error rules | diagnostics, values |
+| vba-runtime | Shared coercion/operators/builtins/error rules; bounded encoding_rs code-page conversion for string/byte intrinsics | diagnostics, values, encoding_rs (=0.8.42) |
 | vba-foreign | Generic host call/result/wait protocol; protocol version 1 and validated source imports | diagnostics, values |
 | vba-vm | Frames, instruction pointer, budgets, inspection hooks; host-root binding and protocol checks | diagnostics, ir, values, runtime, foreign |
 | vba-debug | Breakpoint/step/inspection controller | diagnostics, vm |

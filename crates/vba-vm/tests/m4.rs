@@ -25,6 +25,16 @@ fn session(text: &str) -> R<Session> {
     )?;
     Ok(Session::new(program, 42, vec![], None, Limits::default())?)
 }
+fn session_with_text_context(text: &str, code_page: &str) -> R<Session> {
+    let mut session = session(text)?;
+    session.set_intrinsic_context_config(vm::IntrinsicContextConfig::new(
+        "en-US".into(),
+        "Gregorian".into(),
+        code_page.into(),
+        64,
+    )?);
+    Ok(session)
+}
 fn drive(s: &mut Session) -> R<Outcome> {
     for _ in 0..10000 {
         let out = s.run_slice(&mut NoHost, 7, &mut |_| Ok(false))?;
@@ -472,6 +482,39 @@ fn comparison_constants_are_available_and_local_declarations_shadow_them() -> R 
     answer(
         "Option Explicit\nFunction Answer() As Long\nDim vbTextCompare As Long\nvbTextCompare=8\nAnswer=vbTextCompare\nEnd Function",
         Value::Long(8),
+    )?;
+    Ok(())
+}
+
+#[test]
+fn strconv_constants_are_available_and_shadowable() -> R {
+    answer(
+        "Option Explicit\nFunction Answer() As Long\nAnswer=vbUpperCase+vbLowerCase+vbProperCase+vbWide+vbNarrow+vbKatakana+vbHiragana+vbUnicode+vbFromUnicode\nEnd Function",
+        Value::Long(258),
+    )?;
+    answer(
+        "Option Explicit\nFunction Answer() As Long\nDim vbUpperCase As Long\nvbUpperCase=9\nAnswer=vbUpperCase\nEnd Function",
+        Value::Long(9),
+    )?;
+    Ok(())
+}
+
+#[test]
+fn m6a8_string_and_byte_intrinsics_execute_from_vba_source() -> R {
+    let source = "Function Answer() As String\nAnswer=LeftB(string:=\"café\",length:=3) & \"|\" & RightB$(\"café\",2) & \"|\" & MidB(\"café\",4,1) & \"|\" & Chr$(charcode:=Asc(string:=\"€\"))\nEnd Function";
+    assert_eq!(
+        drive(&mut session_with_text_context(source, "windows-1252")?)?,
+        Outcome::Completed(ReturnValue::Function(Value::String(VbaString::from_utf8(
+            "caf|fé|é|€",
+        )?)))
+    );
+    answer(
+        "Function Answer() As Long\nAnswer=Len(\"A😀\")*100+LenB(\"A😀\")\nEnd Function",
+        Value::Long(306),
+    )?;
+    answer(
+        "Function Answer() As String\nAnswer=StrConv(\"über café\",vbUpperCase)\nEnd Function",
+        Value::String(VbaString::from_utf8("ÜBER CAFÉ")?),
     )?;
     Ok(())
 }

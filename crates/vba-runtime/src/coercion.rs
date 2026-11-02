@@ -533,6 +533,10 @@ pub fn intrinsic(function: I, args: &[V]) -> Result<V> {
     if !function.accepts(args.len()) {
         return Err(error(450, "Wrong number of arguments"));
     }
+    if is_string_context_intrinsic(function) {
+        let arguments: Vec<Option<V>> = args.iter().cloned().map(Some).collect();
+        return string_intrinsic_with_context(function, &arguments, "en-US", "windows-1252");
+    }
     if function == I::StrComp {
         return Err(Error::Unsupported(
             "StrComp requires an injected comparison context".into(),
@@ -2029,6 +2033,560 @@ pub fn intrinsic_extended(
         }
     }
     intrinsic(function, &values)
+}
+
+pub(crate) fn is_string_context_intrinsic(function: I) -> bool {
+    matches!(
+        function,
+        I::Len
+            | I::LenB
+            | I::LCase
+            | I::LCaseDollar
+            | I::UCase
+            | I::UCaseDollar
+            | I::StrConv
+            | I::Asc
+            | I::AscB
+            | I::Chr
+            | I::ChrDollar
+            | I::ChrB
+            | I::ChrBDollar
+            | I::LeftB
+            | I::LeftBDollar
+            | I::RightB
+            | I::RightBDollar
+            | I::MidB
+            | I::MidBDollar
+    )
+}
+
+pub(crate) fn string_intrinsic_with_context(
+    function: I,
+    arguments: &[Option<V>],
+    locale: &str,
+    code_page: &str,
+) -> Result<V> {
+    if !is_string_context_intrinsic(function) {
+        return Err(mismatch());
+    }
+    if !function.accepts(arguments.len()) || arguments.len() > 256 {
+        return Err(error(450, "Wrong number of arguments"));
+    }
+    let first = arguments
+        .first()
+        .and_then(Option::as_ref)
+        .ok_or_else(mismatch)?;
+    if matches!(first, V::Null) {
+        return Ok(V::Null);
+    }
+    let string = text(first)?;
+    let units = string.units();
+    use I as F;
+    match function {
+        F::Len => Ok(V::Long(i32::try_from(units.len()).map_err(|_| overflow())?)),
+        F::LenB => Ok(V::Long(
+            i32::try_from(encode_string_bytes(&string, code_page)?.len())
+                .map_err(|_| overflow())?,
+        )),
+        F::LCase | F::LCaseDollar | F::UCase | F::UCaseDollar => {
+            let upper = matches!(function, F::UCase | F::UCaseDollar);
+            Ok(V::String(case_map(&string, upper, locale)?))
+        }
+        F::Asc | F::AscB => {
+            if function == F::AscB
+                && let Some(bytes) = string.byte_representation()
+            {
+                return bytes
+                    .first()
+                    .copied()
+                    .map(|byte| V::Integer(i16::from(byte)))
+                    .ok_or_else(|| error(5, "Invalid procedure call"));
+            }
+            let first_unit = *units
+                .first()
+                .ok_or_else(|| error(5, "Invalid procedure call"))?;
+            let width = if (0xd800..=0xdbff).contains(&first_unit)
+                && units
+                    .get(1)
+                    .is_some_and(|unit| (0xdc00..=0xdfff).contains(unit))
+            {
+                2
+            } else {
+                1
+            };
+            let first_character =
+                VbaString::from_units(units.get(..width).ok_or_else(mismatch)?.to_vec())
+                    .map_err(|_| mismatch())?;
+            if function == F::Asc && is_unconfigured_code_page(code_page) {
+                if width == 1 && first_unit <= 0x7f {
+                    return Ok(V::Integer(
+                        i16::try_from(first_unit).map_err(|_| overflow())?,
+                    ));
+                }
+                return Err(Error::Unsupported(
+                    "Asc for non-ASCII text requires a configured code page".into(),
+                ));
+            }
+            let bytes = encode_string_bytes(&first_character, code_page)?;
+            let first = *bytes
+                .first()
+                .ok_or_else(|| error(5, "Invalid procedure call"))?;
+            if function == F::AscB {
+                return Ok(V::Integer(i16::from(first)));
+            }
+            if bytes.len() == 1 {
+                return Ok(V::Integer(i16::from(first)));
+            }
+            let second = *bytes.get(1).ok_or_else(mismatch)?;
+            if bytes.len() == 2 {
+                return Ok(V::Integer(i16::from_be_bytes([first, second])));
+            }
+            Err(Error::Unsupported(
+                "Asc code page character exceeds two bytes".into(),
+            ))
+        }
+        F::Chr | F::ChrDollar => {
+            let number = argument_integer(first, i128::from(i16::MIN), i128::from(u16::MAX))?;
+            let bytes = if (0..=i128::from(u8::MAX)).contains(&number) {
+                vec![u8::try_from(number).map_err(|_| overflow())?]
+            } else {
+                let encoding = code_page_encoding(code_page)?;
+                if encoding.is_single_byte() {
+                    return Err(error(5, "Invalid procedure call"));
+                }
+                let code = u16::try_from(number.rem_euclid(65536)).map_err(|_| overflow())?;
+                code.to_be_bytes().to_vec()
+            };
+            make_string(decode_string_bytes(&bytes, code_page)?)
+        }
+        F::ChrB | F::ChrBDollar => {
+            let number = argument_integer(first, 0, i128::from(u8::MAX))?;
+            let byte = u8::try_from(number).map_err(|_| overflow())?;
+            make_byte_string(vec![byte])
+        }
+        F::LeftB | F::LeftBDollar | F::RightB | F::RightBDollar | F::MidB | F::MidBDollar => {
+            let bytes = match string.byte_representation() {
+                Some(bytes) => bytes.to_vec(),
+                None => encode_string_bytes(&string, code_page)?,
+            };
+            let (start, end) = byte_slice(function, arguments, bytes.len())?;
+            make_byte_string(bytes.get(start..end).ok_or_else(mismatch)?.to_vec())
+        }
+        F::StrConv => strconv(arguments, locale, code_page),
+        _ => Err(mismatch()),
+    }
+}
+
+fn make_string(units: Vec<u16>) -> Result<V> {
+    if units.len() > VbaString::MAX_UNITS {
+        return Err(Error::Resource("string budget exceeded".into()));
+    }
+    Ok(V::String(VbaString::from_units(units).map_err(|_| {
+        Error::Resource("string budget exceeded".into())
+    })?))
+}
+
+fn make_byte_string(bytes: Vec<u8>) -> Result<V> {
+    if bytes.len() > VbaString::MAX_UNITS {
+        return Err(Error::Resource("byte string budget exceeded".into()));
+    }
+    Ok(V::String(
+        VbaString::from_byte_representation(bytes)
+            .map_err(|_| Error::Resource("byte string budget exceeded".into()))?,
+    ))
+}
+
+fn byte_slice(function: I, arguments: &[Option<V>], length: usize) -> Result<(usize, usize)> {
+    let get = |index: usize| {
+        arguments
+            .get(index)
+            .and_then(Option::as_ref)
+            .ok_or_else(mismatch)
+    };
+    if matches!(function, I::MidB | I::MidBDollar) {
+        let start = integral(get(1)?, 1, i128::from(i32::MAX))? as usize - 1;
+        let start = start.min(length);
+        let end = if let Some(Some(count)) = arguments.get(2) {
+            start
+                .saturating_add(integral(count, 0, i128::from(i32::MAX))? as usize)
+                .min(length)
+        } else {
+            length
+        };
+        Ok((start, end))
+    } else {
+        let count = integral(get(1)?, 0, i128::from(i32::MAX))? as usize;
+        if matches!(function, I::LeftB | I::LeftBDollar) {
+            Ok((0, count.min(length)))
+        } else {
+            Ok((length.saturating_sub(count), length))
+        }
+    }
+}
+
+fn encode_string_bytes(string: &VbaString, code_page: &str) -> Result<Vec<u8>> {
+    if let Some(bytes) = string.byte_representation() {
+        return Ok(bytes.to_vec());
+    }
+    if is_utf16_code_page(code_page) {
+        let mut bytes = Vec::new();
+        bytes
+            .try_reserve(string.units().len().saturating_mul(2))
+            .map_err(|_| Error::Resource("byte string allocation failed".into()))?;
+        for unit in string.units() {
+            bytes.extend_from_slice(&unit.to_le_bytes());
+        }
+        return Ok(bytes);
+    }
+    let text = String::from_utf16(string.units())
+        .map_err(|_| error(5, "Unpaired surrogate cannot be encoded in this code page"))?;
+    let encoding = code_page_encoding(code_page)?;
+    let (encoded, _, _) = encoding.encode(&text);
+    if encoded.len() > VbaString::MAX_UNITS * 4 {
+        return Err(Error::Resource("byte string budget exceeded".into()));
+    }
+    Ok(encoded.into_owned())
+}
+
+fn decode_string_bytes(bytes: &[u8], code_page: &str) -> Result<Vec<u16>> {
+    if bytes.len() > VbaString::MAX_UNITS * 2 {
+        return Err(Error::Resource("byte string budget exceeded".into()));
+    }
+    if is_utf16_code_page(code_page) {
+        let mut units = Vec::new();
+        units
+            .try_reserve(bytes.len().div_ceil(2))
+            .map_err(|_| Error::Resource("byte string allocation failed".into()))?;
+        for pair in bytes.chunks(2) {
+            match pair {
+                [low, high] => units.push(u16::from_le_bytes([*low, *high])),
+                [byte] => units.push(u16::from(*byte)),
+                [] => {}
+                _ => return Err(mismatch()),
+            }
+        }
+        return Ok(units);
+    }
+    let encoding = code_page_encoding(code_page)?;
+    let (decoded, _, _) = encoding.decode(bytes);
+    Ok(decoded.encode_utf16().collect())
+}
+
+fn is_utf16_code_page(code_page: &str) -> bool {
+    matches!(
+        code_page.to_ascii_lowercase().as_str(),
+        "utf-16" | "utf-16le" | "unicode" | "unconfigured" | "invariant"
+    )
+}
+fn is_unconfigured_code_page(code_page: &str) -> bool {
+    matches!(
+        code_page.to_ascii_lowercase().as_str(),
+        "unconfigured" | "invariant"
+    )
+}
+fn code_page_encoding(code_page: &str) -> Result<&'static encoding_rs::Encoding> {
+    encoding_rs::Encoding::for_label(code_page.trim().as_bytes())
+        .ok_or_else(|| Error::Unsupported(format!("unsupported string code page {code_page}")))
+}
+
+fn case_map(input: &VbaString, uppercase: bool, locale: &str) -> Result<VbaString> {
+    let turkic = locale.to_ascii_lowercase().starts_with("tr")
+        || locale.to_ascii_lowercase().starts_with("az");
+    let mut output = Vec::new();
+    for decoded in char::decode_utf16(input.units().iter().copied()) {
+        let mapped = match decoded {
+            Ok(ch) => mapped_case(ch, uppercase, turkic),
+            Err(error) => {
+                output.push(error.unpaired_surrogate());
+                continue;
+            }
+        };
+        for ch in mapped {
+            let mut buffer = [0u16; 2];
+            output.extend_from_slice(ch.encode_utf16(&mut buffer));
+            if output.len() > VbaString::MAX_UNITS {
+                return Err(Error::Resource("string budget exceeded".into()));
+            }
+        }
+    }
+    VbaString::from_units(output).map_err(|_| Error::Resource("string budget exceeded".into()))
+}
+
+fn mapped_case(ch: char, uppercase: bool, turkic: bool) -> Vec<char> {
+    if ch == 'i' && uppercase && turkic {
+        vec!['İ']
+    } else if ch == 'I' && !uppercase && turkic {
+        vec!['ı']
+    } else if ch == 'İ' && !uppercase && turkic {
+        vec!['i']
+    } else if ch == 'ı' && uppercase && turkic {
+        vec!['I']
+    } else if uppercase {
+        ch.to_uppercase().collect()
+    } else {
+        ch.to_lowercase().collect()
+    }
+}
+
+fn locale_for_lcid(lcid: i128, configured: &str) -> String {
+    if lcid == 0 {
+        return configured.to_owned();
+    }
+    let primary = lcid & 0x03ff;
+    match primary {
+        0x04 => "zh-CN",
+        0x07 => "de-DE",
+        0x09 => "en-US",
+        0x0c => "fr-FR",
+        0x11 => "ja-JP",
+        0x12 => "ko-KR",
+        0x1f => "tr-TR",
+        0x2c => "az-Latn-AZ",
+        _ => configured,
+    }
+    .to_owned()
+}
+
+fn width_convert(input: &[u16], wide: bool) -> Vec<u16> {
+    let mut output = Vec::new();
+    for unit in input.iter().copied() {
+        if wide {
+            let mapped = match unit {
+                0x20 => Some(0x3000),
+                0x21..=0x7e => Some(unit + 0xfee0),
+                0xff9e => Some(0x3099),
+                0xff9f => Some(0x309a),
+                _ => wide_katakana(unit),
+            };
+            output.push(mapped.unwrap_or(unit));
+        } else if let Some(narrow) = narrow_voiced_katakana(unit) {
+            output.extend_from_slice(&narrow);
+        } else {
+            output.push(match unit {
+                0x3000 => 0x20,
+                0xff01..=0xff5e => unit - 0xfee0,
+                _ => narrow_katakana(unit).unwrap_or(unit),
+            });
+        }
+    }
+    output
+}
+
+fn wide_katakana(unit: u16) -> Option<u16> {
+    Some(match unit {
+        0xff61 => 0x3002,
+        0xff62 => 0x300c,
+        0xff63 => 0x300d,
+        0xff64 => 0x3001,
+        0xff65 => 0x30fb,
+        0xff66 => 0x30f2,
+        0xff67..=0xff6b => 0x30a1 + (unit - 0xff67) * 2,
+        0xff6c..=0xff6e => 0x30e3 + (unit - 0xff6c) * 2,
+        0xff6f => 0x30c3,
+        0xff70 => 0x30fc,
+        0xff71..=0xff75 => 0x30a2 + (unit - 0xff71),
+        0xff76..=0xff7a => 0x30ab + (unit - 0xff76) * 2,
+        0xff7b..=0xff7f => 0x30b5 + (unit - 0xff7b) * 2,
+        0xff80..=0xff84 => 0x30bf + (unit - 0xff80) * 2,
+        0xff85..=0xff89 => 0x30ca + (unit - 0xff85),
+        0xff8a..=0xff8e => 0x30cf + (unit - 0xff8a) * 3,
+        0xff8f..=0xff93 => 0x30de + (unit - 0xff8f),
+        0xff94..=0xff96 => 0x30e4 + (unit - 0xff94) * 2,
+        0xff97..=0xff9c => 0x30e9 + (unit - 0xff97),
+        0xff9d => 0x30f3,
+        _ => return None,
+    })
+}
+
+fn narrow_katakana(unit: u16) -> Option<u16> {
+    Some(match unit {
+        0x3002 => 0xff61,
+        0x300c => 0xff62,
+        0x300d => 0xff63,
+        0x3001 => 0xff64,
+        0x30fb => 0xff65,
+        0x30f2 => 0xff66,
+        0x30a1 | 0x30a3 | 0x30a5 | 0x30a7 | 0x30a9 => 0xff67 + (unit - 0x30a1) / 2,
+        0x30e3 | 0x30e5 | 0x30e7 => 0xff6c + (unit - 0x30e3) / 2,
+        0x30c3 => 0xff6f,
+        0x30fc => 0xff70,
+        0x30a2 | 0x30a4 | 0x30a6 | 0x30a8 | 0x30aa => 0xff71 + (unit - 0x30a2) / 2,
+        0x30ab | 0x30ad | 0x30af | 0x30b1 | 0x30b3 => 0xff76 + (unit - 0x30ab) / 2,
+        0x30b5 | 0x30b7 | 0x30b9 | 0x30bb | 0x30bd => 0xff7b + (unit - 0x30b5) / 2,
+        0x30bf | 0x30c1 | 0x30c4 | 0x30c6 | 0x30c8 => 0xff80 + (unit - 0x30bf) / 2,
+        0x30ca..=0x30ce => 0xff85 + (unit - 0x30ca),
+        0x30cf..=0x30d1 => 0xff8a + (unit - 0x30cf) / 3,
+        0x30d2..=0x30d4 => 0xff8b + (unit - 0x30d2) / 3,
+        0x30d5..=0x30d7 => 0xff8c + (unit - 0x30d5) / 3,
+        0x30d8..=0x30da => 0xff8d + (unit - 0x30d8) / 3,
+        0x30db..=0x30dd => 0xff8e + (unit - 0x30db) / 3,
+        0x30de..=0x30e2 => 0xff8f + (unit - 0x30de),
+        0x30e4 | 0x30e6 | 0x30e8 => 0xff94 + (unit - 0x30e4) / 2,
+        0x30e9..=0x30ee => 0xff97 + (unit - 0x30e9),
+        0x30f3 => 0xff9d,
+        _ => return None,
+    })
+}
+
+fn narrow_voiced_katakana(unit: u16) -> Option<[u16; 2]> {
+    let (base, mark) = match unit {
+        0x30ac => (0xff76, 0xff9e),
+        0x30ae => (0xff77, 0xff9e),
+        0x30b0 => (0xff78, 0xff9e),
+        0x30b2 => (0xff79, 0xff9e),
+        0x30b4 => (0xff7a, 0xff9e),
+        0x30b6 => (0xff7b, 0xff9e),
+        0x30b8 => (0xff7c, 0xff9e),
+        0x30ba => (0xff7d, 0xff9e),
+        0x30bc => (0xff7e, 0xff9e),
+        0x30be => (0xff7f, 0xff9e),
+        0x30c0 => (0xff80, 0xff9e),
+        0x30c2 => (0xff81, 0xff9e),
+        0x30c5 => (0xff82, 0xff9e),
+        0x30c7 => (0xff83, 0xff9e),
+        0x30c9 => (0xff84, 0xff9e),
+        0x30d0 => (0xff8a, 0xff9e),
+        0x30d3 => (0xff8b, 0xff9e),
+        0x30d6 => (0xff8c, 0xff9e),
+        0x30d9 => (0xff8d, 0xff9e),
+        0x30dc => (0xff8e, 0xff9e),
+        0x30d1 => (0xff8a, 0xff9f),
+        0x30d4 => (0xff8b, 0xff9f),
+        0x30d7 => (0xff8c, 0xff9f),
+        0x30da => (0xff8d, 0xff9f),
+        0x30dd => (0xff8e, 0xff9f),
+        _ => return None,
+    };
+    Some([base, mark])
+}
+
+fn strconv(arguments: &[Option<V>], locale: &str, code_page: &str) -> Result<V> {
+    let source = arguments
+        .first()
+        .and_then(Option::as_ref)
+        .ok_or_else(mismatch)?;
+    if matches!(source, V::Null) {
+        return Ok(V::Null);
+    }
+    let source = text(source)?;
+    let conversion_value = arguments
+        .get(1)
+        .and_then(Option::as_ref)
+        .ok_or_else(mismatch)?;
+    let conversion = integral(conversion_value, i128::from(i32::MIN), i128::from(i32::MAX))?;
+    let conversion = i32::try_from(conversion).map_err(|_| overflow())?;
+    let lcid = arguments
+        .get(2)
+        .and_then(Option::as_ref)
+        .map(|value| integral(value, 0, i128::from(i32::MAX)))
+        .transpose()?
+        .unwrap_or(0);
+    let active_locale = locale_for_lcid(lcid, locale);
+    let case = conversion & 3;
+    let has_unicode = conversion & 64 != 0;
+    let has_from_unicode = conversion & 128 != 0;
+    if has_unicode && has_from_unicode {
+        return Err(error(5, "Invalid conversion argument"));
+    }
+    let allowed = 3 | 4 | 8 | 16 | 32 | 64 | 128;
+    if conversion < 0 || conversion & !allowed != 0 {
+        return Err(error(5, "Invalid conversion argument"));
+    }
+    let east_asian = matches!(active_locale.as_str(), "ja-JP" | "ko-KR" | "zh-CN")
+        || active_locale.to_ascii_lowercase().starts_with("ja-")
+        || active_locale.to_ascii_lowercase().starts_with("zh-")
+        || active_locale.to_ascii_lowercase().starts_with("ko-");
+    if conversion & (4 | 8) != 0 && !east_asian {
+        return Err(error(
+            5,
+            "Wide/Narrow conversion requires an East Asian locale",
+        ));
+    }
+    if conversion & (16 | 32) != 0 && !active_locale.to_ascii_lowercase().starts_with("ja-") {
+        return Err(error(5, "Kana conversion requires Japanese locale"));
+    }
+    let mut units = source.units().to_vec();
+    if has_unicode {
+        let bytes = match source.byte_representation() {
+            Some(bytes) => bytes.to_vec(),
+            None => units
+                .iter()
+                .map(|unit| u8::try_from(*unit).map_err(|_| error(5, "Invalid byte string")))
+                .collect::<Result<Vec<_>>>()?,
+        };
+        units = decode_string_bytes(&bytes, code_page)?;
+    }
+    if conversion & 4 != 0 {
+        units = width_convert(&units, true);
+    }
+    if conversion & 8 != 0 {
+        units = width_convert(&units, false);
+    }
+    if conversion & 16 != 0 {
+        for unit in &mut units {
+            if (0x3041..=0x3096).contains(unit) {
+                *unit += 0x60;
+            }
+        }
+    }
+    if conversion & 32 != 0 {
+        for unit in &mut units {
+            if (0x30a1..=0x30f6).contains(unit) {
+                *unit -= 0x60;
+            }
+        }
+    }
+    if case == 1 || case == 2 {
+        let interim = VbaString::from_units(units)
+            .map_err(|_| Error::Resource("string budget exceeded".into()))?;
+        units = case_map(&interim, case == 1, &active_locale)?
+            .units()
+            .to_vec();
+    } else if case == 3 {
+        units = proper_case(&units, &active_locale)?;
+    }
+    if has_from_unicode {
+        let text = VbaString::from_units(units)
+            .map_err(|_| Error::Resource("string budget exceeded".into()))?;
+        return make_byte_string(encode_string_bytes(&text, code_page)?);
+    }
+    make_string(units)
+}
+
+fn proper_case(units: &[u16], locale: &str) -> Result<Vec<u16>> {
+    let turkic = locale.to_ascii_lowercase().starts_with("tr")
+        || locale.to_ascii_lowercase().starts_with("az");
+    let mut output = Vec::new();
+    let mut word_start = true;
+    for decoded in char::decode_utf16(units.iter().copied()) {
+        match decoded {
+            Err(error) => {
+                output.push(error.unpaired_surrogate());
+                word_start = true;
+            }
+            Ok(ch) => {
+                let separator = matches!(u32::from(ch), 0 | 9..=13 | 32);
+                let mapped = if word_start && !separator {
+                    mapped_case(ch, true, turkic)
+                } else if separator {
+                    vec![ch]
+                } else {
+                    mapped_case(ch, false, turkic)
+                };
+                for ch in mapped {
+                    let mut buffer = [0u16; 2];
+                    output.extend_from_slice(ch.encode_utf16(&mut buffer));
+                    if output.len() > VbaString::MAX_UNITS {
+                        return Err(Error::Resource("string budget exceeded".into()));
+                    }
+                }
+                word_start = separator;
+            }
+        }
+    }
+    let mapped = VbaString::from_units(output)
+        .map_err(|_| Error::Resource("string budget exceeded".into()))?;
+    Ok(mapped.units().to_vec())
 }
 
 fn find_units(haystack: &[u16], needle: &[u16]) -> Option<usize> {
