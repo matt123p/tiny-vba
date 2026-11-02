@@ -1,5 +1,26 @@
 use std::collections::BTreeSet;
-use vba_values::{INTRINSIC_DESCRIPTORS, Intrinsic, IntrinsicReturn, ScalarKind};
+use vba_values::{INTRINSIC_DESCRIPTORS, Intrinsic, IntrinsicReturn, ScalarKind, VbaDecimal};
+
+#[test]
+fn decimal_storage_preserves_exact_coefficient_scale_and_sign()
+-> Result<(), Box<dyn std::error::Error>> {
+    let values = ["0", "-0.00", "1.2300", "-792281625142643375935439503.35"];
+    for text in values {
+        let decimal = VbaDecimal::parse_ascii(text)
+            .ok_or_else(|| std::io::Error::other("valid exact decimal"))?;
+        assert_eq!(VbaDecimal::parse_ascii(&decimal.to_ascii()), Some(decimal));
+    }
+    assert!(VbaDecimal::parse_ascii("79228162514264337593543950335").is_some());
+    assert!(VbaDecimal::parse_ascii("79228162514264337593543950336").is_none());
+    assert!(VbaDecimal::parse_ascii("0.00000000000000000000000000001").is_none());
+    assert!(VbaDecimal::parse_ascii("1e2").is_none());
+    assert!(VbaDecimal::new(false, VbaDecimal::MAX_COEFFICIENT + 1, 0).is_none());
+    assert!(VbaDecimal::new(false, 1, VbaDecimal::MAX_SCALE + 1).is_none());
+    let decimal_value = vba_values::Value::Decimal(VbaDecimal::ZERO);
+    assert_eq!(decimal_value.payload_bytes(), 32);
+    assert!(decimal_value.validate().is_ok());
+    Ok(())
+}
 
 #[test]
 fn executable_intrinsic_spellings_are_unique_and_case_insensitive() {

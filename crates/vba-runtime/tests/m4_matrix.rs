@@ -1,5 +1,5 @@
 use vba_runtime::{self as r, Error};
-use vba_values::{Intrinsic as I, ScalarKind as K, Value as V, VbaString};
+use vba_values::{Intrinsic as I, ScalarKind as K, Value as V, VbaDecimal, VbaString};
 type R = Result<(), Box<dyn std::error::Error>>;
 fn string(s: &str) -> Result<V, Box<dyn std::error::Error>> {
     Ok(V::String(VbaString::from_utf8(s)?))
@@ -33,6 +33,42 @@ fn currency_rounding_exact_extremes_and_checked_scaled_arithmetic() -> R {
         r::binary("+", &V::Currency(i64::MAX), &V::Currency(1)),
         Err(Error::Vba { number: 6, .. })
     ));
+    Ok(())
+}
+
+#[test]
+fn decimal_variant_keeps_exact_identity_and_integral_ties_even_conversion() -> R {
+    let decimal = VbaDecimal::parse_ascii("1.2300").ok_or("decimal fixture")?;
+    let value = V::Decimal(decimal);
+    assert_eq!(value.validate(), Ok(()));
+    assert_eq!(
+        r::intrinsic(I::VarType, std::slice::from_ref(&value)),
+        Ok(V::Integer(14))
+    );
+    assert_eq!(
+        r::intrinsic(I::TypeName, std::slice::from_ref(&value)),
+        Ok(V::String(VbaString::from_utf8("Decimal")?))
+    );
+    assert_eq!(
+        r::intrinsic(I::CStr, std::slice::from_ref(&value)),
+        Ok(V::String(VbaString::from_utf8("1.2300")?))
+    );
+    assert_eq!(
+        r::assign(
+            K::Long,
+            &V::Decimal(VbaDecimal::parse_ascii("2.5").ok_or("2.5")?),
+            false
+        ),
+        Ok(V::Long(2))
+    );
+    assert_eq!(
+        r::assign(
+            K::Long,
+            &V::Decimal(VbaDecimal::parse_ascii("3.5").ok_or("3.5")?),
+            false
+        ),
+        Ok(V::Long(4))
+    );
     Ok(())
 }
 #[test]

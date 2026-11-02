@@ -36,6 +36,99 @@ impl VbaString {
     }
 }
 
+/// Exact VBA Decimal payload: a signed 96-bit coefficient and decimal scale.
+/// Decimal is a Variant subtype rather than a declared intrinsic scalar type.
+#[derive(Clone, Copy, Debug, Eq, PartialEq, Hash)]
+pub struct VbaDecimal {
+    negative: bool,
+    coefficient: u128,
+    scale: u8,
+}
+impl VbaDecimal {
+    pub const MAX_SCALE: u8 = 28;
+    pub const MAX_COEFFICIENT: u128 = (1_u128 << 96) - 1;
+    pub const ZERO: Self = Self {
+        negative: false,
+        coefficient: 0,
+        scale: 0,
+    };
+
+    pub const fn new(negative: bool, coefficient: u128, scale: u8) -> Option<Self> {
+        if coefficient > Self::MAX_COEFFICIENT || scale > Self::MAX_SCALE {
+            None
+        } else {
+            Some(Self {
+                negative,
+                coefficient,
+                scale,
+            })
+        }
+    }
+
+    pub const fn negative(self) -> bool {
+        self.negative
+    }
+    pub const fn coefficient(self) -> u128 {
+        self.coefficient
+    }
+    pub const fn scale(self) -> u8 {
+        self.scale
+    }
+
+    /// Parse a locale-independent decimal token without exponent notation or rounding.
+    pub fn parse_ascii(text: &str) -> Option<Self> {
+        let (negative, unsigned) = match text.as_bytes().first()? {
+            b'-' => (true, &text[1..]),
+            b'+' => (false, &text[1..]),
+            _ => (false, text),
+        };
+        if unsigned.is_empty() || !unsigned.is_ascii() {
+            return None;
+        }
+        let mut coefficient = 0_u128;
+        let mut scale = 0_u8;
+        let mut decimal_seen = false;
+        let mut digit_seen = false;
+        for byte in unsigned.bytes() {
+            match byte {
+                b'.' if !decimal_seen => decimal_seen = true,
+                b'0'..=b'9' => {
+                    digit_seen = true;
+                    coefficient = coefficient
+                        .checked_mul(10)?
+                        .checked_add(u128::from(byte - b'0'))?;
+                    if decimal_seen {
+                        scale = scale.checked_add(1)?;
+                    }
+                }
+                _ => return None,
+            }
+        }
+        if !digit_seen {
+            return None;
+        }
+        Self::new(negative, coefficient, scale)
+    }
+
+    pub fn to_ascii(self) -> String {
+        let digits = self.coefficient.to_string();
+        let scale = usize::from(self.scale);
+        let body = if scale == 0 {
+            digits
+        } else if digits.len() <= scale {
+            format!("0.{}{}", "0".repeat(scale - digits.len()), digits)
+        } else {
+            let split = digits.len() - scale;
+            format!("{}.{}", &digits[..split], &digits[split..])
+        };
+        if self.negative {
+            format!("-{body}")
+        } else {
+            body
+        }
+    }
+}
+
 #[derive(Clone, Debug, PartialEq)]
 pub enum Value {
     Array(VbaArray),
@@ -51,6 +144,7 @@ pub enum Value {
     Single(f32),
     Double(f64),
     Currency(i64),
+    Decimal(VbaDecimal),
     Date(f64),
     String(VbaString),
     CvErr(u16),
@@ -62,6 +156,7 @@ impl Value {
         match self {
             Self::String(s) => s.units().len() * 2,
             Self::Array(a) => a.payload,
+            Self::Decimal(_) => 32,
             _ => 16,
         }
     }

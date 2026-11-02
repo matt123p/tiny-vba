@@ -197,6 +197,16 @@ impl<'a> IntrinsicContext<'a> {
         self.target_width_bits
     }
 
+    /// The VBA LongPtr alias selected by the explicit 32/64-bit target profile.
+    /// Other widths remain configured for compatibility but are not VBA LongPtr targets.
+    pub const fn long_ptr_kind(&self) -> Option<ScalarKind> {
+        match self.target_width_bits {
+            32 => Some(ScalarKind::Long),
+            64 => Some(ScalarKind::LongLong),
+            _ => None,
+        }
+    }
+
     pub fn string_comparison_service_id(&self) -> Option<&str> {
         self.string_comparison
             .map(StringComparisonService::service_id)

@@ -53,6 +53,7 @@ fn injected_provider_receives_immutable_target_context() -> Result<(), Box<dyn s
     );
     assert_eq!(context.calendar(), "test-calendar");
     assert_eq!(context.target_width_bits(), 32);
+    assert_eq!(context.long_ptr_kind(), Some(vba_values::ScalarKind::Long));
     assert_eq!(
         context.string_comparison_service_id(),
         Some("test-ordering-v1")
@@ -167,5 +168,18 @@ fn date_conversion_requires_and_uses_explicit_locale_calendar_service()
         ),
         Err(Error::Unsupported(_))
     ));
+    Ok(())
+}
+
+#[test]
+fn pointer_alias_tracks_configured_32_and_64_bit_targets() -> Result<(), Box<dyn std::error::Error>>
+{
+    let context = IntrinsicContext::no_services(Mode::Binary, "", "", "", 64);
+    assert_eq!(
+        context.long_ptr_kind(),
+        Some(vba_values::ScalarKind::LongLong)
+    );
+    let unsupported = IntrinsicContext::no_services(Mode::Binary, "", "", "", 16);
+    assert_eq!(unsupported.long_ptr_kind(), None);
     Ok(())
 }

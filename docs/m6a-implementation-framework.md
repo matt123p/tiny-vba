@@ -185,7 +185,8 @@ functions; split a row below further when its tests or dependencies warrant it.
 | C1 | M6A.3 | F3; relevant context | Portable scalar conversions and Variant-state/type inspection; exact width, ties-even, Null/Error states. Keep locale parsing/formatting, Decimal and target-width work explicit. |
 | C2 | M6A.3 | C1; injected date service | Route CDate text parsing and IsDate text recognition through an explicit locale/calendar provider; no ambient OS locale. |
 | C3 | M6A.3 | C2; injected locale conversion service | Add IsNumeric numeric-string recognition and CStr(Date) locale/calendar formatting; no ambient locale. |
-| C4 onward | M6A.3 | C3; exact Decimal/target-width foundations | Complete remaining conversions and formatting. Exact Decimal and target-width foundations precede CDec/CLngPtr; no Double approximation. |
+| C4 | M6A.3 | C3; value/context foundation | Add an exact 96-bit coefficient/scale Decimal Variant payload and expose the configured 32/64-bit LongPtr alias without approximating Decimal arithmetic. |
+| C5 onward | M6A.3 | C4 | Implement CDec, CLngPtr and remaining conversions/formatting against the exact foundations. |
 | A1 onward | M6A.4 | F3 | Arrays/bounds and conditional selection/evaluation; preserve existing array storage/aliases and IIf eagerness. |
 | N1 onward | M6A.4 | F3 | Pure numeric functions, then financial functions with bounded convergence and exact VBA error contracts. |
 | D1 onward | M6A.5 | F4 | Calendar/date representation and clock seam, then constructors/extraction/arithmetic/names in small packets. |

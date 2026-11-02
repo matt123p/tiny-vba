@@ -69,6 +69,7 @@ pub(crate) fn locale_conversion(
         | V::Single(_)
         | V::Double(_)
         | V::Currency(_)
+        | V::Decimal(_)
         | V::Boolean(_) => true,
         V::String(text) => context.is_numeric_text(text)?,
         V::Empty
@@ -102,6 +103,11 @@ pub(crate) fn numeric(v: &V) -> Result<f64> {
         V::LongLong(n) => *n as f64,
         V::Single(n) => f64::from(*n),
         V::Double(n) | V::Date(n) => *n,
+        V::Decimal(_) => {
+            return Err(Error::Unsupported(
+                "Decimal arithmetic requires the exact Decimal executor".into(),
+            ));
+        }
         V::Currency(n) => *n as f64 / 10000.0,
         V::String(s) => String::from_utf16(s.units())
             .map_err(|_| mismatch())?
@@ -125,6 +131,19 @@ fn integral(v: &V, min: i128, max: i128) -> Result<i128> {
         V::Integer(n) => i128::from(*n),
         V::Long(n) => i128::from(*n),
         V::LongLong(n) => i128::from(*n),
+        V::Decimal(n) => {
+            let divisor = 10_i128.pow(u32::from(n.scale()));
+            let coefficient = i128::try_from(n.coefficient()).map_err(|_| overflow())?;
+            let quotient = coefficient / divisor;
+            let remainder = coefficient % divisor;
+            let rounded =
+                if remainder * 2 > divisor || (remainder * 2 == divisor && quotient % 2 != 0) {
+                    quotient + 1
+                } else {
+                    quotient
+                };
+            if n.negative() { -rounded } else { rounded }
+        }
         V::Currency(n) => round_ratio(i128::from(*n), 10000)?,
         V::String(s)
             if String::from_utf16(s.units())
@@ -190,6 +209,7 @@ pub(crate) fn text(v: &V) -> Result<VbaString> {
             }
             s
         }
+        V::Decimal(n) => n.to_ascii(),
         V::Date(_) => {
             return Err(Error::Unsupported(
                 "locale-dependent Date formatting".into(),
@@ -210,6 +230,9 @@ pub(crate) fn convert(kind: K, v: &V) -> Result<V> {
         Object => return Err(mismatch()),
         String => V::String(text(v)?),
         Boolean => {
+            if let V::Decimal(decimal) = v {
+                return Ok(V::Boolean(decimal.coefficient() != 0));
+            }
             if let V::String(s) = v {
                 let s = std::string::String::from_utf16(s.units()).map_err(|_| mismatch())?;
                 if s.eq_ignore_ascii_case("true") {
@@ -422,6 +445,7 @@ pub fn intrinsic(function: I, args: &[V]) -> Result<V> {
                 V::Single(_) => (4, "Single"),
                 V::Double(_) => (5, "Double"),
                 V::Currency(_) => (6, "Currency"),
+                V::Decimal(_) => (14, "Decimal"),
                 V::Date(_) => (7, "Date"),
                 V::String(_) => (8, "String"),
                 V::Object(_) => (9, "Object"),

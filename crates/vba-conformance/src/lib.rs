@@ -2,7 +2,7 @@
 #![forbid(unsafe_code)]
 use std::{collections::BTreeMap, fmt::Write};
 use vba_diagnostics::{Diagnostic, SourceFile};
-use vba_values::{Value, VbaString};
+use vba_values::{Value, VbaDecimal, VbaString};
 
 pub const MAX_SCENARIO_BYTES: usize = 65536;
 #[derive(Clone, Debug, PartialEq)]
@@ -72,6 +72,7 @@ pub fn describe_value(value: &Value) -> String {
         Value::Single(v) => format!("Single({v:?})"),
         Value::Double(v) => format!("Double({v:?})"),
         Value::Currency(v) => format!("Currency({v})"),
+        Value::Decimal(v) => format!("Decimal({})", v.to_ascii()),
         Value::Date(v) => format!("Date({v:?})"),
         Value::String(s) => {
             let mut text = String::with_capacity(16 + s.units().len() * 6);
@@ -406,6 +407,7 @@ fn parse_expected(text: &str) -> Option<Expected> {
                 "Single" => Value::Single(raw.parse().ok()?),
                 "Double" => Value::Double(raw.parse().ok()?),
                 "Currency" => Value::Currency(raw.parse().ok()?),
+                "Decimal" => Value::Decimal(VbaDecimal::parse_ascii(raw)?),
                 "Date" => Value::Date(raw.parse().ok()?),
                 "String" => Value::String(VbaString::from_utf8(raw).ok()?),
                 "CVErr" => Value::CvErr(raw.parse().ok()?),

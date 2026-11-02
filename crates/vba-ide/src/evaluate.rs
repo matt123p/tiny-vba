@@ -174,6 +174,7 @@ pub fn display_value(value: &Value) -> String {
             v.unsigned_abs() / 10000,
             v.unsigned_abs() % 10000
         ),
+        Value::Decimal(v) => v.to_ascii(),
         Value::Date(v) => format!("Date ({v})"),
         Value::CvErr(v) => format!("Error {v}"),
         Value::Object(_) => "Object".into(),
@@ -196,6 +197,7 @@ pub fn type_name(value: &Value) -> &'static str {
         Value::Single(_) => "Single",
         Value::Double(_) => "Double",
         Value::Currency(_) => "Currency",
+        Value::Decimal(_) => "Decimal",
         Value::Date(_) => "Date",
         Value::String(_) => "String",
         Value::CvErr(_) => "Error",
