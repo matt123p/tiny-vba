@@ -4,7 +4,7 @@ Updated 2026-11-01. Status: design and work breakdown; no runtime implementation
 or test results are claimed. Read [the scope](vba-intrinsic-functions.md),
 [the plan](implementation-plan.md) and
 [ADR 0034](decisions/0034-intrinsic-implementation-framework.md) first.
-M6A acceptance still blocks M7. Implement one packet at a time; preserve current
+M6A acceptance is a prerequisite for M7. Implement one packet at a time; preserve current
 M6 acceptance and historical IR/runtime contracts.
 
 ## Start here
