@@ -40,6 +40,12 @@ Owner: fork acceptance/package layers, coordinated with tiny-vba source-import
 and evidence contracts. Starts after M6A acceptance and depends on each
 specimen's M1–M6 and intrinsic capabilities; form
 specimens require M2 and the corresponding host event/persistence integration.
+Native Excel worksheet Form Controls, binary UserForm import and expanded control
+support are deferred outside this delivery profile; see the
+[Office forms and controls plan](office-forms-controls-implementation-plan.md).
+Classify specimens needing those capabilities as UNSUPPORTED/NOT_RUN rather than
+expanding M7 into their implementation. Existing `.tvform` acceptance stays scoped
+to its supported shared/host workflow.
 
 - **M7.1:** Curate licensed, reviewed Excel workbooks and Word documents with
   declared language/object/reference/standard-control requirements and independently
@@ -69,7 +75,7 @@ specimens require M2 and the corresponding host event/persistence integration.
   unverified assumption.
 
 Acceptance: per-document profile/version/evidence records distinguish PASS,
-MISMATCH, UNSUPPORTED and NOT_RUN. Verify forms/standard controls, source
+MISMATCH, UNSUPPORTED and NOT_RUN. Verify declared supported forms/controls, source
 attachment, no untrusted auto-run and signature validity/loss decisions.
 Run both repositories' required CI/WASM gates and real fork workflows.
 Publish incompatibilities; subset success does not imply universal compatibility.

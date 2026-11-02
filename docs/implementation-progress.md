@@ -14,6 +14,17 @@ and classify licensed specimens for unchanged-document/package acceptance.
 M7 implementation has not started.
 Office objects, document events, trust and packaging remain fork-owned.
 
+## Deferred Office forms and controls plan (2026-11-02)
+
+Owner requested a separate future [implementation plan](office-forms-controls-implementation-plan.md)
+for Excel worksheet Form Controls, native VBA UserForm import, broader shared
+controls and persistence. Status: DEFERRED / NOT STARTED, outside the current
+M7–M8 delivery profile. FC0–FC5 define ownership, dependencies and acceptance;
+they do not add implemented capabilities or change M2/M6 sign-off. M7.1 remains
+next. When activated, start with FC0.1 and then the worksheet Button slice.
+Read-only inspection of local Food.xlsm identified a worksheet Form Control
+assigned to CopyIngredients; no workbook macro was executed or modified.
+
 ## Intrinsic milestone inserted before M7 (2026-11-01)
 
 Owner direction added **M6A — VBA intrinsic-function coverage** before M7,

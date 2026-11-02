@@ -19,6 +19,11 @@ code extension points and packet design used to implement the milestone.
 [ADR 0034](decisions/0034-intrinsic-implementation-framework.md) records the design;
 the [M6A work ledger](m6a-work-ledger.md) records completed packet results.
 
+[Deferred Office forms and controls implementation plan](office-forms-controls-implementation-plan.md)
+records worksheet Form Controls (including the missing Food.xlsm button), native
+UserForm import, broader shared controls and persistence. It is outside the current
+M7–M8 delivery profile and has not started.
+
 [VBA attributes and Excel code-view investigation](vba-attributes-and-editor-projection.md)
 documents hidden module/member metadata, recorded-macro attributes, the blank
 `ThisWorkbook` code view, related declarations and the now-implemented M6.9–M6.12 fixes.

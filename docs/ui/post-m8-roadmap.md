@@ -21,8 +21,12 @@ profiles. Shared code stays in tiny-vba; Office objects, trust, document state,
 event ordering and undo/recalculation stay in the application forks.
 
 [M7](../implementation-plan.md#m7--unchanged-document-and-package-acceptance)
-is next: unchanged-source .xlsm/.docm package acceptance, forms/standard controls,
-signature handling and reviewed writeback design. Fresh Excel/Word comparisons
+is next: unchanged-source .xlsm/.docm package acceptance for declared supported
+profiles, signature handling and reviewed writeback design. Native worksheet Form
+Controls, native UserForm import and expanded control support are deferred outside
+the current delivery profile in the
+[separate implementation plan](../office-forms-controls-implementation-plan.md).
+Fresh Excel/Word comparisons
 are deferred to [M8.5](../implementation-plan.md#m8--expanded-conformance-hardening-and-release).
 Generic-host doubles and standalone UI images cannot establish real Office compatibility.
 
@@ -34,9 +38,10 @@ scope and the implementation plan take precedence over that earlier proposal.
 
 | Remaining reference scope | Current allocation |
 |---|---|
-| Form/document source and package persistence; signatures | M7 |
+| Supported source/package preservation; signatures and reviewed writeback design | M7 |
+| Native worksheet Form Controls, UserForm import and broader control persistence | Deferred FC0–FC5; no scheduled milestone |
 | Remaining lawful reference-build/fidelity observations | M8.5; NOT_RUN until observed |
-| Applicable form host/storage parts of scenarios 1–23 | M7 using the completed M2/M5/M6 profiles |
+| Applicable form host/storage parts of scenarios 1–23 | M7 within completed M2/M5/M6 profiles; native control expansion deferred |
 | Public-source/provenance review (scenario 26) | Required throughout M1–M8 |
 
 Native Craft extensions, Python translation previews and Copilot-style assistance
