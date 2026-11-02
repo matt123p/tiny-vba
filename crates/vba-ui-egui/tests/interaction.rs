@@ -693,6 +693,13 @@ fn m8_typed_dot_completion_keeps_receiver_and_accepts_enter() -> R {
 #[test]
 fn m8_ctrl_space_tab_and_escape_work_in_source() -> R {
     let mut h = editor_at_end("Sub Main()\nEnd Sub\nLo")?;
+    let expected = h
+        .state()
+        .ide
+        .completions("Lo")
+        .into_iter()
+        .next()
+        .ok_or("completion")?;
     h.key_press_modifiers(egui::Modifiers::CTRL, egui::Key::Space);
     h.run();
     assert!(h.query_by_label("Long").is_some());
@@ -704,7 +711,9 @@ fn m8_ctrl_space_tab_and_escape_work_in_source() -> R {
             .active_module()
             .ok_or("module")?
             .text
-            .ends_with("Long")
+            .ends_with(&expected),
+        "completion was not accepted: {:?}",
+        h.state().ide.active_module().map(|module| &module.text)
     );
     h.event(egui::Event::Paste("\nDebug.".into()));
     h.run();
