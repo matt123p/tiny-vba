@@ -23,6 +23,8 @@ pub struct IntrinsicContext<'a> {
     target_width_bits: u8,
     string_comparison: Option<&'a dyn StringComparisonService>,
     date_conversion: Option<&'a dyn DateConversionService>,
+    formatting: Option<&'a dyn IntrinsicFormattingService>,
+    last_error_number: i32,
 }
 
 /// A deterministic target service for VBA binary/text string ordering.
@@ -63,6 +65,19 @@ pub trait DateConversionService: Send + Sync {
     }
 }
 
+/// Locale/calendar formatting and localized error-description provider.
+/// The runtime supplies structurally omitted argument slots unchanged.
+pub trait IntrinsicFormattingService: Send + Sync {
+    fn service_id(&self) -> &str;
+    fn format_intrinsic(
+        &self,
+        function: vba_values::Intrinsic,
+        arguments: &[Option<Value>],
+        locale: &str,
+        calendar: &str,
+    ) -> Result<VbaString>;
+}
+
 /// Evaluate a verified extended call using the immutable execution context.
 /// This is the contextual entry point for new intrinsic families; the legacy
 /// `intrinsic_extended` function remains for existing VM callers.
@@ -85,6 +100,19 @@ pub fn intrinsic_extended_with_context(
     }
     if function == vba_values::Intrinsic::CLngPtr {
         return coercion::clng_ptr(arguments, context);
+    }
+    if matches!(
+        function,
+        vba_values::Intrinsic::Format
+            | vba_values::Intrinsic::FormatDollar
+            | vba_values::Intrinsic::FormatCurrency
+            | vba_values::Intrinsic::FormatDateTime
+            | vba_values::Intrinsic::FormatNumber
+            | vba_values::Intrinsic::FormatPercent
+            | vba_values::Intrinsic::ErrorMessage
+            | vba_values::Intrinsic::ErrorMessageDollar
+    ) {
+        return coercion::formatting(function, arguments, context);
     }
     if matches!(
         function,
@@ -126,6 +154,8 @@ impl<'a> IntrinsicContext<'a> {
             target_width_bits,
             string_comparison: None,
             date_conversion: None,
+            formatting: None,
+            last_error_number: 0,
         }
     }
 
@@ -176,6 +206,54 @@ impl<'a> IntrinsicContext<'a> {
         string_comparison: Option<&'a dyn StringComparisonService>,
         date_conversion: Option<&'a dyn DateConversionService>,
     ) -> Self {
+        Self::with_all_services(
+            comparison_mode,
+            locale,
+            calendar,
+            code_page,
+            target_width_bits,
+            string_comparison,
+            date_conversion,
+            None,
+        )
+    }
+
+    #[allow(clippy::too_many_arguments)]
+    pub const fn with_all_services(
+        comparison_mode: vba_values::IntrinsicComparisonMode,
+        locale: &'a str,
+        calendar: &'a str,
+        code_page: &'a str,
+        target_width_bits: u8,
+        string_comparison: Option<&'a dyn StringComparisonService>,
+        date_conversion: Option<&'a dyn DateConversionService>,
+        formatting: Option<&'a dyn IntrinsicFormattingService>,
+    ) -> Self {
+        Self::with_execution_context(
+            comparison_mode,
+            locale,
+            calendar,
+            code_page,
+            target_width_bits,
+            string_comparison,
+            date_conversion,
+            formatting,
+            0,
+        )
+    }
+
+    #[allow(clippy::too_many_arguments)]
+    pub const fn with_execution_context(
+        comparison_mode: vba_values::IntrinsicComparisonMode,
+        locale: &'a str,
+        calendar: &'a str,
+        code_page: &'a str,
+        target_width_bits: u8,
+        string_comparison: Option<&'a dyn StringComparisonService>,
+        date_conversion: Option<&'a dyn DateConversionService>,
+        formatting: Option<&'a dyn IntrinsicFormattingService>,
+        last_error_number: i32,
+    ) -> Self {
         Self {
             comparison_mode,
             locale,
@@ -184,6 +262,8 @@ impl<'a> IntrinsicContext<'a> {
             target_width_bits,
             string_comparison,
             date_conversion,
+            formatting,
+            last_error_number,
         }
     }
 
@@ -205,6 +285,10 @@ impl<'a> IntrinsicContext<'a> {
 
     pub const fn target_width_bits(&self) -> u8 {
         self.target_width_bits
+    }
+
+    pub const fn last_error_number(&self) -> i32 {
+        self.last_error_number
     }
 
     /// The VBA LongPtr alias selected by the explicit 32/64-bit target profile.
@@ -264,6 +348,24 @@ impl<'a> IntrinsicContext<'a> {
             ))
         })?;
         service.format_date(serial, self.locale, self.calendar)
+    }
+
+    pub fn formatting_service_id(&self) -> Option<&str> {
+        self.formatting.map(IntrinsicFormattingService::service_id)
+    }
+
+    pub fn format_intrinsic(
+        &self,
+        function: vba_values::Intrinsic,
+        arguments: &[Option<Value>],
+    ) -> Result<VbaString> {
+        let service = self.formatting.ok_or_else(|| {
+            Error::Unsupported(format!(
+                "intrinsic-formatting-service-unavailable:{}",
+                self.locale
+            ))
+        })?;
+        service.format_intrinsic(function, arguments, self.locale, self.calendar)
     }
 
     pub fn compare_strings(&self, left: &VbaString, right: &VbaString) -> Result<Ordering> {

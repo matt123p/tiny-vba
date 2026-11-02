@@ -187,7 +187,10 @@ functions; split a row below further when its tests or dependencies warrant it.
 | C3 | M6A.3 | C2; injected locale conversion service | Add IsNumeric numeric-string recognition and CStr(Date) locale/calendar formatting; no ambient locale. |
 | C4 | M6A.3 | C3; value/context foundation | Add an exact 96-bit coefficient/scale Decimal Variant payload and expose the configured 32/64-bit LongPtr alias without approximating Decimal arithmetic. |
 | C5 | M6A.3 | C4 | Implement CDec exact scalar/string paths and CLngPtr for explicit 32/64-bit targets; refuse binary-float Decimal approximation and unsupported target widths. |
-| C6 onward | M6A.3 | C5 | Continue remaining conversion and formatting functions in dependency order. |
+| C6 | M6A.3 | C5 | Implement Val, Str/Str$, Hex/Hex$, and Oct/Oct$ with VBA prefix parsing, sign spacing, signed-width and return-tag rules. |
+| C7 | M6A.3 | C6; injected formatting service | Route Format/Format$, FormatCurrency, FormatDateTime, FormatNumber, and FormatPercent through an explicit locale/calendar formatting provider; preserve omitted option slots and String versus Variant return tags. |
+| C8 | M6A.3 | C7; runtime Err state | Add Error/Error$ description lookup through the formatting provider; omitted error number uses current Err.Number and explicit error numbers remain provider-defined. |
+| C9 | M6A.3 | C1–C8 | Audit the conversion inventory and record exact unsupported provider/profile boundaries and validation; do not claim unimplemented spellings. |
 | A1 onward | M6A.4 | F3 | Arrays/bounds and conditional selection/evaluation; preserve existing array storage/aliases and IIf eagerness. |
 | N1 onward | M6A.4 | F3 | Pure numeric functions, then financial functions with bounded convergence and exact VBA error contracts. |
 | D1 onward | M6A.5 | F4 | Calendar/date representation and clock seam, then constructors/extraction/arithmetic/names in small packets. |

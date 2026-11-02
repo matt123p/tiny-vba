@@ -315,6 +315,26 @@ fn locale_conversion_descriptors_require_ir8_context() {
 }
 
 #[test]
+fn numeric_text_variants_keep_variant_and_dollar_return_tags() {
+    for intrinsic in [Intrinsic::Str, Intrinsic::Hex, Intrinsic::Oct] {
+        assert_eq!(
+            descriptor_for(intrinsic).map(|descriptor| descriptor.return_variant),
+            Some(IntrinsicReturn::Variant)
+        );
+    }
+    for intrinsic in [
+        Intrinsic::StrDollar,
+        Intrinsic::HexDollar,
+        Intrinsic::OctDollar,
+    ] {
+        assert_eq!(
+            descriptor_for(intrinsic).map(|descriptor| descriptor.return_variant),
+            Some(IntrinsicReturn::Fixed(ScalarKind::String))
+        );
+    }
+}
+
+#[test]
 fn repetition_descriptors_retain_variant_string_returns() -> Result<(), Box<dyn std::error::Error>>
 {
     let space = Intrinsic::Space

@@ -7,7 +7,7 @@ use std::sync::{
 use vba_compiler::{CompileOptions, compile, compile_modules};
 use vba_diagnostics::{SourceFile, SourceId};
 use vba_ir::{self as ir, Instruction};
-use vba_runtime::{DateConversionService, StringComparisonService};
+use vba_runtime::{DateConversionService, IntrinsicFormattingService, StringComparisonService};
 use vba_values::{IntrinsicComparisonMode, IntrinsicReturn, ScalarKind, Value, VbaString};
 use vba_vm::{self as vm, Limits, NoHost, Outcome, PauseReason, ReturnValue, Session};
 type R<T = ()> = Result<T, Box<dyn Error>>;
@@ -190,6 +190,73 @@ fn session_with_date_service_and_width(source_text: &str, width: u8) -> R<Sessio
 }
 fn session_with_date_service(source_text: &str) -> R<Session> {
     session_with_date_service_and_width(source_text, 64)
+}
+
+struct VmFormattingProvider;
+impl IntrinsicFormattingService for VmFormattingProvider {
+    fn service_id(&self) -> &str {
+        "vm-format-test-v1"
+    }
+    fn format_intrinsic(
+        &self,
+        function: vba_values::Intrinsic,
+        arguments: &[Option<Value>],
+        locale: &str,
+        calendar: &str,
+    ) -> vba_runtime::Result<VbaString> {
+        assert_eq!(locale, "test-locale");
+        assert_eq!(calendar, "test-calendar");
+        use vba_values::Intrinsic as I;
+        let rendered = match function {
+            I::Format => "format".to_owned(),
+            I::FormatDollar => "format-dollar".to_owned(),
+            I::FormatCurrency => "currency".to_owned(),
+            I::FormatDateTime => "date-time".to_owned(),
+            I::FormatNumber => "number".to_owned(),
+            I::FormatPercent => "percent".to_owned(),
+            I::ErrorMessage | I::ErrorMessageDollar => {
+                match arguments.first().and_then(Option::as_ref) {
+                    Some(Value::Long(0) | Value::Integer(0)) => String::new(),
+                    Some(Value::Long(11) | Value::Integer(11)) => "division-by-zero".to_owned(),
+                    Some(Value::Long(13) | Value::Integer(13)) => "type-mismatch".to_owned(),
+                    _ => "application-error".to_owned(),
+                }
+            }
+            _ => {
+                return Err(vba_runtime::Error::Unsupported(
+                    "unexpected format function".into(),
+                ));
+            }
+        };
+        VbaString::from_utf8(&rendered)
+            .map_err(|_| vba_runtime::Error::Unsupported("format test string overflow".into()))
+    }
+}
+
+fn session_with_formatting_service(source_text: &str) -> R<Session> {
+    let source = SourceFile::new(SourceId(93), "format.bas".into(), source_text.into())?;
+    let program = compile(
+        &source,
+        &CompileOptions {
+            capabilities: vm::capabilities(),
+            ..Default::default()
+        },
+    )?;
+    let config = vm::IntrinsicContextConfig::new(
+        "test-locale".into(),
+        "test-calendar".into(),
+        "test-code-page".into(),
+        64,
+    )?;
+    Ok(Session::new_with_formatting_service(
+        program,
+        93,
+        vec![],
+        None,
+        Limits::default(),
+        Arc::new(VmFormattingProvider),
+        config,
+    )?)
 }
 fn number(source: &str, expected: i32) -> R {
     let Outcome::Failed(f) = drive(&mut session(source)?)? else {
@@ -974,6 +1041,27 @@ fn c5_cdec_and_clngptr_use_exact_decimal_and_target_width() -> R {
         )?,
         6,
     )?;
+    Ok(())
+}
+
+#[test]
+fn c6_val_str_hex_and_oct_execute_from_vba_source() -> R {
+    answer(
+        "Function Answer() As String\nAnswer=CStr(Val(\" 2 45 7th\")) & \":\" & Hex(255) & \":\" & Oct(459) & \":\" & Str(459) & \":\" & Str$(-1)\nEnd Function",
+        Value::String(VbaString::from_utf8("2457:FF:713: 459:-1")?),
+    )
+}
+
+#[test]
+fn c7_formatting_and_error_messages_use_the_injected_service() -> R {
+    assert_eq!(
+        drive(&mut session_with_formatting_service(
+            "Function Answer() As String\nAnswer=FormatNumber(12.5) & \":\" & FormatCurrency(2) & \":\" & FormatDateTime(\"date\") & \":\" & Format(\"x\",\"custom\") & \":\" & FormatPercent(0.5) & \":\" & Format$(7,\"q\") & \":\" & Error$(13)\nEnd Function",
+        )?)?,
+        Outcome::Completed(ReturnValue::Function(Value::String(VbaString::from_utf8(
+            "number:currency:date-time:format:percent:format-dollar:type-mismatch",
+        )?)))
+    );
     Ok(())
 }
 #[test]

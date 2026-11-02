@@ -391,6 +391,21 @@ pub enum Intrinsic {
     CBool,
     CStr,
     CVar,
+    Val,
+    Str,
+    StrDollar,
+    Hex,
+    HexDollar,
+    Oct,
+    OctDollar,
+    Format,
+    FormatDollar,
+    FormatCurrency,
+    FormatDateTime,
+    FormatNumber,
+    FormatPercent,
+    ErrorMessage,
+    ErrorMessageDollar,
     Len,
     Abs,
     Int,
@@ -660,6 +675,51 @@ const LEFT_RIGHT_PARAMS: &[IntrinsicParameter] =
 const SPACE_PARAMS: &[IntrinsicParameter] = &[parameter("number", true)];
 const STRING_PARAMS: &[IntrinsicParameter] =
     &[parameter("number", true), parameter("character", true)];
+const FORMAT_PARAMS: &[IntrinsicParameter] = &[
+    parameter("expression", true),
+    with_default(
+        parameter("format", false),
+        IntrinsicOmittedDefault::FunctionSpecific,
+    ),
+    with_default(
+        parameter("firstdayofweek", false),
+        IntrinsicOmittedDefault::FunctionSpecific,
+    ),
+    with_default(
+        parameter("firstweekofyear", false),
+        IntrinsicOmittedDefault::FunctionSpecific,
+    ),
+];
+const FORMAT_NUMBER_PARAMS: &[IntrinsicParameter] = &[
+    parameter("expression", true),
+    with_default(
+        parameter("numdigitsafterdecimal", false),
+        IntrinsicOmittedDefault::FunctionSpecific,
+    ),
+    with_default(
+        parameter("includeleadingdigit", false),
+        IntrinsicOmittedDefault::FunctionSpecific,
+    ),
+    with_default(
+        parameter("useparensfornegative", false),
+        IntrinsicOmittedDefault::FunctionSpecific,
+    ),
+    with_default(
+        parameter("groupdigits", false),
+        IntrinsicOmittedDefault::FunctionSpecific,
+    ),
+];
+const FORMAT_DATE_TIME_PARAMS: &[IntrinsicParameter] = &[
+    parameter("date", true),
+    with_default(
+        parameter("namedformat", false),
+        IntrinsicOmittedDefault::FunctionSpecific,
+    ),
+];
+const ERROR_PARAMS: &[IntrinsicParameter] = &[with_default(
+    parameter("errornumber", false),
+    IntrinsicOmittedDefault::FunctionSpecific,
+)];
 const IIF_PARAMS: &[IntrinsicParameter] = &[
     parameter("expr", true),
     raw_parameter("truepart", true),
@@ -688,6 +748,14 @@ const fn descriptor(
             | Intrinsic::CStr
             | Intrinsic::CDec
             | Intrinsic::CLngPtr
+            | Intrinsic::Format
+            | Intrinsic::FormatDollar
+            | Intrinsic::FormatCurrency
+            | Intrinsic::FormatDateTime
+            | Intrinsic::FormatNumber
+            | Intrinsic::FormatPercent
+            | Intrinsic::ErrorMessage
+            | Intrinsic::ErrorMessageDollar
     ) {
         (8, "intrinsics-m6a-v1")
     } else if matches!(intrinsic, Intrinsic::IIf) {
@@ -704,6 +772,7 @@ const fn descriptor(
         Intrinsic::Filter => 2,
         Intrinsic::Join => 1,
         Intrinsic::Array => 0,
+        Intrinsic::ErrorMessage | Intrinsic::ErrorMessageDollar => 0,
         Intrinsic::LBound | Intrinsic::UBound => 1,
         Intrinsic::Round => 1,
         Intrinsic::StrComp => 2,
@@ -753,7 +822,22 @@ const fn descriptor(
             | Intrinsic::CBool
             | Intrinsic::CStr
             | Intrinsic::CVar
-            | Intrinsic::CVErr => IntrinsicFamily::Conversion,
+            | Intrinsic::CVErr
+            | Intrinsic::Val
+            | Intrinsic::Str
+            | Intrinsic::StrDollar
+            | Intrinsic::Hex
+            | Intrinsic::HexDollar
+            | Intrinsic::Oct
+            | Intrinsic::OctDollar
+            | Intrinsic::Format
+            | Intrinsic::FormatDollar
+            | Intrinsic::FormatCurrency
+            | Intrinsic::FormatDateTime
+            | Intrinsic::FormatNumber
+            | Intrinsic::FormatPercent
+            | Intrinsic::ErrorMessage
+            | Intrinsic::ErrorMessageDollar => IntrinsicFamily::Conversion,
             Intrinsic::StrComp => IntrinsicFamily::StringSearch,
             Intrinsic::Len
             | Intrinsic::Left
@@ -805,6 +889,14 @@ const fn descriptor(
                 | Intrinsic::CStr
                 | Intrinsic::CDec
                 | Intrinsic::CLngPtr
+                | Intrinsic::Format
+                | Intrinsic::FormatDollar
+                | Intrinsic::FormatCurrency
+                | Intrinsic::FormatDateTime
+                | Intrinsic::FormatNumber
+                | Intrinsic::FormatPercent
+                | Intrinsic::ErrorMessage
+                | Intrinsic::ErrorMessageDollar
         ) {
             IntrinsicEffect::Contextual
         } else {
@@ -828,6 +920,14 @@ const fn descriptor(
                 | Intrinsic::CStr
                 | Intrinsic::CDec
                 | Intrinsic::CLngPtr
+                | Intrinsic::Format
+                | Intrinsic::FormatDollar
+                | Intrinsic::FormatCurrency
+                | Intrinsic::FormatDateTime
+                | Intrinsic::FormatNumber
+                | Intrinsic::FormatPercent
+                | Intrinsic::ErrorMessage
+                | Intrinsic::ErrorMessageDollar
         ) {
             "injected comparison or locale conversion service"
         } else {
@@ -844,6 +944,7 @@ const fn return_variant(intrinsic: Intrinsic) -> IntrinsicReturn {
         I::Array | I::ArrayBaseOne | I::Split | I::Filter => R::Array,
         I::StrComp => R::Variant,
         I::IIf | I::Abs | I::Int | I::Fix => R::Polymorphic,
+        I::Val => R::Fixed(K::Double),
         I::Left | I::Right | I::Mid | I::Trim | I::LTrim | I::RTrim => R::Variant,
         I::InStr | I::InStrRev | I::Len | I::LBound | I::UBound => R::Fixed(K::Long),
         I::IsObject
@@ -867,6 +968,15 @@ const fn return_variant(intrinsic: Intrinsic) -> IntrinsicReturn {
         | I::StrReverse
         | I::LCase
         | I::Chr => R::Fixed(K::String),
+        I::StrDollar | I::HexDollar | I::OctDollar => R::Fixed(K::String),
+        I::Str | I::Hex | I::Oct => R::Variant,
+        I::Format
+        | I::FormatCurrency
+        | I::FormatDateTime
+        | I::FormatNumber
+        | I::FormatPercent
+        | I::ErrorMessage => R::Variant,
+        I::FormatDollar | I::ErrorMessageDollar => R::Fixed(K::String),
         I::ChrW => R::Fixed(K::String),
         I::UCase | I::Space | I::String => R::Variant,
         I::SpaceDollar | I::StringDollar => R::Fixed(K::String),
@@ -1116,6 +1226,87 @@ pub const INTRINSIC_DESCRIPTORS: &[IntrinsicDescriptor] = &[
         "CStr(expression)",
     ),
     descriptor(Intrinsic::CVar, "CVar", ONE_RAW, false, "CVar(expression)"),
+    descriptor(Intrinsic::Val, "Val", ONE_VALUE, false, "Val(string)"),
+    descriptor(Intrinsic::Str, "Str", ONE_VALUE, false, "Str(number)"),
+    descriptor(
+        Intrinsic::StrDollar,
+        "Str$",
+        ONE_VALUE,
+        false,
+        "Str$(number)",
+    ),
+    descriptor(Intrinsic::Hex, "Hex", ONE_VALUE, false, "Hex(number)"),
+    descriptor(
+        Intrinsic::HexDollar,
+        "Hex$",
+        ONE_VALUE,
+        false,
+        "Hex$(number)",
+    ),
+    descriptor(Intrinsic::Oct, "Oct", ONE_VALUE, false, "Oct(number)"),
+    descriptor(
+        Intrinsic::OctDollar,
+        "Oct$",
+        ONE_VALUE,
+        false,
+        "Oct$(number)",
+    ),
+    descriptor(
+        Intrinsic::Format,
+        "Format",
+        FORMAT_PARAMS,
+        false,
+        "Format(expression, [format, [firstdayofweek, [firstweekofyear]]])",
+    ),
+    descriptor(
+        Intrinsic::FormatDollar,
+        "Format$",
+        FORMAT_PARAMS,
+        false,
+        "Format$(expression, [format, [firstdayofweek, [firstweekofyear]]])",
+    ),
+    descriptor(
+        Intrinsic::FormatCurrency,
+        "FormatCurrency",
+        FORMAT_NUMBER_PARAMS,
+        false,
+        "FormatCurrency(expression, [numdigitsafterdecimal, [includeleadingdigit, [useparensfornegative, [groupdigits]]]])",
+    ),
+    descriptor(
+        Intrinsic::FormatDateTime,
+        "FormatDateTime",
+        FORMAT_DATE_TIME_PARAMS,
+        false,
+        "FormatDateTime(date, [namedformat])",
+    ),
+    descriptor(
+        Intrinsic::FormatNumber,
+        "FormatNumber",
+        FORMAT_NUMBER_PARAMS,
+        false,
+        "FormatNumber(expression, [numdigitsafterdecimal, [includeleadingdigit, [useparensfornegative, [groupdigits]]]])",
+    ),
+    descriptor(
+        Intrinsic::FormatPercent,
+        "FormatPercent",
+        FORMAT_NUMBER_PARAMS,
+        false,
+        "FormatPercent(expression, [numdigitsafterdecimal, [includeleadingdigit, [useparensfornegative, [groupdigits]]]])",
+    ),
+    descriptor(
+        Intrinsic::ErrorMessage,
+        "Error",
+        ERROR_PARAMS,
+        false,
+        "Error([errornumber])",
+    ),
+    descriptor(
+        Intrinsic::ErrorMessageDollar,
+        "Error$",
+        ERROR_PARAMS,
+        false,
+        "Error$([errornumber])",
+    ),
     descriptor(Intrinsic::Len, "Len", ONE_VALUE, false, "Len(expression)"),
     descriptor(Intrinsic::Abs, "Abs", ONE_VALUE, false, "Abs(number)"),
     descriptor(Intrinsic::Int, "Int", ONE_VALUE, false, "Int(number)"),

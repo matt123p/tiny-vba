@@ -1,5 +1,8 @@
 use std::cmp::Ordering;
-use vba_runtime::{DateConversionService, Error, IntrinsicContext, StringComparisonService};
+use vba_runtime::{
+    DateConversionService, Error, IntrinsicContext, IntrinsicFormattingService,
+    StringComparisonService,
+};
 use vba_values::{Intrinsic as I, IntrinsicComparisonMode as Mode, Value, VbaDecimal, VbaString};
 
 struct DeterministicTestProvider;
@@ -204,5 +207,66 @@ fn pointer_alias_tracks_configured_32_and_64_bit_targets() -> Result<(), Box<dyn
     );
     let unsupported = IntrinsicContext::no_services(Mode::Binary, "", "", "", 16);
     assert_eq!(unsupported.long_ptr_kind(), None);
+    Ok(())
+}
+
+struct TestFormattingProvider;
+impl IntrinsicFormattingService for TestFormattingProvider {
+    fn service_id(&self) -> &str {
+        "format-test-v1"
+    }
+    fn format_intrinsic(
+        &self,
+        function: I,
+        arguments: &[Option<Value>],
+        locale: &str,
+        calendar: &str,
+    ) -> vba_runtime::Result<VbaString> {
+        assert_eq!(locale, "en-test");
+        assert_eq!(calendar, "gregorian-test");
+        if matches!(function, I::ErrorMessage | I::ErrorMessageDollar) {
+            assert_eq!(arguments, &[Some(Value::Long(13))]);
+            return VbaString::from_utf8("error-13")
+                .map_err(|_| Error::Unsupported("test format failed".into()));
+        }
+        assert_eq!(function, I::FormatNumber);
+        assert_eq!(arguments, &[Some(Value::Double(12.5)), None]);
+        VbaString::from_utf8("number-12.5")
+            .map_err(|_| Error::Unsupported("test format failed".into()))
+    }
+}
+
+#[test]
+fn formatting_service_receives_options_and_current_error_number()
+-> Result<(), Box<dyn std::error::Error>> {
+    let provider = TestFormattingProvider;
+    let context = IntrinsicContext::with_execution_context(
+        Mode::Binary,
+        "en-test",
+        "gregorian-test",
+        "windows-1252",
+        64,
+        None,
+        None,
+        Some(&provider),
+        13,
+    );
+    assert_eq!(context.formatting_service_id(), Some("format-test-v1"));
+    assert_eq!(
+        vba_runtime::intrinsic_extended_with_context(
+            I::FormatNumber,
+            &[Some(Value::Double(12.5)), None],
+            &context,
+        ),
+        Ok(Value::String(VbaString::from_utf8("number-12.5")?))
+    );
+    assert_eq!(
+        vba_runtime::intrinsic_extended_with_context(I::ErrorMessage, &[], &context),
+        Ok(Value::String(VbaString::from_utf8("error-13")?))
+    );
+    assert_eq!(
+        vba_runtime::intrinsic_extended_with_context(I::ErrorMessageDollar, &[None], &context),
+        Ok(Value::String(VbaString::from_utf8("error-13")?))
+    );
     Ok(())
 }

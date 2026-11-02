@@ -81,6 +81,45 @@ fn decimal_variant_keeps_exact_identity_and_integral_ties_even_conversion() -> R
     ));
     Ok(())
 }
+
+#[test]
+fn val_str_hex_and_oct_follow_prefix_and_signed_integer_contracts() -> R {
+    assert_eq!(
+        r::intrinsic(I::Val, &[string(" 2 45 7th")?]),
+        Ok(V::Double(2457.0))
+    );
+    assert_eq!(
+        r::intrinsic(I::Val, &[string("24 and 57")?]),
+        Ok(V::Double(24.0))
+    );
+    assert_eq!(
+        r::intrinsic(I::Val, &[string("&HFFFF")?]),
+        Ok(V::Double(-1.0))
+    );
+    assert_eq!(r::intrinsic(I::Val, &[string("&O10")?]), Ok(V::Double(8.0)));
+    assert_eq!(
+        r::intrinsic(I::Hex, &[V::Long(255)]),
+        Ok(V::String(VbaString::from_utf8("FF")?))
+    );
+    assert_eq!(
+        r::intrinsic(I::Hex, &[V::Long(-1)]),
+        Ok(V::String(VbaString::from_utf8("FFFFFFFF")?))
+    );
+    assert_eq!(
+        r::intrinsic(I::Oct, &[V::Long(459)]),
+        Ok(V::String(VbaString::from_utf8("713")?))
+    );
+    assert_eq!(
+        r::intrinsic(I::Str, &[V::Long(459)]),
+        Ok(V::String(VbaString::from_utf8(" 459")?))
+    );
+    assert_eq!(
+        r::intrinsic(I::Str, &[V::Double(-459.65)]),
+        Ok(V::String(VbaString::from_utf8("-459.65")?))
+    );
+    assert_eq!(r::intrinsic(I::HexDollar, &[V::Null]), Ok(V::Null));
+    Ok(())
+}
 #[test]
 fn longlong_never_loses_integer_precision_or_wraps_on_overflow() -> R {
     for n in [i64::MIN, i64::MAX, 9007199254740993] {

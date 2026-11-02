@@ -119,6 +119,168 @@ fn decimal_from_i128(value: i128) -> Result<vba_values::VbaDecimal> {
     vba_values::VbaDecimal::new(value < 0, value.unsigned_abs(), 0).ok_or_else(overflow)
 }
 
+fn numeric_text_function(function: I, args: &[V]) -> Result<V> {
+    let value = args.first().ok_or_else(mismatch)?;
+    if function == I::Val {
+        return Ok(V::Double(val_number(value)?));
+    }
+    if matches!(function, I::Str | I::StrDollar) {
+        if matches!(value, V::Null) {
+            return Ok(V::Null);
+        }
+        let number = match value {
+            V::Boolean(value) => {
+                if *value {
+                    "-1".to_owned()
+                } else {
+                    "0".to_owned()
+                }
+            }
+            V::Byte(_)
+            | V::Integer(_)
+            | V::Long(_)
+            | V::LongLong(_)
+            | V::Currency(_)
+            | V::Decimal(_) => String::from_utf16(text(value)?.units()).map_err(|_| mismatch())?,
+            V::Empty => "0".into(),
+            _ => number_text(numeric(value)?, 15)?,
+        };
+        let rendered = if number.starts_with('-') {
+            number
+        } else {
+            format!(" {number}")
+        };
+        return Ok(V::String(
+            VbaString::from_utf8(&rendered)
+                .map_err(|_| Error::Resource("string budget exceeded".into()))?,
+        ));
+    }
+    if matches!(value, V::Null) {
+        return Ok(V::Null);
+    }
+    let number = integral(value, i128::from(i32::MIN), i128::from(i32::MAX))? as i32;
+    let rendered = if matches!(function, I::Hex | I::HexDollar) {
+        format!("{:X}", number as u32)
+    } else {
+        format!("{:o}", number as u32)
+    };
+    Ok(V::String(VbaString::from_utf8(&rendered).map_err(
+        |_| Error::Resource("string budget exceeded".into()),
+    )?))
+}
+
+fn val_number(value: &V) -> Result<f64> {
+    let text = text(value)?;
+    let original = String::from_utf16(text.units()).map_err(|_| mismatch())?;
+    let compact: String = original
+        .chars()
+        .filter(|character| !matches!(character, ' ' | '\t' | '\n'))
+        .collect();
+    let source = compact.as_str();
+    let (negative, unsigned) = match source.as_bytes().first() {
+        Some(b'-') => (true, source.get(1..).ok_or_else(mismatch)?),
+        Some(b'+') => (false, source.get(1..).ok_or_else(mismatch)?),
+        _ => (false, source),
+    };
+    let bytes = unsigned.as_bytes();
+    if let (Some(b'&'), Some(prefix)) = (bytes.first(), bytes.get(1))
+        && matches!(prefix, b'H' | b'h' | b'O' | b'o')
+    {
+        let radix = if matches!(prefix, b'H' | b'h') { 16 } else { 8 };
+        let digits = unsigned.get(2..).ok_or_else(mismatch)?;
+        let digit_count = digits
+            .bytes()
+            .take_while(|byte| char::from(*byte).is_digit(radix))
+            .count();
+        if digit_count == 0 {
+            return Ok(0.0);
+        }
+        let raw = u128::from_str_radix(digits.get(..digit_count).ok_or_else(mismatch)?, radix)
+            .map_err(|_| overflow())?;
+        let max_digits = if radix == 16 { 16 } else { 22 };
+        if digit_count > max_digits {
+            return Err(overflow());
+        }
+        let bits = if radix == 16 {
+            if digit_count <= 4 {
+                16
+            } else if digit_count <= 8 {
+                32
+            } else {
+                64
+            }
+        } else if digit_count <= 6 {
+            16
+        } else if digit_count <= 11 {
+            32
+        } else {
+            64
+        };
+        let mask = (1_u128 << bits) - 1;
+        let mut signed = (raw & mask) as i128;
+        if raw & (1_u128 << (bits - 1)) != 0 {
+            signed -= 1_i128 << bits;
+        }
+        let signed = if negative { -signed } else { signed };
+        return Ok(signed as f64);
+    }
+    let mut end = 0usize;
+    let mut digits = 0usize;
+    let mut decimal = false;
+    let mut bytes = unsigned.as_bytes();
+    while let Some(byte) = bytes.first().copied() {
+        if byte.is_ascii_digit() {
+            digits += 1;
+            end += 1;
+            bytes = bytes.get(1..).ok_or_else(mismatch)?;
+        } else if byte == b'.' && !decimal {
+            decimal = true;
+            end += 1;
+            bytes = bytes.get(1..).ok_or_else(mismatch)?;
+        } else {
+            break;
+        }
+    }
+    if digits == 0 {
+        return Ok(0.0);
+    }
+    let before_exponent = end;
+    if bytes
+        .first()
+        .is_some_and(|byte| matches!(byte, b'e' | b'E'))
+    {
+        let exponent = bytes.get(1..).ok_or_else(mismatch)?;
+        let sign_len = usize::from(
+            exponent
+                .first()
+                .is_some_and(|byte| matches!(byte, b'+' | b'-')),
+        );
+        let exponent_digits = exponent
+            .iter()
+            .skip(sign_len)
+            .take_while(|byte| byte.is_ascii_digit())
+            .count();
+        if exponent_digits > 0 {
+            end += 1 + sign_len + exponent_digits;
+        } else {
+            end = before_exponent;
+        }
+    }
+    let mut parsed = unsigned
+        .get(..end)
+        .ok_or_else(mismatch)?
+        .parse::<f64>()
+        .map_err(|_| overflow())?;
+    if negative {
+        parsed = -parsed;
+    }
+    if parsed.is_finite() {
+        Ok(parsed)
+    } else {
+        Err(overflow())
+    }
+}
+
 pub(crate) fn clng_ptr(
     arguments: &[Option<V>],
     context: &super::IntrinsicContext<'_>,
@@ -134,6 +296,27 @@ pub(crate) fn clng_ptr(
         ))
     })?;
     convert(kind, value)
+}
+
+pub(crate) fn formatting(
+    function: I,
+    arguments: &[Option<V>],
+    context: &super::IntrinsicContext<'_>,
+) -> Result<V> {
+    if !function.accepts(arguments.len()) {
+        return Err(error(450, "Wrong number of arguments"));
+    }
+    let implicit_error;
+    let effective_arguments = if matches!(function, I::ErrorMessage | I::ErrorMessageDollar)
+        && (arguments.is_empty() || arguments == [None])
+    {
+        implicit_error = [Some(V::Long(context.last_error_number()))];
+        &implicit_error[..]
+    } else {
+        arguments
+    };
+    let value = context.format_intrinsic(function, effective_arguments)?;
+    Ok(V::String(value))
 }
 
 pub(crate) fn mismatch() -> Error {
@@ -369,6 +552,12 @@ pub fn intrinsic(function: I, args: &[V]) -> Result<V> {
             32,
         );
         return cdec(&[Some(argument.clone())], &context);
+    }
+    if matches!(
+        function,
+        I::Val | I::Str | I::StrDollar | I::Hex | I::HexDollar | I::Oct | I::OctDollar
+    ) {
+        return numeric_text_function(function, args);
     }
     if function == I::InStrRev {
         let mut slots = [None, None, None, None];
