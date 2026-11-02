@@ -1,7 +1,7 @@
 # Documentation index
 
-M1–M6 are signed off for their declared profiles; the remaining plan starts at
-M6A, whose acceptance is required before M7. Fresh Excel/Word comparison is
+M1–M6 are signed off for their declared profiles and M6A is accepted; the
+remaining plan starts at M7. Fresh Excel/Word comparison is
 deferred to M8.5. The plan retains M1–M8 numbering with inserted M6A. Earlier implementation reports,
 specifications and ADRs retain historical IDs; see the
 [mapping](implementation-progress.md#plan-renumbering--2026-10-28).
@@ -9,15 +9,15 @@ specifications and ADRs retain historical IDs; see the
 Read [architecture](architecture.md), [implementation plan](implementation-plan.md),
 [scope decision](decisions/0001-repository-scope.md) and [progress](implementation-progress.md) first.
 
-[VBA intrinsic functions — M6A](vba-intrinsic-functions.md) defines the intrinsic
-inventory, implementation groups starting with StrComp, semantic/host boundaries
-and acceptance before M7. [ADR 0033](decisions/0033-intrinsics-before-package-acceptance.md)
-records the inserted milestone; this is planned work, not implemented support.
+[VBA intrinsic functions — M6A](vba-intrinsic-functions.md) records the audited
+inventory, worksheet counterpart matrix and per-function semantics. [M6A acceptance](m6a-acceptance.md)
+records the implemented profile and validation; [ADR 0033](decisions/0033-intrinsics-before-package-acceptance.md)
+records insertion before M7.
 
-[M6A framework and Luna handoff](m6a-implementation-framework.md) specifies the
-code extension points, shared contracts, small work packets and validation.
+[M6A implementation framework](m6a-implementation-framework.md) records the
+code extension points and packet design used to implement the milestone.
 [ADR 0034](decisions/0034-intrinsic-implementation-framework.md) records the design;
-the [M6A work ledger](m6a-work-ledger.md) identifies the next packet (F0).
+the [M6A work ledger](m6a-work-ledger.md) records completed packet results.
 
 [VBA attributes and Excel code-view investigation](vba-attributes-and-editor-projection.md)
 documents hidden module/member metadata, recorded-macro attributes, the blank

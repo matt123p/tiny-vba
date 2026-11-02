@@ -2,21 +2,21 @@
 
 Updated 2026-11-02. Status: M6A accepted after M6A.8/X1; all required intrinsic rows and shared/pinned-host gates pass. M7 may start.
 Owner: tiny-vba language/runtime, with explicit host services supplied by embedding
-applications. **M6A must be accepted before M7 starts.** Existing M7/M8 IDs stay
-stable. See [the implementation plan](implementation-plan.md) and
+applications. M6A acceptance was required before M7; that gate is satisfied.
+Existing M7/M8 IDs stay stable. See [the implementation plan](implementation-plan.md) and
 [ADR 0033](decisions/0033-intrinsics-before-package-acceptance.md).
 
-Implementation entry point: [M6A framework and Luna handoff](m6a-implementation-framework.md),
-with exact code paths, shared extension contracts, dependent work packets and
-StrComp test vectors. [ADR 0034](decisions/0034-intrinsic-implementation-framework.md)
-records the design; the [work ledger](m6a-work-ledger.md) tracks execution.
+The [M6A implementation framework](m6a-implementation-framework.md) records the
+code paths and work packets used to implement this scope.
+[ADR 0034](decisions/0034-intrinsic-implementation-framework.md) records the
+design; the [work ledger](m6a-work-ledger.md) records execution.
 
 ## Purpose and scope
 
 The reported `unknown procedure StrComp` is a missing shared-language intrinsic,
-not an Excel workbook-object member. GridCraft and WordCraft are pinned to shared
-tiny-vba revision `970ae9b81be0e015f89f08068551aa164db36895`; the shared runtime
-provides deterministic UTF-16 Binary comparison, while Text comparison requires
+not an Excel workbook-object member. GridCraft and WordCraft now pin shared
+tiny-vba revision `0b41fd7bf7c78a62323133b290f2f9646667f9d3`; the shared runtime
+provides configured code-page Binary comparison, while Text comparison requires
 an explicitly injected provider. Worksheet-function coverage does not establish
 VBA intrinsic coverage.
 
@@ -42,10 +42,11 @@ MS-VBAL and each function's public reference to resolve individual contracts.
 
 ## Inventory and implementation groups
 
-The following is the required seed inventory, not an audited exhaustive catalogue.
-M6A.1 must reconcile the public index, related function pages, syntax variants and
-actual registry into a per-function matrix in this document. Do not assume that
-every name here is missing or that a worksheet analogue has identical semantics.
+The following was the seed inventory. M6A.1 reconciled the public index, related
+function pages, syntax variants and actual registry into the per-function matrix
+below. The catalogue remains open to newly identified VBA names and variants;
+do not assume that every name was missing or that a worksheet analogue has
+identical semantics.
 
 | Group | Names to inventory and implement/audit |
 |---|---|
@@ -62,7 +63,7 @@ every name here is missing or that a worksheet analogue has identical semantics.
 | Platform/restricted facilities | Shell, CreateObject, GetObject, IMEStatus, MacID, MacScript; classify platform availability and existing policy restrictions |
 | Context-dependent output | Spc, Tab and existing Debug.Print lowering; distinguish function syntax from output statements |
 
-Record each spelling/variant's signature and defaults, argument names, return tag,
+The audited matrix records each spelling/variant's signature and defaults, argument names, return tag,
 module-option dependencies, platform/locale requirements, worksheet-name overlap,
 owning layer, present support/limitations, implementation task, tests and evidence.
 Use separate columns for implemented capability and observed test outcome.
@@ -74,7 +75,7 @@ The current `vba-values::Intrinsic` registry and `vba-runtime` implementation ar
 the starting code audit, together with binder/lowering/VM and IDE call paths.
 Internal enum entries such as ArrayBaseOne are not additional public VBA functions.
 
-## M6A.1 audited seed inventory (F0)
+## M6A.1 audited inventory (F0)
 
 Audited against the current registry/runtime/binder/compiler/VM/IDE tree on
 2026-11-01. `Partial` means a runtime arm exists but does not satisfy the full
@@ -246,9 +247,9 @@ Every scenario not explicitly listed as an executed test remains `NOT_RUN`.
 | Tab | `([n])` in Print context | Unsupported syntax; no standalone function identity or output-positioning operation | M6A.6/H3 disposition: deferred syntax profile | No worksheet analogue; output positioning | [VBA index](https://learn.microsoft.com/en-us/office/vba/language/reference/functions-visual-basic-for-applications) |
 | Debug.Print | `Print [arglist]` statement | Implemented as bounded captured UTF-16 output, comma items separated by tab; semicolon and Spc/Tab positioning syntax unsupported by current parser | M6A.6/H3 disposition: documented profile | No worksheet analogue; output effect and pause semantics | [VBA language reference](https://learn.microsoft.com/en-us/office/vba/language/reference/user-interface-help/debug-object) |
 
-The `$` forms shown in compound spelling cells are separate public spellings,
-not implemented aliases yet. Other host families can also expose typed `$`
-forms; H3/H4 packets must reconcile them against the index before implementation.
+The `$` forms shown in compound spelling cells are separate public spellings.
+The audit records their implemented status individually; newly identified typed
+forms remain candidates for inventory updates.
 `Error 5` for invalid compare modes and exact precedence when compare and string
 arguments are independently invalid are not asserted here: Microsoft Learn's
 StrComp page states that Null compare errors, but does not number that error or
@@ -288,9 +289,9 @@ implementation and not an Office compatibility observation.
 
 These are conceptual counterparts, not interchangeable implementations. Some
 worksheet alternatives require recent Excel versions or several composed
-functions. M6A.1 must expand grouped entries into per-function inventory rows and
-record the applicable version/platform and exact reference contract. Every VBA
-function below is already included in the implementation groups above.
+functions. M6A.1 expanded grouped entries into per-function inventory rows and
+recorded the applicable version/platform and reference contract. Every VBA
+function below is included in the implementation groups above.
 
 | VBA function(s) | Worksheet counterpart(s) | Difference to implement and test |
 |---|---|---|
@@ -391,18 +392,18 @@ WorksheetFunction, workbook selection/clipboard/sort, document trust, packaging
 and undo/recalculation remain fork-owned. This milestone does not authorize
 arbitrary COM/DLL activation, P-code or third-party ActiveX controls.
 
-M6A.1 must classify each host/platform row as an existing service, a required
+M6A.1 classified each host/platform row as an existing service, a required
 bounded service implementation, or an explicit refusal required by current scope.
-Publish the exact function, platform, reason and diagnostic for each refusal;
+The inventory records the exact function, platform, reason and diagnostic for each refusal;
 do not count refusal as implemented VBA behaviour. An unavailable service must
 not appear merely as an unknown user procedure. Platform-specific and restricted
 rows cannot silently disappear from the inventory or become implicit M7 work.
 
 ## M6A.8 cross-host verification status
 
-The published shared revision `0b41fd7bf7c78a62323133b290f2f9646667f9d3` and pinned GridCraft (`9b1f8b9b`) and WordCraft (`1e2b7dfd`) forks exercise `StrComp` in an authored worksheet UDF and macro. All required intrinsic rows, shared gates and host application gates pass; M6A is accepted and M7 may start. Remaining explicit policy/platform refusals are recorded per row. Exact commands and results are in the [work ledger](m6a-work-ledger.md#current-packet). No fresh Office observation is claimed; those are deferred to M8.5.
+The published shared revision `0b41fd7bf7c78a62323133b290f2f9646667f9d3` and pinned GridCraft (`9b1f8b9b`) and WordCraft (`1e2b7dfd`) forks exercise `StrComp` in an authored worksheet UDF and macro. All required intrinsic rows, shared gates and host application gates pass; M6A is accepted and M7 may start. Remaining explicit policy/platform refusals are recorded per row. Exact commands and results are in the [acceptance record](m6a-acceptance.md) and [work ledger](m6a-work-ledger.md#m6a-8-acceptance). No fresh Office observation is claimed; those are deferred to M8.5.
 
-## Acceptance before M7
+## M6A acceptance criteria (satisfied for the declared profile)
 
 1. Publish the reconciled per-function inventory with no NOT_AUDITED rows,
    signatures, scope dispositions, platform limits and linked evidence.

@@ -1,36 +1,38 @@
 # Implementation progress
 
-Updated 2026-11-01. The classic-editor/debugger profile is implemented; its
-historical milestone is M10. Runtime remains m5-host-v1 with verified IR 1/2/3/4/5/6/7.
-The [remaining plan](implementation-plan.md) now contains **M6A, then M7–M8**.
-**M1–M6 are signed off for their declared profiles.** The owner approved moving
+Updated 2026-11-02. The classic-editor/debugger profile is implemented; its
+historical milestone is M10. Runtime host profile remains m5-host-v1; verified IR
+1/2/3/4/5/6/7 and the accepted IR 8 `intrinsics-m6a-v1` extension are implemented.
+The [remaining plan](implementation-plan.md) now contains **M7–M8**.
+**M1–M6 are signed off for their declared profiles; M6A is accepted.** The owner approved moving
 fresh Excel/Word comparisons from M6.4 to M8.5 on 2026-11-01; those comparisons
 remain NOT_RUN and no longer block M7. [M6 acceptance](m6-acceptance.md) records
 the tested scope and [ADR 0032](decisions/0032-m6-sign-off-and-reference-comparison-deferral.md)
-records the revised gate. **Next: M6A.1**, inventory and audit VBA intrinsic
-functions, then implement StrComp in M6A.2. M6A acceptance must precede M7;
+records the revised gate. [M6A acceptance](m6a-acceptance.md) records the
+completed intrinsic inventory and shared/fork validation. **Next: M7.1**, curate
+and classify licensed specimens for unchanged-document/package acceptance.
 M7 implementation has not started.
 Office objects, document events, trust and packaging remain fork-owned.
 
 ## Intrinsic milestone inserted before M7 (2026-11-01)
 
-Owner direction adds **M6A — VBA intrinsic-function coverage** before M7,
+Owner direction added **M6A — VBA intrinsic-function coverage** before M7,
 preserving existing M7/M8 IDs and M6 sign-off. The
 [intrinsic-function document](vba-intrinsic-functions.md) defines the seed
 inventory, audit requirements, implementation groups, host/platform boundaries
 and acceptance. [ADR 0033](decisions/0033-intrinsics-before-package-acceptance.md)
 records the sequencing change. Audit existing partial support alongside missing
-functions; worksheet equivalents do not establish VBA semantics. Shared and real
-fork acceptance must pass before M7 starts. Fresh Office observations remain M8.5.
-This change is planning only; no new intrinsic support or execution evidence.
+functions; worksheet equivalents do not establish VBA semantics. M6A.8 and M6A
+acceptance completed 2026-11-02; see [the acceptance record](m6a-acceptance.md)
+and [work ledger](m6a-work-ledger.md). Fresh Office observations remain M8.5.
 
-Framework prepared for Luna: [implementation handoff](m6a-implementation-framework.md)
+The Luna handoff: [implementation framework](m6a-implementation-framework.md)
 maps inspected code paths to descriptor/binder/IR/runtime/IDE responsibilities,
 specifies IR 8 extended calls without changing legacy contracts, and breaks work
 into F0–F4 foundations plus small function packets and typed StrComp vectors.
 [ADR 0034](decisions/0034-intrinsic-implementation-framework.md) records the
-design. The [ledger](m6a-work-ledger.md) starts at F0, NOT_STARTED. No implementation,
-publication, dependency pin or runtime capability changed during preparation.
+design. Its packet guidance is retained for future intrinsic work; packet status
+and evidence are recorded in the [completed ledger](m6a-work-ledger.md).
 
 ## Reported Food.xlsm For-counter correction (2026-11-01)
 

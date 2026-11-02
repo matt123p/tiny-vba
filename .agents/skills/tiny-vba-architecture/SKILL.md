@@ -5,13 +5,14 @@ description: Design or review tiny-vba crate boundaries, public APIs, dependenci
 
 # Architecture decisions
 
-M6A's planned intrinsic extension follows
+M6A's accepted intrinsic extension follows
 [the framework](../../../docs/m6a-implementation-framework.md) and
 [ADR 0034](../../../docs/decisions/0034-intrinsic-implementation-framework.md):
 descriptors in values, one semantic argument binder, verified IR 8 extended calls,
 central runtime coercion and VM-owned context/effects. The design adds no crate
 or ambient IO authority; implementation/versioned documentation must land
-together. IR 8 is planned, not current support. M6A acceptance precedes M7.
+together. See the [acceptance record](../../../docs/m6a-acceptance.md) before
+extending the supported profile. M7 is the next milestone.
 
 The remaining plan now uses new M1–M8 numbers under ADR 0019. Implemented contract
 IDs in this skill and earlier ADRs are historical; use the progress mapping when

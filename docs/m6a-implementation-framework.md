@@ -1,23 +1,19 @@
-# M6A implementation framework and Luna handoff
+# M6A implementation framework and implementation record
 
-Updated 2026-11-01. Status: design and work breakdown; no runtime implementation
-or test results are claimed. Read [the scope](vba-intrinsic-functions.md),
+Updated 2026-11-02. Status: framework used to implement M6A; implementation and
+validation are recorded in the [work ledger](m6a-work-ledger.md) and
+[acceptance record](m6a-acceptance.md). Read [the scope](vba-intrinsic-functions.md),
 [the plan](implementation-plan.md) and
 [ADR 0034](decisions/0034-intrinsic-implementation-framework.md) first.
-M6A acceptance is a prerequisite for M7. Implement one packet at a time; preserve current
-M6 acceptance and historical IR/runtime contracts.
+M6A acceptance was a prerequisite for M7. The packets below document the completed
+implementation sequence; preserve current M6 and M6A contracts during follow-up.
 
 ## Start here
 
-1. Read AGENTS.md and the development/language-semantics skills. Inspect the
-   working tree; it already contains the M6A planning changes. Preserve them.
-2. Complete packet F0 below. Its output is an audited inventory and the first
-   implementation packet, not a claim that all intrinsics are supported.
-3. Implement F1–F4 in order, with small reviewable changes. Then implement
-   function packets in the prescribed order. Do not rewrite the whole interpreter.
-4. Update the ledger after each packet with exact tests and remaining work.
-   Continue to the next ready packet unless user direction or an actual blocker
-   requires otherwise. No approval is needed for routine choices within this design.
+1. Read AGENTS.md, the relevant development skills and the accepted inventory.
+2. Inspect current code and the ledger before making follow-up changes.
+3. Preserve the versioned contracts and limits recorded below; add new evidence
+   to the ledger when extending support.
 
 ## Verified code map and current gaps
 
@@ -290,10 +286,12 @@ No new remote fixture/macro execution is authorized by this framework.
 
 Final X1 acceptance includes both fork adapters and their application gates using
 published immutable tiny-vba pins, including StrComp in a GridCraft worksheet UDF.
-Do not publish, push or change fork pins as part of preparing this handoff.
-At implementation time, follow the user's current publication instructions and
-repository gates; no development path overrides count as final fork acceptance.
+The M6A work published the shared revision and pinned fork changes to their
+existing feature branches; see the acceptance record for evidence. Future changes
+must follow current publication instructions and repository gates. Development
+path overrides do not count as final fork acceptance.
 
 Report a packet's outcome in this form: implemented behaviour; exact tests run;
-remaining gaps/blockers; next packet. Leave M6A planned/in-progress until every
-required row and X1 pass. Fresh Office comparisons remain M8.5.
+remaining gaps/blockers; next packet. Keep M6A accepted for its declared profile;
+add newly identified gaps to the inventory and plan deliberately. Fresh Office
+comparisons remain M8.5.

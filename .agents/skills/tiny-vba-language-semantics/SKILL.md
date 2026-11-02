@@ -5,14 +5,14 @@ description: Implement or review VBA syntax, binding, values, coercion, bytecode
 
 # VBA language semantics
 
-For planned intrinsic expansion, follow
-[M6A](../../../docs/vba-intrinsic-functions.md) and
-[ADR 0033](../../../docs/decisions/0033-intrinsics-before-package-acceptance.md).
-M6A acceptance precedes M7. Audit existing partial support and missing functions,
-starting implementation with StrComp; retain shared coercion, UTF-16 and exact
-types/errors. Worksheet equivalents are not a VBA implementation. Environmental
-services require explicit injection; platform/policy refusals remain distinct
-from implemented capabilities and test outcomes.
+For the accepted M6A intrinsic profile, see
+[the inventory](../../../docs/vba-intrinsic-functions.md),
+[acceptance](../../../docs/m6a-acceptance.md) and
+[implementation record](../../../docs/m6a-work-ledger.md). IR 8 extended calls,
+the descriptor catalogue and argument planning are implemented. Retain shared
+coercion, UTF-16 and exact types/errors; worksheet equivalents are not a VBA
+implementation. Environmental services require explicit injection; documented
+policy/platform limits remain distinct from supported behavior.
 
 Use [the implementation framework](../../../docs/m6a-implementation-framework.md)
 and [ADR 0034](../../../docs/decisions/0034-intrinsic-implementation-framework.md)

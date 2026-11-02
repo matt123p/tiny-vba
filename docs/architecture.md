@@ -10,17 +10,18 @@ The engine and toolkit-independent IDE model compile and test without Office, UI
 application forks or corpus downloads. This repository also owns an optional editor/debugger UI
 and standalone IDE; those upper layers may depend on UI toolkits.
 
-Planned 2026-11-01: [M6A intrinsic coverage](vba-intrinsic-functions.md) precedes M7
+Accepted 2026-11-02: [M6A intrinsic coverage](vba-intrinsic-functions.md) precedes M7
 under [ADR 0033](decisions/0033-intrinsics-before-package-acceptance.md). It uses
 the existing syntax/binding, values/runtime, verified IR/VM and shared IDE layers;
 environmental services remain explicit host injections. This planning decision
-adds no crate, dependency edge, runtime capability or ambient IO authority.
+added no crate, dependency edge or ambient IO authority.
 
 The [M6A implementation framework](m6a-implementation-framework.md), adopted in
 [ADR 0034](decisions/0034-intrinsic-implementation-framework.md), specifies a
-shared descriptor catalogue, argument call plan and future IR 8 extended-call
-capability. It preserves legacy instructions and uses explicit context/host
-services. IR 8 remains a design to implement, not current execution support.
+shared descriptor catalogue, argument call plan and IR 8 extended-call capability.
+The legacy instruction remains supported; environmental calls use explicit
+context/host services. See [M6A acceptance](m6a-acceptance.md) for evidence and
+profile limits.
 
 VBA source flows through syntax → semantics → verified IR → explicit-state VM.
 The dependency graph is separate from this data flow: IR does not need a dependency on the binder.
