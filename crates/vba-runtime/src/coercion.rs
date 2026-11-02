@@ -84,6 +84,58 @@ pub(crate) fn locale_conversion(
     Ok(V::Boolean(numeric))
 }
 
+pub(crate) fn cdec(arguments: &[Option<V>], context: &super::IntrinsicContext<'_>) -> Result<V> {
+    let value = arguments
+        .first()
+        .and_then(Option::as_ref)
+        .ok_or_else(mismatch)?;
+    use vba_values::VbaDecimal as D;
+    let decimal = match value {
+        V::Decimal(decimal) => *decimal,
+        V::Empty => D::ZERO,
+        V::Boolean(value) => D::new(*value, 1, 0).ok_or_else(overflow)?,
+        V::Byte(value) => D::new(false, u128::from(*value), 0).ok_or_else(overflow)?,
+        V::Integer(value) => decimal_from_i128(i128::from(*value))?,
+        V::Long(value) => decimal_from_i128(i128::from(*value))?,
+        V::LongLong(value) => decimal_from_i128(i128::from(*value))?,
+        V::Currency(value) => {
+            D::new(*value < 0, u128::from(value.unsigned_abs()), 4).ok_or_else(overflow)?
+        }
+        V::String(text) => context.parse_decimal(text)?.ok_or_else(mismatch)?,
+        V::Null => return Err(error(94, "Invalid use of Null")),
+        V::Missing => return Err(error(448, "Named argument not found")),
+        V::Nothing => return Err(error(91, "Object variable not set")),
+        V::Single(_) | V::Double(_) | V::Date(_) => {
+            return Err(Error::Unsupported(
+                "exact CDec conversion from binary floating-point is unavailable".into(),
+            ));
+        }
+        _ => return Err(mismatch()),
+    };
+    Ok(V::Decimal(decimal))
+}
+
+fn decimal_from_i128(value: i128) -> Result<vba_values::VbaDecimal> {
+    vba_values::VbaDecimal::new(value < 0, value.unsigned_abs(), 0).ok_or_else(overflow)
+}
+
+pub(crate) fn clng_ptr(
+    arguments: &[Option<V>],
+    context: &super::IntrinsicContext<'_>,
+) -> Result<V> {
+    let value = arguments
+        .first()
+        .and_then(Option::as_ref)
+        .ok_or_else(mismatch)?;
+    let kind = context.long_ptr_kind().ok_or_else(|| {
+        Error::Unsupported(format!(
+            "longptr-target-width-unavailable:{}",
+            context.target_width_bits()
+        ))
+    })?;
+    convert(kind, value)
+}
+
 pub(crate) fn mismatch() -> Error {
     error(13, "Type mismatch")
 }
@@ -301,6 +353,22 @@ pub fn intrinsic(function: I, args: &[V]) -> Result<V> {
         return Err(Error::Unsupported(
             "StrComp requires an injected comparison context".into(),
         ));
+    }
+    if function == I::CLngPtr {
+        return Err(Error::Unsupported(
+            "CLngPtr requires an explicit target-width context".into(),
+        ));
+    }
+    if function == I::CDec {
+        let argument = args.first().ok_or_else(mismatch)?;
+        let context = super::IntrinsicContext::no_services(
+            vba_values::IntrinsicComparisonMode::Binary,
+            "",
+            "",
+            "",
+            32,
+        );
+        return cdec(&[Some(argument.clone())], &context);
     }
     if function == I::InStrRev {
         let mut slots = [None, None, None, None];

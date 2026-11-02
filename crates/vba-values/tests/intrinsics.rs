@@ -290,6 +290,8 @@ fn locale_conversion_descriptors_require_ir8_context() {
         Intrinsic::IsDate,
         Intrinsic::IsNumeric,
         Intrinsic::CStr,
+        Intrinsic::CDec,
+        Intrinsic::CLngPtr,
     ] {
         let descriptor = descriptor_for(intrinsic);
         assert_eq!(descriptor.map(|item| item.minimum_ir), Some(8));
@@ -302,6 +304,14 @@ fn locale_conversion_descriptors_require_ir8_context() {
             Some("intrinsics-m6a-v1")
         );
     }
+    assert_eq!(
+        descriptor_for(Intrinsic::CDec).map(|item| item.return_variant),
+        Some(IntrinsicReturn::Variant)
+    );
+    assert_eq!(
+        descriptor_for(Intrinsic::CLngPtr).map(|item| item.return_variant),
+        Some(IntrinsicReturn::Polymorphic)
+    );
 }
 
 #[test]

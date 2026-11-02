@@ -130,6 +130,19 @@ impl DateConversionService for VmDateProvider {
         })
     }
 
+    fn parse_decimal(
+        &self,
+        text: &VbaString,
+        locale: &str,
+    ) -> vba_runtime::Result<Option<vba_values::VbaDecimal>> {
+        assert_eq!(locale, "test-locale");
+        Ok(if text.units() == [100, 101, 99, 105, 109, 97, 108] {
+            vba_values::VbaDecimal::parse_ascii("1.2300")
+        } else {
+            None
+        })
+    }
+
     fn is_numeric_text(&self, text: &VbaString, locale: &str) -> vba_runtime::Result<bool> {
         assert_eq!(locale, "test-locale");
         Ok(text.units() == [110, 117, 109, 101, 114, 105, 99])
@@ -150,7 +163,7 @@ impl DateConversionService for VmDateProvider {
     }
 }
 
-fn session_with_date_service(source_text: &str) -> R<Session> {
+fn session_with_date_service_and_width(source_text: &str, width: u8) -> R<Session> {
     let source = SourceFile::new(SourceId(92), "date.bas".into(), source_text.into())?;
     let program = compile(
         &source,
@@ -163,7 +176,7 @@ fn session_with_date_service(source_text: &str) -> R<Session> {
         "test-locale".into(),
         "test-calendar".into(),
         "test-code-page".into(),
-        64,
+        width,
     )?;
     Ok(Session::new_with_date_conversion_service(
         program,
@@ -175,12 +188,23 @@ fn session_with_date_service(source_text: &str) -> R<Session> {
         config,
     )?)
 }
+fn session_with_date_service(source_text: &str) -> R<Session> {
+    session_with_date_service_and_width(source_text, 64)
+}
 fn number(source: &str, expected: i32) -> R {
     let Outcome::Failed(f) = drive(&mut session(source)?)? else {
         return Err("expected numbered failure".into());
     };
     assert_eq!(f.kind, vm::FailureKind::Runtime);
     assert_eq!(f.number, Some(expected));
+    Ok(())
+}
+fn number_in_session(mut session: Session, expected: i32) -> R {
+    let Outcome::Failed(failure) = drive(&mut session)? else {
+        return Err("expected numbered failure".into());
+    };
+    assert_eq!(failure.kind, vm::FailureKind::Runtime);
+    assert_eq!(failure.number, Some(expected));
     Ok(())
 }
 
@@ -917,6 +941,39 @@ fn c3_isnumeric_and_cstr_date_use_the_injected_locale_provider() -> R {
             "date-text:True:False",
         )?)))
     );
+    Ok(())
+}
+
+#[test]
+fn c5_cdec_and_clngptr_use_exact_decimal_and_target_width() -> R {
+    assert_eq!(
+        drive(&mut session_with_date_service(
+            "Function Answer() As Variant\nAnswer=CDec(\"decimal\")\nEnd Function",
+        )?)?,
+        Outcome::Completed(ReturnValue::Function(Value::Decimal(
+            vba_values::VbaDecimal::parse_ascii("1.2300").ok_or("decimal fixture")?,
+        )))
+    );
+    assert_eq!(
+        drive(&mut session_with_date_service_and_width(
+            "Function Answer() As Long\nAnswer=CLngPtr(2147483647)\nEnd Function",
+            32,
+        )?)?,
+        Outcome::Completed(ReturnValue::Function(Value::Long(i32::MAX)))
+    );
+    assert_eq!(
+        drive(&mut session_with_date_service(
+            "Function Answer() As LongLong\nAnswer=CLngPtr(CLngLng(\"2147483648\"))\nEnd Function",
+        )?)?,
+        Outcome::Completed(ReturnValue::Function(Value::LongLong(2147483648)))
+    );
+    number_in_session(
+        session_with_date_service_and_width(
+            "Function Answer() As Long\nAnswer=CLngPtr(CLngLng(\"2147483648\"))\nEnd Function",
+            32,
+        )?,
+        6,
+    )?;
     Ok(())
 }
 #[test]

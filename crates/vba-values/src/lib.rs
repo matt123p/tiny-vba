@@ -381,11 +381,13 @@ pub enum Intrinsic {
     CInt,
     CLng,
     CLngLng,
+    CLngPtr,
     CByte,
     CSng,
     CDbl,
     CCur,
     CDate,
+    CDec,
     CBool,
     CStr,
     CVar,
@@ -684,6 +686,8 @@ const fn descriptor(
             | Intrinsic::IsDate
             | Intrinsic::IsNumeric
             | Intrinsic::CStr
+            | Intrinsic::CDec
+            | Intrinsic::CLngPtr
     ) {
         (8, "intrinsics-m6a-v1")
     } else if matches!(intrinsic, Intrinsic::IIf) {
@@ -744,6 +748,8 @@ const fn descriptor(
             | Intrinsic::CDbl
             | Intrinsic::CCur
             | Intrinsic::CDate
+            | Intrinsic::CDec
+            | Intrinsic::CLngPtr
             | Intrinsic::CBool
             | Intrinsic::CStr
             | Intrinsic::CVar
@@ -797,6 +803,8 @@ const fn descriptor(
                 | Intrinsic::IsDate
                 | Intrinsic::IsNumeric
                 | Intrinsic::CStr
+                | Intrinsic::CDec
+                | Intrinsic::CLngPtr
         ) {
             IntrinsicEffect::Contextual
         } else {
@@ -818,6 +826,8 @@ const fn descriptor(
                 | Intrinsic::IsDate
                 | Intrinsic::IsNumeric
                 | Intrinsic::CStr
+                | Intrinsic::CDec
+                | Intrinsic::CLngPtr
         ) {
             "injected comparison or locale conversion service"
         } else {
@@ -863,10 +873,12 @@ const fn return_variant(intrinsic: Intrinsic) -> IntrinsicReturn {
         I::CInt => R::Fixed(K::Integer),
         I::CLng => R::Fixed(K::Long),
         I::CLngLng => R::Fixed(K::LongLong),
+        I::CLngPtr => R::Polymorphic,
         I::CByte => R::Fixed(K::Byte),
         I::CSng => R::Fixed(K::Single),
         I::CDbl | I::Round => R::Fixed(K::Double),
         I::CCur => R::Fixed(K::Currency),
+        I::CDec => R::Variant,
         I::CDate => R::Fixed(K::Date),
         I::CBool => R::Fixed(K::Boolean),
         I::CStr => R::Fixed(K::String),
@@ -1027,6 +1039,13 @@ pub const INTRINSIC_DESCRIPTORS: &[IntrinsicDescriptor] = &[
         "CLngLng(expression)",
     ),
     descriptor(
+        Intrinsic::CLngPtr,
+        "CLngPtr",
+        ONE_VALUE,
+        false,
+        "CLngPtr(expression)",
+    ),
+    descriptor(
         Intrinsic::CByte,
         "CByte",
         ONE_VALUE,
@@ -1053,6 +1072,13 @@ pub const INTRINSIC_DESCRIPTORS: &[IntrinsicDescriptor] = &[
         ONE_VALUE,
         false,
         "CCur(expression)",
+    ),
+    descriptor(
+        Intrinsic::CDec,
+        "CDec",
+        ONE_VALUE,
+        false,
+        "CDec(expression)",
     ),
     descriptor(
         Intrinsic::CDate,

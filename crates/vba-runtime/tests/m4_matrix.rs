@@ -69,6 +69,16 @@ fn decimal_variant_keeps_exact_identity_and_integral_ties_even_conversion() -> R
         ),
         Ok(V::Long(4))
     );
+    assert_eq!(
+        r::intrinsic(I::CDec, &[V::LongLong(9_007_199_254_740_993)]),
+        Ok(V::Decimal(
+            VbaDecimal::parse_ascii("9007199254740993").ok_or("exact decimal")?
+        ))
+    );
+    assert!(matches!(
+        r::intrinsic(I::CDec, &[V::Double(0.1)]),
+        Err(Error::Unsupported(_))
+    ));
     Ok(())
 }
 #[test]

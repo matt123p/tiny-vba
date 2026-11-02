@@ -1,6 +1,6 @@
 use std::cmp::Ordering;
 use vba_runtime::{DateConversionService, Error, IntrinsicContext, StringComparisonService};
-use vba_values::{Intrinsic as I, IntrinsicComparisonMode as Mode, Value, VbaString};
+use vba_values::{Intrinsic as I, IntrinsicComparisonMode as Mode, Value, VbaDecimal, VbaString};
 
 struct DeterministicTestProvider;
 
@@ -89,6 +89,19 @@ impl DateConversionService for TestDateProvider {
         Ok(text.units() == [49, 50, 51, 44, 53])
     }
 
+    fn parse_decimal(
+        &self,
+        text: &VbaString,
+        locale: &str,
+    ) -> vba_runtime::Result<Option<VbaDecimal>> {
+        assert_eq!(locale, "en-test");
+        Ok(if text.units() == [49, 50, 51, 44, 53] {
+            VbaDecimal::parse_ascii("123.5")
+        } else {
+            None
+        })
+    }
+
     fn format_date(
         &self,
         serial: f64,
@@ -126,6 +139,16 @@ fn date_conversion_requires_and_uses_explicit_locale_calendar_service()
             &context,
         ),
         Ok(Value::Date(45000.0))
+    );
+    assert_eq!(
+        vba_runtime::intrinsic_extended_with_context(
+            I::CDec,
+            &[Some(Value::String(VbaString::from_utf8("123,5")?))],
+            &context,
+        ),
+        Ok(Value::Decimal(
+            VbaDecimal::parse_ascii("123.5").ok_or("decimal fixture")?
+        ))
     );
     assert_eq!(
         vba_runtime::intrinsic_extended_with_context(

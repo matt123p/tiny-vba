@@ -3,7 +3,7 @@
 use std::cmp::Ordering;
 mod coercion;
 pub use coercion::{intrinsic, intrinsic_extended};
-use vba_values::{ScalarKind, Value, VbaString};
+use vba_values::{ScalarKind, Value, VbaDecimal, VbaString};
 pub const PROFILE: &str = "m5-host-v1";
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum Error {
@@ -48,6 +48,10 @@ pub trait DateConversionService: Send + Sync {
     fn is_numeric_text(&self, _text: &VbaString, _locale: &str) -> Result<bool> {
         Ok(false)
     }
+    /// Parse a locale-specific number directly into the exact Decimal representation.
+    fn parse_decimal(&self, _text: &VbaString, _locale: &str) -> Result<Option<VbaDecimal>> {
+        Ok(None)
+    }
     /// Format a Date serial using the selected locale and calendar.
     fn format_date(
         &self,
@@ -75,6 +79,12 @@ pub fn intrinsic_extended_with_context(
         vba_values::Intrinsic::CDate | vba_values::Intrinsic::IsDate
     ) {
         return coercion::date_conversion(function, arguments, context);
+    }
+    if function == vba_values::Intrinsic::CDec {
+        return coercion::cdec(arguments, context);
+    }
+    if function == vba_values::Intrinsic::CLngPtr {
+        return coercion::clng_ptr(arguments, context);
     }
     if matches!(
         function,
@@ -234,6 +244,16 @@ impl<'a> IntrinsicContext<'a> {
             ))
         })?;
         service.is_numeric_text(value, self.locale)
+    }
+
+    pub fn parse_decimal(&self, value: &VbaString) -> Result<Option<VbaDecimal>> {
+        let service = self.date_conversion.ok_or_else(|| {
+            Error::Unsupported(format!(
+                "decimal-conversion-service-unavailable:{}",
+                self.locale
+            ))
+        })?;
+        service.parse_decimal(value, self.locale)
     }
 
     pub fn format_date(&self, serial: f64) -> Result<Option<VbaString>> {
