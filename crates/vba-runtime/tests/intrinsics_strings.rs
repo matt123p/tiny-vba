@@ -1090,3 +1090,44 @@ fn ascii_case_conversion_refuses_unimplemented_non_ascii_mapping() -> TestResult
     ));
     Ok(())
 }
+
+#[test]
+fn ascw_chr_w_use_signed_utf16_codes_and_preserve_surrogates() -> TestResult {
+    assert_eq!(
+        vba_runtime::intrinsic(
+            I::AscW,
+            &[V::String(VbaString::from_units(vec![0xd834, 0xdd1e])?)]
+        )
+        .map_err(|error| std::io::Error::other(format!("{error:?}")))?,
+        V::Integer(0xd834u16 as i16)
+    );
+    assert_eq!(
+        vba_runtime::intrinsic(I::ChrW, &[V::Long(0xd834)])
+            .map_err(|error| std::io::Error::other(format!("{error:?}")))?,
+        V::String(VbaString::from_units(vec![0xd834])?)
+    );
+    assert_eq!(
+        vba_runtime::intrinsic(I::ChrW, &[V::Long(-1)])
+            .map_err(|error| std::io::Error::other(format!("{error:?}")))?,
+        V::String(VbaString::from_units(vec![0xffff])?)
+    );
+    assert_eq!(
+        vba_runtime::intrinsic(I::ChrW, &[V::Long(-32768)])
+            .map_err(|error| std::io::Error::other(format!("{error:?}")))?,
+        V::String(VbaString::from_units(vec![0x8000])?)
+    );
+    assert_eq!(
+        vba_runtime::intrinsic(I::ChrW, &[V::Long(65535)])
+            .map_err(|error| std::io::Error::other(format!("{error:?}")))?,
+        V::String(VbaString::from_units(vec![0xffff])?)
+    );
+    assert!(matches!(
+        vba_runtime::intrinsic(I::AscW, &[string("")?]),
+        Err(Error::Vba { number: 5, .. })
+    ));
+    assert!(matches!(
+        vba_runtime::intrinsic(I::ChrW, &[V::Long(65536)]),
+        Err(Error::Vba { number: 5, .. })
+    ));
+    Ok(())
+}

@@ -268,3 +268,21 @@ fn case_descriptors_match_their_documented_return_contracts()
     );
     Ok(())
 }
+
+#[test]
+fn wide_character_descriptors_have_integer_and_string_results()
+-> Result<(), Box<dyn std::error::Error>> {
+    assert_eq!(
+        Intrinsic::AscW
+            .descriptor()
+            .map(|descriptor| descriptor.return_variant),
+        Some(IntrinsicReturn::Fixed(ScalarKind::Integer))
+    );
+    assert_eq!(
+        Intrinsic::ChrW
+            .descriptor()
+            .map(|descriptor| descriptor.return_variant),
+        Some(IntrinsicReturn::Fixed(ScalarKind::String))
+    );
+    Ok(())
+}

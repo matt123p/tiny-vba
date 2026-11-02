@@ -177,7 +177,8 @@ functions; split a row below further when its tests or dependencies warrant it.
 | S6 | M6A.2 | S5 | Add LTrim/RTrim and StrReverse with whitespace-edge, UTF-16 and Null boundaries. |
 | S7 | M6A.2 | S6 | Implement Space/String count, character, Null, return-tag and bounded-output rules. |
 | S8 | M6A.2 | S7 | Audit LCase/UCase coercion, Null, case range, return type and locale boundary. |
-| S9 onward | M6A.2 | S8 | Continue character/byte/`$` variants in small packets; audit existing functions as well. |
+| S9 | M6A.2 | S8 | Implement AscW/ChrW over UTF-16 code units, with signed Integer returns and surrogate boundaries. |
+| S10 onward | M6A.2 | S9 | Continue byte and `$` variants in small packets; audit existing functions as well. |
 | C1 onward | M6A.3 | F3; relevant context | Conversion/predicates first, then formatting. Decimal and target-width foundation precede CDec/CLngPtr; no Double approximation. |
 | A1 onward | M6A.4 | F3 | Arrays/bounds and conditional selection/evaluation; preserve existing array storage/aliases and IIf eagerness. |
 | N1 onward | M6A.4 | F3 | Pure numeric functions, then financial functions with bounded convergence and exact VBA error contracts. |

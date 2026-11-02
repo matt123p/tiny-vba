@@ -448,6 +448,22 @@ fn lcase_ucase_ascii_and_null_contracts_are_explicit() -> R {
 }
 
 #[test]
+fn ascw_chrw_round_trip_utf16_units_through_source_calls() -> R {
+    answer(
+        "Function Answer() As String\nAnswer=ChrW(55357) & ChrW(56832)\nEnd Function",
+        Value::String(VbaString::from_units(vec![0xd83d, 0xde00])?),
+    )?;
+    answer(
+        "Function Answer() As Long\nAnswer=AscW(ChrW(55357))\nEnd Function",
+        Value::Long(0xd83du16 as i16 as i32),
+    )?;
+    answer(
+        "Function Answer() As Long\nOn Error Resume Next\nAnswer=AscW(\"\")\nAnswer=Err.Number\nEnd Function",
+        Value::Long(5),
+    )
+}
+
+#[test]
 fn strcomp_named_arguments_evaluate_once_in_source_order_and_resume_cleanly() -> R {
     let calls = Arc::new(AtomicUsize::new(0));
     let source = "Dim n As Long\nFunction Answer() As Variant\nAnswer=StrComp(string2:=NextText(),string1:=NextText(),compare:=0)*10+n\nEnd Function\nFunction NextText() As String\nn=n+1\nNextText=CStr(n)\nEnd Function";

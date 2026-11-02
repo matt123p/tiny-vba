@@ -310,7 +310,9 @@ pub enum Intrinsic {
     Space,
     String,
     Asc,
+    AscW,
     Chr,
+    ChrW,
     StrComp,
 }
 
@@ -645,7 +647,9 @@ const fn descriptor(
             | Intrinsic::Space
             | Intrinsic::String
             | Intrinsic::Asc
-            | Intrinsic::Chr => IntrinsicFamily::StringValue,
+            | Intrinsic::AscW
+            | Intrinsic::Chr
+            | Intrinsic::ChrW => IntrinsicFamily::StringValue,
             _ => IntrinsicFamily::Numeric,
         },
         parameters,
@@ -703,7 +707,7 @@ const fn return_variant(intrinsic: Intrinsic) -> IntrinsicReturn {
         I::IsObject | I::IsArray | I::IsMissing | I::IsEmpty | I::IsNull | I::IsError => {
             R::Fixed(K::Boolean)
         }
-        I::VarType | I::Sgn | I::Asc => R::Fixed(K::Integer),
+        I::VarType | I::Sgn | I::Asc | I::AscW => R::Fixed(K::Integer),
         I::TypeName
         | I::Replace
         | I::Join
@@ -716,6 +720,7 @@ const fn return_variant(intrinsic: Intrinsic) -> IntrinsicReturn {
         | I::StrReverse
         | I::LCase
         | I::Chr => R::Fixed(K::String),
+        I::ChrW => R::Fixed(K::String),
         I::UCase | I::Space | I::String => R::Variant,
         I::CInt => R::Fixed(K::Integer),
         I::CLng => R::Fixed(K::Long),
@@ -993,7 +998,9 @@ pub const INTRINSIC_DESCRIPTORS: &[IntrinsicDescriptor] = &[
         "String(number, character)",
     ),
     descriptor(Intrinsic::Asc, "Asc", ONE_VALUE, false, "Asc(string)"),
+    descriptor(Intrinsic::AscW, "AscW", ONE_VALUE, false, "AscW(string)"),
     descriptor(Intrinsic::Chr, "Chr", ONE_VALUE, false, "Chr(charcode)"),
+    descriptor(Intrinsic::ChrW, "ChrW", ONE_VALUE, false, "ChrW(charcode)"),
 ];
 
 const fn instr_descriptor() -> IntrinsicDescriptor {

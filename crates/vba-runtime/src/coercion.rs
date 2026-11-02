@@ -431,7 +431,8 @@ pub fn intrinsic(function: I, args: &[V]) -> Result<V> {
             }
             V::Double(n)
         }
-        Len | Left | Right | Mid | Trim | LTrim | RTrim | StrReverse | LCase | UCase | Asc => {
+        Len | Left | Right | Mid | Trim | LTrim | RTrim | StrReverse | LCase | UCase | Asc
+        | AscW => {
             if matches!(v, V::Null) {
                 if function == StrReverse {
                     return Err(error(94, "Invalid use of Null"));
@@ -443,10 +444,13 @@ pub fn intrinsic(function: I, args: &[V]) -> Result<V> {
             if function == Len {
                 return Ok(V::Long(i32::try_from(units.len()).map_err(|_| overflow())?));
             }
-            if function == Asc {
+            if matches!(function, Asc | AscW) {
                 let unit = *units
                     .first()
                     .ok_or_else(|| error(5, "Invalid procedure call"))?;
+                if function == AscW {
+                    return Ok(V::Integer(unit as i16));
+                }
                 if unit > 127 {
                     return Err(Error::Unsupported("non-ASCII Asc codepage".into()));
                 }
@@ -517,8 +521,19 @@ pub fn intrinsic(function: I, args: &[V]) -> Result<V> {
                     .map_err(|_| Error::Resource("string budget exceeded".into()))?,
             )
         }
-        Chr => {
-            let n = argument_integer(v, 0, 65535)?;
+        Chr | ChrW => {
+            let n = if function == ChrW {
+                argument_integer(v, i128::from(i16::MIN), i128::from(u16::MAX))?.rem_euclid(65536)
+            } else {
+                argument_integer(v, 0, 65535)?
+            };
+            if function == ChrW {
+                let n = u16::try_from(n).map_err(|_| overflow())?;
+                return Ok(V::String(
+                    VbaString::from_units(vec![n])
+                        .map_err(|_| Error::Resource("string budget exceeded".into()))?,
+                ));
+            }
             if n > 127 {
                 return Err(Error::Unsupported("non-ASCII Chr codepage".into()));
             }
