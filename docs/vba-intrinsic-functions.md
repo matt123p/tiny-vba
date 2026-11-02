@@ -1,6 +1,6 @@
 # VBA intrinsic functions — M6A
 
-Updated 2026-11-02. Status: M6A.8 cross-host verification is recorded, but M6A acceptance remains incomplete; required intrinsic rows and the shared tiny-vba CI gate remain open.
+Updated 2026-11-02. Status: M6A accepted after M6A.8/X1; all required intrinsic rows and shared/pinned-host gates pass. M7 may start.
 Owner: tiny-vba language/runtime, with explicit host services supplied by embedding
 applications. **M6A must be accepted before M7 starts.** Existing M7/M8 IDs stay
 stable. See [the implementation plan](implementation-plan.md) and
@@ -400,7 +400,7 @@ rows cannot silently disappear from the inventory or become implicit M7 work.
 
 ## M6A.8 cross-host verification status
 
-The published shared revision and both fork pins exercise `StrComp` in an authored GridCraft worksheet UDF and WordCraft macro. The host and application validation results are recorded in the [work ledger](m6a-work-ledger.md#current-packet); shared tiny-vba CI, GridCraft and WordCraft gates pass. M6A is not accepted: required implementation rows remain partial or absent for `Len` coercion, `LenB`, non-ASCII `LCase`/`UCase`, `StrConv`, code-page `Asc`/`Chr`, and byte-oriented `AscB`, `ChrB`, `LeftB`, `RightB`, and `MidB` (including `$` variants). These are portable implementation gaps, not accepted platform refusals. No fresh Office observation is claimed; those are deferred to M8.5.
+The published shared revision `0b41fd7bf7c78a62323133b290f2f9646667f9d3` and pinned GridCraft (`9b1f8b9b`) and WordCraft (`1e2b7dfd`) forks exercise `StrComp` in an authored worksheet UDF and macro. All required intrinsic rows, shared gates and host application gates pass; M6A is accepted and M7 may start. Remaining explicit policy/platform refusals are recorded per row. Exact commands and results are in the [work ledger](m6a-work-ledger.md#current-packet). No fresh Office observation is claimed; those are deferred to M8.5.
 
 ## Acceptance before M7
 
