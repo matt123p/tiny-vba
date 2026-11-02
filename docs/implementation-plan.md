@@ -90,6 +90,15 @@ document results. Evidence work starts alongside M1 and feeds this final gate.
   errors and side effects. Keep unreviewed/unexecuted material NOT_RUN.
 - **M8.2:** Add importer/parser/VM fuzz targets and minimized regressions,
   bounded-work/timeout tests and repeatable native/WASM performance benchmarks.
+  **Review VM host-call payload accounting:** foreign-call paths currently
+  reserve 64 KiB for reply/snapshot space by charging it to the session payload
+  budget. Determine whether that reservation represents live, reusable memory or
+  cumulative work; if it is temporary, track peak in-flight payload separately
+  from cumulative allocation/work counters and release the reservation when the
+  call completes or fails. Add tests proving repeated host calls can reuse the
+  reservation while oversized arguments/replies and aggregate work still fail
+  within documented limits. Cover pause/resume and failure before host effects.
+  Do not raise payload defaults solely to compensate for reusable per-call space.
 - **M8.3:** Complete native/WASM CI and affected UI/native/browser gates.
   Publish the supported feature/profile/version matrix and remaining gaps.
 - **M8.4:** Expand feature-specific asserted benchmarks and assemble an integrated
