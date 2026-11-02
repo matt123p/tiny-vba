@@ -7,7 +7,9 @@ use std::sync::{
 use vba_compiler::{CompileOptions, compile, compile_modules};
 use vba_diagnostics::{SourceFile, SourceId};
 use vba_ir::{self as ir, Instruction};
-use vba_runtime::{DateConversionService, IntrinsicFormattingService, StringComparisonService};
+use vba_runtime::{
+    ClockService, DateConversionService, IntrinsicFormattingService, StringComparisonService,
+};
 use vba_values::{IntrinsicComparisonMode, IntrinsicReturn, ScalarKind, Value, VbaString};
 use vba_vm::{self as vm, Limits, NoHost, Outcome, PauseReason, ReturnValue, Session};
 type R<T = ()> = Result<T, Box<dyn Error>>;
@@ -161,6 +163,96 @@ impl DateConversionService for VmDateProvider {
             vba_runtime::Error::Unsupported("test date formatting failed".into())
         })?))
     }
+}
+
+fn calendar_text(value: &str) -> vba_runtime::Result<VbaString> {
+    VbaString::from_utf8(value)
+        .map_err(|_| vba_runtime::Error::Unsupported("calendar fixture string failed".into()))
+}
+struct VmCalendarProvider;
+impl DateConversionService for VmCalendarProvider {
+    fn service_id(&self) -> &str {
+        "vm-calendar-test-v1"
+    }
+    fn parse_date(
+        &self,
+        text: &VbaString,
+        _locale: &str,
+        _calendar: &str,
+    ) -> vba_runtime::Result<Option<f64>> {
+        Ok((text.units() == [107, 110, 111, 119, 110]).then_some(45_000.75))
+    }
+    fn parse_time(&self, text: &VbaString, _locale: &str) -> vba_runtime::Result<Option<f64>> {
+        Ok((text.units() == [110, 111, 111, 110]).then_some(0.5))
+    }
+    fn format_date(
+        &self,
+        serial: f64,
+        _locale: &str,
+        _calendar: &str,
+    ) -> vba_runtime::Result<Option<VbaString>> {
+        Ok(Some(calendar_text(&format!("D{serial:.1}"))?))
+    }
+    fn format_time(&self, fraction: f64, _locale: &str) -> vba_runtime::Result<Option<VbaString>> {
+        Ok(Some(calendar_text(&format!("T{fraction:.1}"))?))
+    }
+    fn month_name(
+        &self,
+        month: u8,
+        _abbreviate: bool,
+        _locale: &str,
+        _calendar: &str,
+    ) -> vba_runtime::Result<Option<VbaString>> {
+        Ok(Some(calendar_text(&format!("M{month}"))?))
+    }
+    fn weekday_name(
+        &self,
+        weekday: u8,
+        _abbreviate: bool,
+        _first_day: u8,
+        _locale: &str,
+        _calendar: &str,
+    ) -> vba_runtime::Result<Option<VbaString>> {
+        Ok(Some(calendar_text(&format!("W{weekday}"))?))
+    }
+}
+struct VmClockProvider(f64);
+impl ClockService for VmClockProvider {
+    fn service_id(&self) -> &str {
+        "vm-clock-test-v1"
+    }
+    fn now_serial(&self) -> vba_runtime::Result<f64> {
+        Ok(self.0)
+    }
+}
+fn session_with_calendar_clock(source_text: &str, with_clock: bool) -> R<Session> {
+    let source = SourceFile::new(SourceId(97), "calendar.bas".into(), source_text.into())?;
+    let program = compile(
+        &source,
+        &CompileOptions {
+            capabilities: vm::capabilities(),
+            ..Default::default()
+        },
+    )?;
+    let config = vm::IntrinsicContextConfig::new(
+        "en-US".into(),
+        "gregorian".into(),
+        "windows-1252".into(),
+        64,
+    )?;
+    let mut session = Session::new_with_date_conversion_service(
+        program,
+        97,
+        vec![],
+        None,
+        Limits::default(),
+        Arc::new(VmCalendarProvider),
+        config,
+    )?;
+    if with_clock {
+        session.set_clock_service(Arc::new(VmClockProvider(45_000.5)))?;
+    }
+    Ok(session)
 }
 
 fn session_with_date_service_and_width(source_text: &str, width: u8) -> R<Session> {
@@ -1240,6 +1332,57 @@ fn financial_intrinsics_execute_through_vba_source_calls() -> R {
         "Function Answer() As Double\nAnswer=Pmt(0,10,100)+Sln(30000,7500,10)+IRR(Array(-100,60,60))\nEnd Function",
         Value::Double(-10.0 + 2250.0 + 0.1306623862918075),
     )
+}
+
+#[test]
+fn m6a5_gregorian_calendar_calls_use_explicit_locale_provider() -> R {
+    assert_eq!(
+        drive(&mut session_with_calendar_clock(
+            r#"Function Answer() As String
+Answer=CStr(DateValue("known")) & ":" & CStr(TimeValue("noon")) & ":" & CStr(DateAdd("m",1,DateSerial(2020,1,31))) & ":" & CStr(DateDiff("d",DateSerial(2020,1,31),DateSerial(2020,2,1))) & ":" & MonthName(2) & ":" & WeekdayName(7)
+End Function"#,
+            false,
+        )?)?,
+        Outcome::Completed(ReturnValue::Function(Value::String(VbaString::from_utf8(
+            "D45000.0:D0.5:D43890.0:1:M2:W7",
+        )?)))
+    );
+    Ok(())
+}
+
+#[test]
+fn m6a5_clock_intrinsics_support_bare_vba_forms_and_localized_dollar_results() -> R {
+    assert_eq!(
+        drive(&mut session_with_calendar_clock(
+            r#"Function Answer() As String
+Answer=Date$ & ":" & Time$ & ":" & TypeName(Date) & ":" & TypeName(Time) & ":" & TypeName(Now) & ":" & CStr(Timer)
+End Function"#,
+            true,
+        )?)?,
+        Outcome::Completed(ReturnValue::Function(Value::String(VbaString::from_utf8(
+            "D45000.0:T0.5:Date:Date:Date:43200",
+        )?)))
+    );
+    Ok(())
+}
+
+#[test]
+fn m6a5_randomize_statement_resets_with_session_and_rng_survives_pause() -> R {
+    let mut s = session("Function Answer() As Single\nRandomize 42\nAnswer=Rnd\nEnd Function")?;
+    let first = drive(&mut s)?;
+    s.reset_state()?;
+    let second = drive(&mut s)?;
+    assert_eq!(first, second);
+    let mut paused = session(
+        "Dim first As Single\nFunction Answer() As Single\nRandomize 42\nfirst=Rnd\nStop\nAnswer=first+Rnd\nEnd Function",
+    )?;
+    assert!(matches!(drive(&mut paused)?, Outcome::Paused(_)));
+    paused.continue_execution()?;
+    assert!(matches!(
+        drive(&mut paused)?,
+        Outcome::Completed(ReturnValue::Function(Value::Single(_)))
+    ));
+    Ok(())
 }
 
 #[test]

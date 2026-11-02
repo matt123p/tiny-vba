@@ -2695,6 +2695,21 @@ impl Binder<'_> {
                 {
                     return self.imported(&import, &[], expr.span);
                 }
+                if !self.symbols.contains_key(&name.key())
+                    && !self
+                        .lookup
+                        .local
+                        .contains_key(&(self.signature.module, name.key()))
+                    && !self.lookup.public.contains_key(&name.key())
+                    && !self
+                        .imports
+                        .iter()
+                        .any(|import| import.name.eq_ignore_ascii_case(&name.spelling))
+                    && let Some(function) = vba_values::Intrinsic::from_name(&name.spelling)
+                    && function.accepts(0)
+                {
+                    return self.intrinsic_call(function, &[], expr.span);
+                }
                 if name.key() == "erl" {
                     return Ok(Expr {
                         span: expr.span,
@@ -3420,6 +3435,24 @@ impl Binder<'_> {
                 let ast::ExprKind::Name(name) = &target.kind else {
                     return Err(unsupported("foreign member call", target.span));
                 };
+                if name.key() == "randomize"
+                    && !self.symbols.contains_key(&name.key())
+                    && !self
+                        .lookup
+                        .local
+                        .contains_key(&(self.signature.module, name.key()))
+                    && !self.lookup.public.contains_key(&name.key())
+                {
+                    let expression = self.intrinsic_call(
+                        vba_values::Intrinsic::Randomize,
+                        arguments,
+                        site.span,
+                    )?;
+                    return Ok(Statement {
+                        site,
+                        kind: StatementKind::Foreign(expression),
+                    });
+                }
                 // Project declarations shadow implicit instance members and host globals.
                 if self
                     .lookup
@@ -3598,6 +3631,23 @@ impl Binder<'_> {
                 StatementKind::Exit(*exit)
             }
             ast::StatementKind::Stop => StatementKind::Stop,
+            ast::StatementKind::Randomize(number) => {
+                let mut arguments = Vec::new();
+                if let Some(value) = number {
+                    push(
+                        &mut arguments,
+                        ast::Argument {
+                            name: None,
+                            value: Some(value.clone()),
+                            span: value.span,
+                        },
+                        value.span,
+                    )?;
+                }
+                let expression =
+                    self.intrinsic_call(vba_values::Intrinsic::Randomize, &arguments, site.span)?;
+                StatementKind::Foreign(expression)
+            }
         };
         Ok(Statement { site, kind: bound })
     }

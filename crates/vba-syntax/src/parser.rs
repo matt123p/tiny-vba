@@ -799,6 +799,21 @@ impl Parser<'_> {
             }
         } else if self.eat("Stop") {
             StatementKind::Stop
+        } else if self.eat("Randomize") {
+            let number = if self.eat("(") {
+                let value = if self.at(")") {
+                    None
+                } else {
+                    Some(self.expr(0)?)
+                };
+                self.require(")")?;
+                value
+            } else if self.end() || self.at(":") || self.at("Else") {
+                None
+            } else {
+                Some(self.expr(0)?)
+            };
+            StatementKind::Randomize(number)
         } else if self.eat("Exit") {
             let kind = if self.eat("Sub") {
                 ExitKind::Sub

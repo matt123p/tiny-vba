@@ -196,7 +196,10 @@ functions; split a row below further when its tests or dependencies warrant it.
 | A3 | M6A.4 | A1; numeric coercion | Implement Partition's rounded inputs, argument ranges, boundary bins, padded string shape and Null propagation. |
 | N1 | M6A.4 | F3; numeric coercion | Complete Abs/Atn/Cos/Exp/Int/Fix/Log/Sgn/Sin/Sqr/Tan/Round; preserve Null, result Variant subtypes, math domains and numeric error contracts. |
 | N2 | M6A.4 | N1; bounded numerical algorithms | COMPLETE. Implemented DDB/FV/IPmt/IRR/MIRR/NPer/NPV/Pmt/PPmt/PV/Rate/SLN/SYD with one-dimensional cash-flow arrays, documented optional defaults, payment timing, and a 20-iteration solver limit. |
-| D1 onward | M6A.5 | F4 | Calendar/date representation and clock seam, then constructors/extraction/arithmetic/names in small packets. |
+| D1 | M6A.5 | F4 | Gregorian OLE Automation Date representation and injected clock; Date/Date$, Time/Time$, Now and Timer, including bare VBA call syntax. |
+| D2 | M6A.5 | D1 | DateSerial, DateValue, TimeSerial and TimeValue; normalization, year mapping, range, and injected locale parsing. |
+| D3 | M6A.5 | D1, D2 | Day/Month/Year/Hour/Minute/Second/Weekday and MonthName/WeekdayName, including optional week/name arguments and locale provider. |
+| D4 | M6A.5 | D1–D3 | DateAdd, DateDiff and DatePart interval contracts, calendar boundaries, subsecond preservation and week options. |
 | R1 | M6A.5 | Context/state seam | Rnd/Randomize deterministic state, reset and pause/resume tests; never ambient randomness. |
 | H1 onward | M6A.6 | F3; existing host protocol | One bounded host-service family per packet; colour/CallByName separate. Specify unavailable/denied/cancelled behaviour and no replay. |
 | Q1 | M6A.7 | Each implemented packet | Incremental shared IDE signatures/completion and inspection-policy tests; do not wait until the end to expose functions correctly. |

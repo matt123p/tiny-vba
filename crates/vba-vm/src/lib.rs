@@ -5,6 +5,7 @@ mod host_events;
 use classes::{ClassReturn, Instance};
 pub use host_events::{HostEventHandler, HostEventParameter};
 use std::{
+    cell::Cell,
     collections::{BTreeMap, BTreeSet, VecDeque},
     sync::atomic::{AtomicU32, Ordering},
 };
@@ -284,6 +285,8 @@ pub struct Session {
     string_comparison_service: Option<std::sync::Arc<dyn runtime::StringComparisonService>>,
     date_conversion_service: Option<std::sync::Arc<dyn runtime::DateConversionService>>,
     formatting_service: Option<std::sync::Arc<dyn runtime::IntrinsicFormattingService>>,
+    clock_service: Option<std::sync::Arc<dyn runtime::ClockService>>,
+    random_state: Cell<u32>,
     intrinsic_context_config: Option<IntrinsicContextConfig>,
     array_types: BTreeMap<Location, ScalarKind>,
     output: Vec<vba_values::VbaString>,
@@ -338,15 +341,18 @@ fn reserve<T>(v: &mut Vec<T>, n: usize) -> Result<()> {
 fn value_bytes(v: &Value) -> usize {
     v.payload_bytes()
 }
+#[allow(clippy::too_many_arguments)]
 fn intrinsic_context<'a>(
     mode: vba_values::IntrinsicComparisonMode,
     string_service: Option<&'a dyn runtime::StringComparisonService>,
     date_service: Option<&'a dyn runtime::DateConversionService>,
     formatting_service: Option<&'a dyn runtime::IntrinsicFormattingService>,
+    clock_service: Option<&'a dyn runtime::ClockService>,
+    random_state: &'a Cell<u32>,
     last_error_number: i32,
     config: Option<&'a IntrinsicContextConfig>,
 ) -> runtime::IntrinsicContext<'a> {
-    match config {
+    let context = match config {
         Some(config) => runtime::IntrinsicContext::with_execution_context(
             mode,
             &config.locale,
@@ -365,6 +371,11 @@ fn intrinsic_context<'a>(
             "unconfigured",
             0,
         ),
+    };
+    let context = context.with_random_state(random_state);
+    match clock_service {
+        Some(service) => context.with_clock(service),
+        None => context,
     }
 }
 fn nominal_bytes(ty: &vba_values::NominalType) -> usize {
@@ -434,6 +445,35 @@ impl Session {
         session.formatting_service = Some(service);
         session.intrinsic_context_config = Some(context);
         Ok(session)
+    }
+    pub fn new_with_clock_service(
+        program: ir::VerifiedProgram,
+        identity: u64,
+        arguments: Vec<Value>,
+        binding: Option<HostBinding>,
+        limits: Limits,
+        service: std::sync::Arc<dyn runtime::ClockService>,
+        context: IntrinsicContextConfig,
+    ) -> Result<Self> {
+        let service_id = service.service_id();
+        if service_id.is_empty() || service_id.len() > 128 {
+            return Err(command("invalid clock service identity"));
+        }
+        let mut session = Self::new(program, identity, arguments, binding, limits)?;
+        session.clock_service = Some(service);
+        session.intrinsic_context_config = Some(context);
+        Ok(session)
+    }
+    pub fn set_clock_service(
+        &mut self,
+        service: std::sync::Arc<dyn runtime::ClockService>,
+    ) -> Result<()> {
+        let service_id = service.service_id();
+        if service_id.is_empty() || service_id.len() > 128 {
+            return Err(command("invalid clock service identity"));
+        }
+        self.clock_service = Some(service);
+        Ok(())
     }
     pub fn new_with_type_resolver(
         program: ir::VerifiedProgram,
@@ -593,6 +633,8 @@ impl Session {
             string_comparison_service: None,
             date_conversion_service: None,
             formatting_service: None,
+            clock_service: None,
+            random_state: Cell::new(runtime::INITIAL_RND_SEED),
             intrinsic_context_config: None,
             program,
             identity,
@@ -1397,6 +1439,7 @@ impl Session {
         self.next_receiver = None;
         self.pending_result = None;
         self.output.clear();
+        self.random_state.set(runtime::INITIAL_RND_SEED);
         self.error = ErrorState::default();
         self.raised_source = None;
         self.pause_requested = false;
@@ -3092,6 +3135,8 @@ impl Session {
                     self.string_comparison_service.as_deref(),
                     self.date_conversion_service.as_deref(),
                     self.formatting_service.as_deref(),
+                    self.clock_service.as_deref(),
+                    &self.random_state,
                     self.error.number,
                     self.intrinsic_context_config.as_ref(),
                 );
@@ -3137,6 +3182,8 @@ impl Session {
                     self.string_comparison_service.as_deref(),
                     self.date_conversion_service.as_deref(),
                     self.formatting_service.as_deref(),
+                    self.clock_service.as_deref(),
+                    &self.random_state,
                     self.error.number,
                     self.intrinsic_context_config.as_ref(),
                 );

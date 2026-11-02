@@ -134,6 +134,64 @@ fn strcomp_descriptor_is_contextual_ir8_variant_with_module_default()
 }
 
 #[test]
+fn m6a5_calendar_and_random_descriptors_require_ir8_context()
+-> Result<(), Box<dyn std::error::Error>> {
+    let functions = [
+        Intrinsic::Rnd,
+        Intrinsic::Randomize,
+        Intrinsic::Date,
+        Intrinsic::DateDollar,
+        Intrinsic::Time,
+        Intrinsic::TimeDollar,
+        Intrinsic::Now,
+        Intrinsic::Timer,
+        Intrinsic::DateAdd,
+        Intrinsic::DateDiff,
+        Intrinsic::DatePart,
+        Intrinsic::DateSerial,
+        Intrinsic::DateValue,
+        Intrinsic::TimeSerial,
+        Intrinsic::TimeValue,
+        Intrinsic::Day,
+        Intrinsic::Month,
+        Intrinsic::Year,
+        Intrinsic::Hour,
+        Intrinsic::Minute,
+        Intrinsic::Second,
+        Intrinsic::Weekday,
+        Intrinsic::MonthName,
+        Intrinsic::WeekdayName,
+    ];
+    for function in functions {
+        let descriptor = function
+            .descriptor()
+            .ok_or_else(|| std::io::Error::other("M6A.5 descriptor"))?;
+        assert_eq!(descriptor.minimum_ir, 8, "{}", descriptor.spelling);
+        assert_eq!(descriptor.capability, "intrinsics-m6a-v1");
+        assert_eq!(
+            descriptor.effect,
+            vba_values::IntrinsicEffect::Contextual,
+            "{}",
+            descriptor.spelling
+        );
+        assert!(!descriptor.platform_requirements.is_empty());
+    }
+    assert_eq!(
+        Intrinsic::DateDiff.descriptor().map(|d| d.return_variant),
+        Some(IntrinsicReturn::Fixed(ScalarKind::Long))
+    );
+    assert_eq!(
+        Intrinsic::Rnd.descriptor().map(|d| d.return_variant),
+        Some(IntrinsicReturn::Fixed(ScalarKind::Single))
+    );
+    assert_eq!(
+        Intrinsic::DateDollar.descriptor().map(|d| d.return_variant),
+        Some(IntrinsicReturn::Fixed(ScalarKind::String))
+    );
+    Ok(())
+}
+
+#[test]
 fn instr_search_descriptors_are_ir8_with_distinct_compare_defaults()
 -> Result<(), Box<dyn std::error::Error>> {
     let forward = Intrinsic::InStr

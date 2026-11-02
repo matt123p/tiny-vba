@@ -459,6 +459,30 @@ pub enum Intrinsic {
     Rate,
     Sln,
     Syd,
+    Rnd,
+    Randomize,
+    Date,
+    DateDollar,
+    Time,
+    TimeDollar,
+    Now,
+    Timer,
+    DateAdd,
+    DateDiff,
+    DatePart,
+    DateSerial,
+    DateValue,
+    TimeSerial,
+    TimeValue,
+    Day,
+    Month,
+    Year,
+    Hour,
+    Minute,
+    Second,
+    Weekday,
+    MonthName,
+    WeekdayName,
 }
 
 /// Whether an intrinsic returns its historical VBA Variant subtype or a fixed
@@ -531,6 +555,7 @@ pub enum IntrinsicOmittedDefault {
     FunctionSpecific,
     Two,
     OneTenth,
+    False,
 }
 
 /// Metadata for an executable public intrinsic spelling. This catalogue is
@@ -836,6 +861,78 @@ const SYD_PARAMS: &[IntrinsicParameter] = &[
     parameter("life", true),
     parameter("period", true),
 ];
+const NO_PARAMS: &[IntrinsicParameter] = &[];
+const OPTIONAL_RANDOM_PARAMS: &[IntrinsicParameter] = &[with_default(
+    parameter("number", false),
+    IntrinsicOmittedDefault::ToEnd,
+)];
+const DATEADD_PARAMS: &[IntrinsicParameter] = &[
+    parameter("interval", true),
+    parameter("number", true),
+    parameter("date", true),
+];
+const DATEDIFF_PARAMS: &[IntrinsicParameter] = &[
+    parameter("interval", true),
+    parameter("date1", true),
+    parameter("date2", true),
+    with_default(
+        parameter("firstdayofweek", false),
+        IntrinsicOmittedDefault::Zero,
+    ),
+    with_default(
+        parameter("firstweekofyear", false),
+        IntrinsicOmittedDefault::Zero,
+    ),
+];
+const DATEPART_PARAMS: &[IntrinsicParameter] = &[
+    parameter("interval", true),
+    parameter("date", true),
+    with_default(
+        parameter("firstdayofweek", false),
+        IntrinsicOmittedDefault::Zero,
+    ),
+    with_default(
+        parameter("firstweekofyear", false),
+        IntrinsicOmittedDefault::Zero,
+    ),
+];
+const DATESERIAL_PARAMS: &[IntrinsicParameter] = &[
+    parameter("year", true),
+    parameter("month", true),
+    parameter("day", true),
+];
+const ONE_DATE: &[IntrinsicParameter] = &[parameter("date", true)];
+const TIMESERIAL_PARAMS: &[IntrinsicParameter] = &[
+    parameter("hour", true),
+    parameter("minute", true),
+    parameter("second", true),
+];
+const ONE_TIME: &[IntrinsicParameter] = &[parameter("time", true)];
+const WEEKDAY_PARAMS: &[IntrinsicParameter] = &[
+    parameter("date", true),
+    with_default(
+        parameter("firstdayofweek", false),
+        IntrinsicOmittedDefault::Zero,
+    ),
+];
+const MONTHNAME_PARAMS: &[IntrinsicParameter] = &[
+    parameter("month", true),
+    with_default(
+        parameter("abbreviate", false),
+        IntrinsicOmittedDefault::False,
+    ),
+];
+const WEEKDAYNAME_PARAMS: &[IntrinsicParameter] = &[
+    parameter("weekday", true),
+    with_default(
+        parameter("abbreviate", false),
+        IntrinsicOmittedDefault::False,
+    ),
+    with_default(
+        parameter("firstdayofweek", false),
+        IntrinsicOmittedDefault::Zero,
+    ),
+];
 
 const fn descriptor(
     intrinsic: Intrinsic,
@@ -866,6 +963,30 @@ const fn descriptor(
             | Intrinsic::FormatPercent
             | Intrinsic::ErrorMessage
             | Intrinsic::ErrorMessageDollar
+            | Intrinsic::Rnd
+            | Intrinsic::Randomize
+            | Intrinsic::Date
+            | Intrinsic::DateDollar
+            | Intrinsic::Time
+            | Intrinsic::TimeDollar
+            | Intrinsic::Now
+            | Intrinsic::Timer
+            | Intrinsic::DateValue
+            | Intrinsic::TimeSerial
+            | Intrinsic::TimeValue
+            | Intrinsic::MonthName
+            | Intrinsic::WeekdayName
+            | Intrinsic::DateAdd
+            | Intrinsic::DateDiff
+            | Intrinsic::DatePart
+            | Intrinsic::DateSerial
+            | Intrinsic::Day
+            | Intrinsic::Month
+            | Intrinsic::Year
+            | Intrinsic::Hour
+            | Intrinsic::Minute
+            | Intrinsic::Second
+            | Intrinsic::Weekday
     ) {
         (8, "intrinsics-m6a-v1")
     } else if matches!(intrinsic, Intrinsic::IIf) {
@@ -878,6 +999,28 @@ const fn descriptor(
         Intrinsic::Choose => 2,
         Intrinsic::Switch => 2,
         Intrinsic::Partition | Intrinsic::Syd => 4,
+        Intrinsic::DateAdd
+        | Intrinsic::DateDiff
+        | Intrinsic::TimeSerial
+        | Intrinsic::DateSerial => 3,
+        Intrinsic::DatePart => 2,
+        Intrinsic::Weekday | Intrinsic::MonthName | Intrinsic::WeekdayName => 1,
+        Intrinsic::DateValue
+        | Intrinsic::TimeValue
+        | Intrinsic::Day
+        | Intrinsic::Month
+        | Intrinsic::Year
+        | Intrinsic::Hour
+        | Intrinsic::Minute
+        | Intrinsic::Second => 1,
+        Intrinsic::Rnd
+        | Intrinsic::Randomize
+        | Intrinsic::Date
+        | Intrinsic::DateDollar
+        | Intrinsic::Time
+        | Intrinsic::TimeDollar
+        | Intrinsic::Now
+        | Intrinsic::Timer => 0,
         Intrinsic::IPmt | Intrinsic::PPmt => 4,
         Intrinsic::Ddb => 4,
         Intrinsic::Mirr => 3,
@@ -962,6 +1105,29 @@ const fn descriptor(
             | Intrinsic::ErrorMessage
             | Intrinsic::ErrorMessageDollar => IntrinsicFamily::Conversion,
             Intrinsic::StrComp => IntrinsicFamily::StringSearch,
+            Intrinsic::Rnd | Intrinsic::Randomize => IntrinsicFamily::Numeric,
+            Intrinsic::Date
+            | Intrinsic::DateDollar
+            | Intrinsic::Time
+            | Intrinsic::TimeDollar
+            | Intrinsic::Now
+            | Intrinsic::Timer
+            | Intrinsic::DateAdd
+            | Intrinsic::DateDiff
+            | Intrinsic::DatePart
+            | Intrinsic::DateSerial
+            | Intrinsic::DateValue
+            | Intrinsic::TimeSerial
+            | Intrinsic::TimeValue
+            | Intrinsic::Day
+            | Intrinsic::Month
+            | Intrinsic::Year
+            | Intrinsic::Hour
+            | Intrinsic::Minute
+            | Intrinsic::Second
+            | Intrinsic::Weekday
+            | Intrinsic::MonthName
+            | Intrinsic::WeekdayName => IntrinsicFamily::Conversion,
             Intrinsic::Len
             | Intrinsic::Left
             | Intrinsic::LeftDollar
@@ -1023,6 +1189,30 @@ const fn descriptor(
                 | Intrinsic::FormatPercent
                 | Intrinsic::ErrorMessage
                 | Intrinsic::ErrorMessageDollar
+                | Intrinsic::Rnd
+                | Intrinsic::Randomize
+                | Intrinsic::Date
+                | Intrinsic::DateDollar
+                | Intrinsic::Time
+                | Intrinsic::TimeDollar
+                | Intrinsic::Now
+                | Intrinsic::Timer
+                | Intrinsic::DateValue
+                | Intrinsic::TimeSerial
+                | Intrinsic::TimeValue
+                | Intrinsic::MonthName
+                | Intrinsic::WeekdayName
+                | Intrinsic::DateAdd
+                | Intrinsic::DateDiff
+                | Intrinsic::DatePart
+                | Intrinsic::DateSerial
+                | Intrinsic::Day
+                | Intrinsic::Month
+                | Intrinsic::Year
+                | Intrinsic::Hour
+                | Intrinsic::Minute
+                | Intrinsic::Second
+                | Intrinsic::Weekday
         ) {
             IntrinsicEffect::Contextual
         } else {
@@ -1054,8 +1244,32 @@ const fn descriptor(
                 | Intrinsic::FormatPercent
                 | Intrinsic::ErrorMessage
                 | Intrinsic::ErrorMessageDollar
+                | Intrinsic::Rnd
+                | Intrinsic::Randomize
+                | Intrinsic::Date
+                | Intrinsic::DateDollar
+                | Intrinsic::Time
+                | Intrinsic::TimeDollar
+                | Intrinsic::Now
+                | Intrinsic::Timer
+                | Intrinsic::DateValue
+                | Intrinsic::TimeSerial
+                | Intrinsic::TimeValue
+                | Intrinsic::MonthName
+                | Intrinsic::WeekdayName
+                | Intrinsic::DateAdd
+                | Intrinsic::DateDiff
+                | Intrinsic::DatePart
+                | Intrinsic::DateSerial
+                | Intrinsic::Day
+                | Intrinsic::Month
+                | Intrinsic::Year
+                | Intrinsic::Hour
+                | Intrinsic::Minute
+                | Intrinsic::Second
+                | Intrinsic::Weekday
         ) {
-            "injected comparison or locale conversion service"
+            "injected clock, random state, comparison, or locale calendar service as required"
         } else {
             "portable core"
         },
@@ -1085,9 +1299,30 @@ const fn return_variant(intrinsic: Intrinsic) -> IntrinsicReturn {
         | I::Sln
         | I::Syd => R::Fixed(K::Double),
         I::Atn | I::Cos | I::Exp | I::Log | I::Sin | I::Sqr | I::Tan => R::Fixed(K::Double),
+        I::Rnd => R::Fixed(K::Single),
+        I::Timer => R::Fixed(K::Single),
+        I::Date
+        | I::Time
+        | I::Now
+        | I::DateAdd
+        | I::DateSerial
+        | I::DateValue
+        | I::TimeSerial
+        | I::TimeValue => R::Variant,
+        I::DateDollar | I::TimeDollar => R::Fixed(K::String),
+        I::MonthName | I::WeekdayName => R::Variant,
+        I::DatePart
+        | I::Day
+        | I::Month
+        | I::Year
+        | I::Hour
+        | I::Minute
+        | I::Second
+        | I::Weekday => R::Variant,
+        I::Randomize => R::Variant,
         I::Val => R::Fixed(K::Double),
         I::Left | I::Right | I::Mid | I::Trim | I::LTrim | I::RTrim => R::Variant,
-        I::InStr | I::InStrRev | I::Len | I::LBound | I::UBound => R::Fixed(K::Long),
+        I::InStr | I::InStrRev | I::Len | I::LBound | I::UBound | I::DateDiff => R::Fixed(K::Long),
         I::IsObject
         | I::IsArray
         | I::IsMissing
@@ -1265,6 +1500,102 @@ pub const INTRINSIC_DESCRIPTORS: &[IntrinsicDescriptor] = &[
         SYD_PARAMS,
         false,
         "SYD(cost, salvage, life, period)",
+    ),
+    descriptor(
+        Intrinsic::Rnd,
+        "Rnd",
+        OPTIONAL_RANDOM_PARAMS,
+        false,
+        "Rnd([number])",
+    ),
+    descriptor(
+        Intrinsic::Randomize,
+        "Randomize",
+        OPTIONAL_RANDOM_PARAMS,
+        false,
+        "Randomize([number])",
+    ),
+    descriptor(Intrinsic::Date, "Date", NO_PARAMS, false, "Date()"),
+    descriptor(Intrinsic::DateDollar, "Date$", NO_PARAMS, false, "Date$()"),
+    descriptor(Intrinsic::Time, "Time", NO_PARAMS, false, "Time()"),
+    descriptor(Intrinsic::TimeDollar, "Time$", NO_PARAMS, false, "Time$()"),
+    descriptor(Intrinsic::Now, "Now", NO_PARAMS, false, "Now()"),
+    descriptor(Intrinsic::Timer, "Timer", NO_PARAMS, false, "Timer()"),
+    descriptor(
+        Intrinsic::DateAdd,
+        "DateAdd",
+        DATEADD_PARAMS,
+        false,
+        "DateAdd(interval, number, date)",
+    ),
+    descriptor(
+        Intrinsic::DateDiff,
+        "DateDiff",
+        DATEDIFF_PARAMS,
+        false,
+        "DateDiff(interval, date1, date2, [firstdayofweek, [firstweekofyear]])",
+    ),
+    descriptor(
+        Intrinsic::DatePart,
+        "DatePart",
+        DATEPART_PARAMS,
+        false,
+        "DatePart(interval, date, [firstdayofweek, [firstweekofyear]])",
+    ),
+    descriptor(
+        Intrinsic::DateSerial,
+        "DateSerial",
+        DATESERIAL_PARAMS,
+        false,
+        "DateSerial(year, month, day)",
+    ),
+    descriptor(
+        Intrinsic::DateValue,
+        "DateValue",
+        ONE_DATE,
+        false,
+        "DateValue(date)",
+    ),
+    descriptor(
+        Intrinsic::TimeSerial,
+        "TimeSerial",
+        TIMESERIAL_PARAMS,
+        false,
+        "TimeSerial(hour, minute, second)",
+    ),
+    descriptor(
+        Intrinsic::TimeValue,
+        "TimeValue",
+        ONE_TIME,
+        false,
+        "TimeValue(time)",
+    ),
+    descriptor(Intrinsic::Day, "Day", ONE_DATE, false, "Day(date)"),
+    descriptor(Intrinsic::Month, "Month", ONE_DATE, false, "Month(date)"),
+    descriptor(Intrinsic::Year, "Year", ONE_DATE, false, "Year(date)"),
+    descriptor(Intrinsic::Hour, "Hour", ONE_TIME, false, "Hour(time)"),
+    descriptor(Intrinsic::Minute, "Minute", ONE_TIME, false, "Minute(time)"),
+    descriptor(Intrinsic::Second, "Second", ONE_TIME, false, "Second(time)"),
+    descriptor(
+        Intrinsic::Weekday,
+        "Weekday",
+        WEEKDAY_PARAMS,
+        false,
+        "Weekday(date, [firstdayofweek])",
+    ),
+    descriptor(
+        Intrinsic::MonthName,
+        "MonthName",
+        MONTHNAME_PARAMS,
+        false,
+        "MonthName(month, [abbreviate])",
+    ),
+    descriptor(
+        Intrinsic::WeekdayName,
+        "WeekdayName",
+        WEEKDAYNAME_PARAMS,
+        false,
+        "WeekdayName(weekday, [abbreviate, [firstdayofweek]])",
     ),
     instr_descriptor(),
     instrrev_descriptor(),

@@ -270,3 +270,166 @@ fn formatting_service_receives_options_and_current_error_number()
     );
     Ok(())
 }
+
+fn runtime_result<T>(value: vba_runtime::Result<T>) -> Result<T, Box<dyn std::error::Error>> {
+    value.map_err(|error| std::io::Error::other(format!("{error:?}")).into())
+}
+
+struct FixedClock(f64);
+impl vba_runtime::ClockService for FixedClock {
+    fn service_id(&self) -> &str {
+        "fixed-clock-v1"
+    }
+    fn now_serial(&self) -> vba_runtime::Result<f64> {
+        Ok(self.0)
+    }
+}
+
+#[test]
+fn gregorian_calendar_clock_and_rnd_state_are_deterministic()
+-> Result<(), Box<dyn std::error::Error>> {
+    use std::cell::Cell;
+    let clock = FixedClock(45_000.5);
+    let state = Cell::new(vba_runtime::INITIAL_RND_SEED);
+    let context = IntrinsicContext::no_services(Mode::Binary, "en-US", "gregorian", "", 64)
+        .with_clock(&clock)
+        .with_random_state(&state);
+    assert_eq!(
+        vba_runtime::intrinsic_extended_with_context(I::Now, &[], &context),
+        Ok(Value::Date(45_000.5))
+    );
+    assert_eq!(
+        vba_runtime::intrinsic_extended_with_context(I::Date, &[], &context),
+        Ok(Value::Date(45_000.0))
+    );
+    assert_eq!(
+        vba_runtime::intrinsic_extended_with_context(I::Time, &[], &context),
+        Ok(Value::Date(0.5))
+    );
+    assert_eq!(
+        vba_runtime::intrinsic_extended_with_context(I::Timer, &[], &context),
+        Ok(Value::Single(43_200.0))
+    );
+    let leap = runtime_result(vba_runtime::intrinsic_extended_with_context(
+        I::DateSerial,
+        &[
+            Some(Value::Long(2000)),
+            Some(Value::Long(2)),
+            Some(Value::Long(29)),
+        ],
+        &context,
+    ))?;
+    assert_eq!(leap, Value::Date(36_585.0));
+    assert_eq!(
+        vba_runtime::intrinsic_extended_with_context(I::Day, &[Some(leap.clone())], &context),
+        Ok(Value::Integer(29))
+    );
+    assert_eq!(
+        vba_runtime::intrinsic_extended_with_context(
+            I::DateAdd,
+            &[
+                Some(Value::String(VbaString::from_utf8("m")?)),
+                Some(Value::Long(1)),
+                Some(Value::Date(43_861.0))
+            ],
+            &context,
+        ),
+        Ok(Value::Date(43_890.0))
+    );
+
+    let first = runtime_result(vba_runtime::intrinsic_extended_with_context(
+        I::Rnd,
+        &[],
+        &context,
+    ))?;
+    assert!(
+        matches!(first, Value::Single(value) if (value - (0x50000_u32.wrapping_mul(0x43fd43fd).wrapping_add(0xc39ec3) & 0xffffff) as f32 / 16_777_216.0).abs() < f32::EPSILON)
+    );
+    assert_eq!(
+        vba_runtime::intrinsic_extended_with_context(I::Rnd, &[Some(Value::Long(0))], &context),
+        Ok(first.clone())
+    );
+
+    // Date values retain subsecond precision across clock reads and calendar arithmetic.
+    let precise_clock = FixedClock(45_000.500_000_125);
+    let precise_context = IntrinsicContext::no_services(Mode::Binary, "en-US", "gregorian", "", 64)
+        .with_clock(&precise_clock);
+    assert_eq!(
+        vba_runtime::intrinsic_extended_with_context(I::Now, &[], &precise_context),
+        Ok(Value::Date(45_000.500_000_125))
+    );
+    let added_second = runtime_result(vba_runtime::intrinsic_extended_with_context(
+        I::DateAdd,
+        &[
+            Some(Value::String(VbaString::from_utf8("s")?)),
+            Some(Value::Long(1)),
+            Some(Value::Date(45_000.500_000_125)),
+        ],
+        &precise_context,
+    ))?;
+    assert!(
+        matches!(added_second, Value::Date(value) if (value - 45_000.500_011_699_07).abs() < 1.0e-10)
+    );
+    assert_eq!(
+        vba_runtime::intrinsic_extended_with_context(
+            I::DateSerial,
+            &[
+                Some(Value::Long(99)),
+                Some(Value::Long(13)),
+                Some(Value::Long(1)),
+            ],
+            &precise_context,
+        ),
+        Ok(Value::Date(36_526.0))
+    );
+    let date_diff_weekday = runtime_result(vba_runtime::intrinsic_extended_with_context(
+        I::DateDiff,
+        &[
+            Some(Value::String(VbaString::from_utf8("w")?)),
+            Some(Value::Date(43_833.0)), // Friday, 2020-01-03
+            Some(Value::Date(43_837.0)), // Tuesday, 2020-01-07
+            Some(Value::Long(2)),        // Monday
+            None,
+        ],
+        &precise_context,
+    ))?;
+    assert_eq!(date_diff_weekday, Value::Long(1));
+    Ok(())
+}
+
+#[test]
+fn rnd_negative_seed_then_randomize_numeric_repeats_vba_sequence()
+-> Result<(), Box<dyn std::error::Error>> {
+    use std::cell::Cell;
+    let first_state = Cell::new(vba_runtime::INITIAL_RND_SEED);
+    let second_state = Cell::new(vba_runtime::INITIAL_RND_SEED);
+    let first = IntrinsicContext::no_services(Mode::Binary, "", "gregorian", "", 64)
+        .with_random_state(&first_state);
+    let second = IntrinsicContext::no_services(Mode::Binary, "", "gregorian", "", 64)
+        .with_random_state(&second_state);
+    for context in [&first, &second] {
+        let _ = runtime_result(vba_runtime::intrinsic_extended_with_context(
+            I::Rnd,
+            &[Some(Value::Single(-1.0))],
+            context,
+        ))?;
+        let _ = runtime_result(vba_runtime::intrinsic_extended_with_context(
+            I::Randomize,
+            &[Some(Value::Double(123.0))],
+            context,
+        ))?;
+    }
+    assert_eq!(
+        runtime_result(vba_runtime::intrinsic_extended_with_context(
+            I::Rnd,
+            &[],
+            &first
+        ))?,
+        runtime_result(vba_runtime::intrinsic_extended_with_context(
+            I::Rnd,
+            &[],
+            &second
+        ))?
+    );
+    Ok(())
+}

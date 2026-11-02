@@ -168,6 +168,7 @@ pub enum StatementKind {
     For(Box<ForLoop>),
     Exit(ExitKind),
     Stop,
+    Randomize(Option<Expr>),
 }
 #[derive(Clone, Debug)]
 pub struct IfArm {

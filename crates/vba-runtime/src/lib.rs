@@ -1,10 +1,13 @@
 //! Shared M4 scalar coercion, operator and deterministic intrinsic rules.
 #![forbid(unsafe_code)]
+use std::cell::Cell;
 use std::cmp::Ordering;
+mod calendar;
 mod coercion;
 pub use coercion::{intrinsic, intrinsic_extended};
 use vba_values::{ScalarKind, Value, VbaDecimal, VbaString};
 pub const PROFILE: &str = "m5-host-v1";
+pub const INITIAL_RND_SEED: u32 = 327_680;
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum Error {
     Vba { number: i32, message: String },
@@ -24,6 +27,8 @@ pub struct IntrinsicContext<'a> {
     string_comparison: Option<&'a dyn StringComparisonService>,
     date_conversion: Option<&'a dyn DateConversionService>,
     formatting: Option<&'a dyn IntrinsicFormattingService>,
+    clock: Option<&'a dyn ClockService>,
+    random_state: Option<&'a Cell<u32>>,
     last_error_number: i32,
 }
 
@@ -46,6 +51,31 @@ pub trait StringComparisonService: Send + Sync {
 pub trait DateConversionService: Send + Sync {
     fn service_id(&self) -> &str;
     fn parse_date(&self, text: &VbaString, locale: &str, calendar: &str) -> Result<Option<f64>>;
+    fn parse_time(&self, _text: &VbaString, _locale: &str) -> Result<Option<f64>> {
+        Ok(None)
+    }
+    fn format_time(&self, _fraction: f64, _locale: &str) -> Result<Option<VbaString>> {
+        Ok(None)
+    }
+    fn month_name(
+        &self,
+        _month: u8,
+        _abbreviate: bool,
+        _locale: &str,
+        _calendar: &str,
+    ) -> Result<Option<VbaString>> {
+        Ok(None)
+    }
+    fn weekday_name(
+        &self,
+        _weekday: u8,
+        _abbreviate: bool,
+        _first_day: u8,
+        _locale: &str,
+        _calendar: &str,
+    ) -> Result<Option<VbaString>> {
+        Ok(None)
+    }
     /// Parse a complete locale-specific numeric string for IsNumeric.
     fn is_numeric_text(&self, _text: &VbaString, _locale: &str) -> Result<bool> {
         Ok(false)
@@ -63,6 +93,12 @@ pub trait DateConversionService: Send + Sync {
     ) -> Result<Option<VbaString>> {
         Ok(None)
     }
+}
+
+/// Explicit source for local VBA Date serials. The VM never reads the host clock itself.
+pub trait ClockService: Send + Sync {
+    fn service_id(&self) -> &str;
+    fn now_serial(&self) -> Result<f64>;
 }
 
 /// Locale/calendar formatting and localized error-description provider.
@@ -86,6 +122,39 @@ pub fn intrinsic_extended_with_context(
     arguments: &[Option<Value>],
     context: &IntrinsicContext<'_>,
 ) -> Result<Value> {
+    if matches!(
+        function,
+        vba_values::Intrinsic::Rnd | vba_values::Intrinsic::Randomize
+    ) {
+        return coercion::random_intrinsic(function, arguments, context);
+    }
+    if matches!(
+        function,
+        vba_values::Intrinsic::Date
+            | vba_values::Intrinsic::DateDollar
+            | vba_values::Intrinsic::Time
+            | vba_values::Intrinsic::TimeDollar
+            | vba_values::Intrinsic::Now
+            | vba_values::Intrinsic::Timer
+            | vba_values::Intrinsic::DateAdd
+            | vba_values::Intrinsic::DateDiff
+            | vba_values::Intrinsic::DatePart
+            | vba_values::Intrinsic::DateSerial
+            | vba_values::Intrinsic::DateValue
+            | vba_values::Intrinsic::TimeSerial
+            | vba_values::Intrinsic::TimeValue
+            | vba_values::Intrinsic::Day
+            | vba_values::Intrinsic::Month
+            | vba_values::Intrinsic::Year
+            | vba_values::Intrinsic::Hour
+            | vba_values::Intrinsic::Minute
+            | vba_values::Intrinsic::Second
+            | vba_values::Intrinsic::Weekday
+            | vba_values::Intrinsic::MonthName
+            | vba_values::Intrinsic::WeekdayName
+    ) {
+        return coercion::date_intrinsic(function, arguments, context);
+    }
     if function == vba_values::Intrinsic::StrComp {
         return coercion::strcomp(arguments, context);
     }
@@ -155,6 +224,8 @@ impl<'a> IntrinsicContext<'a> {
             string_comparison: None,
             date_conversion: None,
             formatting: None,
+            clock: None,
+            random_state: None,
             last_error_number: 0,
         }
     }
@@ -263,8 +334,20 @@ impl<'a> IntrinsicContext<'a> {
             string_comparison,
             date_conversion,
             formatting,
+            clock: None,
+            random_state: None,
             last_error_number,
         }
+    }
+
+    pub const fn with_clock(mut self, service: &'a dyn ClockService) -> Self {
+        self.clock = Some(service);
+        self
+    }
+
+    pub const fn with_random_state(mut self, state: &'a Cell<u32>) -> Self {
+        self.random_state = Some(state);
+        self
     }
 
     pub const fn comparison_mode(&self) -> vba_values::IntrinsicComparisonMode {
@@ -348,6 +431,66 @@ impl<'a> IntrinsicContext<'a> {
             ))
         })?;
         service.format_date(serial, self.locale, self.calendar)
+    }
+
+    pub fn parse_time(&self, value: &VbaString) -> Result<Option<f64>> {
+        let service = self.date_conversion.ok_or_else(|| {
+            Error::Unsupported(format!(
+                "time-conversion-service-unavailable:{}",
+                self.locale
+            ))
+        })?;
+        service.parse_time(value, self.locale)
+    }
+
+    pub fn format_time(&self, fraction: f64) -> Result<Option<VbaString>> {
+        let service = self.date_conversion.ok_or_else(|| {
+            Error::Unsupported(format!(
+                "time-formatting-service-unavailable:{}",
+                self.locale
+            ))
+        })?;
+        service.format_time(fraction, self.locale)
+    }
+
+    pub fn month_name(&self, month: u8, abbreviated: bool) -> Result<Option<VbaString>> {
+        let service = self.date_conversion.ok_or_else(|| {
+            Error::Unsupported(format!(
+                "month-name-service-unavailable:{}:{}",
+                self.locale, self.calendar
+            ))
+        })?;
+        service.month_name(month, abbreviated, self.locale, self.calendar)
+    }
+
+    pub fn weekday_name(
+        &self,
+        weekday: u8,
+        abbreviated: bool,
+        first_day: u8,
+    ) -> Result<Option<VbaString>> {
+        let service = self.date_conversion.ok_or_else(|| {
+            Error::Unsupported(format!(
+                "weekday-name-service-unavailable:{}:{}",
+                self.locale, self.calendar
+            ))
+        })?;
+        service.weekday_name(weekday, abbreviated, first_day, self.locale, self.calendar)
+    }
+
+    pub fn now_serial(&self) -> Result<f64> {
+        self.clock
+            .ok_or_else(|| Error::Unsupported("clock-service-unavailable".into()))?
+            .now_serial()
+    }
+
+    pub fn clock_service_id(&self) -> Option<&str> {
+        self.clock.map(ClockService::service_id)
+    }
+
+    pub(crate) fn random_state(&self) -> Result<&Cell<u32>> {
+        self.random_state
+            .ok_or_else(|| Error::Unsupported("random-state-unavailable".into()))
     }
 
     pub fn formatting_service_id(&self) -> Option<&str> {

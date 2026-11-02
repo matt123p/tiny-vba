@@ -1,4 +1,5 @@
 use super::{Error, Result, overflow};
+use crate::calendar as cal;
 use vba_values::{
     Intrinsic as I, IntrinsicFamily, IntrinsicOmittedDefault, ScalarKind as K, Value as V,
     VbaString,
@@ -1035,6 +1036,478 @@ pub fn intrinsic(function: I, args: &[V]) -> Result<V> {
     })
 }
 
+pub(crate) fn random_intrinsic(
+    function: I,
+    arguments: &[Option<V>],
+    context: &super::IntrinsicContext<'_>,
+) -> Result<V> {
+    let state = context.random_state()?;
+    let mut seed = state.get() & 0x00ff_ffff;
+    if function == I::Rnd {
+        let value = arguments.first().and_then(Option::as_ref);
+        let number = value.map(numeric).transpose()?.unwrap_or(1.0) as f32;
+        if !number.is_finite() {
+            return Err(overflow());
+        }
+        if number < 0.0 {
+            let bits = number.to_bits();
+            seed = bits.wrapping_add(bits >> 24) & 0x00ff_ffff;
+        }
+        if number != 0.0 {
+            seed = seed.wrapping_mul(0x43fd_43fd).wrapping_add(0x00c3_9ec3) & 0x00ff_ffff;
+            state.set(seed);
+        }
+        return Ok(V::Single(seed as f32 / 16_777_216.0_f32));
+    }
+    let lvalue = if let Some(Some(value)) = arguments.first() {
+        let number = numeric(value)?;
+        if !number.is_finite() {
+            return Err(overflow());
+        }
+        (number.to_bits() >> 32) as u32
+    } else {
+        let now = context.now_serial()?;
+        let parts = cal::from_serial(now)?;
+        let seconds =
+            (parts.seconds as f32 + parts.subsecond_micros as f32 / 1_000_000.0_f32) / 86_400.0_f32;
+        seconds.to_bits()
+    };
+    let mixed = ((lvalue & 0xffff) ^ (lvalue >> 16)).wrapping_shl(8);
+    state.set((seed & 0xff00_00ff) | mixed);
+    Ok(V::Empty)
+}
+
+fn date_value(value: &V, context: &super::IntrinsicContext<'_>) -> Result<f64> {
+    let serial = match value {
+        V::String(text) => context.parse_date(text)?.ok_or_else(mismatch)?,
+        _ => numeric(value)?,
+    };
+    cal::from_serial(serial)?;
+    Ok(serial)
+}
+fn date_first_day(value: Option<&Option<V>>) -> Result<u8> {
+    let number = match value.and_then(Option::as_ref) {
+        None => 0,
+        Some(value) => i64::try_from(integral(value, 0, 7)?).map_err(|_| overflow())?,
+    };
+    Ok(if number == 0 { 1 } else { number as u8 })
+}
+fn date_first_week(value: Option<&Option<V>>) -> Result<u8> {
+    match value.and_then(Option::as_ref) {
+        None => Ok(1),
+        Some(value) => match integral(value, 0, 3)? {
+            0 => Ok(1),
+            n => u8::try_from(n).map_err(|_| overflow()),
+        },
+    }
+}
+fn date_interval(value: &V) -> Result<String> {
+    let value = text(value)?;
+    let spelling = String::from_utf16(value.units()).map_err(|_| mismatch())?;
+    Ok(spelling.to_ascii_lowercase())
+}
+fn require_gregorian(context: &super::IntrinsicContext<'_>) -> Result<()> {
+    let calendar = context.calendar();
+    if calendar.is_empty()
+        || calendar.eq_ignore_ascii_case("gregorian")
+        || calendar == "unconfigured"
+    {
+        Ok(())
+    } else {
+        Err(Error::Unsupported(format!(
+            "calendar-not-supported:{calendar}"
+        )))
+    }
+}
+fn date_output(serial: f64) -> Result<V> {
+    cal::from_serial(serial)?;
+    Ok(V::Date(serial))
+}
+pub(crate) fn date_intrinsic(
+    function: I,
+    arguments: &[Option<V>],
+    context: &super::IntrinsicContext<'_>,
+) -> Result<V> {
+    require_gregorian(context)?;
+    if arguments
+        .iter()
+        .flatten()
+        .any(|value| matches!(value, V::Null))
+    {
+        return Ok(V::Null);
+    }
+    let now = || {
+        let serial = context.now_serial()?;
+        cal::from_serial(serial)?;
+        Ok(serial)
+    };
+    match function {
+        I::Date | I::DateDollar | I::Time | I::TimeDollar | I::Now | I::Timer => {
+            let serial = now()?;
+            let parts = cal::from_serial(serial)?;
+            match function {
+                I::Now => date_output(serial),
+                I::Date => date_output(cal::serial_from_ymd(parts.year, parts.month, parts.day)?),
+                I::Time => Ok(V::Date(
+                    (f64::from(parts.seconds) + f64::from(parts.subsecond_micros) / 1_000_000.0)
+                        / 86_400.0,
+                )),
+                I::Timer => Ok(V::Single(
+                    parts.seconds as f32 + parts.subsecond_micros as f32 / 1_000_000.0,
+                )),
+                I::DateDollar => context
+                    .format_date(cal::serial_from_ymd(parts.year, parts.month, parts.day)?)?
+                    .map(V::String)
+                    .ok_or_else(|| Error::Unsupported("date-format-service-unavailable".into())),
+                I::TimeDollar => context
+                    .format_time(
+                        (f64::from(parts.seconds)
+                            + f64::from(parts.subsecond_micros) / 1_000_000.0)
+                            / 86_400.0,
+                    )?
+                    .map(V::String)
+                    .ok_or_else(|| Error::Unsupported("time-format-service-unavailable".into())),
+                _ => Err(mismatch()),
+            }
+        }
+        I::DateSerial => {
+            let year = integral(
+                arguments
+                    .first()
+                    .and_then(Option::as_ref)
+                    .ok_or_else(mismatch)?,
+                i128::from(i16::MIN),
+                i128::from(i16::MAX),
+            )?;
+            let month = integral(
+                arguments
+                    .get(1)
+                    .and_then(Option::as_ref)
+                    .ok_or_else(mismatch)?,
+                i128::from(i16::MIN),
+                i128::from(i16::MAX),
+            )?;
+            let day = integral(
+                arguments
+                    .get(2)
+                    .and_then(Option::as_ref)
+                    .ok_or_else(mismatch)?,
+                i128::from(i16::MIN),
+                i128::from(i16::MAX),
+            )?;
+            date_output(cal::date_serial(year as i64, month as i64, day as i64)?)
+        }
+        I::TimeSerial => {
+            let mut seconds = 0_i64;
+            for (index, scale) in [(0_usize, 3600_i64), (1, 60), (2, 1)] {
+                let value = integral(
+                    arguments
+                        .get(index)
+                        .and_then(Option::as_ref)
+                        .ok_or_else(mismatch)?,
+                    i128::from(i16::MIN),
+                    i128::from(i16::MAX),
+                )?;
+                seconds = seconds
+                    .checked_add(
+                        i64::try_from(value)
+                            .map_err(|_| overflow())?
+                            .checked_mul(scale)
+                            .ok_or_else(overflow)?,
+                    )
+                    .ok_or_else(overflow)?;
+            }
+            Ok(V::Date(seconds.rem_euclid(86_400) as f64 / 86_400.0))
+        }
+        I::DateValue => {
+            let serial = date_value(
+                arguments
+                    .first()
+                    .and_then(Option::as_ref)
+                    .ok_or_else(mismatch)?,
+                context,
+            )?;
+            let parts = cal::from_serial(serial)?;
+            date_output(cal::serial_from_ymd(parts.year, parts.month, parts.day)?)
+        }
+        I::TimeValue => {
+            let value = arguments
+                .first()
+                .and_then(Option::as_ref)
+                .ok_or_else(mismatch)?;
+            let fraction = match value {
+                V::String(text) => context.parse_time(text)?.ok_or_else(mismatch)?,
+                _ => {
+                    let parts = cal::from_serial(numeric(value)?)?;
+                    (f64::from(parts.seconds) + f64::from(parts.subsecond_micros) / 1_000_000.0)
+                        / 86_400.0
+                }
+            };
+            if !(0.0..1.0).contains(&fraction) {
+                return Err(error(5, "Invalid procedure call or argument"));
+            }
+            Ok(V::Date(fraction))
+        }
+        I::Day | I::Month | I::Year | I::Hour | I::Minute | I::Second | I::Weekday => {
+            let serial = date_value(
+                arguments
+                    .first()
+                    .and_then(Option::as_ref)
+                    .ok_or_else(mismatch)?,
+                context,
+            )?;
+            let parts = cal::from_serial(serial)?;
+            let result = match function {
+                I::Day => i32::from(parts.day),
+                I::Month => i32::from(parts.month),
+                I::Year => parts.year,
+                I::Hour => (parts.seconds / 3600) as i32,
+                I::Minute => ((parts.seconds / 60) % 60) as i32,
+                I::Second => (parts.seconds % 60) as i32,
+                I::Weekday => {
+                    let first = date_first_day(arguments.get(1))?;
+                    (i32::from(cal::weekday_sunday_one(cal::serial_day(serial)?) - first))
+                        .rem_euclid(7)
+                        + 1
+                }
+                _ => return Err(mismatch()),
+            };
+            Ok(V::Integer(i16::try_from(result).map_err(|_| overflow())?))
+        }
+        I::MonthName => {
+            let month = u8::try_from(integral(
+                arguments
+                    .first()
+                    .and_then(Option::as_ref)
+                    .ok_or_else(mismatch)?,
+                1,
+                12,
+            )?)
+            .map_err(|_| overflow())?;
+            let abbreviated = match arguments.get(1).and_then(Option::as_ref) {
+                Some(value) => super::condition(value)?,
+                None => false,
+            };
+            context
+                .month_name(month, abbreviated)?
+                .map(V::String)
+                .ok_or_else(|| Error::Unsupported("month-name-service-unavailable".into()))
+        }
+        I::WeekdayName => {
+            let weekday = u8::try_from(integral(
+                arguments
+                    .first()
+                    .and_then(Option::as_ref)
+                    .ok_or_else(mismatch)?,
+                1,
+                7,
+            )?)
+            .map_err(|_| overflow())?;
+            let abbreviated = match arguments.get(1).and_then(Option::as_ref) {
+                Some(value) => super::condition(value)?,
+                None => false,
+            };
+            let first = date_first_day(arguments.get(2))?;
+            context
+                .weekday_name(weekday, abbreviated, first)?
+                .map(V::String)
+                .ok_or_else(|| Error::Unsupported("weekday-name-service-unavailable".into()))
+        }
+        I::DateAdd => {
+            let interval = date_interval(
+                arguments
+                    .first()
+                    .and_then(Option::as_ref)
+                    .ok_or_else(mismatch)?,
+            )?;
+            let number = integral(
+                arguments
+                    .get(1)
+                    .and_then(Option::as_ref)
+                    .ok_or_else(mismatch)?,
+                i128::from(i32::MIN),
+                i128::from(i32::MAX),
+            )? as i64;
+            let serial = date_value(
+                arguments
+                    .get(2)
+                    .and_then(Option::as_ref)
+                    .ok_or_else(mismatch)?,
+                context,
+            )?;
+            let parts = cal::from_serial(serial)?;
+            let result = match interval.as_str() {
+                "yyyy" | "q" | "m" => {
+                    let months = match interval.as_str() {
+                        "yyyy" => number.checked_mul(12),
+                        "q" => number.checked_mul(3),
+                        _ => Some(number),
+                    }
+                    .ok_or_else(overflow)?;
+                    let (year, month, day) =
+                        cal::add_months(parts.year, parts.month, parts.day, months)?;
+                    cal::to_serial(cal::DateParts {
+                        year,
+                        month,
+                        day,
+                        seconds: parts.seconds,
+                        subsecond_micros: parts.subsecond_micros,
+                    })?
+                }
+                "d" | "y" | "w" | "ww" => {
+                    let days = if interval == "ww" {
+                        number.checked_mul(7).ok_or_else(overflow)?
+                    } else {
+                        number
+                    };
+                    let new_day = cal::serial_day(serial)?
+                        .checked_add(days)
+                        .ok_or_else(overflow)?;
+                    let date = cal::serial_from_ymd(parts.year, parts.month, parts.day)?;
+                    let target = date + days as f64;
+                    let mut target_parts = cal::from_serial(target)?;
+                    target_parts.seconds = parts.seconds;
+                    target_parts.subsecond_micros = parts.subsecond_micros;
+                    let _ = new_day;
+                    cal::to_serial(target_parts)?
+                }
+                "h" | "n" | "s" => {
+                    let scale = match interval.as_str() {
+                        "h" => 3600_i64,
+                        "n" => 60,
+                        _ => 1,
+                    };
+                    let delta = number.checked_mul(scale).ok_or_else(overflow)?;
+                    let total = cal::serial_day(serial)?
+                        .checked_mul(86_400)
+                        .and_then(|n| n.checked_add(i64::from(parts.seconds)))
+                        .and_then(|n| n.checked_add(delta))
+                        .ok_or_else(overflow)?;
+                    let days = total.div_euclid(86_400);
+                    let seconds = total.rem_euclid(86_400) as u32;
+                    let (year, month, day) = cal::civil_from_serial_day(days)?;
+                    cal::to_serial(cal::DateParts {
+                        year,
+                        month,
+                        day,
+                        seconds,
+                        subsecond_micros: parts.subsecond_micros,
+                    })?
+                }
+                _ => return Err(error(5, "Invalid interval")),
+            };
+            date_output(result)
+        }
+        I::DateDiff | I::DatePart => date_diff_part(function, arguments, context),
+        _ => Err(mismatch()),
+    }
+}
+
+fn date_diff_part(
+    function: I,
+    arguments: &[Option<V>],
+    context: &super::IntrinsicContext<'_>,
+) -> Result<V> {
+    let interval_index = 0;
+    let interval = date_interval(
+        arguments
+            .get(interval_index)
+            .and_then(Option::as_ref)
+            .ok_or_else(mismatch)?,
+    )?;
+    let is_diff = function == I::DateDiff;
+    let (left, right) = if is_diff {
+        (
+            date_value(
+                arguments
+                    .get(1)
+                    .and_then(Option::as_ref)
+                    .ok_or_else(mismatch)?,
+                context,
+            )?,
+            date_value(
+                arguments
+                    .get(2)
+                    .and_then(Option::as_ref)
+                    .ok_or_else(mismatch)?,
+                context,
+            )?,
+        )
+    } else {
+        let value = date_value(
+            arguments
+                .get(1)
+                .and_then(Option::as_ref)
+                .ok_or_else(mismatch)?,
+            context,
+        )?;
+        (value, value)
+    };
+    let first_day = date_first_day(arguments.get(if is_diff { 3 } else { 2 }))?;
+    let first_week = date_first_week(arguments.get(if is_diff { 4 } else { 3 }))?;
+    let a = cal::from_serial(left)?;
+    let b = cal::from_serial(right)?;
+    let day_a = cal::serial_day(left)?;
+    let day_b = cal::serial_day(right)?;
+    let result = if is_diff {
+        let months_a = i64::from(a.year) * 12 + i64::from(a.month);
+        let months_b = i64::from(b.year) * 12 + i64::from(b.month);
+        match interval.as_str() {
+            "yyyy" => i64::from(b.year - a.year),
+            "q" => months_b.div_euclid(3) - months_a.div_euclid(3),
+            "m" => months_b - months_a,
+            "d" | "y" => day_b - day_a,
+            "w" | "ww" => {
+                (day_b - i64::from(first_day)).div_euclid(7)
+                    - (day_a - i64::from(first_day)).div_euclid(7)
+            }
+            "h" | "n" | "s" => {
+                let unit = match interval.as_str() {
+                    "h" => 3600_i64,
+                    "n" => 60,
+                    _ => 1,
+                };
+                let ta = day_a * 86_400 + i64::from(a.seconds);
+                let tb = day_b * 86_400 + i64::from(b.seconds);
+                (tb - ta).div_euclid(unit)
+            }
+            _ => return Err(error(5, "Invalid interval")),
+        }
+    } else {
+        match interval.as_str() {
+            "yyyy" => i64::from(a.year),
+            "q" => i64::from((a.month - 1) / 3 + 1),
+            "m" => i64::from(a.month),
+            "y" => i64::from(cal::days_in_year_to_date(a.year, a.month, a.day)),
+            "d" => i64::from(a.day),
+            "w" => (i64::from(cal::weekday_sunday_one(day_a) - first_day)).rem_euclid(7) + 1,
+            "ww" => {
+                let start = cal::weeks_in_year_start(a.year, first_day, first_week);
+                if day_a < start {
+                    (day_a - cal::weeks_in_year_start(a.year - 1, first_day, first_week))
+                        .div_euclid(7)
+                        + 1
+                } else if day_a >= cal::weeks_in_year_start(a.year + 1, first_day, first_week) {
+                    (day_a - cal::weeks_in_year_start(a.year + 1, first_day, first_week))
+                        .div_euclid(7)
+                        + 1
+                } else {
+                    (day_a - start).div_euclid(7) + 1
+                }
+            }
+            "h" => i64::from(a.seconds / 3600),
+            "n" => i64::from((a.seconds / 60) % 60),
+            "s" => i64::from(a.seconds % 60),
+            _ => return Err(error(5, "Invalid interval")),
+        }
+    };
+    if is_diff {
+        Ok(V::Long(i32::try_from(result).map_err(|_| overflow())?))
+    } else {
+        Ok(V::Integer(i16::try_from(result).map_err(|_| overflow())?))
+    }
+}
+
 const FINANCE_ITERATIONS: usize = 20;
 const FINANCE_TOLERANCE: f64 = 1.0e-7;
 
@@ -1470,6 +1943,7 @@ pub fn intrinsic_extended(
                 IntrinsicOmittedDefault::MinusOne => Some(V::Integer(-1)),
                 IntrinsicOmittedDefault::Two => Some(V::Integer(2)),
                 IntrinsicOmittedDefault::OneTenth => Some(V::Double(0.1)),
+                IntrinsicOmittedDefault::False => Some(V::Boolean(false)),
                 IntrinsicOmittedDefault::Space => {
                     Some(V::String(VbaString::from_utf8(" ").map_err(|_| {
                         Error::Resource("string budget exceeded".into())
