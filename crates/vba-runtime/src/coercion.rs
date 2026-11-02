@@ -9,6 +9,80 @@ pub(crate) fn error(number: i32, message: &str) -> Error {
         message: message.into(),
     }
 }
+
+pub(crate) fn date_conversion(
+    function: I,
+    arguments: &[Option<V>],
+    context: &super::IntrinsicContext<'_>,
+) -> Result<V> {
+    let value = arguments
+        .first()
+        .and_then(Option::as_ref)
+        .ok_or_else(mismatch)?;
+    if function == I::CDate {
+        if let V::String(text) = value {
+            let Some(serial) = context.parse_date(text)? else {
+                return Err(mismatch());
+            };
+            if !serial.is_finite() || !(-657434.0..2958466.0).contains(&serial) {
+                return Err(overflow());
+            }
+            return Ok(V::Date(serial));
+        }
+        return convert(K::Date, value);
+    }
+    let is_date = match value {
+        V::Date(_) => true,
+        V::String(text) => context
+            .parse_date(text)?
+            .is_some_and(|serial| serial.is_finite() && (-657434.0..2958466.0).contains(&serial)),
+        V::Null | V::Missing | V::Nothing | V::CvErr(_) | V::Array(_) | V::Object(_) => false,
+        _ => convert(K::Date, value).is_ok(),
+    };
+    Ok(V::Boolean(is_date))
+}
+
+pub(crate) fn locale_conversion(
+    function: I,
+    arguments: &[Option<V>],
+    context: &super::IntrinsicContext<'_>,
+) -> Result<V> {
+    let value = arguments
+        .first()
+        .and_then(Option::as_ref)
+        .ok_or_else(mismatch)?;
+    if function == I::CStr {
+        if let V::Date(serial) = value {
+            let text = context.format_date(*serial)?.ok_or_else(mismatch)?;
+            if text.units().len() > 32_768 {
+                return Err(Error::Resource("VBA string limit".into()));
+            }
+            return Ok(V::String(text));
+        }
+        return convert(K::String, value);
+    }
+    let numeric = match value {
+        V::Byte(_)
+        | V::Integer(_)
+        | V::Long(_)
+        | V::LongLong(_)
+        | V::Single(_)
+        | V::Double(_)
+        | V::Currency(_)
+        | V::Boolean(_) => true,
+        V::String(text) => context.is_numeric_text(text)?,
+        V::Empty
+        | V::Date(_)
+        | V::Null
+        | V::Missing
+        | V::Nothing
+        | V::CvErr(_)
+        | V::Array(_)
+        | V::Object(_) => false,
+    };
+    Ok(V::Boolean(numeric))
+}
+
 pub(crate) fn mismatch() -> Error {
     error(13, "Type mismatch")
 }

@@ -22,6 +22,7 @@ pub struct IntrinsicContext<'a> {
     code_page: &'a str,
     target_width_bits: u8,
     string_comparison: Option<&'a dyn StringComparisonService>,
+    date_conversion: Option<&'a dyn DateConversionService>,
 }
 
 /// A deterministic target service for VBA binary/text string ordering.
@@ -38,6 +39,26 @@ pub trait StringComparisonService: Send + Sync {
     ) -> Result<Ordering>;
 }
 
+/// Locale/calendar implementation for VBA text-to-date conversion. Implementors
+/// must identify the rules they use; this runtime never consults OS locale state.
+pub trait DateConversionService: Send + Sync {
+    fn service_id(&self) -> &str;
+    fn parse_date(&self, text: &VbaString, locale: &str, calendar: &str) -> Result<Option<f64>>;
+    /// Parse a complete locale-specific numeric string for IsNumeric.
+    fn is_numeric_text(&self, _text: &VbaString, _locale: &str) -> Result<bool> {
+        Ok(false)
+    }
+    /// Format a Date serial using the selected locale and calendar.
+    fn format_date(
+        &self,
+        _serial: f64,
+        _locale: &str,
+        _calendar: &str,
+    ) -> Result<Option<VbaString>> {
+        Ok(None)
+    }
+}
+
 /// Evaluate a verified extended call using the immutable execution context.
 /// This is the contextual entry point for new intrinsic families; the legacy
 /// `intrinsic_extended` function remains for existing VM callers.
@@ -48,6 +69,18 @@ pub fn intrinsic_extended_with_context(
 ) -> Result<Value> {
     if function == vba_values::Intrinsic::StrComp {
         return coercion::strcomp(arguments, context);
+    }
+    if matches!(
+        function,
+        vba_values::Intrinsic::CDate | vba_values::Intrinsic::IsDate
+    ) {
+        return coercion::date_conversion(function, arguments, context);
+    }
+    if matches!(
+        function,
+        vba_values::Intrinsic::IsNumeric | vba_values::Intrinsic::CStr
+    ) {
+        return coercion::locale_conversion(function, arguments, context);
     }
     if matches!(
         function,
@@ -82,6 +115,7 @@ impl<'a> IntrinsicContext<'a> {
             code_page,
             target_width_bits,
             string_comparison: None,
+            date_conversion: None,
         }
     }
 
@@ -93,13 +127,53 @@ impl<'a> IntrinsicContext<'a> {
         target_width_bits: u8,
         service: &'a dyn StringComparisonService,
     ) -> Self {
+        Self::with_services(
+            comparison_mode,
+            locale,
+            calendar,
+            code_page,
+            target_width_bits,
+            Some(service),
+            None,
+        )
+    }
+
+    pub const fn with_date_conversion(
+        comparison_mode: vba_values::IntrinsicComparisonMode,
+        locale: &'a str,
+        calendar: &'a str,
+        code_page: &'a str,
+        target_width_bits: u8,
+        service: &'a dyn DateConversionService,
+    ) -> Self {
+        Self::with_services(
+            comparison_mode,
+            locale,
+            calendar,
+            code_page,
+            target_width_bits,
+            None,
+            Some(service),
+        )
+    }
+
+    pub const fn with_services(
+        comparison_mode: vba_values::IntrinsicComparisonMode,
+        locale: &'a str,
+        calendar: &'a str,
+        code_page: &'a str,
+        target_width_bits: u8,
+        string_comparison: Option<&'a dyn StringComparisonService>,
+        date_conversion: Option<&'a dyn DateConversionService>,
+    ) -> Self {
         Self {
             comparison_mode,
             locale,
             calendar,
             code_page,
             target_width_bits,
-            string_comparison: Some(service),
+            string_comparison,
+            date_conversion,
         }
     }
 
@@ -126,6 +200,40 @@ impl<'a> IntrinsicContext<'a> {
     pub fn string_comparison_service_id(&self) -> Option<&str> {
         self.string_comparison
             .map(StringComparisonService::service_id)
+    }
+
+    pub fn date_conversion_service_id(&self) -> Option<&str> {
+        self.date_conversion.map(DateConversionService::service_id)
+    }
+
+    pub fn parse_date(&self, value: &VbaString) -> Result<Option<f64>> {
+        let service = self.date_conversion.ok_or_else(|| {
+            Error::Unsupported(format!(
+                "date-conversion-service-unavailable:{}:{}",
+                self.locale, self.calendar
+            ))
+        })?;
+        service.parse_date(value, self.locale, self.calendar)
+    }
+
+    pub fn is_numeric_text(&self, value: &VbaString) -> Result<bool> {
+        let service = self.date_conversion.ok_or_else(|| {
+            Error::Unsupported(format!(
+                "numeric-conversion-service-unavailable:{}",
+                self.locale
+            ))
+        })?;
+        service.is_numeric_text(value, self.locale)
+    }
+
+    pub fn format_date(&self, serial: f64) -> Result<Option<VbaString>> {
+        let service = self.date_conversion.ok_or_else(|| {
+            Error::Unsupported(format!(
+                "date-formatting-service-unavailable:{}:{}",
+                self.locale, self.calendar
+            ))
+        })?;
+        service.format_date(serial, self.locale, self.calendar)
     }
 
     pub fn compare_strings(&self, left: &VbaString, right: &VbaString) -> Result<Ordering> {

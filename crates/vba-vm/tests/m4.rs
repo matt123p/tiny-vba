@@ -7,7 +7,7 @@ use std::sync::{
 use vba_compiler::{CompileOptions, compile, compile_modules};
 use vba_diagnostics::{SourceFile, SourceId};
 use vba_ir::{self as ir, Instruction};
-use vba_runtime::StringComparisonService;
+use vba_runtime::{DateConversionService, StringComparisonService};
 use vba_values::{IntrinsicComparisonMode, IntrinsicReturn, ScalarKind, Value, VbaString};
 use vba_vm::{self as vm, Limits, NoHost, Outcome, PauseReason, ReturnValue, Session};
 type R<T = ()> = Result<T, Box<dyn Error>>;
@@ -107,6 +107,71 @@ fn session_with_comparison_service(source_text: &str, calls: Arc<AtomicUsize>) -
         None,
         Limits::default(),
         Arc::new(VmCompareProvider(calls)),
+        config,
+    )?)
+}
+
+struct VmDateProvider;
+impl DateConversionService for VmDateProvider {
+    fn service_id(&self) -> &str {
+        "vm-date-test-v1"
+    }
+    fn parse_date(
+        &self,
+        text: &VbaString,
+        locale: &str,
+        calendar: &str,
+    ) -> vba_runtime::Result<Option<f64>> {
+        assert_eq!(locale, "test-locale");
+        assert_eq!(calendar, "test-calendar");
+        Ok(match text.units() {
+            [107, 110, 111, 119, 110] => Some(45000.0),
+            _ => None,
+        })
+    }
+
+    fn is_numeric_text(&self, text: &VbaString, locale: &str) -> vba_runtime::Result<bool> {
+        assert_eq!(locale, "test-locale");
+        Ok(text.units() == [110, 117, 109, 101, 114, 105, 99])
+    }
+
+    fn format_date(
+        &self,
+        serial: f64,
+        locale: &str,
+        calendar: &str,
+    ) -> vba_runtime::Result<Option<VbaString>> {
+        assert_eq!(serial, 45000.0);
+        assert_eq!(locale, "test-locale");
+        assert_eq!(calendar, "test-calendar");
+        Ok(Some(VbaString::from_utf8("date-text").map_err(|_| {
+            vba_runtime::Error::Unsupported("test date formatting failed".into())
+        })?))
+    }
+}
+
+fn session_with_date_service(source_text: &str) -> R<Session> {
+    let source = SourceFile::new(SourceId(92), "date.bas".into(), source_text.into())?;
+    let program = compile(
+        &source,
+        &CompileOptions {
+            capabilities: vm::capabilities(),
+            ..Default::default()
+        },
+    )?;
+    let config = vm::IntrinsicContextConfig::new(
+        "test-locale".into(),
+        "test-calendar".into(),
+        "test-code-page".into(),
+        64,
+    )?;
+    Ok(Session::new_with_date_conversion_service(
+        program,
+        92,
+        vec![],
+        None,
+        Limits::default(),
+        Arc::new(VmDateProvider),
         config,
     )?)
 }
@@ -823,6 +888,36 @@ fn c1_conversion_and_variant_inspection_calls_execute_from_source() -> R {
         "Function Answer() As String\nAnswer=TypeName(CByte(2)) & \":\" & CStr(VarType(CByte(2))) & \":\" & CStr(CBool(\"True\"))\nEnd Function",
         Value::String(VbaString::from_utf8("Byte:17:True")?),
     )
+}
+
+#[test]
+fn c2_date_parse_and_isdate_use_the_injected_locale_calendar_provider() -> R {
+    assert_eq!(
+        drive(&mut session_with_date_service(
+            "Function Answer() As Date\nAnswer=CDate(\"known\")\nEnd Function",
+        )?)?,
+        Outcome::Completed(ReturnValue::Function(Value::Date(45000.0)))
+    );
+    assert_eq!(
+        drive(&mut session_with_date_service(
+            "Function Answer() As Boolean\nAnswer=IsDate(\"known\") And Not IsDate(\"bad\")\nEnd Function",
+        )?)?,
+        Outcome::Completed(ReturnValue::Function(Value::Boolean(true)))
+    );
+    Ok(())
+}
+
+#[test]
+fn c3_isnumeric_and_cstr_date_use_the_injected_locale_provider() -> R {
+    assert_eq!(
+        drive(&mut session_with_date_service(
+            "Function Answer() As String\nAnswer=CStr(CDate(\"known\")) & \":\" & CStr(IsNumeric(\"numeric\")) & \":\" & CStr(IsNumeric(\"other\"))\nEnd Function",
+        )?)?,
+        Outcome::Completed(ReturnValue::Function(Value::String(VbaString::from_utf8(
+            "date-text:True:False",
+        )?)))
+    );
+    Ok(())
 }
 #[test]
 fn resource_failure_cannot_be_swallowed_by_on_error() -> R {

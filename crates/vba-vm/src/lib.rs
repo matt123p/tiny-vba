@@ -282,6 +282,7 @@ pub struct Session {
     nominal_types: BTreeMap<Location, vba_values::NominalType>,
     type_resolver: Option<std::sync::Arc<dyn foreign::ObjectTypeResolver>>,
     string_comparison_service: Option<std::sync::Arc<dyn runtime::StringComparisonService>>,
+    date_conversion_service: Option<std::sync::Arc<dyn runtime::DateConversionService>>,
     intrinsic_context_config: Option<IntrinsicContextConfig>,
     array_types: BTreeMap<Location, ScalarKind>,
     output: Vec<vba_values::VbaString>,
@@ -338,19 +339,21 @@ fn value_bytes(v: &Value) -> usize {
 }
 fn intrinsic_context<'a>(
     mode: vba_values::IntrinsicComparisonMode,
-    service: Option<&'a dyn runtime::StringComparisonService>,
+    string_service: Option<&'a dyn runtime::StringComparisonService>,
+    date_service: Option<&'a dyn runtime::DateConversionService>,
     config: Option<&'a IntrinsicContextConfig>,
 ) -> runtime::IntrinsicContext<'a> {
-    match (service, config) {
-        (Some(service), Some(config)) => runtime::IntrinsicContext::with_string_comparison(
+    match config {
+        Some(config) => runtime::IntrinsicContext::with_services(
             mode,
             &config.locale,
             &config.calendar,
             &config.code_page,
             config.target_width_bits,
-            service,
+            string_service,
+            date_service,
         ),
-        _ => runtime::IntrinsicContext::no_services(
+        None => runtime::IntrinsicContext::no_services(
             mode,
             "unconfigured",
             "unconfigured",
@@ -388,6 +391,24 @@ impl Session {
         }
         let mut session = Self::new(program, identity, arguments, binding, limits)?;
         session.string_comparison_service = Some(service);
+        session.intrinsic_context_config = Some(context);
+        Ok(session)
+    }
+    pub fn new_with_date_conversion_service(
+        program: ir::VerifiedProgram,
+        identity: u64,
+        arguments: Vec<Value>,
+        binding: Option<HostBinding>,
+        limits: Limits,
+        service: std::sync::Arc<dyn runtime::DateConversionService>,
+        context: IntrinsicContextConfig,
+    ) -> Result<Self> {
+        let service_id = service.service_id();
+        if service_id.is_empty() || service_id.len() > 128 {
+            return Err(command("invalid date-conversion service identity"));
+        }
+        let mut session = Self::new(program, identity, arguments, binding, limits)?;
+        session.date_conversion_service = Some(service);
         session.intrinsic_context_config = Some(context);
         Ok(session)
     }
@@ -547,6 +568,7 @@ impl Session {
             nominal_types: BTreeMap::new(),
             type_resolver,
             string_comparison_service: None,
+            date_conversion_service: None,
             intrinsic_context_config: None,
             program,
             identity,
@@ -3044,6 +3066,7 @@ impl Session {
                 let context = intrinsic_context(
                     compare_mode,
                     self.string_comparison_service.as_deref(),
+                    self.date_conversion_service.as_deref(),
                     self.intrinsic_context_config.as_ref(),
                 );
                 let value =
@@ -3086,6 +3109,7 @@ impl Session {
                 let context = intrinsic_context(
                     compare_mode,
                     self.string_comparison_service.as_deref(),
+                    self.date_conversion_service.as_deref(),
                     self.intrinsic_context_config.as_ref(),
                 );
                 let value = runtime::binary_with_context(binary_name(op), &left, &right, &context)

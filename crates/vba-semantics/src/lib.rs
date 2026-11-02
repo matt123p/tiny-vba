@@ -2423,6 +2423,7 @@ impl Binder<'_> {
         let extended = arguments
             .iter()
             .any(|argument| argument.name.is_some() || argument.value.is_none())
+            || descriptor.minimum_ir >= 8
             || matches!(
                 function,
                 vba_values::Intrinsic::StrComp

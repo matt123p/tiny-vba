@@ -263,6 +263,27 @@ fn trim_dollar_descriptors_distinguish_variant_and_string_returns() {
 }
 
 #[test]
+fn locale_conversion_descriptors_require_ir8_context() {
+    for intrinsic in [
+        Intrinsic::CDate,
+        Intrinsic::IsDate,
+        Intrinsic::IsNumeric,
+        Intrinsic::CStr,
+    ] {
+        let descriptor = descriptor_for(intrinsic);
+        assert_eq!(descriptor.map(|item| item.minimum_ir), Some(8));
+        assert_eq!(
+            descriptor.map(|item| item.effect),
+            Some(vba_values::IntrinsicEffect::Contextual)
+        );
+        assert_eq!(
+            descriptor.map(|item| item.capability),
+            Some("intrinsics-m6a-v1")
+        );
+    }
+}
+
+#[test]
 fn repetition_descriptors_retain_variant_string_returns() -> Result<(), Box<dyn std::error::Error>>
 {
     let space = Intrinsic::Space

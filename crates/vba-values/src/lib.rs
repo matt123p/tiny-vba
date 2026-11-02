@@ -279,6 +279,8 @@ pub enum Intrinsic {
     IsEmpty,
     IsNull,
     IsError,
+    IsDate,
+    IsNumeric,
     VarType,
     TypeName,
     CInt,
@@ -583,6 +585,10 @@ const fn descriptor(
             | Intrinsic::Replace
             | Intrinsic::Split
             | Intrinsic::Filter
+            | Intrinsic::CDate
+            | Intrinsic::IsDate
+            | Intrinsic::IsNumeric
+            | Intrinsic::CStr
     ) {
         (8, "intrinsics-m6a-v1")
     } else if matches!(intrinsic, Intrinsic::IIf) {
@@ -631,6 +637,8 @@ const fn descriptor(
             | Intrinsic::IsEmpty
             | Intrinsic::IsNull
             | Intrinsic::IsError
+            | Intrinsic::IsDate
+            | Intrinsic::IsNumeric
             | Intrinsic::VarType
             | Intrinsic::TypeName => IntrinsicFamily::Inspection,
             Intrinsic::CInt
@@ -690,6 +698,10 @@ const fn descriptor(
                 | Intrinsic::Replace
                 | Intrinsic::Split
                 | Intrinsic::Filter
+                | Intrinsic::CDate
+                | Intrinsic::IsDate
+                | Intrinsic::IsNumeric
+                | Intrinsic::CStr
         ) {
             IntrinsicEffect::Contextual
         } else {
@@ -707,8 +719,12 @@ const fn descriptor(
                 | Intrinsic::Replace
                 | Intrinsic::Split
                 | Intrinsic::Filter
+                | Intrinsic::CDate
+                | Intrinsic::IsDate
+                | Intrinsic::IsNumeric
+                | Intrinsic::CStr
         ) {
-            "injected string-comparison service for Text mode"
+            "injected comparison or locale conversion service"
         } else {
             "portable core"
         },
@@ -725,9 +741,14 @@ const fn return_variant(intrinsic: Intrinsic) -> IntrinsicReturn {
         I::IIf | I::Abs | I::Int | I::Fix => R::Polymorphic,
         I::Left | I::Right | I::Mid | I::Trim | I::LTrim | I::RTrim => R::Variant,
         I::InStr | I::InStrRev | I::Len | I::LBound | I::UBound => R::Fixed(K::Long),
-        I::IsObject | I::IsArray | I::IsMissing | I::IsEmpty | I::IsNull | I::IsError => {
-            R::Fixed(K::Boolean)
-        }
+        I::IsObject
+        | I::IsArray
+        | I::IsMissing
+        | I::IsEmpty
+        | I::IsNull
+        | I::IsError
+        | I::IsDate
+        | I::IsNumeric => R::Fixed(K::Boolean),
         I::VarType | I::Sgn | I::Asc | I::AscW => R::Fixed(K::Integer),
         I::TypeName
         | I::Replace
@@ -944,6 +965,20 @@ pub const INTRINSIC_DESCRIPTORS: &[IntrinsicDescriptor] = &[
         ONE_VALUE,
         false,
         "CDate(expression)",
+    ),
+    descriptor(
+        Intrinsic::IsDate,
+        "IsDate",
+        ONE_VALUE,
+        false,
+        "IsDate(expression)",
+    ),
+    descriptor(
+        Intrinsic::IsNumeric,
+        "IsNumeric",
+        ONE_VALUE,
+        false,
+        "IsNumeric(expression)",
     ),
     descriptor(
         Intrinsic::CBool,
