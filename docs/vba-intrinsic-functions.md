@@ -400,7 +400,7 @@ rows cannot silently disappear from the inventory or become implicit M7 work.
 
 ## M6A.8 cross-host verification status
 
-The published shared revision and both fork pins exercise `StrComp` in an authored GridCraft worksheet UDF and WordCraft macro. The host and application validation results are recorded in the [work ledger](m6a-work-ledger.md#current-packet); GridCraft and WordCraft gates pass, while shared `cargo xtask ci` retains the recorded editor completion failure. M6A is not accepted: required implementation rows remain partial or absent for `Len` coercion, `LenB`, non-ASCII `LCase`/`UCase`, `StrConv`, code-page `Asc`/`Chr`, and byte-oriented `AscB`, `ChrB`, `LeftB`, `RightB`, and `MidB` (including `$` variants). These are portable implementation gaps, not accepted platform refusals. No fresh Office observation is claimed; those are deferred to M8.5.
+The published shared revision and both fork pins exercise `StrComp` in an authored GridCraft worksheet UDF and WordCraft macro. The host and application validation results are recorded in the [work ledger](m6a-work-ledger.md#current-packet); shared tiny-vba CI, GridCraft and WordCraft gates pass. M6A is not accepted: required implementation rows remain partial or absent for `Len` coercion, `LenB`, non-ASCII `LCase`/`UCase`, `StrConv`, code-page `Asc`/`Chr`, and byte-oriented `AscB`, `ChrB`, `LeftB`, `RightB`, and `MidB` (including `$` variants). These are portable implementation gaps, not accepted platform refusals. No fresh Office observation is claimed; those are deferred to M8.5.
 
 ## Acceptance before M7
 
