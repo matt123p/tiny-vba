@@ -432,7 +432,7 @@ pub fn intrinsic(function: I, args: &[V]) -> Result<V> {
             V::Double(n)
         }
         Len | Left | LeftDollar | Right | RightDollar | Mid | MidDollar | Trim | LTrim | RTrim
-        | StrReverse | LCase | UCase | Asc | AscW => {
+        | TrimDollar | LTrimDollar | RTrimDollar | StrReverse | LCase | UCase | Asc | AscW => {
             if matches!(v, V::Null) {
                 if function == StrReverse {
                     return Err(error(94, "Invalid use of Null"));
@@ -488,18 +488,18 @@ pub fn intrinsic(function: I, args: &[V]) -> Result<V> {
                     _ => (),
                 }
             }
-            if function == Trim {
+            if matches!(function, Trim | TrimDollar) {
                 while units.get(start) == Some(&32) {
                     start += 1;
                 }
                 while end > start && units.get(end - 1) == Some(&32) {
                     end -= 1;
                 }
-            } else if function == LTrim {
+            } else if matches!(function, LTrim | LTrimDollar) {
                 while units.get(start) == Some(&32) {
                     start += 1;
                 }
-            } else if function == RTrim {
+            } else if matches!(function, RTrim | RTrimDollar) {
                 while end > start && units.get(end - 1) == Some(&32) {
                     end -= 1;
                 }

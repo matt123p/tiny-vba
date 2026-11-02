@@ -1155,3 +1155,17 @@ fn dollar_slice_forms_share_utf16_slicing_and_keep_string_values() -> TestResult
     );
     Ok(())
 }
+
+#[test]
+fn dollar_trim_forms_share_null_and_space_behavior() -> TestResult {
+    use I::{LTrimDollar, RTrimDollar, TrimDollar};
+    let apply = |function, arguments: &[V]| {
+        vba_runtime::intrinsic(function, arguments)
+            .map_err(|error| std::io::Error::other(format!("{error:?}")))
+    };
+    assert_eq!(apply(TrimDollar, &[string("  a  ")?])?, string("a")?);
+    assert_eq!(apply(LTrimDollar, &[string("  a  ")?])?, string("a  ")?);
+    assert_eq!(apply(RTrimDollar, &[string("  a  ")?])?, string("  a")?);
+    assert_eq!(apply(TrimDollar, &[V::Null])?, V::Null);
+    Ok(())
+}

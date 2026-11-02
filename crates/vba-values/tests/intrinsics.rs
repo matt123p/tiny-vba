@@ -227,12 +227,39 @@ fn string_edge_descriptors_have_one_string_argument() -> Result<(), Box<dyn std:
         assert_eq!(descriptor.spelling, spelling);
         assert_eq!(descriptor.minimum_arguments, 1);
         assert_eq!(descriptor.maximum_arguments, 1);
-        assert_eq!(
-            descriptor.return_variant,
+        let expected = if matches!(intrinsic, Intrinsic::LTrim | Intrinsic::RTrim) {
+            IntrinsicReturn::Variant
+        } else {
             IntrinsicReturn::Fixed(ScalarKind::String)
-        );
+        };
+        assert_eq!(descriptor.return_variant, expected);
     }
     Ok(())
+}
+
+#[test]
+fn trim_dollar_descriptors_distinguish_variant_and_string_returns() {
+    use Intrinsic as I;
+    use IntrinsicReturn as R;
+    use ScalarKind::String;
+    assert_eq!(
+        I::Trim.descriptor().map(|item| item.return_variant),
+        Some(R::Variant)
+    );
+    assert_eq!(
+        I::LTrim.descriptor().map(|item| item.return_variant),
+        Some(R::Variant)
+    );
+    assert_eq!(
+        I::RTrim.descriptor().map(|item| item.return_variant),
+        Some(R::Variant)
+    );
+    for intrinsic in [I::TrimDollar, I::LTrimDollar, I::RTrimDollar] {
+        assert_eq!(
+            intrinsic.descriptor().map(|item| item.return_variant),
+            Some(R::Fixed(String))
+        );
+    }
 }
 
 #[test]

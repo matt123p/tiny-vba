@@ -179,7 +179,9 @@ functions; split a row below further when its tests or dependencies warrant it.
 | S8 | M6A.2 | S7 | Audit LCase/UCase coercion, Null, case range, return type and locale boundary. |
 | S9 | M6A.2 | S8 | Implement AscW/ChrW over UTF-16 code units, with signed Integer returns and surrogate boundaries. |
 | S10 | M6A.2 | S9 | Add Left$/Right$/Mid$ with fixed String return identity while plain forms retain Variant(String). |
-| S11 onward | M6A.2 | S10 | Continue byte and remaining `$` variants in small packets; audit existing functions as well. |
+| S11 | M6A.2 | S10 | Add Trim$/LTrim$/RTrim$ with fixed String return tags and correct plain Variant(String) metadata. |
+| S12 | M6A.2 | S11 | Add Space$/String$ with fixed String return identity while plain forms retain Variant(String). |
+| S13 | M6A.2 | S12 | Audit byte intrinsics and specify byte representation/provider before implementation; Unicode BSTR bytes and converted ANSI/MBCS bytes have distinct semantics. |
 | C1 onward | M6A.3 | F3; relevant context | Conversion/predicates first, then formatting. Decimal and target-width foundation precede CDec/CLngPtr; no Double approximation. |
 | A1 onward | M6A.4 | F3 | Arrays/bounds and conditional selection/evaluation; preserve existing array storage/aliases and IIf eagerness. |
 | N1 onward | M6A.4 | F3 | Pure numeric functions, then financial functions with bounded convergence and exact VBA error contracts. |

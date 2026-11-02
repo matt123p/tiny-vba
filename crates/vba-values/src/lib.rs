@@ -305,8 +305,11 @@ pub enum Intrinsic {
     Mid,
     MidDollar,
     Trim,
+    TrimDollar,
     LTrim,
+    LTrimDollar,
     RTrim,
+    RTrimDollar,
     StrReverse,
     LCase,
     UCase,
@@ -649,8 +652,11 @@ const fn descriptor(
             | Intrinsic::Mid
             | Intrinsic::MidDollar
             | Intrinsic::Trim
+            | Intrinsic::TrimDollar
             | Intrinsic::LTrim
+            | Intrinsic::LTrimDollar
             | Intrinsic::RTrim
+            | Intrinsic::RTrimDollar
             | Intrinsic::StrReverse
             | Intrinsic::LCase
             | Intrinsic::UCase
@@ -713,7 +719,7 @@ const fn return_variant(intrinsic: Intrinsic) -> IntrinsicReturn {
         I::Array | I::ArrayBaseOne | I::Split | I::Filter => R::Array,
         I::StrComp => R::Variant,
         I::IIf | I::Abs | I::Int | I::Fix => R::Polymorphic,
-        I::Left | I::Right | I::Mid => R::Variant,
+        I::Left | I::Right | I::Mid | I::Trim | I::LTrim | I::RTrim => R::Variant,
         I::InStr | I::InStrRev | I::Len | I::LBound | I::UBound => R::Fixed(K::Long),
         I::IsObject | I::IsArray | I::IsMissing | I::IsEmpty | I::IsNull | I::IsError => {
             R::Fixed(K::Boolean)
@@ -725,9 +731,9 @@ const fn return_variant(intrinsic: Intrinsic) -> IntrinsicReturn {
         | I::LeftDollar
         | I::RightDollar
         | I::MidDollar
-        | I::Trim
-        | I::LTrim
-        | I::RTrim
+        | I::TrimDollar
+        | I::LTrimDollar
+        | I::RTrimDollar
         | I::StrReverse
         | I::LCase
         | I::Chr => R::Fixed(K::String),
@@ -1004,8 +1010,29 @@ pub const INTRINSIC_DESCRIPTORS: &[IntrinsicDescriptor] = &[
         "Mid$(string, start, [length])",
     ),
     descriptor(Intrinsic::Trim, "Trim", ONE_VALUE, false, "Trim(string)"),
+    descriptor(
+        Intrinsic::TrimDollar,
+        "Trim$",
+        ONE_VALUE,
+        false,
+        "Trim$(string)",
+    ),
     descriptor(Intrinsic::LTrim, "LTrim", ONE_VALUE, false, "LTrim(string)"),
+    descriptor(
+        Intrinsic::LTrimDollar,
+        "LTrim$",
+        ONE_VALUE,
+        false,
+        "LTrim$(string)",
+    ),
     descriptor(Intrinsic::RTrim, "RTrim", ONE_VALUE, false, "RTrim(string)"),
+    descriptor(
+        Intrinsic::RTrimDollar,
+        "RTrim$",
+        ONE_VALUE,
+        false,
+        "RTrim$(string)",
+    ),
     descriptor(
         Intrinsic::StrReverse,
         "StrReverse",

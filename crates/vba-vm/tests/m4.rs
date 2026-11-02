@@ -424,6 +424,14 @@ fn trim_edges_and_strreverse_are_executable_intrinsics() -> R {
 }
 
 #[test]
+fn dollar_trim_forms_execute_through_source_calls() -> R {
+    answer(
+        "Function Answer() As String\nAnswer=Trim$(\"  x  \") & \"|\" & LTrim$(\"  x  \") & \"|\" & RTrim$(\"  x  \")\nEnd Function",
+        Value::String(VbaString::from_utf8("x|x  |  x")?),
+    )
+}
+
+#[test]
 fn space_and_string_are_variant_string_repetition_intrinsics() -> R {
     answer(
         "Function Answer() As String\nAnswer=Space(2) & String(3,\"xy\") & \"|\" & String(2,42)\nEnd Function",
