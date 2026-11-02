@@ -1054,7 +1054,17 @@ fn space_and_string_repeat_with_null_and_resource_boundaries() -> TestResult {
         string("   ")?
     );
     assert_eq!(
+        vba_runtime::intrinsic(I::SpaceDollar, &[V::Integer(3)])
+            .map_err(|error| std::io::Error::other(format!("{error:?}")))?,
+        string("   ")?
+    );
+    assert_eq!(
         vba_runtime::intrinsic(I::String, &[V::Integer(4), string("ABC")?])
+            .map_err(|error| std::io::Error::other(format!("{error:?}")))?,
+        string("AAAA")?
+    );
+    assert_eq!(
+        vba_runtime::intrinsic(I::StringDollar, &[V::Integer(4), string("ABC")?])
             .map_err(|error| std::io::Error::other(format!("{error:?}")))?,
         string("AAAA")?
     );

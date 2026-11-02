@@ -238,7 +238,10 @@ pub fn intrinsic(function: I, args: &[V]) -> Result<V> {
             Some(V::Object(_) | V::Nothing)
         )));
     }
-    if matches!(function, I::Space | I::String) {
+    if matches!(
+        function,
+        I::Space | I::SpaceDollar | I::String | I::StringDollar
+    ) {
         return string_repeat(function, args);
     }
     if function.family() == Some(IntrinsicFamily::StringSearch) {
@@ -553,10 +556,12 @@ pub fn intrinsic(function: I, args: &[V]) -> Result<V> {
 
 fn string_repeat(function: I, arguments: &[V]) -> Result<V> {
     let number = arguments.first().ok_or_else(mismatch)?;
-    if function == I::String && arguments.iter().any(|value| matches!(value, V::Null)) {
+    if matches!(function, I::String | I::StringDollar)
+        && arguments.iter().any(|value| matches!(value, V::Null))
+    {
         return Ok(V::Null);
     }
-    if function == I::Space && matches!(number, V::Null) {
+    if matches!(function, I::Space | I::SpaceDollar) && matches!(number, V::Null) {
         return Ok(V::Null);
     }
     let count = integral(number, i128::from(i32::MIN), i128::from(i32::MAX))?;
@@ -567,7 +572,7 @@ fn string_repeat(function: I, arguments: &[V]) -> Result<V> {
     if count > VbaString::MAX_UNITS {
         return Err(Error::Resource("string budget exceeded".into()));
     }
-    let character = if function == I::Space {
+    let character = if matches!(function, I::Space | I::SpaceDollar) {
         vec![32]
     } else {
         match arguments.get(1).ok_or_else(mismatch)? {

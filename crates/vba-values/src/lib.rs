@@ -314,7 +314,9 @@ pub enum Intrinsic {
     LCase,
     UCase,
     Space,
+    SpaceDollar,
     String,
+    StringDollar,
     Asc,
     AscW,
     Chr,
@@ -661,7 +663,9 @@ const fn descriptor(
             | Intrinsic::LCase
             | Intrinsic::UCase
             | Intrinsic::Space
+            | Intrinsic::SpaceDollar
             | Intrinsic::String
+            | Intrinsic::StringDollar
             | Intrinsic::Asc
             | Intrinsic::AscW
             | Intrinsic::Chr
@@ -739,6 +743,7 @@ const fn return_variant(intrinsic: Intrinsic) -> IntrinsicReturn {
         | I::Chr => R::Fixed(K::String),
         I::ChrW => R::Fixed(K::String),
         I::UCase | I::Space | I::String => R::Variant,
+        I::SpaceDollar | I::StringDollar => R::Fixed(K::String),
         I::CInt => R::Fixed(K::Integer),
         I::CLng => R::Fixed(K::Long),
         I::CLngLng => R::Fixed(K::LongLong),
@@ -1050,11 +1055,25 @@ pub const INTRINSIC_DESCRIPTORS: &[IntrinsicDescriptor] = &[
         "Space(number)",
     ),
     descriptor(
+        Intrinsic::SpaceDollar,
+        "Space$",
+        SPACE_PARAMS,
+        false,
+        "Space$(number)",
+    ),
+    descriptor(
         Intrinsic::String,
         "String",
         STRING_PARAMS,
         false,
         "String(number, character)",
+    ),
+    descriptor(
+        Intrinsic::StringDollar,
+        "String$",
+        STRING_PARAMS,
+        false,
+        "String$(number, character)",
     ),
     descriptor(Intrinsic::Asc, "Asc", ONE_VALUE, false, "Asc(string)"),
     descriptor(Intrinsic::AscW, "AscW", ONE_VALUE, false, "AscW(string)"),

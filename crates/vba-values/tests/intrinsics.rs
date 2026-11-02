@@ -275,6 +275,15 @@ fn repetition_descriptors_retain_variant_string_returns() -> Result<(), Box<dyn 
     assert_eq!(space.return_variant, IntrinsicReturn::Variant);
     assert_eq!(string.minimum_arguments, 2);
     assert_eq!(string.return_variant, IntrinsicReturn::Variant);
+    for intrinsic in [Intrinsic::SpaceDollar, Intrinsic::StringDollar] {
+        let descriptor = intrinsic
+            .descriptor()
+            .ok_or_else(|| std::io::Error::other("dollar repetition descriptor"))?;
+        assert_eq!(
+            descriptor.return_variant,
+            IntrinsicReturn::Fixed(ScalarKind::String)
+        );
+    }
     Ok(())
 }
 

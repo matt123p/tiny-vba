@@ -444,6 +444,14 @@ fn space_and_string_are_variant_string_repetition_intrinsics() -> R {
 }
 
 #[test]
+fn dollar_repetition_forms_execute_through_source_calls() -> R {
+    answer(
+        "Function Answer() As String\nAnswer=Space$(2) & String$(3,\"xy\")\nEnd Function",
+        Value::String(VbaString::from_utf8("  xxx")?),
+    )
+}
+
+#[test]
 fn lcase_ucase_ascii_and_null_contracts_are_explicit() -> R {
     answer(
         "Function Answer() As String\nAnswer=LCase(\"ABC 123\") & \"|\" & UCase(\"abc 123\")\nEnd Function",
