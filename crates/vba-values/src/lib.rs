@@ -436,6 +436,29 @@ pub enum Intrinsic {
     Chr,
     ChrW,
     StrComp,
+    Choose,
+    Switch,
+    Partition,
+    Atn,
+    Cos,
+    Exp,
+    Log,
+    Sin,
+    Sqr,
+    Tan,
+    Ddb,
+    Fv,
+    IPmt,
+    Irr,
+    Mirr,
+    NPer,
+    Npv,
+    Pmt,
+    PPmt,
+    Pv,
+    Rate,
+    Sln,
+    Syd,
 }
 
 /// Whether an intrinsic returns its historical VBA Variant subtype or a fixed
@@ -506,6 +529,8 @@ pub enum IntrinsicOmittedDefault {
     BinaryCompare,
     ToEnd,
     FunctionSpecific,
+    Two,
+    OneTenth,
 }
 
 /// Metadata for an executable public intrinsic spelling. This catalogue is
@@ -725,7 +750,92 @@ const IIF_PARAMS: &[IntrinsicParameter] = &[
     raw_parameter("truepart", true),
     raw_parameter("falsepart", true),
 ];
+const CHOOSE_PARAMS: &[IntrinsicParameter] =
+    &[raw_parameter("index", true), raw_parameter("choice", true)];
+const SWITCH_PARAMS: &[IntrinsicParameter] = &[
+    raw_parameter("expression", true),
+    raw_parameter("value", true),
+];
+const PARTITION_PARAMS: &[IntrinsicParameter] = &[
+    parameter("number", true),
+    parameter("start", true),
+    parameter("stop", true),
+    parameter("interval", true),
+];
 const ARRAY_PARAMS: &[IntrinsicParameter] = &[];
+const DDB_PARAMS: &[IntrinsicParameter] = &[
+    parameter("cost", true),
+    parameter("salvage", true),
+    parameter("life", true),
+    parameter("period", true),
+    with_default(parameter("factor", false), IntrinsicOmittedDefault::Two),
+];
+const FV_PARAMS: &[IntrinsicParameter] = &[
+    parameter("rate", true),
+    parameter("nper", true),
+    parameter("pmt", true),
+    with_default(parameter("pv", false), IntrinsicOmittedDefault::Zero),
+    with_default(parameter("due", false), IntrinsicOmittedDefault::Zero),
+];
+const PV_PARAMS: &[IntrinsicParameter] = &[
+    parameter("rate", true),
+    parameter("nper", true),
+    parameter("pmt", true),
+    with_default(parameter("fv", false), IntrinsicOmittedDefault::Zero),
+    with_default(parameter("due", false), IntrinsicOmittedDefault::Zero),
+];
+const PMT_PARAMS: &[IntrinsicParameter] = &[
+    parameter("rate", true),
+    parameter("nper", true),
+    parameter("pv", true),
+    with_default(parameter("fv", false), IntrinsicOmittedDefault::Zero),
+    with_default(parameter("due", false), IntrinsicOmittedDefault::Zero),
+];
+
+const RATE_PER_NPER_PV: &[IntrinsicParameter] = &[
+    parameter("rate", true),
+    parameter("per", true),
+    parameter("nper", true),
+    parameter("pv", true),
+    with_default(parameter("fv", false), IntrinsicOmittedDefault::Zero),
+    with_default(parameter("due", false), IntrinsicOmittedDefault::Zero),
+];
+const NPER_PARAMS: &[IntrinsicParameter] = &[
+    parameter("rate", true),
+    parameter("pmt", true),
+    parameter("pv", true),
+    with_default(parameter("fv", false), IntrinsicOmittedDefault::Zero),
+    with_default(parameter("due", false), IntrinsicOmittedDefault::Zero),
+];
+const RATE_PARAMS: &[IntrinsicParameter] = &[
+    parameter("nper", true),
+    parameter("pmt", true),
+    parameter("pv", true),
+    with_default(parameter("fv", false), IntrinsicOmittedDefault::Zero),
+    with_default(parameter("due", false), IntrinsicOmittedDefault::Zero),
+    with_default(parameter("guess", false), IntrinsicOmittedDefault::OneTenth),
+];
+const IRR_PARAMS: &[IntrinsicParameter] = &[
+    raw_parameter("values", true),
+    with_default(parameter("guess", false), IntrinsicOmittedDefault::OneTenth),
+];
+const MIRR_PARAMS: &[IntrinsicParameter] = &[
+    raw_parameter("values", true),
+    parameter("finance_rate", true),
+    parameter("reinvest_rate", true),
+];
+const NPV_PARAMS: &[IntrinsicParameter] = &[parameter("rate", true), raw_parameter("value", true)];
+const SLN_PARAMS: &[IntrinsicParameter] = &[
+    parameter("cost", true),
+    parameter("salvage", true),
+    parameter("life", true),
+];
+const SYD_PARAMS: &[IntrinsicParameter] = &[
+    parameter("cost", true),
+    parameter("salvage", true),
+    parameter("life", true),
+    parameter("period", true),
+];
 
 const fn descriptor(
     intrinsic: Intrinsic,
@@ -765,6 +875,18 @@ const fn descriptor(
     };
     let minimum_arguments = match intrinsic {
         Intrinsic::IIf => 3,
+        Intrinsic::Choose => 2,
+        Intrinsic::Switch => 2,
+        Intrinsic::Partition | Intrinsic::Syd => 4,
+        Intrinsic::IPmt | Intrinsic::PPmt => 4,
+        Intrinsic::Ddb => 4,
+        Intrinsic::Mirr => 3,
+        Intrinsic::Npv => 2,
+        Intrinsic::Sln => 3,
+        Intrinsic::Fv | Intrinsic::Pmt | Intrinsic::Pv => 3,
+        Intrinsic::NPer => 3,
+        Intrinsic::Irr => 1,
+        Intrinsic::Rate => 3,
         Intrinsic::InStr => 2,
         Intrinsic::InStrRev => 2,
         Intrinsic::Replace => 3,
@@ -792,7 +914,8 @@ const fn descriptor(
             Intrinsic::Array | Intrinsic::ArrayBaseOne | Intrinsic::LBound | Intrinsic::UBound => {
                 IntrinsicFamily::Arrays
             }
-            Intrinsic::IIf => IntrinsicFamily::Selection,
+            Intrinsic::IIf | Intrinsic::Choose | Intrinsic::Switch => IntrinsicFamily::Selection,
+            Intrinsic::Partition => IntrinsicFamily::Numeric,
             Intrinsic::InStr
             | Intrinsic::InStrRev
             | Intrinsic::Replace
@@ -867,7 +990,10 @@ const fn descriptor(
         },
         parameters,
         variadic,
-        variadic_mode: if matches!(intrinsic, Intrinsic::Array) {
+        variadic_mode: if matches!(
+            intrinsic,
+            Intrinsic::Array | Intrinsic::Choose | Intrinsic::Switch | Intrinsic::Npv
+        ) {
             RAW
         } else {
             VALUE
@@ -944,6 +1070,21 @@ const fn return_variant(intrinsic: Intrinsic) -> IntrinsicReturn {
         I::Array | I::ArrayBaseOne | I::Split | I::Filter => R::Array,
         I::StrComp => R::Variant,
         I::IIf | I::Abs | I::Int | I::Fix => R::Polymorphic,
+        I::Choose | I::Switch | I::Partition => R::Variant,
+        I::Ddb
+        | I::Fv
+        | I::IPmt
+        | I::Irr
+        | I::Mirr
+        | I::NPer
+        | I::Npv
+        | I::Pmt
+        | I::PPmt
+        | I::Pv
+        | I::Rate
+        | I::Sln
+        | I::Syd => R::Fixed(K::Double),
+        I::Atn | I::Cos | I::Exp | I::Log | I::Sin | I::Sqr | I::Tan => R::Fixed(K::Double),
         I::Val => R::Fixed(K::Double),
         I::Left | I::Right | I::Mid | I::Trim | I::LTrim | I::RTrim => R::Variant,
         I::InStr | I::InStrRev | I::Len | I::LBound | I::UBound => R::Fixed(K::Long),
@@ -1005,6 +1146,125 @@ pub const INTRINSIC_DESCRIPTORS: &[IntrinsicDescriptor] = &[
         IIF_PARAMS,
         false,
         "IIf(expr, truepart, falsepart)",
+    ),
+    descriptor(
+        Intrinsic::Choose,
+        "Choose",
+        CHOOSE_PARAMS,
+        true,
+        "Choose(index, choice-1, [choice-2, ...])",
+    ),
+    descriptor(
+        Intrinsic::Switch,
+        "Switch",
+        SWITCH_PARAMS,
+        true,
+        "Switch(expr-1, value-1, [expr-2, value-2, ...])",
+    ),
+    descriptor(
+        Intrinsic::Partition,
+        "Partition",
+        PARTITION_PARAMS,
+        false,
+        "Partition(number, start, stop, interval)",
+    ),
+    descriptor(Intrinsic::Atn, "Atn", ONE_VALUE, false, "Atn(number)"),
+    descriptor(Intrinsic::Cos, "Cos", ONE_VALUE, false, "Cos(number)"),
+    descriptor(Intrinsic::Exp, "Exp", ONE_VALUE, false, "Exp(number)"),
+    descriptor(Intrinsic::Log, "Log", ONE_VALUE, false, "Log(number)"),
+    descriptor(Intrinsic::Sin, "Sin", ONE_VALUE, false, "Sin(number)"),
+    descriptor(Intrinsic::Sqr, "Sqr", ONE_VALUE, false, "Sqr(number)"),
+    descriptor(Intrinsic::Tan, "Tan", ONE_VALUE, false, "Tan(number)"),
+    descriptor(
+        Intrinsic::Ddb,
+        "DDB",
+        DDB_PARAMS,
+        false,
+        "DDB(cost, salvage, life, period, [factor])",
+    ),
+    descriptor(
+        Intrinsic::Fv,
+        "FV",
+        FV_PARAMS,
+        false,
+        "FV(rate, nper, pmt, [pv, [due]])",
+    ),
+    descriptor(
+        Intrinsic::IPmt,
+        "IPmt",
+        RATE_PER_NPER_PV,
+        false,
+        "IPmt(rate, per, nper, pv, [fv, [due]])",
+    ),
+    descriptor(
+        Intrinsic::Irr,
+        "IRR",
+        IRR_PARAMS,
+        false,
+        "IRR(values, [guess])",
+    ),
+    descriptor(
+        Intrinsic::Mirr,
+        "MIRR",
+        MIRR_PARAMS,
+        false,
+        "MIRR(values, finance_rate, reinvest_rate)",
+    ),
+    descriptor(
+        Intrinsic::NPer,
+        "NPer",
+        NPER_PARAMS,
+        false,
+        "NPer(rate, pmt, pv, [fv, [due]])",
+    ),
+    descriptor(
+        Intrinsic::Npv,
+        "NPV",
+        NPV_PARAMS,
+        true,
+        "NPV(rate, values...)",
+    ),
+    descriptor(
+        Intrinsic::Pmt,
+        "Pmt",
+        PMT_PARAMS,
+        false,
+        "Pmt(rate, nper, pv, [fv, [due]])",
+    ),
+    descriptor(
+        Intrinsic::PPmt,
+        "PPmt",
+        RATE_PER_NPER_PV,
+        false,
+        "PPmt(rate, per, nper, pv, [fv, [due]])",
+    ),
+    descriptor(
+        Intrinsic::Pv,
+        "PV",
+        PV_PARAMS,
+        false,
+        "PV(rate, nper, pmt, [fv, [due]])",
+    ),
+    descriptor(
+        Intrinsic::Rate,
+        "Rate",
+        RATE_PARAMS,
+        false,
+        "Rate(nper, pmt, pv, [fv, [due, [guess]]])",
+    ),
+    descriptor(
+        Intrinsic::Sln,
+        "SLN",
+        SLN_PARAMS,
+        false,
+        "SLN(cost, salvage, life)",
+    ),
+    descriptor(
+        Intrinsic::Syd,
+        "SYD",
+        SYD_PARAMS,
+        false,
+        "SYD(cost, salvage, life, period)",
     ),
     instr_descriptor(),
     instrrev_descriptor(),
@@ -1474,7 +1734,9 @@ impl Intrinsic {
         else {
             return false;
         };
-        count >= item.minimum_arguments && count <= item.maximum_arguments
+        count >= item.minimum_arguments
+            && count <= item.maximum_arguments
+            && (self != Self::Switch || count.is_multiple_of(2))
     }
 }
 

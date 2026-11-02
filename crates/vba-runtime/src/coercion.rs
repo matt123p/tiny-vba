@@ -586,6 +586,110 @@ pub fn intrinsic(function: I, args: &[V]) -> Result<V> {
             .cloned()
             .ok_or_else(mismatch);
     }
+    if function == I::Choose {
+        let index = args.first().ok_or_else(mismatch)?;
+        if matches!(index, V::Null) {
+            return Ok(V::Null);
+        }
+        let index = numeric(index)?.round_ties_even();
+        if !index.is_finite() || index < 1.0 || index >= args.len() as f64 {
+            return Ok(V::Null);
+        }
+        let index = index as usize;
+        return args.get(index).cloned().ok_or_else(mismatch);
+    }
+    if function == I::Switch {
+        for pair in args.chunks(2) {
+            if super::condition(pair.first().ok_or_else(mismatch)?)? {
+                return pair.get(1).cloned().ok_or_else(mismatch);
+            }
+        }
+        return Ok(V::Null);
+    }
+    if matches!(
+        function,
+        I::Ddb
+            | I::Fv
+            | I::IPmt
+            | I::Irr
+            | I::Mirr
+            | I::NPer
+            | I::Npv
+            | I::Pmt
+            | I::PPmt
+            | I::Pv
+            | I::Rate
+            | I::Sln
+            | I::Syd
+    ) {
+        return financial(function, args);
+    }
+    if function == I::Partition {
+        if args.iter().any(|argument| matches!(argument, V::Null)) {
+            return Ok(V::Null);
+        }
+        let mut integers = [0_i64; 4];
+        for (target, argument) in integers.iter_mut().zip(args) {
+            *target = i64::try_from(integral(
+                argument,
+                i128::from(i32::MIN),
+                i128::from(i32::MAX),
+            )?)
+            .map_err(|_| overflow())?;
+        }
+        let [number, start, stop, interval] = integers;
+        if start < 0 || stop <= start || interval < 1 {
+            return Err(error(5, "Invalid procedure call or argument"));
+        }
+        let width = stop.to_string().len().saturating_add(1);
+        let (lower, upper) = if number < start {
+            (None, Some(start - 1))
+        } else if number > stop {
+            (Some(stop + 1), None)
+        } else {
+            let lower = start + ((number - start) / interval) * interval;
+            let upper = (lower + interval - 1).min(stop);
+            (Some(lower), Some(upper))
+        };
+        let lower = lower.map_or_else(|| " ".repeat(width), |value| format!("{value:>width$}"));
+        let upper = upper.map_or_else(|| " ".repeat(width), |value| format!("{value:>width$}"));
+        return Ok(V::String(
+            VbaString::from_utf8(&format!("{lower}:{upper}"))
+                .map_err(|_| Error::Resource("Partition result allocation failed".into()))?,
+        ));
+    }
+    if matches!(
+        function,
+        I::Atn | I::Cos | I::Exp | I::Log | I::Sin | I::Sqr | I::Tan
+    ) {
+        let value = args.first().ok_or_else(mismatch)?;
+        if matches!(value, V::Null) {
+            return Ok(V::Null);
+        }
+        let number = numeric(value)?;
+        if number.is_nan() {
+            return Err(error(5, "Invalid procedure call or argument"));
+        }
+        let result = match function {
+            I::Atn => number.atan(),
+            I::Cos => number.cos(),
+            I::Exp => number.exp(),
+            I::Log if number > 0.0 => number.ln(),
+            I::Log => return Err(error(5, "Invalid procedure call or argument")),
+            I::Sin => number.sin(),
+            I::Sqr if number >= 0.0 => number.sqrt(),
+            I::Sqr => return Err(error(5, "Invalid procedure call or argument")),
+            I::Tan => number.tan(),
+            _ => return Err(mismatch()),
+        };
+        if result.is_nan() {
+            return Err(error(5, "Invalid procedure call or argument"));
+        }
+        if result.is_infinite() {
+            return Err(overflow());
+        }
+        return Ok(V::Double(result));
+    }
     if function == I::IsObject {
         return Ok(V::Boolean(matches!(
             args.first(),
@@ -630,7 +734,11 @@ pub fn intrinsic(function: I, args: &[V]) -> Result<V> {
             return Err(mismatch());
         };
         let dim = if let Some(dim) = args.get(1) {
-            integral(dim, 1, 8)? as usize
+            let dimension = integral(dim, i128::from(i32::MIN), i128::from(i32::MAX))?;
+            if dimension < 1 {
+                return Err(error(5, "Invalid procedure call or argument"));
+            }
+            usize::try_from(dimension).map_err(|_| overflow())?
         } else {
             1
         };
@@ -778,12 +886,30 @@ pub fn intrinsic(function: I, args: &[V]) -> Result<V> {
                 return Ok(V::Null);
             }
             let digits = if let Some(d) = args.get(1) {
-                argument_integer(d, 0, 28)? as i32
+                i32::try_from(argument_integer(
+                    d,
+                    i128::from(i32::MIN),
+                    i128::from(i32::MAX),
+                )?)
+                .map_err(|_| overflow())?
             } else {
                 0
             };
+            let number = numeric(v)?;
+            if digits > 308 {
+                return Ok(V::Double(number));
+            }
+            if digits < -308 {
+                return Ok(V::Double(0.0));
+            }
             let scale = 10f64.powi(digits);
-            let n = (numeric(v)? * scale).round_ties_even() / scale;
+            if !scale.is_finite() {
+                return Ok(V::Double(number));
+            }
+            if scale == 0.0 {
+                return Ok(V::Double(0.0));
+            }
+            let n = (number * scale).round_ties_even() / scale;
             if !n.is_finite() {
                 return Err(overflow());
             }
@@ -909,6 +1035,325 @@ pub fn intrinsic(function: I, args: &[V]) -> Result<V> {
     })
 }
 
+const FINANCE_ITERATIONS: usize = 20;
+const FINANCE_TOLERANCE: f64 = 1.0e-7;
+
+fn finance_error() -> Error {
+    error(5, "Invalid procedure call or argument")
+}
+fn finite_finance(value: f64) -> Result<f64> {
+    if value.is_finite() {
+        Ok(value)
+    } else {
+        Err(overflow())
+    }
+}
+fn finance_value(value: f64) -> Result<V> {
+    Ok(V::Double(finite_finance(value)?))
+}
+fn finance_array(value: &V) -> Result<Vec<f64>> {
+    let V::Array(array) = value else {
+        return Err(mismatch());
+    };
+    if array.bounds().len() != 1 || array.elements().is_empty() {
+        return Err(finance_error());
+    }
+    array.elements().iter().map(numeric).collect()
+}
+fn finance_cashflows(values: &[V]) -> Result<Vec<f64>> {
+    let mut flows = Vec::new();
+    for value in values {
+        match value {
+            V::Array(_) => flows.extend(finance_array(value)?),
+            _ => flows.push(numeric(value)?),
+        }
+    }
+    if flows.is_empty() {
+        return Err(finance_error());
+    }
+    Ok(flows)
+}
+fn finance_signs(flows: &[f64]) -> bool {
+    flows.iter().any(|v| *v < 0.0) && flows.iter().any(|v| *v > 0.0)
+}
+fn annuity_factor(rate: f64, nper: f64, due: bool) -> Result<f64> {
+    if rate == 0.0 {
+        return Ok(nper);
+    }
+    let growth = (1.0 + rate).powf(nper);
+    finite_finance((1.0 + rate * f64::from(due)) * (growth - 1.0) / rate)
+}
+fn finance_rate_due(value: &V) -> Result<bool> {
+    match integral(value, 0, 1)? {
+        0 => Ok(false),
+        1 => Ok(true),
+        _ => Err(finance_error()),
+    }
+}
+fn financial(function: I, args: &[V]) -> Result<V> {
+    let number = |index: usize, default: f64| -> Result<f64> {
+        args.get(index).map_or(Ok(default), numeric)
+    };
+    if args.iter().any(|v| matches!(v, V::Null)) {
+        return Ok(V::Null);
+    }
+    if function == I::Irr || function == I::Mirr {
+        let flows = finance_array(args.first().ok_or_else(mismatch)?)?;
+        if !finance_signs(&flows) {
+            return Err(finance_error());
+        }
+        if function == I::Irr {
+            let guess = number(1, 0.1)?;
+            let mut rate = guess;
+            for _ in 0..FINANCE_ITERATIONS {
+                if rate <= -1.0 {
+                    return Err(finance_error());
+                }
+                let mut value = 0.0;
+                let mut derivative = 0.0;
+                for (index, cash) in flows.iter().enumerate() {
+                    let period = index as f64;
+                    let denominator = (1.0 + rate).powf(period);
+                    value += cash / denominator;
+                    if period > 0.0 {
+                        derivative -= period * cash / ((1.0 + rate).powf(period + 1.0));
+                    }
+                }
+                if !value.is_finite() || !derivative.is_finite() || derivative == 0.0 {
+                    return Err(finance_error());
+                }
+                let next = rate - value / derivative;
+                if !next.is_finite() || next <= -1.0 {
+                    return Err(finance_error());
+                }
+                if (next - rate).abs() <= FINANCE_TOLERANCE {
+                    return finance_value(next);
+                }
+                rate = next;
+            }
+            return Err(finance_error());
+        }
+        let finance_rate = numeric(args.get(1).ok_or_else(mismatch)?)?;
+        let reinvest_rate = numeric(args.get(2).ok_or_else(mismatch)?)?;
+        if finance_rate <= -1.0 || reinvest_rate <= -1.0 {
+            return Err(finance_error());
+        }
+        let last = flows.len().saturating_sub(1) as f64;
+        if last == 0.0 {
+            return Err(finance_error());
+        }
+        let mut present_negative = 0.0;
+        let mut future_positive = 0.0;
+        for (index, cash) in flows.iter().enumerate() {
+            let period = index as f64;
+            if *cash < 0.0 {
+                present_negative += cash / (1.0 + finance_rate).powf(period);
+            }
+            if *cash > 0.0 {
+                future_positive += cash * (1.0 + reinvest_rate).powf(last - period);
+            }
+        }
+        if present_negative == 0.0 || future_positive < 0.0 {
+            return Err(finance_error());
+        }
+        return finance_value((future_positive / -present_negative).powf(1.0 / last) - 1.0);
+    }
+    if function == I::Npv {
+        let rate = numeric(args.first().ok_or_else(mismatch)?)?;
+        if rate <= -1.0 {
+            return Err(finance_error());
+        }
+        let flows = finance_cashflows(args.get(1..).ok_or_else(mismatch)?)?;
+        let mut total = 0.0;
+        for (index, cash) in flows.iter().enumerate() {
+            total += cash / (1.0 + rate).powf(index as f64 + 1.0);
+        }
+        return finance_value(total);
+    }
+    if function == I::Sln || function == I::Syd || function == I::Ddb {
+        let cost = numeric(args.first().ok_or_else(mismatch)?)?;
+        let salvage = numeric(args.get(1).ok_or_else(mismatch)?)?;
+        let life = numeric(args.get(2).ok_or_else(mismatch)?)?;
+        if life <= 0.0 {
+            return Err(finance_error());
+        }
+        let result = match function {
+            I::Sln => (cost - salvage) / life,
+            I::Syd => {
+                let period = numeric(args.get(3).ok_or_else(mismatch)?)?;
+                if period < 1.0 || period > life {
+                    return Err(finance_error());
+                }
+                (cost - salvage) * (life - period + 1.0) / (life * (life + 1.0) / 2.0)
+            }
+            I::Ddb => {
+                let period = numeric(args.get(3).ok_or_else(mismatch)?)?;
+                let factor = number(4, 2.0)?;
+                if period < 1.0 || period > life || factor <= 0.0 {
+                    return Err(finance_error());
+                }
+                let periods_before = (period - 1.0).floor();
+                let ratio = (1.0 - factor / life).max(0.0);
+                let book = if cost <= salvage || ratio == 0.0 {
+                    salvage
+                } else {
+                    (cost * ratio.powf(periods_before)).max(salvage)
+                };
+                (book * factor / life)
+                    .max(0.0)
+                    .min((book - salvage).max(0.0))
+            }
+            _ => return Err(mismatch()),
+        };
+        return finance_value(result);
+    }
+    let due_index = match function {
+        I::IPmt | I::PPmt => 5,
+        I::Rate => 4,
+        _ => 4,
+    };
+    let due = args.get(due_index).map_or(Ok(false), finance_rate_due)?;
+    let (rate, nper, pmt, pv, fv) = match function {
+        I::Fv => (
+            number(0, 0.0)?,
+            number(1, 0.0)?,
+            number(2, 0.0)?,
+            number(3, 0.0)?,
+            0.0,
+        ),
+        I::Pv => (
+            number(0, 0.0)?,
+            number(1, 0.0)?,
+            number(2, 0.0)?,
+            0.0,
+            number(3, 0.0)?,
+        ),
+        I::Pmt => (
+            number(0, 0.0)?,
+            number(1, 0.0)?,
+            0.0,
+            number(2, 0.0)?,
+            number(3, 0.0)?,
+        ),
+        I::NPer => (
+            number(0, 0.0)?,
+            0.0,
+            number(1, 0.0)?,
+            number(2, 0.0)?,
+            number(3, 0.0)?,
+        ),
+        I::IPmt | I::PPmt => (
+            number(0, 0.0)?,
+            number(2, 0.0)?,
+            0.0,
+            number(3, 0.0)?,
+            number(4, 0.0)?,
+        ),
+        I::Rate => (
+            0.0,
+            number(0, 0.0)?,
+            number(1, 0.0)?,
+            number(2, 0.0)?,
+            number(3, 0.0)?,
+        ),
+        _ => return Err(mismatch()),
+    };
+    if (function != I::NPer && nper <= 0.0) || rate <= -1.0 {
+        return Err(finance_error());
+    }
+    let payment = if rate == 0.0 {
+        -(pv + fv) / nper
+    } else {
+        -(fv + pv * (1.0 + rate).powf(nper)) * rate
+            / ((1.0 + rate * f64::from(due)) * ((1.0 + rate).powf(nper) - 1.0))
+    };
+    let result = match function {
+        I::Fv => -(pv * (1.0 + rate).powf(nper) + pmt * annuity_factor(rate, nper, due)?),
+        I::Pv => -(fv + pmt * annuity_factor(rate, nper, due)?) / (1.0 + rate).powf(nper),
+        I::Pmt => payment,
+        I::NPer => {
+            if rate == 0.0 {
+                if pmt == 0.0 {
+                    return Err(finance_error());
+                }
+                -(pv + fv) / pmt
+            } else {
+                let adjusted = pmt * (1.0 + rate * f64::from(due));
+                let denominator = adjusted + fv * rate;
+                let numerator = adjusted + pv * rate;
+                if numerator <= 0.0 || denominator == 0.0 {
+                    return Err(finance_error());
+                }
+                (denominator / numerator).ln() / (1.0 + rate).ln()
+            }
+        }
+        I::IPmt | I::PPmt => {
+            let period = numeric(args.get(1).ok_or_else(mismatch)?)?;
+            if period < 1.0 || period > nper {
+                return Err(finance_error());
+            }
+            let interest = if rate == 0.0 || (due && period == 1.0) {
+                0.0
+            } else {
+                let previous_balance = pv * (1.0 + rate).powf(period - 1.0)
+                    + payment
+                        * if due {
+                            ((1.0 + rate).powf(period - 1.0) - 1.0) / rate * (1.0 + rate)
+                        } else {
+                            ((1.0 + rate).powf(period - 1.0) - 1.0) / rate
+                        };
+                -previous_balance * rate
+            };
+            if function == I::IPmt {
+                interest
+            } else {
+                payment - interest
+            }
+        }
+        I::Rate => {
+            let guess = number(5, 0.1)?;
+            let mut candidate = guess;
+            let mut converged = false;
+            for _ in 0..FINANCE_ITERATIONS {
+                if candidate <= -1.0 {
+                    return Err(finance_error());
+                }
+                let pow = (1.0 + candidate).powf(nper);
+                let residual = pv * pow + pmt * annuity_factor(candidate, nper, due)? + fv;
+                let delta = candidate.abs().max(1.0e-6) * 1.0e-5;
+                let lower = (candidate - delta).max(-0.999999999);
+                let upper = candidate + delta;
+                let derivative = ((pv * (1.0 + upper).powf(nper)
+                    + pmt * annuity_factor(upper, nper, due)?
+                    + fv)
+                    - (pv * (1.0 + lower).powf(nper)
+                        + pmt * annuity_factor(lower, nper, due)?
+                        + fv))
+                    / (upper - lower);
+                if derivative == 0.0 || !derivative.is_finite() {
+                    return Err(finance_error());
+                }
+                let next = candidate - residual / derivative;
+                if !next.is_finite() || next <= -1.0 {
+                    return Err(finance_error());
+                }
+                if (next - candidate).abs() <= FINANCE_TOLERANCE {
+                    candidate = next;
+                    converged = true;
+                    break;
+                }
+                candidate = next;
+            }
+            if !converged {
+                return Err(finance_error());
+            }
+            candidate
+        }
+        _ => return Err(mismatch()),
+    };
+    finance_value(result)
+}
+
 fn string_repeat(function: I, arguments: &[V]) -> Result<V> {
     let number = arguments.first().ok_or_else(mismatch)?;
     if matches!(function, I::String | I::StringDollar)
@@ -1023,6 +1468,8 @@ pub fn intrinsic_extended(
                 IntrinsicOmittedDefault::Zero => Some(V::Integer(0)),
                 IntrinsicOmittedDefault::One => Some(V::Integer(1)),
                 IntrinsicOmittedDefault::MinusOne => Some(V::Integer(-1)),
+                IntrinsicOmittedDefault::Two => Some(V::Integer(2)),
+                IntrinsicOmittedDefault::OneTenth => Some(V::Double(0.1)),
                 IntrinsicOmittedDefault::Space => {
                     Some(V::String(VbaString::from_utf8(" ").map_err(|_| {
                         Error::Resource("string budget exceeded".into())

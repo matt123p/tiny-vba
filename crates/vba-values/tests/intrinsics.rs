@@ -417,3 +417,90 @@ fn dollar_slices_keep_string_return_identity() -> Result<(), Box<dyn std::error:
     }
     Ok(())
 }
+
+#[test]
+fn selection_descriptors_preserve_variadic_contracts_and_variant_results() {
+    for intrinsic in [Intrinsic::Choose, Intrinsic::Switch] {
+        let descriptor = intrinsic.descriptor();
+        assert!(descriptor.is_some(), "selection descriptor");
+        if let Some(descriptor) = descriptor {
+            assert_eq!(descriptor.family, vba_values::IntrinsicFamily::Selection);
+            assert!(descriptor.variadic);
+            assert_eq!(descriptor.return_variant, IntrinsicReturn::Variant);
+            assert!(descriptor.minimum_ir >= 2);
+        }
+    }
+    assert!(Intrinsic::Choose.accepts(2));
+    assert!(Intrinsic::Choose.accepts(256));
+    assert!(Intrinsic::Switch.accepts(2));
+    assert!(Intrinsic::Switch.accepts(256));
+    assert!(!Intrinsic::Switch.accepts(1));
+    assert!(!Intrinsic::Switch.accepts(3));
+    assert!(!Intrinsic::Choose.accepts(1));
+}
+
+#[test]
+fn elementary_math_descriptors_return_double() {
+    for intrinsic in [
+        Intrinsic::Atn,
+        Intrinsic::Cos,
+        Intrinsic::Exp,
+        Intrinsic::Log,
+        Intrinsic::Sin,
+        Intrinsic::Sqr,
+        Intrinsic::Tan,
+    ] {
+        let descriptor = intrinsic.descriptor();
+        assert!(descriptor.is_some(), "math descriptor");
+        if let Some(descriptor) = descriptor {
+            assert_eq!(descriptor.family, vba_values::IntrinsicFamily::Numeric);
+            assert_eq!(
+                descriptor.return_variant,
+                IntrinsicReturn::Fixed(ScalarKind::Double)
+            );
+            assert_eq!(descriptor.minimum_ir, 2);
+        }
+    }
+}
+
+#[test]
+fn financial_descriptors_return_double_and_encode_defaults() {
+    use vba_values::IntrinsicOmittedDefault as Default;
+    for name in [
+        "DDB", "FV", "IPmt", "IRR", "MIRR", "NPer", "NPV", "Pmt", "PPmt", "PV", "Rate", "SLN",
+        "SYD",
+    ] {
+        let descriptor = Intrinsic::from_name(name).and_then(Intrinsic::descriptor);
+        assert!(
+            matches!(
+                descriptor.map(|d| d.return_variant),
+                Some(IntrinsicReturn::Fixed(ScalarKind::Double))
+            ),
+            "{name}"
+        );
+    }
+    assert_eq!(
+        Intrinsic::Ddb
+            .descriptor()
+            .and_then(|d| d.parameters.get(4))
+            .map(|p| p.omitted_default),
+        Some(Default::Two)
+    );
+    assert_eq!(
+        Intrinsic::Irr
+            .descriptor()
+            .and_then(|d| d.parameters.get(1))
+            .map(|p| p.omitted_default),
+        Some(Default::OneTenth)
+    );
+    assert_eq!(
+        Intrinsic::Rate
+            .descriptor()
+            .and_then(|d| d.parameters.get(5))
+            .map(|p| p.omitted_default),
+        Some(Default::OneTenth)
+    );
+    assert!(Intrinsic::Npv.descriptor().is_some_and(
+        |d| d.variadic && d.variadic_mode == vba_values::IntrinsicArgumentMode::RawVariant
+    ));
+}

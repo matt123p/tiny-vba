@@ -191,8 +191,11 @@ functions; split a row below further when its tests or dependencies warrant it.
 | C7 | M6A.3 | C6; injected formatting service | Route Format/Format$, FormatCurrency, FormatDateTime, FormatNumber, and FormatPercent through an explicit locale/calendar formatting provider; preserve omitted option slots and String versus Variant return tags. |
 | C8 | M6A.3 | C7; runtime Err state | Add Error/Error$ description lookup through the formatting provider; omitted error number uses current Err.Number and explicit error numbers remain provider-defined. |
 | C9 | M6A.3 | C1–C8 | Audit the conversion inventory and record exact unsupported provider/profile boundaries and validation; do not claim unimplemented spellings. |
-| A1 onward | M6A.4 | F3 | Arrays/bounds and conditional selection/evaluation; preserve existing array storage/aliases and IIf eagerness. |
-| N1 onward | M6A.4 | F3 | Pure numeric functions, then financial functions with bounded convergence and exact VBA error contracts. |
+| A1 | M6A.4 | F3; existing array storage and module Option Base | Complete Array, LBound and UBound contracts, including qualified Array base, zero-length bounds, dimensions and numbered errors. |
+| A2 | M6A.4 | A1; existing source-order expression lowering | Complete Choose, IIf and Switch selection, index/coercion and Null behavior while preserving their distinct eager/selected evaluation rules. |
+| A3 | M6A.4 | A1; numeric coercion | Implement Partition's rounded inputs, argument ranges, boundary bins, padded string shape and Null propagation. |
+| N1 | M6A.4 | F3; numeric coercion | Complete Abs/Atn/Cos/Exp/Int/Fix/Log/Sgn/Sin/Sqr/Tan/Round; preserve Null, result Variant subtypes, math domains and numeric error contracts. |
+| N2 | M6A.4 | N1; bounded numerical algorithms | COMPLETE. Implemented DDB/FV/IPmt/IRR/MIRR/NPer/NPV/Pmt/PPmt/PV/Rate/SLN/SYD with one-dimensional cash-flow arrays, documented optional defaults, payment timing, and a 20-iteration solver limit. |
 | D1 onward | M6A.5 | F4 | Calendar/date representation and clock seam, then constructors/extraction/arithmetic/names in small packets. |
 | R1 | M6A.5 | Context/state seam | Rnd/Randomize deterministic state, reset and pause/resume tests; never ambient randomness. |
 | H1 onward | M6A.6 | F3; existing host protocol | One bounded host-service family per packet; colour/CallByName separate. Specify unavailable/denied/cancelled behaviour and no replay. |

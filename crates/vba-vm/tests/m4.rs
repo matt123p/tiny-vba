@@ -1166,6 +1166,82 @@ fn option_base_controls_implicit_bounds_but_not_explicit_bounds() -> R {
         Value::Long(-2),
     )
 }
+
+#[test]
+fn array_constructor_empty_shape_and_bounds_errors_execute_from_source() -> R {
+    answer(
+        r#"Option Base 1
+Function Answer() As String
+Dim values As Variant
+values=Array(Empty,Null,7)
+Answer=LBound(values) & ":" & UBound(values) & ":" & LBound(VBA.Array(4)) & ":" & UBound(Array())
+End Function"#,
+        Value::String(VbaString::from_utf8("1:3:0:0")?),
+    )?;
+    answer(
+        "Function Answer() As Long\nDim values(1 To 2, -3 To 4) As Long\nOn Error Resume Next\nAnswer=LBound(values,0)\nAnswer=Err.Number\nEnd Function",
+        Value::Long(5),
+    )?;
+    answer(
+        "Function Answer() As Long\nDim values(1 To 2, -3 To 4) As Long\nOn Error Resume Next\nAnswer=UBound(values,3)\nAnswer=Err.Number\nEnd Function",
+        Value::Long(9),
+    )?;
+    Ok(())
+}
+
+#[test]
+fn choose_switch_and_iif_evaluate_arguments_eagerly_in_source_order() -> R {
+    answer(
+        "Dim trace As Long\nFunction Mark(n As Long) As Long\ntrace=trace*10+n\nMark=n\nEnd Function\nFunction Answer() As Long\nDim choice As Variant\nchoice=Choose(2,Mark(1),Mark(2),Mark(3))\nAnswer=choice+trace\nEnd Function",
+        Value::Long(125),
+    )?;
+    answer(
+        "Dim trace As Long\nFunction Mark(n As Long) As Long\ntrace=trace*10+n\nMark=n\nEnd Function\nFunction Answer() As Long\nDim choice As Variant\nchoice=Switch(Mark(0),Mark(1),Mark(1),Mark(2),Mark(0),Mark(3))\nAnswer=choice+trace\nEnd Function",
+        Value::Long(11205),
+    )?;
+    answer(
+        "Dim trace As Long\nFunction Mark(n As Long) As Long\ntrace=trace*10+n\nMark=n\nEnd Function\nFunction Answer() As Long\nAnswer=IIf(True,Mark(1),Mark(2))+trace\nEnd Function",
+        Value::Long(13),
+    )?;
+    answer(
+        "Function Answer() As Boolean\nAnswer=IsNull(Choose(0,1,2)) And IsNull(Switch(False,1))\nEnd Function",
+        Value::Boolean(true),
+    )
+}
+
+#[test]
+fn partition_executes_as_variant_string_from_source() -> R {
+    answer(
+        r#"Function Answer() As String
+Answer=Partition(20,0,99,10) & "|" & Partition(100,0,99,10) & "|" & Partition(1010,100,1010,20)
+End Function"#,
+        Value::String(VbaString::from_utf8(" 20: 29|100:   | 1000: 1010")?),
+    )?;
+    answer(
+        "Function Answer() As Boolean\nAnswer=IsNull(Partition(Null,-1,0,0))\nEnd Function",
+        Value::Boolean(true),
+    )
+}
+
+#[test]
+fn pure_math_intrinsics_execute_from_source() -> R {
+    answer(
+        "Function Answer() As Double\nAnswer=Atn(1)+Cos(0)+Exp(0)+Log(1)+Sin(0)+Sqr(9)+Tan(0)\nEnd Function",
+        Value::Double(std::f64::consts::FRAC_PI_4 + 5.0),
+    )?;
+    answer(
+        "Function Answer() As Double\nAnswer=Round(1250,-2)+Round(1350,-2)\nEnd Function",
+        Value::Double(2600.0),
+    )
+}
+#[test]
+fn financial_intrinsics_execute_through_vba_source_calls() -> R {
+    answer(
+        "Function Answer() As Double\nAnswer=Pmt(0,10,100)+Sln(30000,7500,10)+IRR(Array(-100,60,60))\nEnd Function",
+        Value::Double(-10.0 + 2250.0 + 0.1306623862918075),
+    )
+}
+
 #[test]
 fn named_byref_array_arguments_capture_indices_once_in_source_order() -> R {
     answer(
