@@ -124,6 +124,28 @@ pub fn intrinsic_extended_with_context(
 ) -> Result<Value> {
     if matches!(
         function,
+        vba_values::Intrinsic::Rgb | vba_values::Intrinsic::QbColor
+    ) {
+        return coercion::color_intrinsic(function, arguments);
+    }
+    if let Some(descriptor) = function.descriptor()
+        && descriptor.effect == vba_values::IntrinsicEffect::Restricted
+    {
+        return Err(Error::Unsupported(format!(
+            "intrinsic-policy-restricted:{}",
+            descriptor.spelling
+        )));
+    }
+    if function
+        .descriptor()
+        .is_some_and(|descriptor| descriptor.effect == vba_values::IntrinsicEffect::HostEffect)
+    {
+        return Err(Error::Unsupported(
+            "intrinsic-requires-vm-host-service".into(),
+        ));
+    }
+    if matches!(
+        function,
         vba_values::Intrinsic::Rnd | vba_values::Intrinsic::Randomize
     ) {
         return coercion::random_intrinsic(function, arguments, context);

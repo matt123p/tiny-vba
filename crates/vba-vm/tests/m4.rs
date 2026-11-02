@@ -6,6 +6,7 @@ use std::sync::{
 };
 use vba_compiler::{CompileOptions, compile, compile_modules};
 use vba_diagnostics::{SourceFile, SourceId};
+use vba_foreign::{Completion, ForeignError, Host, HostCall, HostIntrinsicCall, Reply};
 use vba_ir::{self as ir, Instruction};
 use vba_runtime::{
     ClockService, DateConversionService, IntrinsicFormattingService, StringComparisonService,
@@ -1382,6 +1383,183 @@ fn m6a5_randomize_statement_resets_with_session_and_rng_survives_pause() -> R {
         drive(&mut paused)?,
         Outcome::Completed(ReturnValue::Function(Value::Single(_)))
     ));
+    Ok(())
+}
+
+struct IntrinsicWaitHost {
+    calls: usize,
+    resumes: usize,
+    variable: VbaString,
+    result: VbaString,
+}
+impl Host for IntrinsicWaitHost {
+    fn identity(&self) -> u64 {
+        812
+    }
+    fn invoke(&mut self, _: HostCall) -> Reply {
+        Reply::Error(ForeignError {
+            number: 5,
+            description: "ordinary foreign call not expected".into(),
+        })
+    }
+    fn invoke_intrinsic(&mut self, call: HostIntrinsicCall) -> Reply {
+        self.calls += 1;
+        assert_eq!(call.intrinsic, "Environ$");
+        assert_eq!(
+            call.arguments.first(),
+            Some(&Some(Value::String(self.variable.clone())))
+        );
+        Reply::Wait(27)
+    }
+    fn resume(&mut self, token: u64) -> Reply {
+        self.resumes += 1;
+        assert_eq!(token, 27);
+        Reply::Complete(Completion {
+            value: Value::String(self.result.clone()),
+            writes: vec![],
+        })
+    }
+    fn cancel(&mut self, _: u64) {}
+}
+
+#[test]
+fn m6a6_environment_intrinsic_uses_host_wait_without_replaying_the_request() -> R {
+    use std::collections::BTreeSet;
+    let source = SourceFile::new(
+        SourceId(813),
+        "host-intrinsic.bas".into(),
+        "Function Answer() As String\nAnswer = Environ$(\"SAFE_TEST_VARIABLE\")\nEnd Function"
+            .into(),
+    )?;
+    let program = compile(
+        &source,
+        &CompileOptions {
+            capabilities: vm::capabilities(),
+            ..Default::default()
+        },
+    )?;
+    let mut session = Session::new(
+        program,
+        813,
+        vec![],
+        Some(vm::HostBinding {
+            identity: 812,
+            roots: Default::default(),
+            permitted: BTreeSet::new(),
+        }),
+        Limits::default(),
+    )?;
+    let mut host = IntrinsicWaitHost {
+        calls: 0,
+        resumes: 0,
+        variable: VbaString::from_utf8("SAFE_TEST_VARIABLE")?,
+        result: VbaString::from_utf8("provided")?,
+    };
+    assert_eq!(
+        session.run_slice(&mut host, 32, &mut |_| Ok(false))?,
+        Outcome::Waiting
+    );
+    assert_eq!(host.calls, 1);
+    assert_eq!(session.resume_host(&mut host)?, Outcome::Yielded);
+    assert_eq!(
+        session.run_slice(&mut host, 32, &mut |_| Ok(false))?,
+        Outcome::Completed(ReturnValue::Function(Value::String(VbaString::from_utf8(
+            "provided"
+        )?,)))
+    );
+    assert_eq!((host.calls, host.resumes), (1, 1));
+    Ok(())
+}
+
+#[test]
+fn m6a6_rgb_and_qbcolor_execute_from_vba_source() -> R {
+    answer(
+        "Function Answer() As Long\nAnswer = RGB(1, 2, 3) + QBColor(4)\nEnd Function",
+        Value::Long(0x030300),
+    )
+}
+
+struct CallByNameHost {
+    member: VbaString,
+    result: VbaString,
+}
+impl Host for CallByNameHost {
+    fn identity(&self) -> u64 {
+        814
+    }
+    fn invoke(&mut self, _: HostCall) -> Reply {
+        Reply::Error(ForeignError {
+            number: 5,
+            description: "ordinary foreign call not expected".into(),
+        })
+    }
+    fn invoke_intrinsic(&mut self, call: HostIntrinsicCall) -> Reply {
+        assert_eq!(call.intrinsic, "CallByName");
+        assert!(
+            matches!(call.arguments.first(), Some(Some(Value::Object(object))) if object.host == 814)
+        );
+        assert_eq!(
+            call.arguments.get(1),
+            Some(&Some(Value::String(self.member.clone())))
+        );
+        assert_eq!(call.arguments.get(2), Some(&Some(Value::Integer(2))));
+        Reply::Complete(Completion {
+            value: Value::String(self.result.clone()),
+            writes: vec![],
+        })
+    }
+    fn resume(&mut self, _: u64) -> Reply {
+        Reply::Error(ForeignError {
+            number: 5,
+            description: "no pending intrinsic".into(),
+        })
+    }
+    fn cancel(&mut self, _: u64) {}
+}
+
+#[test]
+fn m6a6_callbyname_uses_bound_host_and_object_argument() -> R {
+    let source = SourceFile::new(
+        SourceId(814),
+        "callbyname.bas".into(),
+        "Function Answer(ByVal target As Object) As Variant\nAnswer = CallByName(target, \"Caption\", 2)\nEnd Function".into(),
+    )?;
+    let program = compile(
+        &source,
+        &CompileOptions {
+            capabilities: vm::capabilities(),
+            ..Default::default()
+        },
+    )?;
+    let target = vba_values::ObjectRef {
+        host: 814,
+        object: 7,
+        generation: 2,
+    };
+    let mut session = Session::new(
+        program,
+        814,
+        vec![Value::Object(target)],
+        Some(vm::HostBinding {
+            identity: 814,
+            roots: Default::default(),
+            permitted: Default::default(),
+        }),
+        Limits::default(),
+    )?;
+    assert_eq!(
+        session.run_slice(
+            &mut CallByNameHost {
+                member: VbaString::from_utf8("Caption")?,
+                result: VbaString::from_utf8("title")?,
+            },
+            32,
+            &mut |_| Ok(false),
+        )?,
+        Outcome::Completed(ReturnValue::Function(Value::String(VbaString::from_utf8(
+            "title"
+        )?,)))
+    );
     Ok(())
 }
 

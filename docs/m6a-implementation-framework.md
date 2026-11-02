@@ -201,7 +201,12 @@ functions; split a row below further when its tests or dependencies warrant it.
 | D3 | M6A.5 | D1, D2 | Day/Month/Year/Hour/Minute/Second/Weekday and MonthName/WeekdayName, including optional week/name arguments and locale provider. |
 | D4 | M6A.5 | D1–D3 | DateAdd, DateDiff and DatePart interval contracts, calendar boundaries, subsecond preservation and week options. |
 | R1 | M6A.5 | Context/state seam | Rnd/Randomize deterministic state, reset and pause/resume tests; never ambient randomness. |
-| H1 onward | M6A.6 | F3; existing host protocol | One bounded host-service family per packet; colour/CallByName separate. Specify unavailable/denied/cancelled behaviour and no replay. |
+| H1 | M6A.6 | F3; runtime scalar coercion | RGB/QBColor encoding, range/coercion vectors and pure runtime/source execution. |
+| H2 | M6A.6 | F3; host protocol 1.1 | CallByName through explicit host policy; preserve argument slots, validate object identity, bound results and prove exactly-once wait/resume. |
+| H3 | M6A.6 | H2; host protocol 1.1 | MsgBox/InputBox/DoEvents/Command/Environ spellings through explicit host service; missing service refuses, no ambient process/environment/UI access. Audit Debug.Print and classify unsupported Spc/Tab syntax. |
+| H4 | M6A.6 | H2; host protocol 1.1 | Dir/CurDir and file inspection/input functions through host-owned file namespace/cursor; preserve omitted slots, bound payload and wait/cancel behavior. |
+| H5 | M6A.6 | H2; host protocol 1.1 | GetSetting/GetAllSettings through explicit host settings provider and bounded result shapes. |
+| H6 | M6A.6 | F3 | Shell/CreateObject/GetObject/IMEStatus/MacID/MacScript explicit policy refusal; no dispatch or ambient capability. |
 | Q1 | M6A.7 | Each implemented packet | Incremental shared IDE signatures/completion and inspection-policy tests; do not wait until the end to expose functions correctly. |
 | X1 | M6A.8 | All required rows | Published shared revision, real pinned fork tests and documented acceptance; only then start M7. |
 

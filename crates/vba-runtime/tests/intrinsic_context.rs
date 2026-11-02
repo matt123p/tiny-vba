@@ -433,3 +433,58 @@ fn rnd_negative_seed_then_randomize_numeric_repeats_vba_sequence()
     );
     Ok(())
 }
+
+#[test]
+fn rgb_and_qbcolor_return_vba_long_color_values_and_enforce_ranges()
+-> Result<(), Box<dyn std::error::Error>> {
+    let context = IntrinsicContext::no_services(Mode::Binary, "", "", "", 32);
+    assert_eq!(
+        vba_runtime::intrinsic_extended_with_context(
+            I::Rgb,
+            &[
+                Some(Value::Integer(1)),
+                Some(Value::Integer(2)),
+                Some(Value::Integer(3)),
+            ],
+            &context,
+        ),
+        Ok(Value::Long(0x030201))
+    );
+    assert_eq!(
+        vba_runtime::intrinsic_extended_with_context(
+            I::Rgb,
+            &[
+                Some(Value::Long(255)),
+                Some(Value::Long(256)),
+                Some(Value::Long(1000)),
+            ],
+            &context,
+        ),
+        Ok(Value::Long(0x00ff_ffff))
+    );
+    assert_eq!(
+        vba_runtime::intrinsic_extended_with_context(
+            I::QbColor,
+            &[Some(Value::Integer(4))],
+            &context,
+        ),
+        Ok(Value::Long(0x0000_00ff))
+    );
+    assert_eq!(
+        vba_runtime::intrinsic_extended_with_context(
+            I::QbColor,
+            &[Some(Value::Integer(8))],
+            &context,
+        ),
+        Ok(Value::Long(0x0080_8080))
+    );
+    assert!(matches!(
+        vba_runtime::intrinsic_extended_with_context(
+            I::QbColor,
+            &[Some(Value::Long(16))],
+            &context
+        ),
+        Err(vba_runtime::Error::Vba { number: 5, .. })
+    ));
+    Ok(())
+}

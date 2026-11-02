@@ -24,6 +24,15 @@ through a JSON member-dispatch shim. Active and explicitly qualified objects hav
 identities. Successful writes survive later errors; no implicit whole-macro rollback is introduced.
 Pause, cancellation, close and host loss must release borrows and pending tokens explicitly.
 
+M6A.6 adds native host protocol minor version 1 with `Host::invoke_intrinsic` and a bounded,
+typed request containing the canonical intrinsic spelling and structural `Option<Value>` slots.
+The default implementation refuses. Host providers own allowlists, environment variable policy,
+prompt policy, file namespace/cursor state and settings scope; they must bound results and validate
+the identity and lifetime of any object passed to CallByName. No ambient filesystem, process,
+registry, UI or COM implementation is selected by the engine. Intrinsic requests use the existing
+single pending-call wait/resume/cancel path and are never replayed after suspension. Protocol 1.0
+hosts remain usable for ordinary foreign calls; the new operation is refused by those hosts.
+
 M5 acceptance requires fake and real FillCells, breakpoint/edit/resume without repeated writes,
 active versus qualified targets, stale refs, permissions/protocol refusal, partial effects and
 undo/recalc integrity. Core native/WASM builds must not require Gridcraft or its dependencies.

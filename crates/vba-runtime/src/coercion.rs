@@ -1077,6 +1077,50 @@ pub(crate) fn random_intrinsic(
     Ok(V::Empty)
 }
 
+pub(crate) fn color_intrinsic(function: I, arguments: &[Option<V>]) -> Result<V> {
+    if function == I::QbColor {
+        let index = integral(
+            arguments
+                .first()
+                .and_then(Option::as_ref)
+                .ok_or_else(mismatch)?,
+            i128::from(i16::MIN),
+            i128::from(i16::MAX),
+        )?;
+        if !(0..=15).contains(&index) {
+            return Err(error(5, "Invalid procedure call or argument"));
+        }
+        let index = index as usize;
+        const QB_COLORS: [i32; 16] = [
+            0x000000, 0xff0000, 0x00ff00, 0xffff00, 0x0000ff, 0xff00ff, 0x00ffff, 0xffffff,
+            0x808080, 0xff8080, 0x80ff80, 0xffff80, 0x8080ff, 0xff80ff, 0x80ffff, 0xffffff,
+        ];
+        return Ok(V::Long(
+            *QB_COLORS
+                .get(index)
+                .ok_or_else(|| error(5, "Invalid procedure call or argument"))?,
+        ));
+    }
+    let mut components = [0_i128; 3];
+    for (index, component) in components.iter_mut().enumerate() {
+        *component = integral(
+            arguments
+                .get(index)
+                .and_then(Option::as_ref)
+                .ok_or_else(mismatch)?,
+            i128::from(i16::MIN),
+            i128::from(i16::MAX),
+        )?;
+        if *component < 0 {
+            return Err(error(5, "Invalid procedure call or argument"));
+        }
+        *component = (*component).min(255);
+    }
+    Ok(V::Long(
+        components[0] as i32 | ((components[1] as i32) << 8) | ((components[2] as i32) << 16),
+    ))
+}
+
 fn date_value(value: &V, context: &super::IntrinsicContext<'_>) -> Result<f64> {
     let serial = match value {
         V::String(text) => context.parse_date(text)?.ok_or_else(mismatch)?,

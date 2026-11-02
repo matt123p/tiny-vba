@@ -483,6 +483,40 @@ pub enum Intrinsic {
     Weekday,
     MonthName,
     WeekdayName,
+    Rgb,
+    QbColor,
+    CallByName,
+    MsgBox,
+    InputBox,
+    InputBoxDollar,
+    DoEvents,
+    Command,
+    CommandDollar,
+    Environ,
+    EnvironDollar,
+    Dir,
+    DirDollar,
+    CurDir,
+    CurDirDollar,
+    Eof,
+    FileAttr,
+    FileDateTime,
+    FileLen,
+    FreeFile,
+    GetAttr,
+    Input,
+    InputDollar,
+    Loc,
+    Lof,
+    Seek,
+    GetSetting,
+    GetAllSettings,
+    Shell,
+    CreateObject,
+    GetObject,
+    ImeStatus,
+    MacId,
+    MacScript,
 }
 
 /// Whether an intrinsic returns its historical VBA Variant subtype or a fixed
@@ -501,6 +535,7 @@ pub enum IntrinsicEffect {
     Pure,
     Contextual,
     HostEffect,
+    Restricted,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -512,6 +547,7 @@ pub enum IntrinsicFamily {
     Selection,
     StringSearch,
     StringValue,
+    HostServices,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -933,6 +969,58 @@ const WEEKDAYNAME_PARAMS: &[IntrinsicParameter] = &[
         IntrinsicOmittedDefault::Zero,
     ),
 ];
+const RGB_PARAMS: &[IntrinsicParameter] = &[
+    parameter("red", true),
+    parameter("green", true),
+    parameter("blue", true),
+];
+const OPTIONAL_COLOR_PARAMS: &[IntrinsicParameter] = &[parameter("color", true)];
+const CALLBYNAME_PARAMS: &[IntrinsicParameter] = &[
+    object_parameter("object", true),
+    parameter("procname", true),
+    parameter("calltype", true),
+];
+const MSGBOX_PARAMS: &[IntrinsicParameter] = &[
+    parameter("prompt", true),
+    parameter("buttons", false),
+    parameter("title", false),
+    parameter("helpfile", false),
+    parameter("context", false),
+];
+const INPUTBOX_PARAMS: &[IntrinsicParameter] = &[
+    parameter("prompt", true),
+    parameter("title", false),
+    parameter("default", false),
+    parameter("xpos", false),
+    parameter("ypos", false),
+    parameter("helpfile", false),
+    parameter("context", false),
+];
+const ENVIRON_PARAMS: &[IntrinsicParameter] = &[parameter("envstring", true)];
+const DIR_PARAMS: &[IntrinsicParameter] =
+    &[parameter("pathname", false), parameter("attributes", false)];
+const OPTIONAL_DRIVE_PARAMS: &[IntrinsicParameter] = &[parameter("drive", false)];
+const FILE_NUMBER_PARAMS: &[IntrinsicParameter] = &[parameter("filenumber", true)];
+const FILE_ATTR_PARAMS: &[IntrinsicParameter] =
+    &[parameter("filenumber", true), parameter("returntype", true)];
+const PATH_PARAMS: &[IntrinsicParameter] = &[parameter("pathname", true)];
+const FREEFILE_PARAMS: &[IntrinsicParameter] = &[parameter("rangenumber", false)];
+const INPUT_PARAMS: &[IntrinsicParameter] =
+    &[parameter("number", true), parameter("filenumber", true)];
+const SETTING_PARAMS: &[IntrinsicParameter] = &[
+    parameter("appname", true),
+    parameter("section", true),
+    parameter("key", true),
+    parameter("default", false),
+];
+const GETALLSETTINGS_PARAMS: &[IntrinsicParameter] =
+    &[parameter("appname", true), parameter("section", true)];
+const SHELL_PARAMS: &[IntrinsicParameter] =
+    &[parameter("pathname", true), parameter("windowstyle", false)];
+const CREATEOBJECT_PARAMS: &[IntrinsicParameter] =
+    &[parameter("classname", true), parameter("servername", false)];
+const GETOBJECT_PARAMS: &[IntrinsicParameter] =
+    &[parameter("pathname", false), parameter("classname", false)];
 
 const fn descriptor(
     intrinsic: Intrinsic,
@@ -987,6 +1075,40 @@ const fn descriptor(
             | Intrinsic::Minute
             | Intrinsic::Second
             | Intrinsic::Weekday
+            | Intrinsic::Rgb
+            | Intrinsic::QbColor
+            | Intrinsic::CallByName
+            | Intrinsic::MsgBox
+            | Intrinsic::InputBox
+            | Intrinsic::InputBoxDollar
+            | Intrinsic::DoEvents
+            | Intrinsic::Command
+            | Intrinsic::CommandDollar
+            | Intrinsic::Environ
+            | Intrinsic::EnvironDollar
+            | Intrinsic::Dir
+            | Intrinsic::DirDollar
+            | Intrinsic::CurDir
+            | Intrinsic::CurDirDollar
+            | Intrinsic::Eof
+            | Intrinsic::FileAttr
+            | Intrinsic::FileDateTime
+            | Intrinsic::FileLen
+            | Intrinsic::FreeFile
+            | Intrinsic::GetAttr
+            | Intrinsic::Input
+            | Intrinsic::InputDollar
+            | Intrinsic::Loc
+            | Intrinsic::Lof
+            | Intrinsic::Seek
+            | Intrinsic::GetSetting
+            | Intrinsic::GetAllSettings
+            | Intrinsic::Shell
+            | Intrinsic::CreateObject
+            | Intrinsic::GetObject
+            | Intrinsic::ImeStatus
+            | Intrinsic::MacId
+            | Intrinsic::MacScript
     ) {
         (8, "intrinsics-m6a-v1")
     } else if matches!(intrinsic, Intrinsic::IIf) {
@@ -1021,6 +1143,18 @@ const fn descriptor(
         | Intrinsic::TimeDollar
         | Intrinsic::Now
         | Intrinsic::Timer => 0,
+        Intrinsic::CallByName => 3,
+        Intrinsic::GetSetting => 3,
+        Intrinsic::GetAllSettings => 2,
+        Intrinsic::Dir
+        | Intrinsic::CurDir
+        | Intrinsic::FreeFile
+        | Intrinsic::GetObject
+        | Intrinsic::DoEvents
+        | Intrinsic::Command
+        | Intrinsic::CommandDollar
+        | Intrinsic::ImeStatus => 0,
+        Intrinsic::MsgBox | Intrinsic::InputBox | Intrinsic::InputBoxDollar => 1,
         Intrinsic::IPmt | Intrinsic::PPmt => 4,
         Intrinsic::Ddb => 4,
         Intrinsic::Mirr => 3,
@@ -1105,6 +1239,39 @@ const fn descriptor(
             | Intrinsic::ErrorMessage
             | Intrinsic::ErrorMessageDollar => IntrinsicFamily::Conversion,
             Intrinsic::StrComp => IntrinsicFamily::StringSearch,
+            Intrinsic::CallByName
+            | Intrinsic::MsgBox
+            | Intrinsic::InputBox
+            | Intrinsic::InputBoxDollar
+            | Intrinsic::DoEvents
+            | Intrinsic::Command
+            | Intrinsic::CommandDollar
+            | Intrinsic::Environ
+            | Intrinsic::EnvironDollar
+            | Intrinsic::Dir
+            | Intrinsic::DirDollar
+            | Intrinsic::CurDir
+            | Intrinsic::CurDirDollar
+            | Intrinsic::Eof
+            | Intrinsic::FileAttr
+            | Intrinsic::FileDateTime
+            | Intrinsic::FileLen
+            | Intrinsic::FreeFile
+            | Intrinsic::GetAttr
+            | Intrinsic::Input
+            | Intrinsic::InputDollar
+            | Intrinsic::Loc
+            | Intrinsic::Lof
+            | Intrinsic::Seek
+            | Intrinsic::GetSetting
+            | Intrinsic::GetAllSettings
+            | Intrinsic::Shell
+            | Intrinsic::CreateObject
+            | Intrinsic::GetObject
+            | Intrinsic::ImeStatus
+            | Intrinsic::MacId
+            | Intrinsic::MacScript => IntrinsicFamily::HostServices,
+            Intrinsic::Rgb | Intrinsic::QbColor => IntrinsicFamily::Numeric,
             Intrinsic::Rnd | Intrinsic::Randomize => IntrinsicFamily::Numeric,
             Intrinsic::Date
             | Intrinsic::DateDollar
@@ -1158,7 +1325,11 @@ const fn descriptor(
         variadic,
         variadic_mode: if matches!(
             intrinsic,
-            Intrinsic::Array | Intrinsic::Choose | Intrinsic::Switch | Intrinsic::Npv
+            Intrinsic::Array
+                | Intrinsic::Choose
+                | Intrinsic::Switch
+                | Intrinsic::Npv
+                | Intrinsic::CallByName
         ) {
             RAW
         } else {
@@ -1168,6 +1339,46 @@ const fn descriptor(
         maximum_arguments: if variadic { 256 } else { parameters.len() },
         return_variant: return_variant(intrinsic),
         effect: if matches!(
+            intrinsic,
+            Intrinsic::Shell
+                | Intrinsic::CreateObject
+                | Intrinsic::GetObject
+                | Intrinsic::ImeStatus
+                | Intrinsic::MacId
+                | Intrinsic::MacScript
+        ) {
+            IntrinsicEffect::Restricted
+        } else if matches!(
+            intrinsic,
+            Intrinsic::CallByName
+                | Intrinsic::MsgBox
+                | Intrinsic::InputBox
+                | Intrinsic::InputBoxDollar
+                | Intrinsic::DoEvents
+                | Intrinsic::Command
+                | Intrinsic::CommandDollar
+                | Intrinsic::Environ
+                | Intrinsic::EnvironDollar
+                | Intrinsic::Dir
+                | Intrinsic::DirDollar
+                | Intrinsic::CurDir
+                | Intrinsic::CurDirDollar
+                | Intrinsic::Eof
+                | Intrinsic::FileAttr
+                | Intrinsic::FileDateTime
+                | Intrinsic::FileLen
+                | Intrinsic::FreeFile
+                | Intrinsic::GetAttr
+                | Intrinsic::Input
+                | Intrinsic::InputDollar
+                | Intrinsic::Loc
+                | Intrinsic::Lof
+                | Intrinsic::Seek
+                | Intrinsic::GetSetting
+                | Intrinsic::GetAllSettings
+        ) {
+            IntrinsicEffect::HostEffect
+        } else if matches!(
             intrinsic,
             Intrinsic::StrComp
                 | Intrinsic::InStr
@@ -1218,58 +1429,44 @@ const fn descriptor(
         } else {
             IntrinsicEffect::Pure
         },
-        read_only_inspection: true,
+        read_only_inspection: !matches!(
+            intrinsic,
+            Intrinsic::CallByName
+                | Intrinsic::MsgBox
+                | Intrinsic::InputBox
+                | Intrinsic::InputBoxDollar
+                | Intrinsic::DoEvents
+                | Intrinsic::Command
+                | Intrinsic::CommandDollar
+                | Intrinsic::Environ
+                | Intrinsic::EnvironDollar
+                | Intrinsic::Dir
+                | Intrinsic::DirDollar
+                | Intrinsic::CurDir
+                | Intrinsic::CurDirDollar
+                | Intrinsic::Eof
+                | Intrinsic::FileAttr
+                | Intrinsic::FileDateTime
+                | Intrinsic::FileLen
+                | Intrinsic::FreeFile
+                | Intrinsic::GetAttr
+                | Intrinsic::Input
+                | Intrinsic::InputDollar
+                | Intrinsic::Loc
+                | Intrinsic::Lof
+                | Intrinsic::Seek
+                | Intrinsic::GetSetting
+                | Intrinsic::GetAllSettings
+                | Intrinsic::Shell
+                | Intrinsic::CreateObject
+                | Intrinsic::GetObject
+                | Intrinsic::MacScript
+        ),
         minimum_ir,
         capability,
         signature,
-        platform_requirements: if matches!(
-            intrinsic,
-            Intrinsic::StrComp
-                | Intrinsic::InStr
-                | Intrinsic::InStrRev
-                | Intrinsic::Replace
-                | Intrinsic::Split
-                | Intrinsic::Filter
-                | Intrinsic::CDate
-                | Intrinsic::IsDate
-                | Intrinsic::IsNumeric
-                | Intrinsic::CStr
-                | Intrinsic::CDec
-                | Intrinsic::CLngPtr
-                | Intrinsic::Format
-                | Intrinsic::FormatDollar
-                | Intrinsic::FormatCurrency
-                | Intrinsic::FormatDateTime
-                | Intrinsic::FormatNumber
-                | Intrinsic::FormatPercent
-                | Intrinsic::ErrorMessage
-                | Intrinsic::ErrorMessageDollar
-                | Intrinsic::Rnd
-                | Intrinsic::Randomize
-                | Intrinsic::Date
-                | Intrinsic::DateDollar
-                | Intrinsic::Time
-                | Intrinsic::TimeDollar
-                | Intrinsic::Now
-                | Intrinsic::Timer
-                | Intrinsic::DateValue
-                | Intrinsic::TimeSerial
-                | Intrinsic::TimeValue
-                | Intrinsic::MonthName
-                | Intrinsic::WeekdayName
-                | Intrinsic::DateAdd
-                | Intrinsic::DateDiff
-                | Intrinsic::DatePart
-                | Intrinsic::DateSerial
-                | Intrinsic::Day
-                | Intrinsic::Month
-                | Intrinsic::Year
-                | Intrinsic::Hour
-                | Intrinsic::Minute
-                | Intrinsic::Second
-                | Intrinsic::Weekday
-        ) {
-            "injected clock, random state, comparison, or locale calendar service as required"
+        platform_requirements: if minimum_ir >= 8 {
+            "intrinsics-m6a-v1 contextual service or explicit policy as required"
         } else {
             "portable core"
         },
@@ -1369,6 +1566,31 @@ const fn return_variant(intrinsic: Intrinsic) -> IntrinsicReturn {
         I::CBool => R::Fixed(K::Boolean),
         I::CStr => R::Fixed(K::String),
         I::CVar | I::CVErr | I::DebugPrint => R::Variant,
+        I::Rgb | I::QbColor | I::FileAttr | I::FileLen | I::GetAttr | I::Loc | I::Lof | I::Seek => {
+            R::Fixed(K::Long)
+        }
+        I::MsgBox | I::DoEvents | I::FreeFile => R::Fixed(K::Integer),
+        I::Eof => R::Fixed(K::Boolean),
+        I::FileDateTime => R::Fixed(K::Date),
+        I::GetAllSettings => R::Array,
+        I::CallByName
+        | I::Command
+        | I::Environ
+        | I::Dir
+        | I::CurDir
+        | I::GetSetting
+        | I::InputBox
+        | I::Input => R::Variant,
+        I::InputBoxDollar
+        | I::CommandDollar
+        | I::EnvironDollar
+        | I::DirDollar
+        | I::CurDirDollar
+        | I::InputDollar => R::Fixed(K::String),
+        I::Shell | I::MacId => R::Fixed(K::Long),
+        I::CreateObject | I::GetObject => R::Fixed(K::Object),
+        I::ImeStatus => R::Fixed(K::Integer),
+        I::MacScript => R::Fixed(K::String),
     }
 }
 
@@ -1596,6 +1818,238 @@ pub const INTRINSIC_DESCRIPTORS: &[IntrinsicDescriptor] = &[
         WEEKDAYNAME_PARAMS,
         false,
         "WeekdayName(weekday, [abbreviate, [firstdayofweek]])",
+    ),
+    descriptor(
+        Intrinsic::Rgb,
+        "RGB",
+        RGB_PARAMS,
+        false,
+        "RGB(red, green, blue)",
+    ),
+    descriptor(
+        Intrinsic::QbColor,
+        "QBColor",
+        OPTIONAL_COLOR_PARAMS,
+        false,
+        "QBColor(color)",
+    ),
+    descriptor(
+        Intrinsic::CallByName,
+        "CallByName",
+        CALLBYNAME_PARAMS,
+        true,
+        "CallByName(object, procname, calltype, [args()])",
+    ),
+    descriptor(
+        Intrinsic::MsgBox,
+        "MsgBox",
+        MSGBOX_PARAMS,
+        false,
+        "MsgBox(prompt, [buttons, [title, [helpfile, context]]])",
+    ),
+    descriptor(
+        Intrinsic::InputBox,
+        "InputBox",
+        INPUTBOX_PARAMS,
+        false,
+        "InputBox(prompt, [title, [default, [xpos, [ypos, [helpfile, context]]]]])",
+    ),
+    descriptor(
+        Intrinsic::InputBoxDollar,
+        "InputBox$",
+        INPUTBOX_PARAMS,
+        false,
+        "InputBox$(prompt, [title, [default, [xpos, [ypos, [helpfile, context]]]]])",
+    ),
+    descriptor(
+        Intrinsic::DoEvents,
+        "DoEvents",
+        NO_PARAMS,
+        false,
+        "DoEvents()",
+    ),
+    descriptor(Intrinsic::Command, "Command", NO_PARAMS, false, "Command()"),
+    descriptor(
+        Intrinsic::CommandDollar,
+        "Command$",
+        NO_PARAMS,
+        false,
+        "Command$()",
+    ),
+    descriptor(
+        Intrinsic::Environ,
+        "Environ",
+        ENVIRON_PARAMS,
+        false,
+        "Environ(envstring)",
+    ),
+    descriptor(
+        Intrinsic::EnvironDollar,
+        "Environ$",
+        ENVIRON_PARAMS,
+        false,
+        "Environ$(envstring)",
+    ),
+    descriptor(
+        Intrinsic::Dir,
+        "Dir",
+        DIR_PARAMS,
+        false,
+        "Dir([pathname, [attributes]])",
+    ),
+    descriptor(
+        Intrinsic::DirDollar,
+        "Dir$",
+        DIR_PARAMS,
+        false,
+        "Dir$([pathname, [attributes]])",
+    ),
+    descriptor(
+        Intrinsic::CurDir,
+        "CurDir",
+        OPTIONAL_DRIVE_PARAMS,
+        false,
+        "CurDir([drive])",
+    ),
+    descriptor(
+        Intrinsic::CurDirDollar,
+        "CurDir$",
+        OPTIONAL_DRIVE_PARAMS,
+        false,
+        "CurDir$([drive])",
+    ),
+    descriptor(
+        Intrinsic::Eof,
+        "EOF",
+        FILE_NUMBER_PARAMS,
+        false,
+        "EOF(filenumber)",
+    ),
+    descriptor(
+        Intrinsic::FileAttr,
+        "FileAttr",
+        FILE_ATTR_PARAMS,
+        false,
+        "FileAttr(filenumber, returntype)",
+    ),
+    descriptor(
+        Intrinsic::FileDateTime,
+        "FileDateTime",
+        PATH_PARAMS,
+        false,
+        "FileDateTime(pathname)",
+    ),
+    descriptor(
+        Intrinsic::FileLen,
+        "FileLen",
+        PATH_PARAMS,
+        false,
+        "FileLen(pathname)",
+    ),
+    descriptor(
+        Intrinsic::FreeFile,
+        "FreeFile",
+        FREEFILE_PARAMS,
+        false,
+        "FreeFile([rangenumber])",
+    ),
+    descriptor(
+        Intrinsic::GetAttr,
+        "GetAttr",
+        PATH_PARAMS,
+        false,
+        "GetAttr(pathname)",
+    ),
+    descriptor(
+        Intrinsic::Input,
+        "Input",
+        INPUT_PARAMS,
+        false,
+        "Input(number, filenumber)",
+    ),
+    descriptor(
+        Intrinsic::InputDollar,
+        "Input$",
+        INPUT_PARAMS,
+        false,
+        "Input$(number, filenumber)",
+    ),
+    descriptor(
+        Intrinsic::Loc,
+        "Loc",
+        FILE_NUMBER_PARAMS,
+        false,
+        "Loc(filenumber)",
+    ),
+    descriptor(
+        Intrinsic::Lof,
+        "LOF",
+        FILE_NUMBER_PARAMS,
+        false,
+        "LOF(filenumber)",
+    ),
+    descriptor(
+        Intrinsic::Seek,
+        "Seek",
+        FILE_NUMBER_PARAMS,
+        false,
+        "Seek(filenumber)",
+    ),
+    descriptor(
+        Intrinsic::GetSetting,
+        "GetSetting",
+        SETTING_PARAMS,
+        false,
+        "GetSetting(appname, section, key, [default])",
+    ),
+    descriptor(
+        Intrinsic::GetAllSettings,
+        "GetAllSettings",
+        GETALLSETTINGS_PARAMS,
+        false,
+        "GetAllSettings(appname, section)",
+    ),
+    descriptor(
+        Intrinsic::Shell,
+        "Shell",
+        SHELL_PARAMS,
+        false,
+        "Shell(pathname, [windowstyle])",
+    ),
+    descriptor(
+        Intrinsic::CreateObject,
+        "CreateObject",
+        CREATEOBJECT_PARAMS,
+        false,
+        "CreateObject(classname, [servername])",
+    ),
+    descriptor(
+        Intrinsic::GetObject,
+        "GetObject",
+        GETOBJECT_PARAMS,
+        false,
+        "GetObject([pathname, [classname]])",
+    ),
+    descriptor(
+        Intrinsic::ImeStatus,
+        "IMEStatus",
+        NO_PARAMS,
+        false,
+        "IMEStatus()",
+    ),
+    descriptor(
+        Intrinsic::MacId,
+        "MacID",
+        ONE_VALUE,
+        false,
+        "MacID(constant)",
+    ),
+    descriptor(
+        Intrinsic::MacScript,
+        "MacScript",
+        ONE_VALUE,
+        false,
+        "MacScript(script)",
     ),
     instr_descriptor(),
     instrrev_descriptor(),

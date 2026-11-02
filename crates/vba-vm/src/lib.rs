@@ -268,6 +268,7 @@ struct SuspendedInvocation {
     result_reference: Option<Location>,
     argument_continuation: bool,
     stack_capacity: usize,
+    intrinsic_return: Option<vba_values::IntrinsicReturn>,
 }
 pub struct Session {
     suspended_invocations: Vec<SuspendedInvocation>,
@@ -310,6 +311,7 @@ pub struct Session {
     foreign: foreign::Session,
     host_result_reference: Option<Location>,
     argument_continuation: bool,
+    host_intrinsic_return: Option<vba_values::IntrinsicReturn>,
     pending_fault: Option<Failure>,
     error: ErrorState,
     raised_source: Option<String>,
@@ -655,6 +657,7 @@ impl Session {
             foreign: foreign::Session::default(),
             host_result_reference: None,
             argument_continuation: false,
+            host_intrinsic_return: None,
             pending_fault: None,
             error: ErrorState::default(),
             raised_source: None,
@@ -1119,6 +1122,7 @@ impl Session {
             result_reference: self.host_result_reference.take(),
             argument_continuation: std::mem::take(&mut self.argument_continuation),
             stack_capacity: std::mem::take(&mut self.stack_capacity),
+            intrinsic_return: self.host_intrinsic_return.take(),
         });
         self.state = Outcome::Completed(ReturnValue::Sub);
         if let Err(error) = self.start_next_callback(host) {
@@ -1143,6 +1147,7 @@ impl Session {
         self.host_result_reference = saved.result_reference;
         self.argument_continuation = saved.argument_continuation;
         self.stack_capacity = saved.stack_capacity;
+        self.host_intrinsic_return = saved.intrinsic_return;
         self.pending_result = None;
         self.generation = self.generation.checked_add(1).ok_or_else(resource)?;
         self.state = Outcome::Waiting;
@@ -2227,6 +2232,7 @@ impl Session {
         self.callback_output_frame = None;
         self.host_result_reference = None;
         self.argument_continuation = false;
+        self.host_intrinsic_return = None;
         let native_fields = if self.preserve_instances {
             self.instances
                 .iter()
@@ -3104,6 +3110,7 @@ impl Session {
             }
             I::IntrinsicCall {
                 function,
+                return_variant,
                 supplied_arguments,
                 bindings,
                 compare_mode,
@@ -3140,11 +3147,55 @@ impl Session {
                     self.error.number,
                     self.intrinsic_context_config.as_ref(),
                 );
-                let value =
-                    runtime::intrinsic_extended_with_context(function, &arguments, &context)
-                        .map_err(runtime_diagnostic)?;
-                self.push(Operand::Value(value))?;
-                self.advance()?;
+                let descriptor = function
+                    .descriptor()
+                    .ok_or_else(|| invariant("verified intrinsic descriptor"))?;
+                if descriptor.effect == vba_values::IntrinsicEffect::HostEffect {
+                    if self
+                        .binding
+                        .as_ref()
+                        .is_none_or(|binding| binding.identity != host.identity())
+                    {
+                        return Err(Diagnostic::unsupported(
+                            "intrinsic host operation requires an explicit host binding",
+                        ));
+                    }
+                    if self.counters.host_calls >= self.limits.host_calls {
+                        return Err(resource());
+                    }
+                    let snapshot_bytes = arguments
+                        .iter()
+                        .flatten()
+                        .try_fold(65_536_usize, |total, value| {
+                            total.checked_add(value_bytes(value)).ok_or_else(resource)
+                        })?;
+                    self.charge(snapshot_bytes)?;
+                    self.counters.host_calls = self
+                        .counters
+                        .host_calls
+                        .checked_add(1)
+                        .ok_or_else(resource)?;
+                    self.host_intrinsic_return = Some(return_variant);
+                    self.advance()?;
+                    let outcome = self
+                        .foreign
+                        .invoke_intrinsic(
+                            host,
+                            foreign::HostIntrinsicCall {
+                                intrinsic: descriptor.spelling.to_owned(),
+                                arguments,
+                            },
+                            &mut self.store,
+                        )
+                        .map_err(|error| protocol(&error.message))?;
+                    self.accept_host(outcome)?;
+                } else {
+                    let value =
+                        runtime::intrinsic_extended_with_context(function, &arguments, &context)
+                            .map_err(runtime_diagnostic)?;
+                    self.push(Operand::Value(value))?;
+                    self.advance()?;
+                }
             }
             I::Convert(kind) => {
                 let v = self.pop_value()?;
@@ -3754,6 +3805,7 @@ impl Session {
         match outcome {
             foreign::Outcome::Suspended => self.state = Outcome::Waiting,
             foreign::Outcome::Complete(value) => {
+                let value = self.bind_host_intrinsic_result(value)?;
                 if let Some(location) = self.host_result_reference.take() {
                     let kind = *self
                         .kinds
@@ -3778,12 +3830,30 @@ impl Session {
             }
             foreign::Outcome::Error(error) => {
                 self.host_result_reference = None;
+                self.host_intrinsic_return = None;
                 let failure =
                     self.failure(FailureKind::Runtime, Some(error.number), error.description)?;
                 self.deliver_failure(failure)?;
             }
         }
         Ok(())
+    }
+    fn bind_host_intrinsic_result(&mut self, value: Value) -> Result<Value> {
+        match self.host_intrinsic_return.take() {
+            Some(vba_values::IntrinsicReturn::Fixed(kind)) => {
+                runtime::assign(kind, &value, false).map_err(runtime_diagnostic)
+            }
+            Some(vba_values::IntrinsicReturn::Array) if !matches!(value, Value::Array(_)) => {
+                Err(runtime_diagnostic(runtime::Error::Vba {
+                    number: 13,
+                    message: "Host intrinsic returned a non-array value".into(),
+                }))
+            }
+            Some(vba_values::IntrinsicReturn::Array)
+            | Some(vba_values::IntrinsicReturn::Variant)
+            | Some(vba_values::IntrinsicReturn::Polymorphic)
+            | None => Ok(value),
+        }
     }
     pub fn resume_host(&mut self, host: &mut impl Host) -> Result<Outcome> {
         self.check_host(host)?;

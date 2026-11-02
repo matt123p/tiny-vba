@@ -50,6 +50,13 @@ pub struct HostCall {
     pub member: String,
     pub arguments: Vec<HostArgument>,
 }
+/// Bounded request for a VBA intrinsic whose effect belongs to the embedding.
+/// Omitted slots stay distinct from supplied `Value::Missing` arguments.
+#[derive(Clone, Debug, PartialEq)]
+pub struct HostIntrinsicCall {
+    pub intrinsic: String,
+    pub arguments: Vec<Option<Value>>,
+}
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct ForeignError {
     pub number: i32,
@@ -74,6 +81,16 @@ pub trait Host {
     /// Stable identity, unique per host instance during the embedding session.
     fn identity(&self) -> u64;
     fn invoke(&mut self, call: HostCall) -> Reply;
+    /// Host policy and capability boundary for environment, prompt, file, settings,
+    /// and late-bound intrinsic operations. The default refuses the operation.
+    /// Providers must allowlist each operation, bound result sizes, and validate
+    /// object handles (including host identity and lifetime) before CallByName.
+    fn invoke_intrinsic(&mut self, call: HostIntrinsicCall) -> Reply {
+        Reply::Error(ForeignError {
+            number: 5,
+            description: format!("intrinsic host service unavailable: {}", call.intrinsic),
+        })
+    }
     fn resume(&mut self, token: u64) -> Reply;
     fn cancel(&mut self, token: u64);
 }
@@ -120,6 +137,50 @@ impl Session {
         store: &mut Locations,
     ) -> Result<Outcome, Diagnostic> {
         self.invoke_checked(host, invocation, store, &mut |_, _| Ok(()))
+    }
+    pub fn invoke_intrinsic(
+        &mut self,
+        host: &mut impl Host,
+        call: HostIntrinsicCall,
+        store: &mut Locations,
+    ) -> Result<Outcome, Diagnostic> {
+        check_protocol(host.protocol())?;
+        if self.pending.is_some() {
+            return Err(protocol("call already suspended"));
+        }
+        if host.protocol().minor < 1 {
+            return Err(protocol("host protocol lacks intrinsic operation support"));
+        }
+        if call.intrinsic.is_empty()
+            || call.intrinsic.len() > 64
+            || !call.intrinsic.is_ascii()
+            || !call
+                .intrinsic
+                .as_bytes()
+                .first()
+                .is_some_and(u8::is_ascii_alphabetic)
+            || !call
+                .intrinsic
+                .bytes()
+                .all(|byte| byte.is_ascii_alphanumeric() || byte == b'$')
+            || call.arguments.len() > 256
+        {
+            return Err(protocol("invalid intrinsic request or argument budget"));
+        }
+        let mut payload = 0_usize;
+        for value in call.arguments.iter().flatten() {
+            value.validate()?;
+            payload = payload
+                .checked_add(value.payload_bytes())
+                .ok_or_else(|| protocol("intrinsic payload budget exceeded"))?;
+            if payload > 8 * 1024 * 1024 {
+                return Err(protocol("intrinsic payload budget exceeded"));
+            }
+        }
+        let reply = host.invoke_intrinsic(call);
+        self.accept(reply, Vec::new(), store, host.identity(), 0, &mut |_, _| {
+            Ok(())
+        })
     }
     pub fn invoke_checked(
         &mut self,
@@ -309,7 +370,7 @@ pub struct ProtocolVersion {
     pub major: u16,
     pub minor: u16,
 }
-pub const PROTOCOL_VERSION: ProtocolVersion = ProtocolVersion { major: 1, minor: 0 };
+pub const PROTOCOL_VERSION: ProtocolVersion = ProtocolVersion { major: 1, minor: 1 };
 pub fn check_protocol(version: ProtocolVersion) -> Result<(), Diagnostic> {
     if version.major != PROTOCOL_VERSION.major || version.minor > PROTOCOL_VERSION.minor {
         return Err(protocol("incompatible native host protocol"));

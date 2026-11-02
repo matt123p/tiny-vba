@@ -2474,10 +2474,109 @@ impl Binder<'_> {
             });
         }
         if descriptor.variadic {
-            return Err(unsupported(
-                "named/omitted variadic intrinsic arguments",
+            if function != vba_values::Intrinsic::CallByName {
+                return Err(unsupported(
+                    "named/omitted variadic intrinsic arguments",
+                    span,
+                ));
+            }
+            let mut named_seen = false;
+            let mut next_positional = 0usize;
+            let mut next_tail = descriptor.parameters.len();
+            let mut assigned = vec![false; descriptor.parameters.len()];
+            let mut parameter_indexes = Vec::new();
+            let mut values = Vec::new();
+            let mut modes = Vec::new();
+            parameter_indexes
+                .try_reserve_exact(arguments.len())
+                .map_err(|_| limit(span))?;
+            values
+                .try_reserve_exact(arguments.len())
+                .map_err(|_| limit(span))?;
+            modes
+                .try_reserve_exact(arguments.len())
+                .map_err(|_| limit(span))?;
+            for argument in arguments {
+                let parameter_index = if let Some(name) = &argument.name {
+                    named_seen = true;
+                    descriptor
+                        .parameters
+                        .iter()
+                        .position(|parameter| parameter.name.eq_ignore_ascii_case(&name.spelling))
+                        .ok_or_else(|| err("unknown intrinsic argument name", argument.span))?
+                } else {
+                    if named_seen {
+                        return Err(err(
+                            "positional intrinsic argument after named",
+                            argument.span,
+                        ));
+                    }
+                    while assigned.get(next_positional).is_some_and(|used| *used) {
+                        next_positional = next_positional.saturating_add(1);
+                    }
+                    if next_positional < descriptor.parameters.len() {
+                        let index = next_positional;
+                        next_positional = next_positional.saturating_add(1);
+                        index
+                    } else {
+                        let index = next_tail;
+                        next_tail = next_tail.saturating_add(1);
+                        index
+                    }
+                };
+                if argument.value.is_none() {
+                    return Err(unsupported("omitted CallByName argument", argument.span));
+                }
+                if parameter_index < descriptor.parameters.len() {
+                    let Some(slot) = assigned.get_mut(parameter_index) else {
+                        return Err(err("intrinsic argument position", argument.span));
+                    };
+                    if *slot {
+                        return Err(err("duplicate intrinsic argument", argument.span));
+                    }
+                    *slot = true;
+                }
+                let mode = descriptor
+                    .parameters
+                    .get(parameter_index)
+                    .map_or(descriptor.variadic_mode, |parameter| parameter.mode);
+                let source = argument
+                    .value
+                    .as_ref()
+                    .ok_or_else(|| err("CallByName argument", argument.span))?;
+                let expression = match mode {
+                    vba_values::IntrinsicArgumentMode::Value => self.value_expr(source)?,
+                    vba_values::IntrinsicArgumentMode::RawVariant
+                    | vba_values::IntrinsicArgumentMode::Object => self.expr(source)?,
+                };
+                push(&mut values, expression, argument.span)?;
+                push(&mut modes, mode, argument.span)?;
+                push(&mut parameter_indexes, parameter_index, argument.span)?;
+            }
+            if assigned.iter().any(|used| !used) {
+                return Err(err("missing required intrinsic argument", span));
+            }
+            let mut bindings = vec![vba_values::IntrinsicArgumentBinding::Omitted; arguments.len()];
+            for (evaluated, parameter_index) in parameter_indexes.into_iter().enumerate() {
+                let binding = bindings
+                    .get_mut(parameter_index)
+                    .ok_or_else(|| err("intrinsic argument position", span))?;
+                *binding = vba_values::IntrinsicArgumentBinding::Evaluated(
+                    u16::try_from(evaluated).map_err(|_| limit(span))?,
+                );
+            }
+            return Ok(Expr {
                 span,
-            ));
+                kind: ExprKind::Intrinsic {
+                    function,
+                    arguments: values,
+                    plan: Some(IntrinsicCallPlan {
+                        bindings,
+                        argument_modes: modes,
+                        return_variant: descriptor.return_variant,
+                    }),
+                },
+            });
         }
         let mut start_form = false;
         let mut positional_count = 0usize;

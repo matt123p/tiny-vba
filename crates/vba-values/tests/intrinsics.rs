@@ -192,6 +192,76 @@ fn m6a5_calendar_and_random_descriptors_require_ir8_context()
 }
 
 #[test]
+fn m6a6_host_and_restricted_intrinsics_have_explicit_metadata()
+-> Result<(), Box<dyn std::error::Error>> {
+    let host_functions = [
+        Intrinsic::CallByName,
+        Intrinsic::MsgBox,
+        Intrinsic::InputBox,
+        Intrinsic::InputBoxDollar,
+        Intrinsic::DoEvents,
+        Intrinsic::Command,
+        Intrinsic::CommandDollar,
+        Intrinsic::Environ,
+        Intrinsic::EnvironDollar,
+        Intrinsic::Dir,
+        Intrinsic::DirDollar,
+        Intrinsic::CurDir,
+        Intrinsic::CurDirDollar,
+        Intrinsic::Eof,
+        Intrinsic::FileAttr,
+        Intrinsic::FileDateTime,
+        Intrinsic::FileLen,
+        Intrinsic::FreeFile,
+        Intrinsic::GetAttr,
+        Intrinsic::Input,
+        Intrinsic::InputDollar,
+        Intrinsic::Loc,
+        Intrinsic::Lof,
+        Intrinsic::Seek,
+        Intrinsic::GetSetting,
+        Intrinsic::GetAllSettings,
+    ];
+    for function in host_functions {
+        let descriptor = function
+            .descriptor()
+            .ok_or_else(|| std::io::Error::other("M6A.6 host descriptor"))?;
+        assert_eq!(descriptor.minimum_ir, 8, "{}", descriptor.spelling);
+        assert_eq!(descriptor.capability, "intrinsics-m6a-v1");
+        assert_eq!(descriptor.effect, vba_values::IntrinsicEffect::HostEffect);
+        assert!(!descriptor.read_only_inspection, "{}", descriptor.spelling);
+    }
+    for function in [
+        Intrinsic::Shell,
+        Intrinsic::CreateObject,
+        Intrinsic::GetObject,
+        Intrinsic::ImeStatus,
+        Intrinsic::MacId,
+        Intrinsic::MacScript,
+    ] {
+        let descriptor = function
+            .descriptor()
+            .ok_or_else(|| std::io::Error::other("M6A.6 restricted descriptor"))?;
+        assert_eq!(descriptor.effect, vba_values::IntrinsicEffect::Restricted);
+    }
+    assert_eq!(
+        Intrinsic::Rgb.descriptor().map(|d| d.return_variant),
+        Some(IntrinsicReturn::Fixed(ScalarKind::Long))
+    );
+    assert_eq!(
+        Intrinsic::CallByName
+            .descriptor()
+            .map(|d| d.minimum_arguments),
+        Some(3)
+    );
+    assert_eq!(
+        Intrinsic::Dir.descriptor().map(|d| d.minimum_arguments),
+        Some(0)
+    );
+    Ok(())
+}
+
+#[test]
 fn instr_search_descriptors_are_ir8_with_distinct_compare_defaults()
 -> Result<(), Box<dyn std::error::Error>> {
     let forward = Intrinsic::InStr
