@@ -1,7 +1,7 @@
 use std::cmp::Ordering;
 use vba_runtime::{
-    DateConversionService, Error, IntrinsicContext, IntrinsicFormattingService,
-    StringComparisonService,
+    BinaryStringComparisonService, DateConversionService, Error, IntrinsicContext,
+    IntrinsicFormattingService, StringComparisonService,
 };
 use vba_values::{Intrinsic as I, IntrinsicComparisonMode as Mode, Value, VbaDecimal, VbaString};
 
@@ -27,6 +27,23 @@ impl StringComparisonService for DeterministicTestProvider {
         assert_eq!(code_page, "test-code-page");
         Ok(Ordering::Less)
     }
+}
+
+#[test]
+fn built_in_binary_comparison_provider_uses_utf16_ordinal_order_only()
+-> Result<(), Box<dyn std::error::Error>> {
+    let provider = BinaryStringComparisonService;
+    let left = VbaString::from_utf8("A")?;
+    let right = VbaString::from_utf8("a")?;
+    assert_eq!(
+        provider.compare(Mode::Binary, &left, &right, "invariant", "UTF-16"),
+        Ok(Ordering::Less)
+    );
+    assert!(matches!(
+        provider.compare(Mode::Text, &left, &right, "invariant", "UTF-16"),
+        Err(Error::Unsupported(_))
+    ));
+    Ok(())
 }
 
 #[test]

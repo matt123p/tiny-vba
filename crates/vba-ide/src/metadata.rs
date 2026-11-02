@@ -22,6 +22,25 @@ pub struct ReferenceInfo {
 }
 
 impl Ide {
+    /// Configure an explicit string-comparison provider for future VM sessions.
+    /// The IDE never selects a locale or calls an ambient comparison API.
+    pub fn configure_string_comparison_service(
+        &mut self,
+        service: std::sync::Arc<dyn vba_runtime::StringComparisonService>,
+        context: vba_vm::IntrinsicContextConfig,
+    ) -> Result<()> {
+        if self.session.is_some() {
+            return Err(error("reset before changing the string comparison service"));
+        }
+        let service_id = service.service_id();
+        if service_id.is_empty() || service_id.len() > 128 {
+            return Err(error("invalid string comparison service identity"));
+        }
+        self.string_comparison_service = Some(service);
+        self.intrinsic_context_config = Some(context);
+        Ok(())
+    }
+
     pub(crate) fn catalog_owner_matches(&self, item: &crate::ApiMember, declared: &str) -> bool {
         if let Ok(Some(ty)) = self.reference_bindings.object_type(declared) {
             return item

@@ -131,6 +131,33 @@ fn safe_watches_compare_exact_values_and_refuse_host_side_effects() -> R {
     Ok(())
 }
 #[test]
+fn configured_binary_comparison_provider_reaches_ide_vm_sessions() -> R {
+    let mut ide = Ide::new();
+    ide.configure_string_comparison_service(
+        std::sync::Arc::new(vba_runtime::BinaryStringComparisonService),
+        vba_vm::IntrinsicContextConfig::new(
+            "invariant".into(),
+            "Gregorian".into(),
+            "UTF-16".into(),
+            usize::BITS as u8,
+        )?,
+    )?;
+    ide.add_module(
+        "Compare.bas",
+        "Public Sub Main()\nDebug.Print StrComp(\"A\", \"a\")\nEnd Sub\n",
+    )?;
+    ide.dispatch(Action::Run, &mut NoHost)?;
+    for _ in 0..1000 {
+        if !matches!(ide.mode(), Mode::Running | Mode::Waiting) {
+            break;
+        }
+        ide.tick(&mut NoHost)?;
+    }
+    assert_eq!(ide.mode(), Mode::Completed, "{:?}", ide.diagnostics);
+    assert!(ide.output().iter().any(|line| line.contains('1')));
+    Ok(())
+}
+#[test]
 fn immediate_assignment_and_expression_share_paused_scope() -> R {
     let mut ide = paused()?;
     ide.immediate("counter = counter + 1")?;

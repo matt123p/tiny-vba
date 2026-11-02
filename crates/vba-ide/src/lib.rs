@@ -315,6 +315,8 @@ pub struct Ide {
     imports: Vec<Import>,
     reference_bindings: vba_foreign::ReferenceSet,
     type_resolver: Option<std::sync::Arc<dyn vba_foreign::ObjectTypeResolver>>,
+    string_comparison_service: Option<std::sync::Arc<dyn vba_runtime::StringComparisonService>>,
+    intrinsic_context_config: Option<vba_vm::IntrinsicContextConfig>,
     roots: BTreeMap<String, ObjectRef>,
     requests: Vec<HostRequest>,
     temporary_breakpoint: Option<StatementId>,
@@ -365,6 +367,8 @@ impl Ide {
             imports: vec![],
             reference_bindings: vba_foreign::ReferenceSet::default(),
             type_resolver: None,
+            string_comparison_service: None,
+            intrinsic_context_config: None,
             roots: BTreeMap::new(),
             requests: vec![],
             temporary_breakpoint: None,
@@ -912,6 +916,12 @@ impl Ide {
             Limits::default(),
             self.type_resolver.clone(),
         )?;
+        if let (Some(service), Some(context)) = (
+            self.string_comparison_service.clone(),
+            self.intrinsic_context_config.clone(),
+        ) {
+            session.set_string_comparison_service(service, context)?;
+        }
         if !self.stale
             && self.session_host == Some(host.identity())
             && let Some(previous) = &self.session
@@ -1220,6 +1230,13 @@ impl Ide {
                 Limits::default(),
                 self.type_resolver.clone(),
             )?);
+            if let (Some(service), Some(context)) = (
+                self.string_comparison_service.clone(),
+                self.intrinsic_context_config.clone(),
+            ) && let Some(session) = self.session.as_mut()
+            {
+                session.set_string_comparison_service(service, context)?;
+            }
             self.session_host = Some(host.identity());
             self.controller = Controller::new();
             let session = self

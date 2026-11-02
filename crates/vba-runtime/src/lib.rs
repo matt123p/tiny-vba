@@ -46,6 +46,32 @@ pub trait StringComparisonService: Send + Sync {
     ) -> Result<Ordering>;
 }
 
+/// Deterministic UTF-16 ordinal comparison for VBA Binary mode.
+/// Text comparison remains unavailable unless the embedding injects a provider.
+#[derive(Clone, Copy, Debug, Default)]
+pub struct BinaryStringComparisonService;
+impl StringComparisonService for BinaryStringComparisonService {
+    fn service_id(&self) -> &str {
+        "vba-binary-utf16-v1"
+    }
+
+    fn compare(
+        &self,
+        mode: vba_values::IntrinsicComparisonMode,
+        left: &VbaString,
+        right: &VbaString,
+        _locale: &str,
+        _code_page: &str,
+    ) -> Result<Ordering> {
+        if mode != vba_values::IntrinsicComparisonMode::Binary {
+            return Err(Error::Unsupported(
+                "text string comparison requires an explicit provider".into(),
+            ));
+        }
+        Ok(left.units().cmp(right.units()))
+    }
+}
+
 /// Locale/calendar implementation for VBA text-to-date conversion. Implementors
 /// must identify the rules they use; this runtime never consults OS locale state.
 pub trait DateConversionService: Send + Sync {

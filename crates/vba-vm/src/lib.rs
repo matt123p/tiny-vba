@@ -477,6 +477,19 @@ impl Session {
         self.clock_service = Some(service);
         Ok(())
     }
+    pub fn set_string_comparison_service(
+        &mut self,
+        service: std::sync::Arc<dyn runtime::StringComparisonService>,
+        context: IntrinsicContextConfig,
+    ) -> Result<()> {
+        let service_id = service.service_id();
+        if service_id.is_empty() || service_id.len() > 128 {
+            return Err(command("invalid string-comparison service identity"));
+        }
+        self.string_comparison_service = Some(service);
+        self.intrinsic_context_config = Some(context);
+        Ok(())
+    }
     pub fn new_with_type_resolver(
         program: ir::VerifiedProgram,
         identity: u64,
