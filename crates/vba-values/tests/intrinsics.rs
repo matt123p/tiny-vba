@@ -243,6 +243,13 @@ fn m6a6_host_and_restricted_intrinsics_have_explicit_metadata()
             .descriptor()
             .ok_or_else(|| std::io::Error::other("M6A.6 restricted descriptor"))?;
         assert_eq!(descriptor.effect, vba_values::IntrinsicEffect::Restricted);
+        assert!(!descriptor.read_only_inspection, "{}", descriptor.spelling);
+    }
+    for function in [Intrinsic::Rnd, Intrinsic::Randomize] {
+        let descriptor = function
+            .descriptor()
+            .ok_or_else(|| std::io::Error::other("effectful inspection descriptor"))?;
+        assert!(!descriptor.read_only_inspection, "{}", descriptor.spelling);
     }
     assert_eq!(
         Intrinsic::Rgb.descriptor().map(|d| d.return_variant),

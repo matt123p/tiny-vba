@@ -69,6 +69,37 @@ fn intrinsic_completion_and_signature_help_use_executable_descriptors() -> R {
     );
     Ok(())
 }
+
+#[test]
+fn every_intrinsic_descriptor_drives_shared_completion_quick_info_and_signature_help() -> R {
+    for descriptor in vba_values::INTRINSIC_DESCRIPTORS {
+        for name in std::iter::once(descriptor.spelling).chain(descriptor.aliases.iter().copied()) {
+            let mut ide = Ide::new();
+            let source = format!("Sub Main()\n{name}(\nEnd Sub\n");
+            let id = ide.add_module("Intrinsic.bas", &source)?;
+            ide.navigate(id, source.find(name).ok_or("call")? + name.len() + 1)?;
+
+            let prefix = format!("VBA.{name}");
+            assert!(
+                ide.completions(&prefix).contains(&name.to_owned()),
+                "completion missing for {name}"
+            );
+            assert_eq!(
+                ide.quick_info(name).as_deref(),
+                Some(descriptor.signature),
+                "quick info mismatch for {name}"
+            );
+            if name != "Debug.Print" {
+                assert_eq!(
+                    ide.parameter_info().map(|info| info.signature),
+                    Some(descriptor.signature.to_owned()),
+                    "signature help mismatch for {name}"
+                );
+            }
+        }
+    }
+    Ok(())
+}
 #[test]
 fn reference_configuration_is_bounded_and_does_not_grant_binding() -> R {
     let mut ide = Ide::demo()?;

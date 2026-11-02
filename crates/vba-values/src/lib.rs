@@ -1402,6 +1402,7 @@ const fn descriptor(
                 | Intrinsic::ErrorMessageDollar
                 | Intrinsic::Rnd
                 | Intrinsic::Randomize
+                | Intrinsic::DebugPrint
                 | Intrinsic::Date
                 | Intrinsic::DateDollar
                 | Intrinsic::Time
@@ -1460,7 +1461,12 @@ const fn descriptor(
                 | Intrinsic::Shell
                 | Intrinsic::CreateObject
                 | Intrinsic::GetObject
+                | Intrinsic::ImeStatus
+                | Intrinsic::MacId
                 | Intrinsic::MacScript
+                | Intrinsic::DebugPrint
+                | Intrinsic::Rnd
+                | Intrinsic::Randomize
         ),
         minimum_ir,
         capability,

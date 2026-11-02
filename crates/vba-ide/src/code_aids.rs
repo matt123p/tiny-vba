@@ -52,7 +52,7 @@ pub fn completion_prefix(text: &str, caret: usize) -> (&str, usize) {
             }
             '.' => start = i,
             ',' if depth > 0 => start = i,
-            c if c.is_alphanumeric() || c == '_' => start = i,
+            c if c.is_alphanumeric() || c == '_' || c == '$' => start = i,
             _ if depth > 0 => start = i,
             _ => break,
         }

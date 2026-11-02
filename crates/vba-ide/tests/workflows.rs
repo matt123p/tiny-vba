@@ -107,6 +107,17 @@ fn safe_watches_compare_exact_values_and_refuse_host_side_effects() -> R {
     assert_eq!(ide.evaluate("counter + 2")?, Value::Long(6));
     assert_eq!(ide.evaluate("counter = 4")?, Value::Boolean(true));
     assert!(ide.evaluate("Dangerous()").is_err());
+    for intrinsic_call in [
+        "Environ$(\"PATH\")",
+        "MsgBox(\"inspection\")",
+        "Shell(\"nope\")",
+        "CreateObject(\"Example.Type\")",
+    ] {
+        assert!(
+            ide.evaluate(intrinsic_call).is_err(),
+            "safe inspection evaluated {intrinsic_call}"
+        );
+    }
     assert!(ide.evaluate("Application.Name").is_err());
     assert!(ide.evaluate("1: Dangerous").is_err());
     ide.add_watch("counter")?;

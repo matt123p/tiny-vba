@@ -207,7 +207,7 @@ functions; split a row below further when its tests or dependencies warrant it.
 | H4 | M6A.6 | H2; host protocol 1.1 | Dir/CurDir and file inspection/input functions through host-owned file namespace/cursor; preserve omitted slots, bound payload and wait/cancel behavior. |
 | H5 | M6A.6 | H2; host protocol 1.1 | GetSetting/GetAllSettings through explicit host settings provider and bounded result shapes. |
 | H6 | M6A.6 | F3 | Shell/CreateObject/GetObject/IMEStatus/MacID/MacScript explicit policy refusal; no dispatch or ambient capability. |
-| Q1 | M6A.7 | Each implemented packet | Incremental shared IDE signatures/completion and inspection-policy tests; do not wait until the end to expose functions correctly. |
+| Q1 | M6A.7 | Each implemented packet | Drive shared IDE completion, quick info and parameter help from every executable descriptor and alias; preserve safe inspection refusal for host, restricted and state-changing intrinsics. Cover `$` spellings and shadowing; run affected IDE suites. |
 | X1 | M6A.8 | All required rows | Published shared revision, real pinned fork tests and documented acceptance; only then start M7. |
 
 F2–F4 are shared infrastructure, not permission to implement all family functions
