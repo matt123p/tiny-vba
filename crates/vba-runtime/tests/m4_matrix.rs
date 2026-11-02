@@ -86,6 +86,52 @@ fn special_states_have_distinct_conversion_predicate_and_operator_rules() -> R {
     }
     Ok(())
 }
+
+#[test]
+fn c1_portable_conversions_preserve_rounding_widths_and_special_states() -> R {
+    for (intrinsic, input, expected) in [
+        (
+            I::CBool,
+            V::String(VbaString::from_utf8("True")?),
+            V::Boolean(true),
+        ),
+        (
+            I::CBool,
+            V::String(VbaString::from_utf8("FALSE")?),
+            V::Boolean(false),
+        ),
+        (I::CBool, V::Double(-0.25), V::Boolean(true)),
+        (I::CByte, V::Double(254.5), V::Byte(254)),
+        (I::CInt, V::Double(2.5), V::Integer(2)),
+        (I::CInt, V::Double(3.5), V::Integer(4)),
+        (I::CLng, V::Double(-2.5), V::Long(-2)),
+        (
+            I::CLngLng,
+            V::String(VbaString::from_utf8("9007199254740993")?),
+            V::LongLong(9007199254740993),
+        ),
+        (I::CDbl, V::Boolean(true), V::Double(-1.0)),
+        (I::CVar, V::Null, V::Null),
+        (I::CVErr, V::Integer(2042), V::CvErr(2042)),
+    ] {
+        assert_eq!(r::intrinsic(intrinsic, &[input]), Ok(expected));
+    }
+    for (intrinsic, input) in [
+        (I::CByte, V::Double(255.5)),
+        (I::CInt, V::Long(32768)),
+        (I::CLng, V::Double(2147483648.0)),
+    ] {
+        assert!(matches!(
+            r::intrinsic(intrinsic, &[input]),
+            Err(Error::Vba { number: 6, .. })
+        ));
+    }
+    assert!(matches!(
+        r::intrinsic(I::CBool, &[V::Null]),
+        Err(Error::Vba { number: 94, .. })
+    ));
+    Ok(())
+}
 #[test]
 fn single_date_and_integer_coercion_boundaries_preserve_result_tags() {
     assert_eq!(

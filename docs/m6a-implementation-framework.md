@@ -182,7 +182,8 @@ functions; split a row below further when its tests or dependencies warrant it.
 | S11 | M6A.2 | S10 | Add Trim$/LTrim$/RTrim$ with fixed String return tags and correct plain Variant(String) metadata. |
 | S12 | M6A.2 | S11 | Add Space$/String$ with fixed String return identity while plain forms retain Variant(String). |
 | S13 | M6A.2 | S12 | Audit byte intrinsics and specify byte representation/provider before implementation; Unicode BSTR bytes and converted ANSI/MBCS bytes have distinct semantics. |
-| C1 onward | M6A.3 | F3; relevant context | Conversion/predicates first, then formatting. Decimal and target-width foundation precede CDec/CLngPtr; no Double approximation. |
+| C1 | M6A.3 | F3; relevant context | Portable scalar conversions and Variant-state/type inspection; exact width, ties-even, Null/Error states. Keep locale parsing/formatting, Decimal and target-width work explicit. |
+| C2 onward | M6A.3 | C1; locale/calendar providers as required | Complete provider-dependent conversions and formatting. Decimal and target-width foundation precede CDec/CLngPtr; no Double approximation. |
 | A1 onward | M6A.4 | F3 | Arrays/bounds and conditional selection/evaluation; preserve existing array storage/aliases and IIf eagerness. |
 | N1 onward | M6A.4 | F3 | Pure numeric functions, then financial functions with bounded convergence and exact VBA error contracts. |
 | D1 onward | M6A.5 | F4 | Calendar/date representation and clock seam, then constructors/extraction/arithmetic/names in small packets. |

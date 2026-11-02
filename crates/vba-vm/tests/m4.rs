@@ -816,6 +816,14 @@ fn exact_numeric_tags_null_states_and_intrinsics_execute() -> R {
     number("Function Answer() As Byte\nAnswer=256\nEnd Function", 6)?;
     number("Function Answer() As Long\nAnswer=Null\nEnd Function", 94)
 }
+
+#[test]
+fn c1_conversion_and_variant_inspection_calls_execute_from_source() -> R {
+    answer(
+        "Function Answer() As String\nAnswer=TypeName(CByte(2)) & \":\" & CStr(VarType(CByte(2))) & \":\" & CStr(CBool(\"True\"))\nEnd Function",
+        Value::String(VbaString::from_utf8("Byte:17:True")?),
+    )
+}
 #[test]
 fn resource_failure_cannot_be_swallowed_by_on_error() -> R {
     let mut s = session(
