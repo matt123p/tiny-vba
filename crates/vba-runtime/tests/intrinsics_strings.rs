@@ -1131,3 +1131,27 @@ fn ascw_chr_w_use_signed_utf16_codes_and_preserve_surrogates() -> TestResult {
     ));
     Ok(())
 }
+
+#[test]
+fn dollar_slice_forms_share_utf16_slicing_and_keep_string_values() -> TestResult {
+    let left = vba_runtime::intrinsic(I::LeftDollar, &[string("A😀B")?, V::Integer(2)])
+        .map_err(|error| std::io::Error::other(format!("{error:?}")))?;
+    assert_eq!(
+        left,
+        V::String(VbaString::from_units(vec![b'A' as u16, 0xd83d])?)
+    );
+    assert_eq!(
+        vba_runtime::intrinsic(I::RightDollar, &[string("abcde")?, V::Integer(2)])
+            .map_err(|error| std::io::Error::other(format!("{error:?}")))?,
+        string("de")?
+    );
+    assert_eq!(
+        vba_runtime::intrinsic(
+            I::MidDollar,
+            &[string("abcde")?, V::Integer(2), V::Integer(2)]
+        )
+        .map_err(|error| std::io::Error::other(format!("{error:?}")))?,
+        string("bc")?
+    );
+    Ok(())
+}

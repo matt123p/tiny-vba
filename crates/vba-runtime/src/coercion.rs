@@ -431,8 +431,8 @@ pub fn intrinsic(function: I, args: &[V]) -> Result<V> {
             }
             V::Double(n)
         }
-        Len | Left | Right | Mid | Trim | LTrim | RTrim | StrReverse | LCase | UCase | Asc
-        | AscW => {
+        Len | Left | LeftDollar | Right | RightDollar | Mid | MidDollar | Trim | LTrim | RTrim
+        | StrReverse | LCase | UCase | Asc | AscW => {
             if matches!(v, V::Null) {
                 if function == StrReverse {
                     return Err(error(94, "Invalid use of Null"));
@@ -458,17 +458,24 @@ pub fn intrinsic(function: I, args: &[V]) -> Result<V> {
             }
             let mut start = 0usize;
             let mut end = units.len();
-            if matches!(function, Left | Right | Mid) {
+            if matches!(
+                function,
+                Left | LeftDollar | Right | RightDollar | Mid | MidDollar
+            ) {
                 let count = args.get(1).ok_or_else(mismatch)?;
                 let count = argument_integer(
                     count,
-                    if function == Mid { 1 } else { 0 },
+                    if matches!(function, Mid | MidDollar) {
+                        1
+                    } else {
+                        0
+                    },
                     i128::from(i32::MAX),
                 )? as usize;
                 match function {
-                    Left => end = count.min(end),
-                    Right => start = end.saturating_sub(count),
-                    Mid => {
+                    Left | LeftDollar => end = count.min(end),
+                    Right | RightDollar => start = end.saturating_sub(count),
+                    Mid | MidDollar => {
                         start = count.saturating_sub(1).min(end);
                         if let Some(n) = args.get(2) {
                             end = start

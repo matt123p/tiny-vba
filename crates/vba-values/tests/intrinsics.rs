@@ -286,3 +286,26 @@ fn wide_character_descriptors_have_integer_and_string_results()
     );
     Ok(())
 }
+
+#[test]
+fn dollar_slices_keep_string_return_identity() -> Result<(), Box<dyn std::error::Error>> {
+    for (variant, dollar) in [
+        (Intrinsic::Left, Intrinsic::LeftDollar),
+        (Intrinsic::Right, Intrinsic::RightDollar),
+        (Intrinsic::Mid, Intrinsic::MidDollar),
+    ] {
+        assert_eq!(
+            variant
+                .descriptor()
+                .map(|descriptor| descriptor.return_variant),
+            Some(IntrinsicReturn::Variant)
+        );
+        assert_eq!(
+            dollar
+                .descriptor()
+                .map(|descriptor| descriptor.return_variant),
+            Some(IntrinsicReturn::Fixed(ScalarKind::String))
+        );
+    }
+    Ok(())
+}

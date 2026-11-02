@@ -299,8 +299,11 @@ pub enum Intrinsic {
     Sgn,
     Round,
     Left,
+    LeftDollar,
     Right,
+    RightDollar,
     Mid,
+    MidDollar,
     Trim,
     LTrim,
     RTrim,
@@ -594,8 +597,12 @@ const fn descriptor(
         Intrinsic::LBound | Intrinsic::UBound => 1,
         Intrinsic::Round => 1,
         Intrinsic::StrComp => 2,
-        Intrinsic::Mid => 2,
-        Intrinsic::Left | Intrinsic::Right | Intrinsic::String => 2,
+        Intrinsic::Mid | Intrinsic::MidDollar => 2,
+        Intrinsic::Left
+        | Intrinsic::LeftDollar
+        | Intrinsic::Right
+        | Intrinsic::RightDollar
+        | Intrinsic::String => 2,
         _ => 1,
     };
     IntrinsicDescriptor {
@@ -636,8 +643,11 @@ const fn descriptor(
             Intrinsic::StrComp => IntrinsicFamily::StringSearch,
             Intrinsic::Len
             | Intrinsic::Left
+            | Intrinsic::LeftDollar
             | Intrinsic::Right
+            | Intrinsic::RightDollar
             | Intrinsic::Mid
+            | Intrinsic::MidDollar
             | Intrinsic::Trim
             | Intrinsic::LTrim
             | Intrinsic::RTrim
@@ -703,6 +713,7 @@ const fn return_variant(intrinsic: Intrinsic) -> IntrinsicReturn {
         I::Array | I::ArrayBaseOne | I::Split | I::Filter => R::Array,
         I::StrComp => R::Variant,
         I::IIf | I::Abs | I::Int | I::Fix => R::Polymorphic,
+        I::Left | I::Right | I::Mid => R::Variant,
         I::InStr | I::InStrRev | I::Len | I::LBound | I::UBound => R::Fixed(K::Long),
         I::IsObject | I::IsArray | I::IsMissing | I::IsEmpty | I::IsNull | I::IsError => {
             R::Fixed(K::Boolean)
@@ -711,9 +722,9 @@ const fn return_variant(intrinsic: Intrinsic) -> IntrinsicReturn {
         I::TypeName
         | I::Replace
         | I::Join
-        | I::Left
-        | I::Right
-        | I::Mid
+        | I::LeftDollar
+        | I::RightDollar
+        | I::MidDollar
         | I::Trim
         | I::LTrim
         | I::RTrim
@@ -958,6 +969,13 @@ pub const INTRINSIC_DESCRIPTORS: &[IntrinsicDescriptor] = &[
         "Left(string, length)",
     ),
     descriptor(
+        Intrinsic::LeftDollar,
+        "Left$",
+        LEFT_RIGHT_PARAMS,
+        false,
+        "Left$(string, length)",
+    ),
+    descriptor(
         Intrinsic::Right,
         "Right",
         LEFT_RIGHT_PARAMS,
@@ -965,11 +983,25 @@ pub const INTRINSIC_DESCRIPTORS: &[IntrinsicDescriptor] = &[
         "Right(string, length)",
     ),
     descriptor(
+        Intrinsic::RightDollar,
+        "Right$",
+        LEFT_RIGHT_PARAMS,
+        false,
+        "Right$(string, length)",
+    ),
+    descriptor(
         Intrinsic::Mid,
         "Mid",
         MID_PARAMS,
         false,
         "Mid(string, start, [length])",
+    ),
+    descriptor(
+        Intrinsic::MidDollar,
+        "Mid$",
+        MID_PARAMS,
+        false,
+        "Mid$(string, start, [length])",
     ),
     descriptor(Intrinsic::Trim, "Trim", ONE_VALUE, false, "Trim(string)"),
     descriptor(Intrinsic::LTrim, "LTrim", ONE_VALUE, false, "LTrim(string)"),

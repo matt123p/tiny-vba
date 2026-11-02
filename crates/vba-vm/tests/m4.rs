@@ -464,6 +464,14 @@ fn ascw_chrw_round_trip_utf16_units_through_source_calls() -> R {
 }
 
 #[test]
+fn dollar_slice_forms_execute_through_source_calls() -> R {
+    answer(
+        "Function Answer() As String\nAnswer=Left$(\"abcde\",2) & Right$(\"abcde\",2) & Mid$(\"abcde\",2,2)\nEnd Function",
+        Value::String(VbaString::from_utf8("abdebc")?),
+    )
+}
+
+#[test]
 fn strcomp_named_arguments_evaluate_once_in_source_order_and_resume_cleanly() -> R {
     let calls = Arc::new(AtomicUsize::new(0));
     let source = "Dim n As Long\nFunction Answer() As Variant\nAnswer=StrComp(string2:=NextText(),string1:=NextText(),compare:=0)*10+n\nEnd Function\nFunction NextText() As String\nn=n+1\nNextText=CStr(n)\nEnd Function";
