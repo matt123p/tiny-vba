@@ -5,8 +5,9 @@
 Written in Rust, tiny-vba provides the shared language engine, runtime, editor and
 debugger for native and WebAssembly applications. Its purpose is to let people bring
 their VBA knowledge—and, as compatibility grows, their existing macros—to ArtCraft.
-GridCraft and WordCraft already embed it through opt-in integrations; DeckCraft is
-an intended host, with no integration claimed here yet.
+The maintainer's GridCraft and WordCraft forks embed it through opt-in integrations
+on feature branches. **These integrations are not part of official upstream builds.**
+DeckCraft is an intended host, with no integration claimed here yet.
 
 ![The shared VBA editor paused at a breakpoint, with typed locals visible](docs/images/debugger.png)
 
@@ -130,11 +131,16 @@ See [debugger behaviour](docs/debugger.md) and
 
 ## Try it in GridCraft
 
-The integration lives in [GridCraft](https://github.com/matt123p/gridcraft):
+The integration lives in the maintainer's
+[GridCraft fork, on `feat/tiny-vba-integration`](https://github.com/matt123p/gridcraft/tree/feat/tiny-vba-integration),
+not the official upstream build or the fork's `main` branch.
 `crates/vba` owns the Excel object adapter, and the application embeds tiny-vba's
-editor/debugger. VBA is disabled in default builds. From a GridCraft checkout:
+editor/debugger. Build the feature branch with VBA enabled:
 
 ```sh
+git clone --branch feat/tiny-vba-integration --single-branch https://github.com/matt123p/gridcraft.git
+cd gridcraft
+
 # Embedded editor
 cargo run -p gridcraft --features vba
 
@@ -167,17 +173,21 @@ use GridCraft's own protection, undo and recalculation paths.
 Opening workbook source does not execute it. Edited source can be stored in
 GridCraft's workbook storage or exported as plain modules; it does not rewrite the
 original `vbaProject.bin`. Arbitrary existing `.xlsm` macros are not yet guaranteed
-to run unchanged. Follow the [GridCraft integration guide](https://github.com/matt123p/gridcraft/blob/main/docs/vba.md)
-and [Excel compatibility audit](https://github.com/matt123p/gridcraft/blob/main/docs/vba-excel-compatibility.md)
+to run unchanged. Follow the [GridCraft integration guide](https://github.com/matt123p/gridcraft/blob/feat/tiny-vba-integration/docs/vba.md)
+and [Excel compatibility audit](https://github.com/matt123p/gridcraft/blob/feat/tiny-vba-integration/docs/vba-excel-compatibility.md)
 for the current member-by-member scope and browser build instructions.
 
 ## Try it in WordCraft
 
-The integration lives in [WordCraft](https://github.com/matt123p/wordcraft):
-`crates/vba` owns the Word object adapter and document lifecycle. From a WordCraft
-checkout:
+The integration lives in the maintainer's
+[WordCraft fork, on `feat/vba-host-integration`](https://github.com/matt123p/wordcraft/tree/feat/vba-host-integration),
+not the official upstream build or the fork's `main` branch.
+`crates/vba` owns the Word object adapter and document lifecycle. Build the feature
+branch with VBA enabled:
 
 ```sh
+git clone --branch feat/vba-host-integration --single-branch https://github.com/matt123p/wordcraft.git
+cd wordcraft
 cargo run -p wordcraft --features vba
 ```
 
@@ -201,10 +211,10 @@ Application events. Tables, inline-object position mapping and the broader Word
 object model remain outside this profile. Importing source is inert; automatic
 attachment/execution of a document package's VBA on Open/New is not implemented.
 Plain-source save/export is separate from binary `.docm` project writeback.
-See the [WordCraft integration guide](https://github.com/matt123p/wordcraft/blob/main/docs/vba-integration.md)
+See the [WordCraft integration guide](https://github.com/matt123p/wordcraft/blob/feat/vba-host-integration/docs/vba-integration.md)
 for supported members, trust, events, native/browser source transfer and limitations.
 
-Both apps consume an immutable Git revision of tiny-vba; neither needs a sibling
+Both fork integrations consume an immutable Git revision of tiny-vba; neither needs a sibling
 tiny-vba checkout. Each app's pinned revision determines its available features.
 
 ## Current compatibility and remaining work
