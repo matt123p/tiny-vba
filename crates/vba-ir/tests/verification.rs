@@ -527,6 +527,7 @@ fn direct() -> TestResult<Program> {
         end_statement: statement,
         kind: ProcedureKind::Sub,
         parameters: vec![Parameter {
+            param_array: false,
             default: None,
             array: None,
             name: "n".into(),

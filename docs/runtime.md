@@ -336,3 +336,17 @@ Numeric For loops now accept scalar Variant counters, including implicit locals
 without Option Explicit. Initialization, Next, Exit For and pause/resume retain
 the normal checkpoint/alias/budget machinery. Variant bounds are validated before
 the counter is written; existing numeric operations own coercion and overflow.
+
+## Host calls while waiting (2026-11-03)
+
+[ADR 0036](decisions/0036-suspended-host-project-calls.md) defines explicit host-mediated
+calls into the existing waiting session. Use `Ide::start_suspended_call` only for its exact
+pending token and read `take_host_call_result` after normal ticks. Callback outputs belong
+to the callback; never copy them into unrelated original foreign argument slots. VBA runtime
+errors return to the caller, while resource/protocol/cancellation failures cancel the stack.
+Persistent state, parked locations and cumulative budgets are shared. Reset/close cancel all
+waits. Hosts own precommit/cancellation policy and asynchronous prompt delivery.
+
+`Ide::abort_host_wait(token, failure, host)` selects an embedding's fatal nested-error
+policy. It validates the active token, cancels the whole parked/modal stack and exposes
+a runtime diagnostic; it does not inject a catchable error into the original caller.

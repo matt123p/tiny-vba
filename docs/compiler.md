@@ -259,3 +259,11 @@ invalid/Null bounds raise ordinary catchable VBA errors. Integer/Long counters
 keep their existing conversions. Array, Boolean, String and Object controls
 remain refused. Positive integral literal Step (default 1) remains the declared
 profile; this change does not add dynamic or negative Step support.
+
+## Host optional defaults (2026-11-03)
+
+IR 8 capability `host-procedure-defaults-v1` retains standard-procedure optional/default and ParamArray
+metadata for explicit host calls. Earlier targets retain static call-site expansion and
+required standard parameters. Verification requires IR 8 and the declared feature; this
+adds no opcode. [ADR 0036](decisions/0036-suspended-host-project-calls.md) defines ownership.
+Qualified type members accept contextual keyword spelling, including `External.Name`.

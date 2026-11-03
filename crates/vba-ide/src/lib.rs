@@ -9,6 +9,8 @@ pub mod form_archive;
 mod form_project;
 pub mod forms;
 mod history;
+mod host_calls;
+pub use host_calls::{NestedCallResult, SuspendedCall};
 mod search;
 pub use search::{FindOptions, FindScope, SearchMatch};
 mod immediate;
@@ -324,6 +326,8 @@ pub struct Ide {
     temporary_breakpoint: Option<StatementId>,
     session_host: Option<u64>,
     document_event_delivery: bool,
+    suspended_host_calls: Vec<host_calls::PendingCall>,
+    host_call_results: host_calls::Results,
     bookmarks: BTreeSet<(u64, usize)>,
     navigation: Vec<(SourceId, usize)>,
     pub constants: Vec<ConstantInfo>,
@@ -377,6 +381,8 @@ impl Ide {
             temporary_breakpoint: None,
             session_host: None,
             document_event_delivery: false,
+            suspended_host_calls: Vec::new(),
+            host_call_results: Default::default(),
             bookmarks: BTreeSet::new(),
             navigation: Vec::new(),
             constants: Vec::new(),
@@ -975,6 +981,8 @@ impl Ide {
         }
         self.session = Some(session);
         self.session_host = Some(host.identity());
+        self.suspended_host_calls.clear();
+        self.host_call_results.clear();
         self.document_event_delivery = false;
         self.stale = false;
         self.selected_frame = 0;
@@ -1046,6 +1054,8 @@ impl Ide {
                     s.cancel(host)?;
                 }
                 self.session = None;
+                self.suspended_host_calls.clear();
+                self.host_call_results.clear();
                 self.document_event_delivery = false;
                 self.controller = Controller::new();
                 self.stale = false;
@@ -1131,6 +1141,8 @@ impl Ide {
             s.disconnect(host)?;
         }
         self.session = None;
+        self.suspended_host_calls.clear();
+        self.host_call_results.clear();
         self.document_event_delivery = false;
         self.modules.clear();
         self.forms.clear();
@@ -1147,7 +1159,7 @@ impl Ide {
         parameters: &[HostEventParameter],
         host: &impl Host,
     ) -> Result<Vec<HostEventHandler>> {
-        if self.stale || self.mode() != Mode::Completed {
+        if self.stale || !matches!(self.mode(), Mode::Completed | Mode::Waiting) {
             return Err(error("host events require a completed current invocation"));
         }
         self.session
@@ -1212,13 +1224,12 @@ impl Ide {
     ) -> Result<()> {
         self.dispatch_document_event_for_owner(code_name, handler, arguments, None, host)
     }
-    /// Deliver a document callback with its host-owned workbook/worksheet object as `Me`'s
-    /// forwarding target. The host handle must use the active host identity.
-    pub fn dispatch_document_event_for_owner(
+    /// Prepare an idle project for explicit event discovery, without executing user code.
+    pub fn prepare_host_events(&mut self, host: &mut impl Host) -> Result<()> {
+        self.prepare_host_event_context(None, host)
+    }
+    fn prepare_host_event_context(
         &mut self,
-        code_name: &str,
-        handler: &str,
-        arguments: Vec<Value>,
         owner: Option<ObjectRef>,
         host: &mut impl Host,
     ) -> Result<()> {
@@ -1288,6 +1299,19 @@ impl Ide {
             self.diagnostics.clear();
             self.messages.clear();
         }
+        Ok(())
+    }
+    /// Deliver a document callback with its host-owned workbook/worksheet object as `Me`'s
+    /// forwarding target. The host handle must use the active host identity.
+    pub fn dispatch_document_event_for_owner(
+        &mut self,
+        code_name: &str,
+        handler: &str,
+        arguments: Vec<Value>,
+        owner: Option<ObjectRef>,
+        host: &mut impl Host,
+    ) -> Result<()> {
+        self.prepare_host_event_context(owner, host)?;
         let session = self
             .session
             .as_mut()
@@ -1395,7 +1419,8 @@ impl Ide {
                 Ok(stop)
             })?
         };
-        if let Outcome::Failed(failure) = &outcome {
+        let finished_host_call = self.finish_host_call(host)?;
+        if !finished_host_call && let Outcome::Failed(failure) = &outcome {
             let mut d = Diagnostic::new(
                 "VBA_EXECUTION",
                 format!(
@@ -1419,7 +1444,8 @@ impl Ide {
             }
             self.show_execution();
         }
-        if let Some(session) = &mut self.session
+        if !finished_host_call
+            && let Some(session) = &mut self.session
             && session.has_suspended_invocation()
             && matches!(
                 session.outcome(),

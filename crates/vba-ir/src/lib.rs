@@ -33,7 +33,8 @@ pub const IR5_VERSION: u32 = 5;
 pub const IR6_VERSION: u32 = 6;
 pub const IR7_VERSION: u32 = 7;
 pub const IR8_VERSION: u32 = 8;
-pub const FEATURES: [&str; 23] = [
+pub const FEATURES: [&str; 24] = [
+    "host-procedure-defaults-v1",
     "host-events-v1",
     "project-classes-v7",
     "default-members-v6",
@@ -343,6 +344,8 @@ pub struct Local {
 }
 #[derive(Clone, Debug)]
 pub struct Parameter {
+    /// IR 8 host-procedure-defaults-v1; trailing arguments are packed by host calls.
+    pub param_array: bool,
     pub default: Option<Value>,
     pub array: Option<ScalarKind>,
     pub name: String,
@@ -593,6 +596,7 @@ impl Capabilities {
                 .collect(),
             declarations: ScalarKind::ALL.into_iter().collect(),
         };
+        caps.features.remove("host-procedure-defaults-v1");
         caps.features.remove("intrinsics-m6a-v1");
         caps.features.remove("string-comparison-context-v1");
         caps.instructions.remove(&Opcode::IntrinsicCall);
@@ -603,6 +607,7 @@ impl Capabilities {
         let mut caps = Self::ir7_structural();
         caps.profile = "ir8-structural".into();
         caps.ir_versions.insert(IR8_VERSION);
+        caps.features.insert("host-procedure-defaults-v1".into());
         caps.features.insert("intrinsics-m6a-v1".into());
         caps.features.insert("string-comparison-context-v1".into());
         caps.instructions.insert(Opcode::IntrinsicCall);

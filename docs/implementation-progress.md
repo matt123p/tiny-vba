@@ -37,6 +37,17 @@ and classify licensed specimens for unchanged-document/package acceptance.
 M7 implementation has not started.
 Office objects, document events, trust and packaging remain fork-owned.
 
+## Suspended generic host calls (2026-11-03)
+
+[ADR 0036](decisions/0036-suspended-host-project-calls.md) adds bounded public-procedure,
+document-event and publisher-event calls while a project waits on its exact host token.
+Typed results, callback ByRef outputs, catchable runtime errors and persistent state survive
+parking; Reset cancels every wait. Debugger and cumulative limits remain authoritative.
+IR 8 `host-procedure-defaults-v1` retains optional standard-procedure defaults; older targets
+retain their contract. `prepare_host_events` prepares idle subscription context without running
+user code. Qualified external type members accept keyword spellings. No ambient IO or Office
+objects were added. M7/package acceptance and reference comparisons remain separate work.
+
 ## Deferred Office forms and controls plan (2026-11-02)
 
 Owner requested a separate future [implementation plan](office-forms-controls-implementation-plan.md)
@@ -1283,3 +1294,7 @@ unshadowed module-kind binding and live host-global consultation cases in real
 fork workflows. Declared host globals and typed/call receivers complete their
 members in the shared editor without host invocation. Package round trips and
 signatures are the next milestone's separate gate.
+
+Validation for ADR 0036: `cargo xtask ci`, `cargo xtask wasm` and `cargo xtask wasm-run` passed. All seven suspended-call tests, 15 compiler tests and the qualified-type regression also passed under Node WASI. These are authored generic contract tests, not fresh Office oracle evidence.
+
+ADR 0036 fatal-policy refinement: exact-token `abort_host_wait` stops all parked/modal invocations with a runtime diagnostic when the embedding requires it. Generic error-return behavior remains available; Office error policy stays in GridCraft.
