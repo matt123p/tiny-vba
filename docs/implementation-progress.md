@@ -1272,4 +1272,6 @@ fork workflows. Declared host globals and typed/call receivers complete their
 members in the shared editor without host invocation. Package round trips and
 signatures are the next milestone's separate gate.
 
-Validation for ADR 0035: `cargo xtask ci`, `cargo xtask wasm` and `cargo xtask wasm-run` passed. All six suspended-call tests, 15 compiler tests and the qualified-type regression also passed under Node WASI. These are authored generic contract tests, not fresh Office oracle evidence.
+Validation for ADR 0035: `cargo xtask ci`, `cargo xtask wasm` and `cargo xtask wasm-run` passed. All seven suspended-call tests, 15 compiler tests and the qualified-type regression also passed under Node WASI. These are authored generic contract tests, not fresh Office oracle evidence.
+
+ADR 0035 fatal-policy refinement: exact-token `abort_host_wait` stops all parked/modal invocations with a runtime diagnostic when the embedding requires it. Generic error-return behavior remains available; Office error policy stays in GridCraft.

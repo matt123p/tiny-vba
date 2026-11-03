@@ -26,6 +26,52 @@ pub(crate) struct PendingCall {
 }
 pub(crate) type Results = VecDeque<(u64, NestedCallResult)>;
 impl Ide {
+    /// Apply an embedding's fatal nested-error policy, preserving normal host cancellation
+    /// and form token ownership. Wrong tokens cannot abort a different invocation.
+    pub fn abort_host_wait(
+        &mut self,
+        token: u64,
+        failure: vba_foreign::ForeignError,
+        host: &mut impl Host,
+    ) -> Result<()> {
+        if self.stale || self.session_host != Some(host.identity()) {
+            return Err(error("fatal host completion identity mismatch"));
+        }
+        let session = self
+            .session
+            .as_mut()
+            .ok_or_else(|| error("no project session"))?;
+        let result = if self.forms.is_empty() {
+            session.abort_host_wait(token, failure, host)
+        } else {
+            let mut gate = std::mem::take(&mut self.form_gate);
+            let result = session.abort_host_wait(
+                token,
+                failure,
+                &mut form_project::FormHost {
+                    host,
+                    gate: &mut gate,
+                },
+            );
+            self.form_gate = gate;
+            result
+        };
+        result?;
+        self.suspended_host_calls.clear();
+        self.host_call_results.clear();
+        if let Outcome::Failed(f) = session.outcome() {
+            let mut diagnostic = Diagnostic::new(
+                "VBA_EXECUTION",
+                format!("Error {}: {}", f.number.unwrap_or(5), f.message),
+            );
+            if let Some(span) = f.frames.first().and_then(|f| f.span) {
+                diagnostic = diagnostic.at(span);
+            }
+            self.diagnostics = vec![diagnostic.clone()];
+            self.navigate_diagnostic(&diagnostic);
+        }
+        Ok(())
+    }
     /// The host must already be waiting on this exact token. Execution still advances through
     /// normal debugger ticks, with the same VM, persistent state and cumulative limits.
     pub fn start_suspended_call(

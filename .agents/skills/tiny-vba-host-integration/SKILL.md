@@ -175,3 +175,6 @@ are separate from original foreign-call writes. Preserve shared state/budgets, h
 identity, catchable runtime failures and fail-closed resource/protocol cancellation. Do not
 start a substitute interpreter or commit a document while callbacks are paused. Idle events
 can use `prepare_host_events` without executing code. Office signatures/policy remain fork-owned.
+Use exact-token `abort_host_wait` when an embedding needs a fatal nested error policy;
+normal typed result/error transport remains available. It cancels modal waits through
+the form gate as well as foreign host waits. Do not implement Office policy in the VM.

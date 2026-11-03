@@ -2,6 +2,27 @@
 use super::*;
 pub type NestedCallResult = std::result::Result<foreign::Completion, foreign::ForeignError>;
 impl Session {
+    /// A host may choose a fatal policy for a returned nested error. This stops all parked
+    /// invocations at the exact original wait; it never injects a catchable caller error.
+    pub fn abort_host_wait(
+        &mut self,
+        token: u64,
+        error: foreign::ForeignError,
+        host: &mut impl Host,
+    ) -> Result<()> {
+        self.check_host(host)?;
+        if !matches!(self.outcome(), Outcome::Waiting)
+            || self.pending_host_token() != Some(token)
+            || error.number == 0
+            || error.description.len() > self.limits.payload
+        {
+            return Err(command("invalid fatal host wait completion"));
+        }
+        let failure = self.failure(FailureKind::Runtime, Some(error.number), error.description)?;
+        self.cancel(host)?;
+        self.state = Outcome::Failed(failure);
+        Ok(())
+    }
     /// Resolve a standard-module procedure, including optional arguments, without executing it.
     pub fn schedule_host_procedure(&mut self, name: &str, arguments: Vec<Value>) -> Result<usize> {
         if name.is_empty() || name.len() > 256 || arguments.len() > 256 {

@@ -30,3 +30,10 @@ use contextual keyword spellings (`External.Name`); bare reserved identifiers re
 Generic tests live in `vba-ide/tests/suspended_calls.rs`, the compiler capability regression,
 and syntax qualified-type regression. Workbook trust, macro names, event signatures/order,
 consent, prompts, persistence, undo and active/code-owner routing are tested in GridCraft.
+
+Hosts may select a fatal policy for a nested runtime error with `Ide::abort_host_wait`.
+It validates the exact current token, cancels all parked and modal-form waits through
+their owning host and publishes a terminal runtime diagnostic without invoking a caller
+error handler. Generic result/error transport does not prescribe an application's policy.
+The generic host regression verifies wrong-token refusal, no caller resumption and one
+cancellation. GridCraft selects this policy for an unhandled macro error in Application.Run.

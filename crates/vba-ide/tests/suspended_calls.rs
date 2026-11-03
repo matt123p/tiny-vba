@@ -282,3 +282,35 @@ fn nested_work_does_not_replenish_instruction_budget() -> R {
     assert!(ide.take_host_call_result().is_none());
     Ok(())
 }
+
+#[test]
+fn host_can_select_fatal_nested_error_without_caller_catch_or_token_replay() -> R {
+    let (mut ide, mut host) = setup(
+        "Sub Main()\nOn Error Resume Next\nbridge.Run \"Child\"\nDebug.Print \"must not resume\"\nEnd Sub\nPublic Sub Child()\nErr.Raise 17\nEnd Sub\n",
+    )?;
+    for _ in 0..100 {
+        if ide.mode() == Mode::Waiting
+            && let Some((token, request)) = host.requests.pop_front()
+        {
+            ide.start_suspended_call(token, request, &mut host)?;
+        }
+        ide.tick(&mut host)?;
+        if let Some((token, Err(failure))) = ide.take_host_call_result() {
+            assert!(
+                ide.abort_host_wait(token + 1, failure.clone(), &mut host)
+                    .is_err()
+            );
+            ide.abort_host_wait(token, failure, &mut host)?;
+            break;
+        }
+    }
+    assert_eq!(ide.mode(), Mode::Failed);
+    assert_eq!(host.cancelled, [1]);
+    assert!(ide.output().is_empty());
+    assert!(
+        ide.diagnostics
+            .iter()
+            .any(|d| d.message.contains("Error 17:"))
+    );
+    Ok(())
+}

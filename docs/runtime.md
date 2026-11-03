@@ -346,3 +346,7 @@ to the callback; never copy them into unrelated original foreign argument slots.
 errors return to the caller, while resource/protocol/cancellation failures cancel the stack.
 Persistent state, parked locations and cumulative budgets are shared. Reset/close cancel all
 waits. Hosts own precommit/cancellation policy and asynchronous prompt delivery.
+
+`Ide::abort_host_wait(token, failure, host)` selects an embedding's fatal nested-error
+policy. It validates the active token, cancels the whole parked/modal stack and exposes
+a runtime diagnostic; it does not inject a catchable error into the original caller.
