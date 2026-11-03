@@ -165,3 +165,13 @@ sequentially through ordinary callbacks. Host-supplied signatures must include
 scalar kind, ByRef mode and nominal type. Carry completed ByRef outputs to the next
 sink; preserve pending delivery through pause/wait and discard it on Reset/close/trust
 loss. Office names, event signatures and save/close ordering stay in forks.
+
+## Waiting project calls
+
+Follow [ADR 0035](../../../docs/decisions/0035-suspended-host-project-calls.md).
+Use `Ide::start_suspended_call` with the current wait token and normal debugger ticks;
+read `take_host_call_result`, then answer the original host wait. Callback ByRef outputs
+are separate from original foreign-call writes. Preserve shared state/budgets, host/source
+identity, catchable runtime failures and fail-closed resource/protocol cancellation. Do not
+start a substitute interpreter or commit a document while callbacks are paused. Idle events
+can use `prepare_host_events` without executing code. Office signatures/policy remain fork-owned.

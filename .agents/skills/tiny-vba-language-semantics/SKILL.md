@@ -156,3 +156,9 @@ positive integral literal-Step profile. Preserve numeric bound validation and
 once-only capture before counter assignment; reuse shared arithmetic, exact
 numeric tags, catchable errors and debugger checkpoints. Do not reintroduce the
 legacy Integer/Long-only binder guard or accept arrays as scalar controls.
+
+IR 8 `host-procedure-defaults-v1` under ADR 0035 retains standard optional/default
+and trailing ParamArray metadata for explicit host calls. Validate its version/feature,
+ByVal Variant-array position and literal defaults. Earlier targets retain expanded static
+calls and required standard parameters. Qualified external type members may use contextual
+keyword spellings; bare reserved identifiers remain invalid.

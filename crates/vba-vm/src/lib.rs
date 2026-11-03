@@ -1,8 +1,10 @@
 //! M3 explicit-frame execution, single-use continuations and generation-checked inspection.
 #![forbid(unsafe_code)]
 mod classes;
+mod host_calls;
 mod host_events;
 use classes::{ClassReturn, Instance};
+pub use host_calls::NestedCallResult;
 pub use host_events::{HostEventHandler, HostEventParameter};
 use std::{
     cell::Cell,
@@ -260,6 +262,7 @@ pub struct ProjectState {
     values: BTreeMap<u32, Value>,
 }
 struct SuspendedInvocation {
+    callback_output_frame: Option<u64>,
     frames: Vec<Frame>,
     foreign: foreign::Session,
     visit: Option<Visit>,
@@ -1130,6 +1133,7 @@ impl Session {
             .try_reserve(1)
             .map_err(|_| resource())?;
         self.suspended_invocations.push(SuspendedInvocation {
+            callback_output_frame: self.callback_output_frame.take(),
             frames: std::mem::take(&mut self.frames),
             foreign: std::mem::take(&mut self.foreign),
             visit: self.visit.take(),
@@ -1155,6 +1159,7 @@ impl Session {
             .suspended_invocations
             .pop()
             .ok_or_else(|| command("no suspended invocation"))?;
+        self.callback_output_frame = saved.callback_output_frame;
         self.frames = saved.frames;
         self.foreign = saved.foreign;
         self.visit = saved.visit;
@@ -1703,7 +1708,14 @@ impl Session {
             .procedures
             .get(id.0 as usize)
             .ok_or_else(|| invariant("callee missing"))?;
-        if self.frames.len() >= self.limits.depth || args.len() != proc.parameters.len() {
+        if self.frames.len().saturating_add(
+            self.suspended_invocations
+                .iter()
+                .map(|s| s.frames.len())
+                .sum::<usize>(),
+        ) >= self.limits.depth
+            || args.len() != proc.parameters.len()
+        {
             return Err(resource());
         }
         let owned_count = proc.locals.iter().enumerate().filter(|(i, local)| {
@@ -2549,7 +2561,9 @@ impl Session {
                 return Ok(());
             }
         }
+        self.preserve_instances = !self.suspended_invocations.is_empty();
         self.cleanup();
+        self.preserve_instances = false;
         self.state = Outcome::Failed(failure);
         Ok(())
     }

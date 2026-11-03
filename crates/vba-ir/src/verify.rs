@@ -541,9 +541,26 @@ fn validate(
                 return Err(invalid("duplicate local name"));
             }
         }
+        let host_defaults = p.ir_version >= IR8_VERSION
+            && p.required_features.contains("host-procedure-defaults-v1");
+        if host_defaults {
+            feature(p, caps, "host-procedure-defaults-v1")?;
+        }
         for (i, param) in proc.parameters.iter().enumerate() {
+            if param.param_array
+                && (!host_defaults
+                    || i + 1 != proc.parameters.len()
+                    || param.array != Some(ScalarKind::Variant)
+                    || param.mode != ParameterMode::ByVal
+                    || param.default.is_some()
+                    || !param.required)
+            {
+                return Err(invalid("invalid host ParamArray metadata"));
+            }
             if let Some(value) = &param.default {
-                if p.ir_version < IR7_VERSION || !p.classes.iter().any(|c| c.source == proc.source)
+                if !host_defaults
+                    && (p.ir_version < IR7_VERSION
+                        || !p.classes.iter().any(|c| c.source == proc.source))
                 {
                     return Err(invalid("class default metadata"));
                 }
@@ -563,6 +580,7 @@ fn validate(
                 .get(i)
                 .ok_or_else(|| invalid("missing parameter slot"))?;
             if (!param.required
+                && !host_defaults
                 && (p.ir_version < IR7_VERSION
                     || !p.classes.iter().any(|c| c.source == proc.source)))
                 || local.role != SlotRole::Parameter(i as u32)

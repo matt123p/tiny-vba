@@ -506,3 +506,79 @@ fn imports_lower_to_ir4_hidden_roots_and_refuse_writes() -> Result<(), Box<dyn E
     assert_eq!(shadowed.program().ir_version, 1);
     Ok(())
 }
+
+#[test]
+fn host_optional_defaults_require_ir8_capability_and_metadata_feature() -> Result<(), Box<dyn Error>>
+{
+    let source = source(
+        "Sub Answer()\nCall Work\nEnd Sub\nPublic Sub Work(Optional ByVal n As Long = 7)\nEnd Sub\n",
+    )?;
+    let modern = compile(
+        &source,
+        &CompileOptions {
+            capabilities: ir::Capabilities::ir8_structural(),
+            ..Default::default()
+        },
+    )?;
+    assert!(
+        modern
+            .program()
+            .required_features
+            .contains("host-procedure-defaults-v1")
+    );
+    let work = modern
+        .program()
+        .procedures
+        .iter()
+        .find(|p| p.name == "Work")
+        .ok_or("procedure")?;
+    assert_eq!(
+        work.parameters.first().ok_or("parameter")?.default,
+        Some(Value::Long(7))
+    );
+    assert!(!work.parameters.first().ok_or("parameter")?.required);
+    let mut malformed = modern.program().clone();
+    malformed
+        .required_features
+        .remove("host-procedure-defaults-v1");
+    assert!(
+        ir::verify(
+            malformed,
+            &ir::Capabilities::ir8_structural(),
+            &ir::VerifyLimits::default()
+        )
+        .is_err()
+    );
+    assert!(
+        ir::verify(
+            modern.program().clone(),
+            &ir::Capabilities::ir7_structural(),
+            &ir::VerifyLimits::default()
+        )
+        .is_err()
+    );
+    let old = compile(
+        &source,
+        &CompileOptions {
+            capabilities: ir::Capabilities::ir7_structural(),
+            ..Default::default()
+        },
+    )?;
+    assert!(
+        !old.program()
+            .required_features
+            .contains("host-procedure-defaults-v1")
+    );
+    assert!(
+        old.program()
+            .procedures
+            .iter()
+            .find(|p| p.name == "Work")
+            .ok_or("procedure")?
+            .parameters
+            .first()
+            .ok_or("parameter")?
+            .required
+    );
+    Ok(())
+}

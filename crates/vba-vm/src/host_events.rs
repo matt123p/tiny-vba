@@ -28,7 +28,10 @@ impl Session {
         host: &impl Host,
     ) -> Result<Vec<HostEventHandler>> {
         self.check_host(host)?;
-        if self.lifecycle_closed() || self.stale || !self.terminal() {
+        if self.lifecycle_closed()
+            || self.stale
+            || !(self.terminal() || matches!(self.state, Outcome::Waiting))
+        {
             return Err(command(
                 "host events require a current completed invocation",
             ));
@@ -159,7 +162,10 @@ impl Session {
         handler: &HostEventHandler,
         arguments: Vec<Value>,
     ) -> Result<usize> {
-        if self.lifecycle_closed() || self.stale || !self.terminal() {
+        if self.lifecycle_closed()
+            || self.stale
+            || !(self.terminal() || matches!(self.state, Outcome::Waiting))
+        {
             return Err(command(
                 "host event handler requires a current completed invocation",
             ));

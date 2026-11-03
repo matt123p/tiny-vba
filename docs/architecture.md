@@ -231,3 +231,11 @@ no Office names or ambient subscriptions enter the shared crates.
 [ADR 0031](decisions/0031-variant-for-counters.md) extends shared numeric For
 controls to scalar Variant, using binder validation and existing verified
 instructions/runtime arithmetic; host-specific execution remains outside the engine.
+
+## Waiting host project calls (2026-11-03)
+
+[ADR 0035](decisions/0035-suspended-host-project-calls.md) extends the existing VM frame
+suspension and toolkit-independent IDE orchestration. The IDE validates public procedure
+visibility, exact pending token, source and host identity; the VM owns frames, typed values,
+ByRef outputs and cumulative limits. No dependency edge or foreign protocol variant changes.
+Application forks own macro resolution policy, lifecycle events, prompts and native commits.

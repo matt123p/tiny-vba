@@ -635,3 +635,10 @@ Split applies its delimiter/limit defaults and module comparison mode.
 Filter applies its include and module comparison defaults and returns a zero-based String array.
 Text matching uses the injected string-comparison provider; without one the VM
 returns named Unsupported.
+
+### IR 8 host procedure defaults (2026-11-03)
+
+`host-procedure-defaults-v1` permits optional/required flags and literal scalar defaults on
+standard procedures. It requires IR 8 and explicit consumer capability. Earlier IR contracts
+retain required standard parameter metadata and expanded static call arguments. This is
+metadata for bounded host-mediated calls under ADR 0035; no instruction/protocol change.

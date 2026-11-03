@@ -251,7 +251,7 @@ impl Parser<'_> {
         }
         let mut name = self.name()?;
         if self.eat(".") {
-            let member = self.name()?;
+            let member = self.member_name()?;
             name.spelling.push('.');
             name.spelling.push_str(&member.spelling);
             name.span = self.source.span(name.span.start(), member.span.end())?;

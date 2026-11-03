@@ -114,11 +114,27 @@ pub fn compile_modules(
     let mut features = BTreeSet::from(["scalar-core".to_owned()]);
     let mut nominal_locals = Vec::new();
     for (procedure_index, procedure) in program.procedures.iter().enumerate() {
-        if procedure.signature.parameters.iter().any(|p| p.optional) {
+        if procedure
+            .signature
+            .parameters
+            .iter()
+            .any(|p| p.optional || p.param_array)
+        {
             features.insert("argument-defaults-v2".into());
+            if options
+                .capabilities
+                .features
+                .contains("host-procedure-defaults-v1")
+            {
+                features.insert("host-procedure-defaults-v1".into());
+            }
         }
         let mut builder = Builder {
             procedure: ir::ProcedureId(idx(procedure_index)?),
+            retain_standard_defaults: options
+                .capabilities
+                .features
+                .contains("host-procedure-defaults-v1"),
             contextual_comparison_target: options
                 .capabilities
                 .ir_versions
@@ -321,7 +337,8 @@ pub fn compile_modules(
     let mut ir = ir::Program {
         classes,
         nominal_locals,
-        ir_version: if features.contains("intrinsics-m6a-v1")
+        ir_version: if features.contains("host-procedure-defaults-v1")
+            || features.contains("intrinsics-m6a-v1")
             || features.contains("string-comparison-context-v1")
         {
             ir::IR8_VERSION
@@ -401,6 +418,7 @@ struct Block {
     foreign: Vec<(usize, ir::ForeignSite)>,
 }
 struct Builder<'a> {
+    retain_standard_defaults: bool,
     procedure: ir::ProcedureId,
     contextual_comparison_target: bool,
     nominal_locals: &'a mut Vec<ir::NominalLocal>,
@@ -1761,11 +1779,13 @@ impl Builder<'_> {
                 .parameters
                 .iter()
                 .map(|p| ir::Parameter {
-                    default: if self
-                        .program
-                        .modules
-                        .get(signature.module)
-                        .is_some_and(|m| m.kind != ast::ModuleKind::Standard)
+                    param_array: self.retain_standard_defaults && p.param_array,
+                    default: if self.retain_standard_defaults
+                        || self
+                            .program
+                            .modules
+                            .get(signature.module)
+                            .is_some_and(|m| m.kind != ast::ModuleKind::Standard)
                     {
                         p.default.clone()
                     } else {
@@ -1780,11 +1800,12 @@ impl Builder<'_> {
                         ir::ParameterMode::ByRef
                     },
                     required: !p.optional
-                        || self
-                            .program
-                            .modules
-                            .get(signature.module)
-                            .is_none_or(|m| m.kind == ast::ModuleKind::Standard),
+                        || !self.retain_standard_defaults
+                            && self
+                                .program
+                                .modules
+                                .get(signature.module)
+                                .is_none_or(|m| m.kind == ast::ModuleKind::Standard),
                 })
                 .collect(),
             locals: self.locals,

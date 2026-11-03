@@ -1,6 +1,6 @@
 # Implementation progress
 
-Updated 2026-11-02. The classic-editor/debugger profile is implemented; its
+Updated 2026-11-03. The classic-editor/debugger profile is implemented; its
 historical milestone is M10. Runtime host profile remains m5-host-v1; verified IR
 1/2/3/4/5/6/7 and the accepted IR 8 `intrinsics-m6a-v1` extension are implemented.
 The [remaining plan](implementation-plan.md) now contains **M7–M8**.
@@ -13,6 +13,17 @@ completed intrinsic inventory and shared/fork validation. **Next: M7.1**, curate
 and classify licensed specimens for unchanged-document/package acceptance.
 M7 implementation has not started.
 Office objects, document events, trust and packaging remain fork-owned.
+
+## Suspended generic host calls (2026-11-03)
+
+[ADR 0035](decisions/0035-suspended-host-project-calls.md) adds bounded public-procedure,
+document-event and publisher-event calls while a project waits on its exact host token.
+Typed results, callback ByRef outputs, catchable runtime errors and persistent state survive
+parking; Reset cancels every wait. Debugger and cumulative limits remain authoritative.
+IR 8 `host-procedure-defaults-v1` retains optional standard-procedure defaults; older targets
+retain their contract. `prepare_host_events` prepares idle subscription context without running
+user code. Qualified external type members accept keyword spellings. No ambient IO or Office
+objects were added. M7/package acceptance and reference comparisons remain separate work.
 
 ## Deferred Office forms and controls plan (2026-11-02)
 
@@ -1260,3 +1271,5 @@ unshadowed module-kind binding and live host-global consultation cases in real
 fork workflows. Declared host globals and typed/call receivers complete their
 members in the shared editor without host invocation. Package round trips and
 signatures are the next milestone's separate gate.
+
+Validation for ADR 0035: `cargo xtask ci`, `cargo xtask wasm` and `cargo xtask wasm-run` passed. All six suspended-call tests, 15 compiler tests and the qualified-type regression also passed under Node WASI. These are authored generic contract tests, not fresh Office oracle evidence.
