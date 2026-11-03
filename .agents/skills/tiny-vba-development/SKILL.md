@@ -5,6 +5,9 @@ description: Implement or review tiny-vba changes using the project design contr
 
 # tiny-vba development
 
+Licensing is MIT OR Apache-2.0 on explicit maintainer direction; see
+[ADR 0035](../../../docs/decisions/0035-dual-license.md). Retain third-party notices.
+
 M6A — VBA intrinsic-function coverage — was accepted on 2026-11-02. See the
 [intrinsic scope](../../../docs/vba-intrinsic-functions.md),
 [acceptance record](../../../docs/m6a-acceptance.md), and

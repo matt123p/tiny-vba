@@ -30,7 +30,7 @@ def layers():
         ['cargo', 'metadata', '--locked', '--no-deps', '--format-version', '1'], cwd=ROOT, text=True))
     actual = {}
     for package in metadata['packages']:
-        if package['license'] != 'MIT':
+        if package['license'] != 'MIT OR Apache-2.0':
             raise ValueError(f'{package["name"]}: licence differs from repository LICENSE')
         manifest = tomllib.loads(Path(package['manifest_path']).read_text())
         if manifest.get('lints', {}).get('workspace') is not True:

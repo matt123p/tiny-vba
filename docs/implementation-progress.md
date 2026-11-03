@@ -1,6 +1,29 @@
 # Implementation progress
 
-Updated 2026-11-02. The classic-editor/debugger profile is implemented; its
+## README and license alignment (2026-11-03)
+
+Rewrote the public README around ArtCraft's clean-room VBA purpose, the Excel
+compatibility adoption requirement, familiar editor/debugger workflows, and
+opt-in GridCraft/WordCraft walkthroughs with small authored macros. Added original,
+regenerated UI renders with provenance in `docs/images/`. Current support and
+remaining package/reference-comparison gates remain explicit; no new runtime or
+Office compatibility support is claimed. The next implementation task remains M7.1.
+
+On explicit maintainer direction, aligned licensing with GridCraft and WordCraft:
+MIT OR Apache-2.0. Preserved the existing MIT notice in `LICENSE-MIT`, added
+`LICENSE-APACHE`, and updated `LICENSE`, Cargo metadata and the repository gate.
+[ADR 0035](decisions/0035-dual-license.md) supersedes the original MIT-only decision.
+
+Validation: `cargo xtask ci`, `cargo xtask wasm` and `cargo xtask wasm-run` PASS.
+`cargo run --locked --offline -p vba-ui-egui --example snapshots` PASS; the two
+selected renders were visually inspected. Local README/provenance links resolve,
+the MIT notice is unchanged and the Apache text matches GridCraft. The README's
+CLI execution example returns `Function(Long(42))`. `git diff --check` PASS.
+Windows checks used a workspace-local TEMP/TMP and the installed Python 3.13
+directory on PATH after the default WindowsApps Python alias failed. No fresh
+GridCraft/WordCraft GUI walkthrough or Microsoft Office comparison was run.
+
+Updated 2026-11-03. The classic-editor/debugger profile is implemented; its
 historical milestone is M10. Runtime host profile remains m5-host-v1; verified IR
 1/2/3/4/5/6/7 and the accepted IR 8 `intrinsics-m6a-v1` extension are implemented.
 The [remaining plan](implementation-plan.md) now contains **M7–M8**.

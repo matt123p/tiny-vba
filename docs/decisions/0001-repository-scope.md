@@ -2,6 +2,9 @@
 
 Date: 2026-10-26. Status: adopted for setup, with open implementation decisions below.
 
+Licensing update 2026-11-03: [ADR 0035](0035-dual-license.md) supersedes item 6
+and the open licensing decision below on explicit maintainer direction.
+
 ## Adopted choices
 
 1. **tiny-vba is the standalone language repository.** Current user direction overrides the combined

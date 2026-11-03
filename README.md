@@ -1,144 +1,284 @@
-# Tiny VBA
+# tiny-vba
 
-Tiny VBA is the shared VBA implementation for the ArtCraft Office applications:
-GridCraft, WordCraft and DeckCraft. Written in Rust for native and WebAssembly use,
-it provides the language engine, runtime, editor and debugger for embedding in those
-applications.
+**A clean-room VBA implementation for the ArtCraft applications: GridCraft, WordCraft and DeckCraft.**
 
-The standalone graphical shell and command-line tools exist only to develop and test
-the shared components without launching a host application. A standalone VBA editor
-is not the project's goal.
+Written in Rust, tiny-vba provides the shared language engine, runtime, editor and
+debugger for native and WebAssembly applications. Its purpose is to let people bring
+their VBA knowledge—and, as compatibility grows, their existing macros—to ArtCraft.
+GridCraft and WordCraft already embed it through opt-in integrations; DeckCraft is
+an intended host, with no integration claimed here yet.
 
-**Current status:** the shared engine, editor/debugger and read-only project importer
-are implemented, with verified IR 1–8, `intrinsics-m6a-v1` and the `m5-host-v1`
-host profile.
-M6 is signed off for its tested integration profile, including host events, VBA
-attribute metadata and a lossless code view embedded in GridCraft and WordCraft.
-M6A VBA intrinsic coverage is accepted for its [declared profile](docs/m6a-acceptance.md).
-[M7 is next](docs/implementation-plan.md): unchanged-document/package acceptance.
-Fresh Excel/Word comparisons remain NOT_RUN and are scheduled for M8.5. See the
-[M6 acceptance record](docs/m6-acceptance.md) for evidence and boundaries.
+![The shared VBA editor paused at a breakpoint, with typed locals visible](docs/images/debugger.png)
 
-All **44 authored scenarios and 153 reviewed ReflexGrid cases pass**. The latter match published
-Microsoft Excel Mac oracle expectations; this is inherited evidence, not a new local Excel run.
-See [the acceptance report](docs/m4-oracle-report.md) and [language scope](docs/m4-language.md).
-[Read-only project import](docs/project-import.md) extracts bounded source/metadata without execution.
-The [embeddable editor/debugger and standalone test tools](docs/ui/embedding.md) are implemented, with
-[corrected M8 completion audit](docs/ui/m8-completion-audit.md) and
-[classic tools/DAP acceptance](docs/ui/m10-implementation.md).
-The [remaining plan](docs/implementation-plan.md) uses new M1–M8 numbering for
-host/language compatibility, standard Office forms, document integration and release.
-Historical reports retain their original milestone IDs; see the
-[numbering map](docs/implementation-progress.md#plan-renumbering--2026-10-28).
+## Why VBA matters to the whole suite
 
+For ArtCraft, Excel compatibility is essential to adoption. A business might accept
+some differences in how a word processor or presentation app works. A spreadsheet
+that runs its reporting, pricing or operations has to keep working. Rewriting years
+of VBA is rarely an acceptable migration plan.
 
-## Shared components and application integration
+That makes VBA fidelity a suite-wide requirement. Gaps in Excel macro compatibility
+have been a major barrier to business adoption of open-source office suites: if a
+business cannot move its spreadsheets, it has little reason to move the rest of its
+Office workflow. Excellent word processing and presentations alone cannot solve
+that problem.
 
-This repository owns language semantics, bytecode, execution, debugging, the reusable egui
-editor/debugger UI, a generic foreign-call contract and read-only VBA project decoding.
-The ArtCraft applications own their Office compatibility objects, member catalogues,
-document state, host adapters, storage, trust, events, undo/recalculation and application UI.
-The Excel and Word compatibility layers live in GridCraft and WordCraft respectively.
+tiny-vba exists to address this barrier. **High Excel/VBA compatibility is the design
+goal; universal compatibility is not a claim about today's implementation.**
 
-Applications embed the shared editor/debugger in their existing UI stack and supply their
-own host integration. The standalone shell exercises the same shared components for testing.
-See the [editor/debugger UI contract](docs/editor-debugger-ui.md) and
-[embedding guide](docs/ui/embedding.md).
+## Designed for compatibility and familiarity
 
-## Development and standalone testing
+- **Preserve VBA runtime behaviour.** Types, coercion, `ByRef`, arrays and their lower
+  bounds, error handling, classes, properties, events and persistent state matter as
+  much as recognizing syntax. `Empty`, `Null`, `Missing`, `Nothing`, Currency and Date
+  retain their distinct meanings.
+- **Make existing VBA skills useful immediately.** Project Explorer, Properties,
+  module/procedure views, IntelliSense-style assistance, Immediate, Locals, Watches
+  and Call Stack provide a familiar editing and debugging workflow, with familiar
+  shortcuts such as F5, F8 and F9.
+- **Use the application's real objects.** GridCraft owns the Excel-compatible
+  workbook object model; WordCraft owns the Word-compatible document object model.
+  Macros work through the host's native document engine, undo, protection and
+  recalculation rather than a separate copy of the document.
+- **Share the same engine across platforms and apps.** The compiler, VM and debugger
+  support native and WebAssembly use. Apps embed the same editor and debugger with
+  their own theme, fonts and application services.
+- **Measure compatibility honestly.** Unsupported operations fail explicitly.
+  Authored tests, inherited reference results and fresh Microsoft Office comparisons
+  are reported separately. Passing one profile does not establish all of VBA or Excel.
 
-The commands below exercise the shared engine and UI in isolation. Microsoft Office and
-the ArtCraft host applications are not required for these tests.
+Clean-room means independently authored code informed by public specifications,
+documentation and permitted black-box observations. No Microsoft implementation
+code, proprietary Office binaries or vendor artwork is included.
 
-Rust is pinned by `rust-toolchain.toml`; Python 3.11+ and Git support repository checks only.
-Project decoding uses pinned cfb and encoding_rs dependencies; Office is not required. Node 18+ runs the WASI smoke test.
+## In-process execution: compatibility and speed
+
+tiny-vba runs **inside the host application**, with native Rust calls between the
+VBA engine and the application's object model. This is central to two goals:
+
+- **Compatibility:** high Excel fidelity needs tightly integrated access to
+  GridCraft's live workbook state, object identities, events, calculation and undo
+  behaviour. In-process integration lets the VBA adapter coordinate directly with
+  those systems and preserve their semantics as a macro executes.
+- **Speed:** even a simple macro that loops over cells can make thousands of
+  object-model calls in one run. Sending every property read, write and method call
+  through an API to a separate process would add serialization, transport and
+  process-boundary overhead repeatedly, potentially dominating the actual work.
+  Native in-process dispatch avoids that overhead on the macro execution path.
+
+The same approach applies to WordCraft's document objects. External control APIs
+and the optional DAP debugger serve other clients; they are not the route used for
+ordinary VBA object-model calls. GridCraft's separate editor window is another
+window in the same process, using the same interpreter and workbook integration.
+
+## Editor
+
+![Member completion for Debug.Print in the light-theme editor](docs/images/completion.png)
+
+The reusable editor offers:
+
+- **Code assistance:** scoped word and member completion, signature/parameter help,
+  Quick Info, List Constants, definition navigation and an Object Browser. Host
+  catalogues supply the supported Excel or Word members without executing them.
+- **Readable source:** VBA syntax colouring, line numbers, live red/underlined parser
+  diagnostics, breakpoint markers and current-statement highlighting. Hidden VBA
+  attributes stay out of the normal code view while remaining in the stored source.
+- **Everyday editing:** undo/redo, clipboard operations, block indent/outdent and
+  comments, automatic indentation/case correction, and literal Find/Replace across
+  a procedure, module or project, with case and whole-word options.
+- **Project navigation:** Project Explorer, Properties, module and procedure
+  selectors, procedure-only and split views, bookmarks and navigation history.
+- **Workspace controls:** light/dark and host-supplied themes, pane placement,
+  toolbar preferences, keyboard access and accessible control labels.
+
+The form designer adds a Toolbox, Properties, drag/resize, alignment, tab order and
+event-handler navigation for the implemented **Label, TextBox and CommandButton**
+profile. Forms run through the real VM and can be debugged during modal or modeless
+interaction. Source and design travel together in the project's `.tvform` format.
+This does not yet include importing native Office binary UserForms or worksheet
+Form Controls. See the [form workflow and supported scope](docs/m2-acceptance.md).
+
+## Debugger
+
+Break, inspect and resume execution in the same editor:
+
+| Feature | What you can do |
+|---|---|
+| Breakpoints and execution | Toggle statement breakpoints; Run/Continue, Break and Reset; see the current statement |
+| Stepping | Step Into, Step Over and Step Out through VBA procedures |
+| Locals and Call Stack | Inspect typed values and arrays, navigate stack frames and edit supported local values while paused |
+| Watches and Quick Watch | Evaluate read-only expressions, inspect array elements and break when a watch condition is true or its value changes |
+| Immediate and Output | Inspect expressions and read `Debug.Print` output; optionally enable bounded, isolated function evaluation |
+| Error trapping | Choose the supported VBA error-trapping modes and inspect fault state |
+| Set Next Statement | Relocate within verified straight-line checkpoints in the current frame; unsupported jumps are refused |
+| Optional DAP adapter | Use the CLI's Debug Adapter Protocol frontend with an external client |
+
+Watch evaluation does not call functions or property getters. Immediate function
+calls require explicit opt-in and use an isolated VM; permitted host effects are
+real. Reset clears runtime state but does not undo document changes already made.
+See [debugger behaviour](docs/debugger.md) and
+[advanced-tool acceptance](docs/ui/m10-implementation.md) for the exact boundaries.
+
+| Shortcut | Action |
+|---|---|
+| F5 / F9 | Run or Continue / toggle breakpoint |
+| F8 / Shift+F8 / Ctrl+Shift+F8 | Step Into / Over / Out |
+| Shift+F9 | Quick Watch |
+| Ctrl+G / Ctrl+L | Immediate / Call Stack |
+| Ctrl+R / F4 / F2 | Project Explorer / Properties / Object Browser |
+| Ctrl+Space / Ctrl+J | Completion |
+
+## Try it in GridCraft
+
+The integration lives in [GridCraft](https://github.com/matt123p/gridcraft):
+`crates/vba` owns the Excel object adapter, and the application embeds tiny-vba's
+editor/debugger. VBA is disabled in default builds. From a GridCraft checkout:
+
+```sh
+# Embedded editor
+cargo run -p gridcraft --features vba
+
+# Or a separate native editor window (includes the vba feature)
+cargo run -p gridcraft --features vba-window
+```
+
+1. Open or create a workbook. Enable **Developer** under **File > Options >
+   Customize Ribbon > Main Tabs**, then choose **Developer > Visual Basic**, or
+   press **Alt+F11**. **Alt+F8** opens the macro picker; **Edit** opens a procedure.
+2. Add a standard module, or import plain `.bas` source. New projects start blank.
+3. Try this small workbook macro:
+
+```vb
+Public Sub HelloGridCraft()
+    Range("A1").Value = "Hello from VBA"
+    Range("B1").Value = 6 * 7
+End Sub
+```
+
+4. Click **Allow VBA for this editor session**, select `HelloGridCraft`, then Run.
+   Return to the workbook to see the text and `42`. For a debugger tour, set a
+   breakpoint with F9 and use F8 to step through the assignments.
+
+The current adapter covers a growing Excel-compatible profile: Application,
+Workbook, Worksheet, ranges and collections, values/formulas, formatting, data
+operations, tables, events and worksheet UDFs, each with documented limits. Writes
+use GridCraft's own protection, undo and recalculation paths.
+
+Opening workbook source does not execute it. Edited source can be stored in
+GridCraft's workbook storage or exported as plain modules; it does not rewrite the
+original `vbaProject.bin`. Arbitrary existing `.xlsm` macros are not yet guaranteed
+to run unchanged. Follow the [GridCraft integration guide](https://github.com/matt123p/gridcraft/blob/main/docs/vba.md)
+and [Excel compatibility audit](https://github.com/matt123p/gridcraft/blob/main/docs/vba-excel-compatibility.md)
+for the current member-by-member scope and browser build instructions.
+
+## Try it in WordCraft
+
+The integration lives in [WordCraft](https://github.com/matt123p/wordcraft):
+`crates/vba` owns the Word object adapter and document lifecycle. From a WordCraft
+checkout:
+
+```sh
+cargo run -p wordcraft --features vba
+```
+
+1. Create a blank document, then choose **View > Macros > Visual Basic** or press
+   **Alt+F11**.
+2. Add a standard module or import a `.bas` file containing:
+
+```vb
+Public Sub HelloWordCraft()
+    ActiveDocument.Content.InsertBefore "Hello from VBA!"
+End Sub
+```
+
+3. Enable the editor's per-document **trust checkbox**, select `HelloWordCraft` and
+   Run. The text appears in the document; successful text mutations in a macro share
+   one undo step. F9 and F8 use the same breakpoint and stepping workflow as GridCraft.
+
+The current Word profile exposes Application, Document, Selection and live Range
+objects for supported plain main-story paragraphs, plus selected document and
+Application events. Tables, inline-object position mapping and the broader Word
+object model remain outside this profile. Importing source is inert; automatic
+attachment/execution of a document package's VBA on Open/New is not implemented.
+Plain-source save/export is separate from binary `.docm` project writeback.
+See the [WordCraft integration guide](https://github.com/matt123p/wordcraft/blob/main/docs/vba-integration.md)
+for supported members, trust, events, native/browser source transfer and limitations.
+
+Both apps consume an immutable Git revision of tiny-vba; neither needs a sibling
+tiny-vba checkout. Each app's pinned revision determines its available features.
+
+## Current compatibility and remaining work
+
+The shared engine, editor/debugger, read-only project importer, selected
+class/form profile and declared intrinsic-function profile are implemented.
+M1–M6 are signed off for their declared profiles; M6A intrinsic coverage is accepted.
+See the [compatibility matrix](docs/compatibility-matrix.md) and
+[intrinsic inventory](docs/vba-intrinsic-functions.md) for actual support.
+
+The recorded language acceptance includes **44 authored scenarios and 153 reviewed
+ReflexGrid cases passing**. The latter match inherited, upstream-reported Excel Mac
+expectations; they are not fresh local Office comparisons or a measure of all VBA.
+The [oracle report](docs/m4-oracle-report.md) records their provenance.
+
+Next are unchanged-document/package acceptance (M7), then expanded conformance,
+hardening and release validation (M8). Fresh Excel/Word comparisons remain
+**NOT_RUN**, scheduled for M8.5. Binary project writeback/signature handling still
+needs its reviewed contract. Arbitrary COM/DLL execution, P-code execution and
+third-party ActiveX/OLE controls are outside the current scope. Broader Office
+forms/controls have a [separate deferred plan](docs/office-forms-controls-implementation-plan.md).
+
+## Develop and test tiny-vba
+
+The standalone shell lets you try the same shared components without an ArtCraft
+app or Microsoft Office. It is a development/test host for the embedded experience.
+Use the Rust toolchain pinned in `rust-toolchain.toml`; Python 3.11+ supports
+repository checks and Node 18+ runs the WASI smoke gate.
 
 ```sh
 cargo run -p vba-ide-app
+cargo run -p vba-ide-app -- --open examples/forms/CustomerForm.tvform
+cargo run -p vba-cli -- run examples/pure-vba/Arithmetic.bas --entry Answer
 cargo run -p vba-cli -- debug examples/pure-vba/Arithmetic.bas --entry Answer
 cargo run -p vba-cli -- --help
-cargo run -p vba-cli -- parse examples/pure-vba/Arithmetic.bas
-cargo run -p vba-cli -- run examples/pure-vba/Arithmetic.bas
-cargo run -p vba-cli --example m3_smoke
-cargo run -p vba-cli -- disasm examples/pure-vba/Arithmetic.bas
-cargo run -p vba-cli -- compile examples/pure-vba/M2Control.bas --entry Answer
-cargo run -p vba-cli -- conformance validate tests/fixtures/m0/arithmetic.vbas
-cargo test --workspace --locked
-cargo xtask ci
-rustup target add wasm32-unknown-unknown
-cargo xtask wasm
-rustup target add wasm32-wasip1
-cargo xtask wasm-run
 ```
 
-`cargo xtask ci` checks formatting, Clippy, Rust tests, dependency boundaries and source pins.
-It verifies corpus hashes when checkouts are present; it never runs downloaded VBA.
-WASM library compilation and identical native/WASI execution are separate gates.
+The default IDE demo starts at `Main`: F9 sets a breakpoint, F5 runs and F8 steps.
+The CLI example's `Answer` function returns `42`. For an optional external debugger,
+run `cargo run -p vba-cli --features dap -- dap examples/pure-vba/Arithmetic.bas`.
+See the [embedding and browser guide](docs/ui/embedding.md) for web setup and Rust integration.
 
-## Optional external test material
+```sh
+cargo xtask ci
+rustup target add wasm32-unknown-unknown wasm32-wasip1
+cargo xtask wasm
+cargo xtask wasm-run
+cargo xtask ui
+```
+
+Core builds/tests work without corpus checkouts or application siblings. External
+test material is optional and must follow the [corpus policy](tests/corpora/README.md):
 
 ```sh
 git submodule update --init --checkout --depth 1
 cargo xtask corpora
-python3 tools/check_repository.py corpora --require-checkouts
 ```
 
-Submodules are pinned by Git gitlinks and [the source lock](references/sources.lock.json).
-Fast builds/tests work with no submodules checked out. Do not use `--remote` in reproducible builds.
-Corpus/reference submodules use `update = none` so Cargo Git consumers do not
-download unrelated test data. `--checkout` explicitly opts in when verifying corpora.
-See [corpus policy and inventory](tests/corpora/README.md) before selecting any fixture.
-Two workbook sources have unresolved licensing; every specimen still requires classification.
+Contributions should include focused regressions and precise support claims:
+types, errors, side effects and pause/resume behaviour matter. Start with the
+[development guide](docs/developer-guide.md), [architecture](docs/architecture.md),
+[remaining plan](docs/implementation-plan.md) and [agent guidance](AGENTS.md).
+The [documentation index](docs/README.md) links the detailed contracts and evidence.
 
-## Layout
+## License and credits
 
-```text
-apps/vba-ide-app/     standalone native/web shell for development and testing
-apps/vba-cli/src/     command-line development and test frontend
-crates/*/src/        compiler, values/runtime, VM, debugger, foreign protocol, importer
-crates/*/tests/      owning crate's Rust integration tests as they are implemented
-apps/vba-cli/tests/  executable CLI checks
-examples/            self-authored pure VBA and foreign-call acceptance examples
-tests/               shared scenario/fixture data by test tier
-tests/corpora/       six external test-data submodules and hashed candidate inventory
-references/          official VBA-Docs submodule, source lock and reference notices
-docs/                architecture, plan, decisions, progress and original design inputs
-.agents/skills/      shared Codex/OpenCode development and design skills
-fuzz/                reserved standalone fuzz workspace (not implemented)
-reports/             ignored generated output
-xtask/ and tools/    quality commands and offline repository checks
-```
+tiny-vba is dual-licensed under [MIT](LICENSE-MIT) or [Apache-2.0](LICENSE-APACHE),
+at your option, matching GridCraft and WordCraft. See [LICENSE](LICENSE).
+Existing copyright notices are retained. Dependencies, fonts, external fixtures
+and reference submodules keep their own licenses and notices; see
+[UI dependency/font notices](docs/provenance/ui-dependencies.json) and
+[source provenance](references/sources.lock.json).
 
-There is deliberately no root `src/`: Cargo builds `src/` inside each focused crate.
-See [architecture](docs/architecture.md) for crate responsibilities and dependencies,
-[bytecode/VM specification](docs/bytecode-vm-specification.md) for the adopted IR 1 implementation contract,
-[the implementation plan](docs/implementation-plan.md) for gated work,
-and [decisions](docs/decisions/0001-repository-scope.md) for choices and open questions.
-
-## Project documents
-
-[Documentation index](docs/README.md) · [Compatibility matrix](docs/compatibility-matrix.md) ·
-[Development guide](docs/developer-guide.md) · [Agent skills](docs/agent-skills.md) ·
-[Progress](docs/implementation-progress.md)
-
-The supplied design documents remain preserved. Current user direction and the repository
-scope decision take precedence over their older proposals for a shared automation repository
-or an Office bridge inside the interpreter workspace.
-
-## Licence
-
-[MIT](LICENSE), preserving the existing repository licence. The design proposes MIT OR Apache-2.0;
-that change remains a maintainer decision. External submodules retain their own licences and notices.
-
-## UI, embedding and provenance
-
-The [M8 plan](docs/ui/m8-implementation-plan.md), [embedding guide](docs/ui/embedding.md) and
-[acceptance/compatibility report](docs/ui/m8-acceptance.md) describe the shared Classic editor/debugger and its embedding interfaces.
-`cargo xtask ui` generates original screenshots in ignored `reports/ui/`; `ui-native` runs a real
-window/capture and `web` builds the browser bundle. The optional Chromium harness is in
-`tools/ui-browser`. Core and IDE model consumers remain free of GUI dependencies.
-
-UI implementation follows public functional documentation with independently authored code/layout
-and original markers. [Source provenance](docs/provenance/vbe_sources.yaml) references ignored
-`.cache/evidence/` downloads; no reference HTML, screenshots, VBE artwork or clone code is checked
-in. [Dependency/font notices](docs/provenance/ui-dependencies.json) are tracked separately.
+The README images are original renders of tiny-vba's shared UI, not Microsoft
+Office screenshots. Their [capture sources and attribution](docs/images/README.md)
+are recorded alongside them. VBA, Excel, Word and PowerPoint are Microsoft
+trademarks; this independent project is not affiliated with or endorsed by Microsoft.
