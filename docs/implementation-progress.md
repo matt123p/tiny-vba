@@ -13,8 +13,13 @@ Shared CI, WASM, actual WASI (56 form-instance cases), UI (12 actual widget
 cases), native capture and web gates PASS. Chromium array-loaded ListBox and
 transposed ComboBox input/modal Stop/resume PASS; editor smoke and legacy form
 regressions also PASS. Array-loaded row/text renders were inspected. Original M7
-fixture/hash checks and changed Markdown targets PASS. Fork pin/test updates are
-in progress.
+fixture/hash checks and changed Markdown targets PASS. Both forks pin shared
+runtime revision `3688113b`: GridCraft `9351fdef` and WordCraft `07774ca7`.
+Full CI (10/8 gates), all six native and six actual Node 22 WASM package cases
+per fork, strict optional VBA/UI Clippy and optional VBA web builds PASS. The
+existing ListBox/ComboBox package cases now cover nonzero source bounds, bulk/
+transposed loading, source-copy isolation and current-row Column reads before
+authorized row/text input and exact original XLSM/DOCM project preservation.
 M7A.4 remains IN PROGRESS. Next: whole-array readback/empty-list shape and remaining
 loading/list semantics, followed by containers/resources/bindings. Native edited
 persistence and .tvform removal remain M7A.5/M7A.6. Fresh Office comparison is

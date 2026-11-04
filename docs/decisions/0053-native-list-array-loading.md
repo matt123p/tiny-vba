@@ -15,8 +15,9 @@ Column writes reuse List cell conversion and selected-row refresh.
 Loading builds a local, independent Variant array before changing canonical
 VbaItems, VbaCount or VbaListIndex. All source cells must convert through the
 existing VBA CStr intrinsic, matching this packet's unbound string cells. This
-retains source array element types and bounds without aliasing source data;
-arrays are not flattened through JSON, a host cursor or a second mutable store.
+leaves the source array element type and bounds unchanged; loaded rows do not
+alias that source. Arrays are not flattened through JSON, a host cursor or a
+second mutable store.
 An accepted load replaces rows, clears selection and refreshes Value/Text using
 the existing control-specific Change/Click continuations. All fields commit
 before authored callbacks. Stop/resume, reentrance, instruction/allocation budgets
@@ -28,9 +29,10 @@ new dependency, host API or toolkit state is introduced.
 
 The existing 1,024-row, ten-column and 16,384-UTF-16-unit/cell limits apply.
 Oversized input raises 7 before mutation. Scalar input follows LBound error 13;
-unsupported ranks fail with 9 through ordinary bounds/indexing. Null cells follow
-CStr error 94. Indexed bounds failures retain 381. No error-handler rank probes
-are used, so successful validation does not manufacture or swallow Err failures.
+missing dimensions fail with 9 through bounds queries, and extra dimensions
+fail with 9 when indexed within the selected size limits. Size-limit refusal
+precedes cell indexing. Null cells follow CStr error 94. Indexed bounds failures
+retain 381. No error-handler rank probes are used, so successful validation does not manufacture or swallow Err failures.
 A failed load leaves existing rows, selection, Value and Text intact.
 
 These are authored expectations based on public documentation and the existing
