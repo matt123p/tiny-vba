@@ -6,7 +6,7 @@ and [ADR 0040](decisions/0040-native-userform-import-and-attachment.md). The fir
 [ADR 0038](decisions/0038-native-office-forms-and-compatibility-only.md) and
 [ADR 0039](decisions/0039-m7a-native-control-metadata.md). It is not M7A sign-off.
 Native import now supports flat Label/TextBox/CommandButton and selected
-CheckBox/OptionButton/ToggleButton forms; see [the current runtime record](m7a4-native-runtime.md). Native edited
+CheckBox/OptionButton/ToggleButton/ScrollBar/SpinButton/ListBox forms; see [the current runtime record](m7a4-native-runtime.md). Native edited
 persistence and `.tvform` removal remain unimplemented.
 
 ## Audited implementation paths — FC0.1
@@ -14,7 +14,7 @@ persistence and `.tvform` removal remain unimplemented.
 | Surface / owner | Actual path and current boundary | Required native work |
 |---|---|---|
 | Shared project decode / tiny-vba | `crates/vba-project/src/lib.rs::decode` retains `/PROJECTlk` refusal; `BaseClass` now yields a distinct UserForm with bounded designer resources | Implemented selected f/o/VBFrame resource/component result; broader controls/resources remain explicit gaps |
-| Shared design/runtime / tiny-vba | `vba-ide/src/forms.rs` has Label/TextBox/CommandButton only, 128 controls and 2 MiB model limit. `form_project.rs` generates ordinary class/event support separately from authored source | Native input now maps to validated design; instance/lifecycle/property/event gaps remain M7A.4 |
+| Shared design/runtime / tiny-vba | `vba-ide/src/forms.rs` has nine selected native flat families, 128 controls and 2 MiB model limit. `form_project.rs` generates ordinary class/event support separately from authored source | Native input now maps to validated design; instance/lifecycle/property/event gaps remain M7A.4 |
 | Shared exchange / tiny-vba | `Ide::import_form` / `export_form` consume the custom archive. Native `.frm/.frx` imports now attach through a caller-supplied bundle; native/browser IO routes accept the pair | Atomic native import implemented; native export and edited-resource encoding remain M7A.5; remove legacy routes in M7A.6 |
 | Worksheet package / GridCraft | `xlsx::passthrough::KeptReader::sheet_elements/vml` preserves `controls`, `ctrlProp` parts and VML. New `read_worksheet_controls` decodes a read-only Button snapshot | Finish DrawingML/VML reconciliation before native rendering/activation; preserve source graph separately from future writable state |
 | DrawingML shape identity / GridCraft | `xlsx::drawing::read_shape` reads nonempty `macro` into `on_action` but assigns model `id: 0`; source `cNvPr` identity is not retained as a native-control join key | Retain/reconcile native source identity; reject conflicting assignment/representation data; do not join by model sequence number or guessed caption |
@@ -42,12 +42,12 @@ in M7A.4; a declared unsupported packet is not implementation evidence.
 | OptionButton | Value/group/binding, Change/Click | Native flat decode/runtime/input and root groups; binding/native edited save unsupported |
 | ToggleButton | Value/binding, Change/Click | Native flat decode/runtime/input; binding/native edited save unsupported |
 | ComboBox | Items/selection/columns/binding/style, Change/Click/drop/update events | UNSUPPORTED |
-| ListBox | Items/selection/columns/multiselect/binding, Change/Click | UNSUPPORTED |
+| ListBox | Items/selection/columns/multiselect/binding, Change/Click | Selected native unbound indexed rows/columns, single selection, Value/Text and input; array APIs/multiple selection/bindings/save remain unsupported |
 | Frame | Caption/container/child Controls/grouping/tab behavior | UNSUPPORTED |
 | MultiPage | Pages/selected Value, child controls, Change | UNSUPPORTED |
 | TabStrip | Tabs/selected Value, Change | UNSUPPORTED |
-| ScrollBar | Value/range/increments/orientation, Change/Scroll | UNSUPPORTED |
-| SpinButton | Value/range/increments/orientation, Change/spin events | UNSUPPORTED |
+| ScrollBar | Value/range/increments/orientation, Change/Scroll | Selected native records, Long properties, reversed ranges and input/drag-only Scroll; further resources/properties/save remain unsupported |
+| SpinButton | Value/range/increments/orientation, Change/spin events | Selected native records, Long properties and input/Change/spin; further resources/properties/save remain unsupported |
 | Image | Native picture resource/geometry/display properties and applicable input events | UNSUPPORTED |
 
 Inventory basis: Microsoft's [Forms object list](https://learn.microsoft.com/en-us/office/vba/language/reference/user-interface-help/objects-microsoft-forms),
@@ -135,7 +135,7 @@ build/OS/locale comparisons remain NOT_RUN under M8.5.
 | FC1.2–FC1.4 geometry/render/input/launch | DONE for worksheet-form-controls-v1 | Native widgets, placement, pointer/keyboard, consent, owner scope and debugger continuation |
 | FC1.5 native worksheet save | DONE for worksheet-form-controls-v1 | Untouched bytes plus edited caption/anchor/assignment/state/create/delete/reopen |
 | FC2 worksheet Form Controls | DONE for worksheet-form-controls-v1 | Nine native families, bounded bindings/list state, selected Shape/ControlFormat APIs; [contract/evidence](m7a-worksheet-controls.md) |
-| FC4 broader UserForm controls | IN_PROGRESS | [Native boolean controls](m7a4-native-runtime.md) implemented; list/container/scroll/image/binding/platform packets remain |
+| FC4 broader UserForm controls | IN_PROGRESS | [Selected flat control runtime](m7a4-native-runtime.md) includes boolean, text, numeric and unbound single-selection ListBox packets; further list/container/image/binding/platform packets remain |
 | FC3.1–FC3.4 native UserForm codecs/attachment | DONE for native-userform-import-v1 | Export + embedded parity, shared designer/runtime/debugger, standalone IO, XLSM/DOCM trust and byte retention |
 | FC3.5 native lifecycle parity | IN_PROGRESS | [Shared explicit instance packet](m7a4-userform-instances.md) implemented; default/collection/lifecycle/focus/event and fork gates remain |
 | FC5 edited native persistence | NOT_STARTED | Required encoder, native resource and signature/cache contract |

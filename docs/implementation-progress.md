@@ -13,7 +13,14 @@ PASS, with ten actual form-instance widget tests. Chromium native list/focus/
 numeric input and modal Stop/resume PASS; Unicode text, boolean, editor smoke
 and legacy form browser regressions also PASS. Light/dark/narrow/scaled/injected-host
 multi-instance list renders were inspected. Original M7 fixture/hash validation
-and changed Markdown targets PASS. Consumer immutable-pin integration follows. Full M7A.4 remains IN PROGRESS, including
+and changed Markdown targets PASS. Both forks pin shared revision `c578131f`:
+GridCraft `1cdbe9c3` and WordCraft `71048414`. Their full CI (10/8 gates), five
+native and actual Node 22 WASM package/trust/input cases, strict optional VBA/UI
+Clippy and optional VBA web builds PASS. The new package case checks typed
+MSForms.ListBox access, trusted selection and exact original XLSM/DOCM project
+bytes on reopen; WordCraft also checks authorization revocation. The inventory
+now records the selected numeric and ListBox packets rather than its obsolete
+unsupported labels. Full M7A.4 remains IN PROGRESS, including
 ComboBox, further list/binding APIs, containers/pages/images/platform and
 remaining lifecycle/property contracts in [the runtime record](m7a4-native-runtime.md).
 Next: native ComboBox editable/drop-list behavior using the same canonical list

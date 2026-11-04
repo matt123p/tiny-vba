@@ -30,7 +30,8 @@ allocation/instruction/continuation limits remain authoritative. Resource failur
 use error 7. Invalid selection/property indexes use 380 and invalid indexed list
 access/removal uses 381 through ordinary frames. Value/selection state is committed
 before Change; definitive non-Null changes then raise Click, including Stop/resume
-without replay. Programmatic writes do not mark input dirty. New physical row
+without replay. These exact error/event expectations are authored checks; fresh
+Office verification remains NOT_RUN under M8.5. Programmatic writes do not mark input dirty. New physical row
 selection respects Locked, focus validation and ordinary typed BeforeUpdate/
 AfterUpdate on focus transfer. Duplicate-text/index and structural-mutation event
 edge cases still require fresh Office observation under M8.5 (NOT_RUN).
