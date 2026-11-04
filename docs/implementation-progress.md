@@ -13,8 +13,13 @@ Chromium ComboBox completion/F4/navigation/Enter/modal Stop/resume PASS, as do
 list/focus/text/numeric/boolean, editor smoke and legacy form browser regressions.
 Light/dark/narrow/scaled/injected-host popup renders were inspected. The popup
 uses the injected theme rather than inheriting a mismatched global frame.
-Original M7 fixture/hash checks and changed Markdown targets PASS. Consumer
-immutable-pin integration follows.
+Original M7 fixture/hash checks and changed Markdown targets PASS. Both forks
+pin shared runtime revision `6534f4fc`: GridCraft `2c84a6ad` and WordCraft
+`04d2b58b`. Full CI (10/8 gates), all six native and actual Node 22 WASM package/
+trust/input cases, strict optional VBA/UI Clippy and optional VBA web builds
+PASS. The additional XLSM/DOCM regression checks MSForms.ComboBox access,
+trusted row selection and UTF-16 free text with MatchEntry=None, exact original
+project bytes after reopen, and WordCraft authorization revocation.
 Full M7A.4 remains IN PROGRESS for further list APIs/bindings/resources,
 containers/pages/images/RefEdit, platform and remaining lifecycle/property cases.
 Next: whole-array List/Column APIs and remaining list semantics before container
