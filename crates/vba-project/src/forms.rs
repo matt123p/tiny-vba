@@ -37,6 +37,9 @@ pub struct Control {
     pub width: i32,
     pub height: i32,
     pub caption: String,
+    pub tag: String,
+    pub control_tip_text: String,
+    pub help_context_id: i32,
     pub text: String,
     pub enabled: bool,
     pub visible: bool,
@@ -103,6 +106,8 @@ impl Default for TextBehavior {
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Design {
     pub caption: String,
+    pub tag: String,
+    pub help_context_id: i32,
     pub width: i32,
     pub height: i32,
     /// Native site/painting order. Only immediate children are admitted in v1.

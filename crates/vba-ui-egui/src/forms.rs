@@ -1131,6 +1131,19 @@ impl EditorUi {
                                 }
                             });
                         });
+                        if native && enabled && ui.rect_contains_pointer(bounds)
+                            && !ui.input(|i| i.pointer.any_down())
+                            && let Ok(vba_ide::Value::String(tip)) = ide.form_instance_field(instance, Some(c.id), "ControlTipText")
+                            && !tip.units().is_empty() {
+                            let remaining=ui.style().interaction.tooltip_delay-ui.input(|i|i.pointer.time_since_last_movement());
+                            if remaining>0. {
+                                ui.ctx().request_repaint_after(std::time::Duration::try_from_secs_f32(remaining).unwrap_or(std::time::Duration::from_millis(50)));
+                            } else {
+                                let mut tooltip=egui::Tooltip::always_open(ui.ctx().clone(),ui.layer_id(),widget_id.with("control.tip"),bounds).at_pointer();
+                                tooltip.popup=tooltip.popup.frame(egui::Frame::popup(ui.style()).fill(theme.editor).stroke(egui::Stroke::new(1.,theme.border)));
+                                tooltip.show(|ui| {ui.label(egui::RichText::new(String::from_utf16_lossy(tip.units())).color(theme.text));});
+                            }
+                        }
                     }
                     if native && idle && keyboard_owner == Some(instance) {
                         let focused = ui.ctx().memory(|m| m.focused());

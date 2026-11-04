@@ -958,3 +958,79 @@ fn native_drop_list_combo_is_readonly_and_pointer_selection_closes_the_list() ->
     assert!(h.state().errors.is_empty(), "{:?}", h.state().errors);
     Ok(())
 }
+
+#[test]
+fn native_control_tip_uses_canonical_text_without_focus_or_macro_execution() -> R {
+    let mut ide = Ide::new();
+    ide.import_native_form_export(
+        "NativeForm.frm",
+        &fixture::export(),
+        1252,
+        &[NativeFormResource {
+            name: "NativeForm.frx".into(),
+            bytes: fixture::metadata_companion(),
+        }],
+    )?;
+    ide.add_module("Main.bas","Sub Main()\nNativeForm.Entry.ControlTipText=\"Authored explanation\"\nNativeForm.Show 0\nEnd Sub")?;
+    ide.dispatch(Action::Run, &mut NoHost)?;
+    for _ in 0..100 {
+        ide.tick(&mut NoHost)?;
+        if ide.mode() == Mode::Completed {
+            break;
+        }
+    }
+    let f = *ide.form_instances()?.first().ok_or("instance")?;
+    let before = ide.form_instance_field(f, None, "VbaActiveControl")?;
+    let output = ide.output();
+    let mut h = Harness::builder()
+        .with_size(egui::vec2(1400., 1000.))
+        .build_ui_state(
+            |ui, s: &mut State| {
+                ui.style_mut().interaction.tooltip_delay = 0.;
+                for c in s.view.show(ui, &s.ide, Theme::light()) {
+                    if let Err(e) = apply(&mut s.ide, c, &mut NoHost) {
+                        s.errors.push(e.to_string());
+                    }
+                }
+                if let Err(e) = s.ide.tick(&mut NoHost) {
+                    s.errors.push(e.to_string());
+                }
+            },
+            State {
+                ide,
+                view: EditorUi::default(),
+                errors: vec![],
+            },
+        );
+    h.run_steps(5);
+    h.get(
+        egui_kittest::kittest::By::new()
+            .label("Entry")
+            .role(egui::accesskit::Role::TextInput),
+    )
+    .hover();
+    h.run_steps(8);
+    assert!(h.query_by_label("Authored explanation").is_some());
+    assert_eq!(h.state().ide.output(), output);
+    assert_eq!(
+        h.state()
+            .ide
+            .form_instance_field(f, None, "VbaActiveControl")?,
+        before
+    );
+    assert_eq!(
+        h.state().ide.form_instance_field(f, Some(12), "Tag")?,
+        vba_ide::Value::String(vba_ide::VbaString::from_utf8("tag-12")?)
+    );
+    assert_eq!(
+        h.state()
+            .ide
+            .form_instance_field(f, Some(12), "HelpContextID")?,
+        vba_ide::Value::Long(112)
+    );
+    h.event(egui::Event::PointerMoved(egui::pos2(1300., 950.)));
+    h.run_steps(8);
+    assert!(h.query_by_label("Authored explanation").is_none());
+    assert!(h.state().errors.is_empty(), "{:?}", h.state().errors);
+    Ok(())
+}

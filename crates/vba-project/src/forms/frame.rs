@@ -149,6 +149,27 @@ pub(super) fn parse(input: &str, export: bool) -> Result<Header> {
     }
     Err(corrupt("unterminated native designer header"))
 }
+pub(super) fn metadata(header: &Header) -> Result<(String, i32)> {
+    let tag = header
+        .properties
+        .get("tag")
+        .map(|s| quoted(s))
+        .transpose()?
+        .unwrap_or_default();
+    let help = header
+        .properties
+        .get("helpcontextid")
+        .map(|s| {
+            s.parse::<i32>()
+                .map_err(|_| corrupt("native help context ID"))
+        })
+        .transpose()?
+        .unwrap_or(0);
+    if help < 0 {
+        return Err(unsupported("negative native help context ID"));
+    }
+    Ok((tag, help))
+}
 pub(super) fn dimension(header: &Header, key: &str, default: i32) -> Result<i32> {
     let Some(s) = header.properties.get(key) else {
         return Ok(default);
@@ -294,6 +315,8 @@ pub fn decode_export(
             source: String::new(),
             attributes: vec![],
             design: Design {
+                tag: metadata(&header)?.0,
+                help_context_id: metadata(&header)?.1,
                 caption: header
                     .properties
                     .get("caption")

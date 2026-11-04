@@ -430,3 +430,11 @@ current-row Column access through ordinary class procedures. Source bounds/types
 remain independent; complete validation precedes canonical row/selection changes
 and ordinary callbacks. Whole-array reads, additional list/binding semantics and
 the broader M7A.4 scope remain open.
+
+[ADR 0054](decisions/0054-native-list-array-readback.md) adds detached zero-based
+List/Column array snapshots to the existing unbound ten-column native packet,
+preserving selection, Err and ordinary debugger lifetime. [ADR 0055](decisions/0055-native-form-metadata-and-control-tips.md)
+promotes native Tag/ControlTipText/HelpContextID into ordinary instance metadata
+and renders canonical control tips without executing code or changing focus.
+Original resources stay independent; actual Help-file/F1 routing and the broader
+M7A control/persistence/removal requirements remain open.

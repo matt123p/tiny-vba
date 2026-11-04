@@ -104,6 +104,16 @@ impl Ide {
         {
             return Err(error("native form project resource budget"));
         }
+        if native.design.tag.encode_utf16().count() > 16384
+            || native.design.help_context_id < 0
+            || native.design.controls.iter().any(|c| {
+                c.tag.encode_utf16().count() > 16384
+                    || c.control_tip_text.encode_utf16().count() > 16384
+                    || c.help_context_id < 0
+            })
+        {
+            return Err(error("native form metadata outside supported limits"));
+        }
         let point = |n: i32| n as f32 * (72.0 / 2540.0);
         let mut controls = Vec::new();
         let mut order = Vec::new();

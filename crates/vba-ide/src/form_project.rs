@@ -444,6 +444,7 @@ pub(crate) fn checked_handlers(
             "class_terminate",
         ]
         .contains(&d.name.key().as_str())
+            || native && ["tag", "helpcontextid"].contains(&d.name.key().as_str())
             || d.name.spelling.to_ascii_lowercase().starts_with("vba")
             || form
                 .controls
@@ -457,6 +458,7 @@ pub(crate) fn checked_handlers(
     }
     for c in &form.controls {
         if c.name.to_ascii_lowercase().starts_with("vba")
+            || native && ["tag", "helpcontextid"].contains(&c.name.to_ascii_lowercase().as_str())
             || [
                 "show",
                 "hide",
@@ -484,6 +486,7 @@ pub(crate) fn checked_handlers(
     for p in &parsed.module.procedures {
         let key = p.name.key();
         if key.starts_with("vba")
+            || native && ["tag", "helpcontextid"].contains(&key.as_str())
             || [
                 "class_initialize",
                 "class_terminate",
@@ -619,6 +622,9 @@ fn compiled_form(form: &Form, module: &Module, native: Option<&NativeForm>) -> R
     for property in ["Width", "Height"] {
         source.push_str(&format!("Public Vba{property} As Single\nPublic Property Get {property}() As Single\nIf Not VbaLoaded Then Class_Initialize\n{property}=Vba{property}\nEnd Property\nPublic Property Let {property}(ByVal value As Single)\nIf Not VbaLoaded Then Class_Initialize\nIf value<0 Or value>32767 Then Err.Raise 380\nVba{property}=value\nEnd Property\n"));
     }
+    if native.is_some() {
+        source.push_str("Public VbaTag As String\nPublic Property Get Tag() As String\nIf Not VbaLoaded Then Class_Initialize\nTag=VbaTag\nEnd Property\nPublic Property Let Tag(ByVal value As String)\nIf Not VbaLoaded Then Class_Initialize\nVbaTag=value\nEnd Property\nPublic VbaHelpContextID As Long\nPublic Property Get HelpContextID() As Long\nIf Not VbaLoaded Then Class_Initialize\nHelpContextID=VbaHelpContextID\nEnd Property\nPublic Property Let HelpContextID(ByVal value As Long)\nIf value<0 Then Err.Raise 380\nIf Not VbaLoaded Then Class_Initialize\nVbaHelpContextID=value\nEnd Property\n");
+    }
     // A visible window retains its own instance until Hide/Unload; this is ordinary
     // class state, not another object store or a special VM form type.
     source.push_str(&format!("Private VbaDisplayOwner As {}\n", form.name));
@@ -639,6 +645,13 @@ fn compiled_form(form: &Form, module: &Module, native: Option<&NativeForm>) -> R
         form.width,
         form.height
     ));
+    if let Some(native) = native {
+        source.push_str(&format!(
+            "VbaTag={}\nVbaHelpContextID={}\n",
+            vba_string(&native.design.tag),
+            native.design.help_context_id
+        ));
+    }
     for c in &form.controls {
         let temp = format!("VbaInit{}", c.id);
         source.push_str(&format!("Dim {temp} As {}\nSet {temp}=New {}\n{temp}.Enabled={}\n{temp}.Visible={}\n{temp}.TabStop={}\n{temp}.VbaTabIndex={}\n{temp}.Left={}\n{temp}.Top={}\n{temp}.Width={}\n{temp}.Height={}\n",class_name(c.kind),class_name(c.kind),boolean(c.enabled),boolean(c.visible),boolean(c.tab_stop),form.tab_order.iter().position(|id|*id==c.id).unwrap_or(0),c.bounds.left,c.bounds.top,c.bounds.width,c.bounds.height));
@@ -674,6 +687,12 @@ fn compiled_form(form: &Form, module: &Module, native: Option<&NativeForm>) -> R
         ));
         if let Some(control) = native.and_then(|n| n.design.controls.iter().find(|n| n.id == c.id))
         {
+            source.push_str(&format!(
+                "{temp}.Tag={}\n{temp}.ControlTipText={}\n{temp}.HelpContextID={}\n",
+                vba_string(&control.tag),
+                vba_string(&control.control_tip_text),
+                control.help_context_id
+            ));
             if matches!(
                 c.kind,
                 ControlKind::TextBox
@@ -1505,6 +1524,8 @@ impl Ide {
         let key = field.to_ascii_lowercase();
         let field = match key.as_str() {
             "caption" if control.is_none() => "VbaCaption",
+            "tag" if control.is_none() => "VbaTag",
+            "helpcontextid" => "VbaHelpContextID",
             "visible" if control.is_none() => "VbaVisible",
             "left" => "VbaLeft",
             "top" => "VbaTop",

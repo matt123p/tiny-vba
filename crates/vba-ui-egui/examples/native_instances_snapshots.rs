@@ -1,13 +1,14 @@
 //! Original multi-instance UserForm renders using the production import/VM/UI path.
 #[path = "../../vba-project/tests/support/native_forms.rs"]
 mod fixture;
-use egui_kittest::Harness;
+use egui_kittest::{Harness, kittest::Queryable};
 use vba_ide::{Action, Ide, Mode, NativeFormResource, NoHost};
 use vba_ui_egui::{EditorUi, Theme};
 struct State {
     ide: Ide,
     view: EditorUi,
     theme: Theme,
+    metadata: bool,
 }
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     let folder = std::env::args()
@@ -20,6 +21,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let lists = std::env::args()
         .nth(2)
         .is_some_and(|option| option == "--list-controls");
+    let metadata = std::env::args().nth(2).is_some_and(|o| o == "--metadata");
     for (name, theme, width, scale) in [
         ("light", Theme::light(), 1400., 1.),
         ("dark", Theme::dark(), 1400., 1.),
@@ -34,7 +36,9 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             1252,
             &[NativeFormResource {
                 name: "NativeForm.frx".into(),
-                bytes: if combos {
+                bytes: if metadata {
+                    fixture::metadata_companion()
+                } else if combos {
                     fixture::combo_companion(3, 1)
                 } else if lists {
                     fixture::list_companion()
@@ -43,7 +47,9 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                 },
             }],
         )?;
-        let main = if lists || combos {
+        let main = if metadata {
+            "Sub Main()\nNativeForm.Entry.ControlTipText=\"A native form control tip\"\nNativeForm.Show 0\nEnd Sub"
+        } else if lists || combos {
             "Sub Main()\nDim a As New NativeForm,b As New NativeForm\na.Caption=\"First window\"\nb.Caption=\"Second window\"\na.List1.AddItem \"alpha\"\na.List1.AddItem \"beta\"\na.List1.List(0,1)=\"A\"\na.List1.List(1,1)=\"B\"\na.List1.ListIndex=1\nb.List1.AddItem \"separate instance\"\nb.List1.List(0,1)=\"C\"\nb.List1.ListIndex=0\na.Show 0\nb.Show 0\nEnd Sub"
         } else {
             "Sub Main()\nDim a As NativeForm,b As NativeForm\nSet a=New NativeForm\nSet b=New NativeForm\na.Caption=\"First window\"\nb.Caption=\"Second window\"\na.Entry.Text=\"Value one\"\nb.Entry.Text=\"Value two\"\na.Show 0\nb.Show 0\nEnd Sub"
@@ -62,7 +68,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                 break;
             }
         }
-        if ide.form_instances()?.len() != 2 {
+        if ide.form_instances()?.len() != if metadata { 1 } else { 2 } {
             return Err("expected two live native form instances".into());
         }
         let mut h = Harness::builder()
@@ -71,16 +77,34 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             .wgpu()
             .build_ui_state(
                 |ui, s: &mut State| {
+                    if s.metadata {
+                        ui.style_mut().interaction.tooltip_delay = 0.;
+                    }
                     let _ = s.view.show(ui, &s.ide, s.theme);
                 },
                 State {
                     ide,
                     view: EditorUi::default(),
                     theme,
+                    metadata,
                 },
             );
         h.run_steps(5);
-        let prefix = if combos {
+        if metadata {
+            h.get(
+                egui_kittest::kittest::By::new()
+                    .label("Entry")
+                    .role(egui::accesskit::Role::TextInput),
+            )
+            .hover();
+            h.run_steps(8);
+            if h.query_by_label("A native form control tip").is_none() {
+                return Err("expected native tooltip".into());
+            }
+        }
+        let prefix = if metadata {
+            "m7a4-native-metadata"
+        } else if combos {
             "m7a4-combo-instances"
         } else if lists {
             "m7a4-list-instances"

@@ -282,11 +282,14 @@ pub(super) fn decode(
         design.end()?;
     }
     r.end()?;
-    Ok(NativeForm { format: Format::Embedded, name: header.name.clone(), code_page: 1252, source: String::new(), attributes: vec![], design: Design { caption,width,height,controls }, resources: vec![], diagnostics: vec!["Native resources retained; fonts, colours, decoration and window placement use the existing shared renderer. Full Office presentation/lifecycle parity is tracked separately in M7A.4.".into()] })
+    Ok(NativeForm { format: Format::Embedded, name: header.name.clone(), code_page: 1252, source: String::new(), attributes: vec![], design: Design { caption, tag: frame::metadata(header)?.0, help_context_id: frame::metadata(header)?.1, width,height,controls }, resources: vec![], diagnostics: vec!["Native resources retained; fonts, colours, decoration and window placement use the existing shared renderer. Full Office presentation/lifecycle parity is tracked separately in M7A.4.".into()] })
 }
 struct Site {
     id: u32,
     name: String,
+    tag: String,
+    control_tip_text: String,
+    help_context_id: i32,
     flags: u32,
     bytes: usize,
     tab: i16,
@@ -303,7 +306,8 @@ fn site(r: &mut Reader<'_>) -> Result<Site> {
     if id == 0 || id > i32::MAX as u32 {
         return Err(corrupt("invalid native site ID"));
     }
-    field(&mut b, m, 3, 4, 0)?;
+    let help_context_id = i32::try_from(field(&mut b, m, 3, 4, 0)?)
+        .map_err(|_| unsupported("native help context ID outside Long range"))?;
     let flags = field(&mut b, m, 4, 4, 0x33)?;
     if flags & !0x3f != 0 || flags & 0x10 == 0 {
         return Err(unsupported("native site flags/container/default/cancel"));
@@ -334,15 +338,18 @@ fn site(r: &mut Reader<'_>) -> Result<Site> {
     align(&mut b, 4)?;
     let name = string(&mut b, name)?;
     text::identifier(&name)?;
-    string(&mut b, tag)?;
+    let tag = string(&mut b, tag)?;
     let (left, top) = if m & (1 << 8) != 0 {
         (i32_value(&mut b)?, i32_value(&mut b)?)
     } else {
         (0, 0)
     };
-    string(&mut b, tooltip)?;
+    let control_tip_text = string(&mut b, tooltip)?;
     b.end()?;
     Ok(Site {
+        tag,
+        control_tip_text,
+        help_context_id,
         id,
         name,
         flags,
@@ -545,6 +552,9 @@ fn control(bytes: &[u8], site: Site) -> Result<Control> {
     Ok(Control {
         id: site.id,
         name: site.name,
+        tag: site.tag,
+        control_tip_text: site.control_tip_text,
+        help_context_id: site.help_context_id,
         kind: site.kind,
         left: site.left,
         top: site.top,
@@ -618,6 +628,9 @@ fn numeric_control(r: Reader<'_>, mut b: Reader<'_>, site: Site) -> Result<Contr
     Ok(Control {
         id: site.id,
         name: site.name,
+        tag: site.tag,
+        control_tip_text: site.control_tip_text,
+        help_context_id: site.help_context_id,
         kind: site.kind,
         left: site.left,
         top: site.top,

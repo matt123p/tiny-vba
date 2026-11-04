@@ -106,57 +106,88 @@ VbaTextColumn=column
 VbaRefresh
 End Property
 "#;
-pub(crate) const CELLS: &str = r#"Public Property Get List(Optional ByVal row As Variant,Optional ByVal column As Variant) As Variant
-If VBA.IsMissing(row) Then Err.Raise 381
+pub(crate) const CELLS: &str = r#"Public Property Get List(Optional ByVal pvargIndex As Variant,Optional ByVal pvargColumn As Variant) As Variant
+If VBA.IsMissing(pvargIndex) Then
+If Not VBA.IsMissing(pvargColumn) Then Err.Raise 381
+List=VbaSnapshot(False)
+Exit Property
+End If
 Dim index As Long,col As Long
-index=VBA.CLng(row)
-If Not VBA.IsMissing(column) Then col=VBA.CLng(column)
+index=VBA.CLng(pvargIndex)
+If Not VBA.IsMissing(pvargColumn) Then col=VBA.CLng(pvargColumn)
 If index<0 Or index>=VbaCount Or col<0 Or col>9 Then Err.Raise 381
 List=VbaItems(index*10+col)
 End Property
-Public Property Let List(Optional ByVal row As Variant,Optional ByVal column As Variant,ByVal value As Variant)
-If VBA.IsMissing(row) Then
-If Not VBA.IsMissing(column) Then Err.Raise 381
+Public Property Let List(Optional ByVal pvargIndex As Variant,Optional ByVal pvargColumn As Variant,ByVal value As Variant)
+If VBA.IsMissing(pvargIndex) Then
+If Not VBA.IsMissing(pvargColumn) Then Err.Raise 381
 VbaLoad value,False
 Exit Property
 End If
 Dim index As Long,col As Long,text As String
-index=VBA.CLng(row)
-If Not VBA.IsMissing(column) Then col=VBA.CLng(column)
+index=VBA.CLng(pvargIndex)
+If Not VBA.IsMissing(pvargColumn) Then col=VBA.CLng(pvargColumn)
 If index<0 Or index>=VbaCount Or col<0 Or col>9 Then Err.Raise 381
 text=VBA.CStr(value)
 If VBA.Len(text)>16384 Then Err.Raise 7
 VbaItems(index*10+col)=text
 If index=VbaListIndex Then VbaRefresh
 End Property
-Public Property Get Column(Optional ByVal col As Variant,Optional ByVal row As Variant) As Variant
-If VBA.IsMissing(col) Then Err.Raise 381
+Public Property Get Column(Optional ByVal pvargColumn As Variant,Optional ByVal pvargIndex As Variant) As Variant
+If VBA.IsMissing(pvargColumn) Then
+If Not VBA.IsMissing(pvargIndex) Then Err.Raise 381
+Column=VbaSnapshot(True)
+Exit Property
+End If
 Dim x As Long,y As Long
-x=VBA.CLng(col)
+x=VBA.CLng(pvargColumn)
 If x<0 Or x>9 Then Err.Raise 381
-If VBA.IsMissing(row) Then
+If VBA.IsMissing(pvargIndex) Then
 If VbaListIndex<0 Then
 Column=Null
 Exit Property
 End If
 y=VbaListIndex
 Else
-y=VBA.CLng(row)
+y=VBA.CLng(pvargIndex)
 End If
 Column=Me.List(y,x)
 End Property
-Public Property Let Column(Optional ByVal col As Variant,Optional ByVal row As Variant,ByVal value As Variant)
-If VBA.IsMissing(col) Then
-If Not VBA.IsMissing(row) Then Err.Raise 381
+Public Property Let Column(Optional ByVal pvargColumn As Variant,Optional ByVal pvargIndex As Variant,ByVal value As Variant)
+If VBA.IsMissing(pvargColumn) Then
+If Not VBA.IsMissing(pvargIndex) Then Err.Raise 381
 VbaLoad value,True
 Exit Property
 End If
 Dim x As Long,y As Long
-x=VBA.CLng(col)
+x=VBA.CLng(pvargColumn)
 y=VbaListIndex
-If Not VBA.IsMissing(row) Then y=VBA.CLng(row)
+If Not VBA.IsMissing(pvargIndex) Then y=VBA.CLng(pvargIndex)
 Me.List(y,x)=value
 End Property
+Private Function VbaSnapshot(ByVal transpose As Boolean) As Variant
+Dim row As Long,column As Long,data() As Variant
+If VbaCount<0 Or VbaCount>1024 Then Err.Raise 7
+If VbaCount=0 Then
+VbaSnapshot=Null
+Exit Function
+End If
+If transpose Then
+ReDim data(0 To 9,0 To VbaCount-1)
+Else
+ReDim data(0 To VbaCount-1,0 To 9)
+End If
+For row=0 To VbaCount-1
+For column=0 To 9
+If transpose Then
+data(column,row)=VbaItems(row*10+column)
+Else
+data(row,column)=VbaItems(row*10+column)
+End If
+Next column
+Next row
+VbaSnapshot=data
+End Function
 Private Sub VbaLoad(ByVal value As Variant,ByVal transpose As Boolean)
 Dim first As Long,second As Long,rows As Double,columns As Double
 Dim row As Long,column As Long,text As String,data() As Variant

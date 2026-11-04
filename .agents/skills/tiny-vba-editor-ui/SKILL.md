@@ -184,3 +184,9 @@ Reuse ordinary list rows, canonical UTF-16 text/selection/drop state and existin
 locale services/refusals. Preserve authorized input, typed validation, source/
 resource identity and nonreplayed Change/Click/drop continuations. No new codec,
 COM or second mutable store; broader M7A.4 work stays explicit.
+
+Native array readback follows [ADR 0054](../../../docs/decisions/0054-native-list-array-readback.md):
+copy canonical cells with explicit bounds, preserving Err, selection and events.
+[ADR 0055](../../../docs/decisions/0055-native-form-metadata-and-control-tips.md) keeps native
+metadata in ordinary fields and tooltip hover inert, bounded and theme-injected.
+Help/F1 routing, native persistence/removal and the broader M7A scope stay open.

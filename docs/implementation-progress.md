@@ -1,5 +1,26 @@
 # Implementation progress
 
+## M7A.4 continued — array readback and native metadata (2026-11-04)
+
+Implemented [ADR 0054](decisions/0054-native-list-array-readback.md) and
+[ADR 0055](decisions/0055-native-form-metadata-and-control-tips.md): detached native
+List/Column snapshots, documented named parameters, inert metadata decoding and
+ordinary Tag/ControlTipText/HelpContextID state with actual runtime control tips.
+The 60 native form-instance, 11 decoder and 13 actual widget cases PASS. Hover
+preserves focus/output; source/resource state stays independent. Light/dark/
+narrow/scaled/injected-host tooltip renders were inspected. Shared CI, WASM,
+actual WASI (60 instance/11 decoder cases), UI/native/web gates PASS. Chromium
+native control-tip hover and List/Column snapshot round-trip/input/modal Stop/
+resume PASS; editor smoke and legacy form browser regressions also PASS. The
+actual normal-delay browser tooltip was visually inspected. Original M7 fixture/
+hash checks and changed Markdown targets PASS. Fork integration is in progress.
+M7A remains IN PROGRESS for further array/list/binding semantics, native containers/
+pages/images/RefEdit, applicable platform controls and remaining lifecycle/input/
+property cases; actual Help/F1 routing is still unsupported. Native edited
+persistence (M7A.5), .tvform removal (M7A.6) and full acceptance (M7A.7) remain
+required. Fresh Office traces remain NOT_RUN under M8.5. Next after this packet:
+native container/resource/collection work while retaining the complete inventory.
+
 ## M7A.4 continued — native list array loading (2026-11-04)
 
 Implemented [ADR 0053](decisions/0053-native-list-array-loading.md): shared native

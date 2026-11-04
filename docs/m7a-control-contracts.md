@@ -30,7 +30,7 @@ are file-format defaults from MS-OFORMS, not undocumented VBE toolbox defaults.
 | Form Caption / size | Native FormExtraDataBlock + VBFrame; v5 VBFrame caption supported | D |
 | Form scrolling / Zoom / Enabled | Import requires unscrolled matching physical/logical size, zoom 100, enabled form | Other values U |
 | Font / ForeColor / BackColor / border / effect | Known native property fields, StdFont/TextProps and original resources; no font file acquisition | P; renderer parity M7A.4 |
-| Tag / HelpContextID / ControlTipText | Known frame/site strings/scalars retained in resources | P; no runtime property claim |
+| Tag / HelpContextID / ControlTipText | Known frame/site strings/scalars; ordinary per-instance metadata and runtime tips | D; Help/F1 routing remains U (ADR 0055) |
 | Window placement / StartUpPosition / ShowModal | VBFrame metadata retained; enabled/default-modal form required; explicit show modes use existing runtime | P for placement; disabled/default-modeless metadata U; parity M7A.4 |
 | Default / Cancel / Accelerator / TakeFocusOnClick changes | Native site/control flags or fields | Default/Cancel decoded and executed; other fields U |
 | Locked / multiline / password / MaxLength / scrolling changes | MorphData behavior fields or nondefault flags | Locked/MaxLength, multiline, password and selected Enter/Tab/field behavior decoded and executed; scrolling remains U |
@@ -63,8 +63,8 @@ unlisted property remains outside the selected import/runtime claim.
 | CheckBox | Value/TripleState, caption; binding remains U | Change/Click, user cycling/Locked; selected Enter/Exit; key/mouse/binding remain U | D/P | shared | selected Value/Change/Click | U |
 | OptionButton | Value/GroupName, caption; binding remains U | Change/Click/root grouping; selected Enter/Exit; key/mouse/binding remain U | D/P | shared | selected Value/Change/Click | U |
 | ToggleButton | Value/TripleState, caption; binding remains U | Change/Click/user cycling/Locked; selected Enter/Exit; key/mouse/binding remain U | D/P | shared | selected Value/Change/Click | U |
-| ComboBox | Selected unbound rows/columns, 2D List/Column loading, indexed/current-row Column, Value/Text/style/matching/selection; further list/binding APIs remain U | Selected Change/Click/DropButtonClick and input/focus/update | D/P | shared | selected packet | U |
-| ListBox | Selected unbound indexed rows, ListCount/ListIndex/Selected, Value/Text/columns, 2D List/Column loading and indexed/current-row Column; array reads/further loading cases, multiple selection and bindings remain U | Selected Change/Click, input/focus/update | D/P | shared | selected packet | U |
+| ComboBox | Selected unbound rows/columns, 2D List/Column loading/readback, indexed/current-row Column, Value/Text/style/matching/selection; further list/binding APIs remain U | Selected Change/Click/DropButtonClick and input/focus/update | D/P | shared | selected packet | U |
+| ListBox | Selected unbound indexed rows, ListCount/ListIndex/Selected, Value/Text/columns, 2D List/Column loading/readback and indexed/current-row Column; further shape/loading cases, multiple selection and bindings remain U | Selected Change/Click, input/focus/update | D/P | shared | selected packet | U |
 | Frame | Caption, Controls/container/group/tab behavior | Click, applicable focus/input | U | U | U | U |
 | MultiPage | Pages/Controls/Value, child identities/layout | Change, applicable focus/input | U | U | U | U |
 | TabStrip | Tabs/Value, layout/selection | Change, applicable focus/input | U | U | U | U |

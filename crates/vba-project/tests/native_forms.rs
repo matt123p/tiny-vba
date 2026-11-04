@@ -291,3 +291,45 @@ fn native_combo_styles_matching_and_columns_are_decoded_without_activation() {
     assert!(decode(&fixture::combo_companion(5, 2)).is_err());
     assert!(decode(&fixture::combo_companion(3, 9)).is_err());
 }
+
+#[test]
+fn native_site_and_frame_metadata_decode_without_changing_original_resources() {
+    let resource = fixture::metadata_companion();
+    let export = String::from_utf8(fixture::export()).unwrap().replace(
+        " ClientHeight",
+        " Tag = \"form-tag\"\r\n HelpContextID = 42\r\n ClientHeight",
+    );
+    let native = forms::decode_export(
+        "NativeForm.frm",
+        export.as_bytes(),
+        1252,
+        &[Resource {
+            name: "NativeForm.frx".into(),
+            bytes: resource.clone(),
+        }],
+        &Limits::default(),
+    )
+    .unwrap();
+    assert_eq!(native.design.tag, "form-tag");
+    assert_eq!(native.design.help_context_id, 42);
+    for control in &native.design.controls {
+        assert_eq!(control.tag, format!("tag-{}", control.id));
+        assert_eq!(control.control_tip_text, format!("tip-{}", control.id));
+        assert_eq!(control.help_context_id, 100 + control.id as i32);
+    }
+    assert_eq!(native.resources[1].bytes, resource);
+    let bad = export.replace("HelpContextID = 42", "HelpContextID = -1");
+    assert!(
+        forms::decode_export(
+            "NativeForm.frm",
+            bad.as_bytes(),
+            1252,
+            &[Resource {
+                name: "NativeForm.frx".into(),
+                bytes: fixture::metadata_companion()
+            }],
+            &Limits::default()
+        )
+        .is_err()
+    );
+}

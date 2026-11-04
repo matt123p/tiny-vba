@@ -1737,3 +1737,224 @@ End Sub"#,
     assert_eq!(ide.native_form(f.source), Some(&original));
     Ok(())
 }
+
+#[test]
+fn native_list_array_readback_is_zero_based_independent_and_inert() -> R {
+    let ide = list_setup(
+        r#"Sub Main()
+Dim l As MSForms.ListBox,snapshot As Variant,columns As Variant,current As Variant
+Set l=NativeForm.List1
+Debug.Print IsNull(l.List),IsNull(l.Column)
+l.AddItem "first"
+l.AddItem "second"
+l.List(0,1)="A"
+l.List(1,1)="B"
+l.ListIndex=1
+l.ColumnCount=0
+snapshot=l.List()
+columns=l.Column()
+Debug.Print VarType(snapshot),LBound(snapshot,1),UBound(snapshot,1),LBound(snapshot,2),UBound(snapshot,2)
+Debug.Print LBound(columns,1),UBound(columns,1),LBound(columns,2),UBound(columns,2)
+Debug.Print snapshot(0,0),snapshot(1,1),columns(0,1),columns(1,0),VarType(snapshot(0,9))
+Debug.Print l.List(pvargColumn:=1,pvargIndex:=0),l.Column(pvargIndex:=1,pvargColumn:=0)
+snapshot(1,1)="external"
+l.Column(pvargIndex:=0,pvargColumn:=0)="control"
+Debug.Print l.Value,l.ListIndex,l.List(0),snapshot(0,0),columns(0,0)
+On Error Resume Next
+Err.Raise 5
+current=l.List
+Debug.Print Err.Number,l.ListIndex
+Err.Clear
+l.Clear
+Debug.Print IsNull(l.List),IsNull(l.Column),snapshot(1,1),columns(1,1)
+l.AddItem "single"
+current=l.List
+columns=l.Column
+Debug.Print UBound(current,1),UBound(current,2),UBound(columns,1),UBound(columns,2)
+End Sub"#,
+        "\r\nPrivate Sub List1_Change()\r\nDebug.Print \"change\"\r\nEnd Sub\r\n",
+    )?;
+    assert_eq!(ide.mode(), Mode::Completed, "{:?}", ide.diagnostics);
+    assert_eq!(
+        ide.output(),
+        vec![
+            "initialized",
+            "True\tTrue",
+            "change",
+            "8204\t0\t1\t0\t9",
+            "0\t9\t0\t1",
+            "first\tB\tsecond\tA\t8",
+            "A\tsecond",
+            "B\t1\tcontrol\tfirst\tfirst",
+            "5\t1",
+            "change",
+            "True\tTrue\texternal\tB",
+            "0\t9\t9\t0"
+        ]
+    );
+    Ok(())
+}
+
+#[test]
+fn native_combo_array_snapshots_roundtrip_and_survive_stop_without_source_changes() -> R {
+    let mut ide = combo_setup(
+        r#"Sub Main()
+Dim c As MSForms.ComboBox,snapshot As Variant,columns As Variant
+Dim rows(4 To 6,-1 To 0) As String
+Set c=NativeForm.Combo1
+rows(4,-1)="Alpha"
+rows(4,0)="A"
+rows(5,-1)="Beta"
+rows(5,0)="B"
+rows(6,-1)="Gamma"
+rows(6,0)="C"
+c.List=rows
+c.ListIndex=1
+snapshot=c.List
+columns=c.Column
+Stop
+c.Column=columns
+Debug.Print c.ListCount,c.List(1),c.List(2,1),c.ListIndex
+c.List=snapshot
+Debug.Print c.ListCount,c.List(0),c.List(1,1),c.ListIndex
+snapshot(0,0)="detached"
+Debug.Print c.List(0),IsNull(c.Value),rows(4,-1)
+On Error Resume Next
+snapshot=c.List(,0)
+Debug.Print Err.Number
+Err.Clear
+snapshot=c.Column(,0)
+Debug.Print Err.Number
+End Sub"#,
+        "",
+        3,
+        1,
+    )?;
+    assert_eq!(ide.mode(), Mode::Break, "{:?}", ide.diagnostics);
+    let f = *ide.form_instances()?.first().ok_or("instance")?;
+    let native = ide.native_form(f.source).ok_or("native")?.clone();
+    assert_eq!(
+        ide.form_instance_field(f, Some(14), "ListIndex")?,
+        Value::Long(1)
+    );
+    assert_eq!(
+        ide.form_instance_field(f, Some(14), "Value")?,
+        Value::String(VbaString::from_utf8("B")?)
+    );
+    ide.dispatch(Action::Run, &mut NoHost)?;
+    settle(&mut ide)?;
+    assert_eq!(ide.mode(), Mode::Completed, "{:?}", ide.diagnostics);
+    assert_eq!(
+        ide.output(),
+        vec![
+            "initialized",
+            "3\tBeta\tC\t-1",
+            "3\tAlpha\tB\t-1",
+            "Alpha\tTrue\tAlpha",
+            "381",
+            "381"
+        ]
+    );
+    assert_eq!(ide.native_form(f.source), Some(&native));
+    Ok(())
+}
+
+#[test]
+fn native_form_metadata_initializes_before_authored_code_and_stays_instance_local() -> R {
+    let mut ide = Ide::new();
+    let export=String::from_utf8(fixture::export())?.replace(" ClientHeight", " Tag = \"form-tag\"\r\n HelpContextID = 42\r\n ClientHeight").replace("Debug.Print \"initialized\"", "Debug.Print Me.Tag,Me.HelpContextID,Entry.Tag,Entry.ControlTipText,Entry.HelpContextID");
+    ide.import_native_form_export(
+        "NativeForm.frm",
+        export.as_bytes(),
+        1252,
+        &[NativeFormResource {
+            name: "NativeForm.frx".into(),
+            bytes: fixture::metadata_companion(),
+        }],
+    )?;
+    assert!(ide.output().is_empty());
+    assert!(ide.form_instances()?.is_empty());
+    ide.add_module(
+        "Main.bas",
+        r#"Sub Main()
+Dim a As New NativeForm,b As New NativeForm,control As MSForms.Control
+Set control=a.Entry
+Debug.Print control.Tag,control.ControlTipText,control.HelpContextID
+control.Tag="changed"
+control.ControlTipText="explanation"
+control.HelpContextID=7
+a.Tag="changed form"
+a.HelpContextID=8
+Debug.Print a.Tag,a.HelpContextID,control.Tag,control.ControlTipText,control.HelpContextID
+Debug.Print b.Tag,b.Entry.Tag,b.Entry.HelpContextID
+On Error Resume Next
+control.HelpContextID=-1
+Debug.Print Err.Number,control.HelpContextID
+Err.Clear
+a.HelpContextID=-1
+Debug.Print Err.Number,a.HelpContextID
+Err.Clear
+control.Tag=Null
+Debug.Print Err.Number,control.Tag
+End Sub"#,
+    )?;
+    ide.dispatch(Action::Run, &mut NoHost)?;
+    settle(&mut ide)?;
+    assert_eq!(ide.mode(), Mode::Completed, "{:?}", ide.diagnostics);
+    assert_eq!(
+        ide.output(),
+        vec![
+            "form-tag\t42\ttag-12\ttip-12\t112",
+            "tag-12\ttip-12\t112",
+            "changed form\t8\tchanged\texplanation\t7",
+            "form-tag\t42\ttag-12\ttip-12\t112",
+            "form-tag\ttag-12\t112",
+            "380\t7",
+            "380\t8",
+            "94\tchanged"
+        ]
+    );
+    Ok(())
+}
+
+#[test]
+fn native_metadata_invalid_attachment_and_member_collisions_are_atomic() -> R {
+    let native = vba_project::forms::decode_export(
+        "NativeForm.frm",
+        &fixture::export(),
+        1252,
+        &[vba_project::forms::Resource {
+            name: "NativeForm.frx".into(),
+            bytes: fixture::metadata_companion(),
+        }],
+        &vba_project::Limits::default(),
+    )?;
+    for fault in 0..5 {
+        let mut n = native.clone();
+        match fault {
+            0 => n.design.help_context_id = -1,
+            1 => {
+                n.design
+                    .controls
+                    .first_mut()
+                    .ok_or("control")?
+                    .help_context_id = -1
+            }
+            2 => {
+                n.design
+                    .controls
+                    .first_mut()
+                    .ok_or("control")?
+                    .control_tip_text = "x".repeat(16385)
+            }
+            3 => n.source.push_str("\r\nPublic Tag As String\r\n"),
+            _ => n.design.controls.first_mut().ok_or("control")?.name = "HelpContextID".into(),
+        }
+        let mut ide = Ide::new();
+        assert!(ide.attach_native_form(n).is_err());
+        assert!(ide.modules.is_empty());
+        assert!(ide.form_instances()?.is_empty());
+        assert!(ide.output().is_empty());
+    }
+    Ok(())
+}

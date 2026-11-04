@@ -63,6 +63,7 @@ pub(crate) fn control_class(kind: ControlKind) -> String {
     let mut s = String::from(
         "Option Explicit\nPublic VbaName As String\nPublic VbaDirty As Boolean\nPublic Property Get Name() As String\nName=VbaName\nEnd Property\nPublic Enabled As Boolean\nPublic Visible As Boolean\nPublic TabStop As Boolean\nPublic VbaTabIndex As Integer\nPublic Event VbaTabChanged(ByVal previous As Integer,ByVal requested As Integer)\nPublic Property Get TabIndex() As Integer\nTabIndex=VbaTabIndex\nEnd Property\nPublic Property Let TabIndex(ByVal value As Integer)\nIf value<0 Then Err.Raise 380\nRaiseEvent VbaTabChanged(VbaTabIndex,value)\nEnd Property\n",
     );
+    s.push_str("Public Tag As String\nPublic ControlTipText As String\nPublic VbaHelpContextID As Long\nPublic Property Get HelpContextID() As Long\nHelpContextID=VbaHelpContextID\nEnd Property\nPublic Property Let HelpContextID(ByVal value As Long)\nIf value<0 Then Err.Raise 380\nVbaHelpContextID=value\nEnd Property\n");
     if kind != ControlKind::Label {
         s.push_str("Public VbaFocusConfirmed As Boolean\nPublic Event VbaFocusRequested(ByVal target As Object)\nPublic Sub SetFocus()\nVbaFocusConfirmed=False\nRaiseEvent VbaFocusRequested(Me)\nIf Not VbaFocusConfirmed Then Err.Raise 2110\nEnd Sub\n");
     }

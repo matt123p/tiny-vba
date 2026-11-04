@@ -46,6 +46,12 @@ const assert = require('node:assert/strict');
     await click(130, 110); await page.keyboard.press('F5');
     await page.waitForFunction(() => document.querySelector('#vba-status').textContent === 'Waiting for host');
     await page.screenshot({ path: path.join(report, 'm7a-native-browser-runtime.png') });
+    if (process.env.VBA_NATIVE_TOOLTIP) {
+      await page.mouse.move(565, 435); await page.waitForTimeout(1000);
+      assert.equal((await page.locator('#vba-output').textContent()).trim(), 'initialized');
+      assert.equal(await page.locator('#vba-status').textContent(), 'Waiting for host');
+      await page.screenshot({ path: path.join(report, 'm7a-native-browser-control-tip.png') });
+    }
     await click(565, 475);
     await page.waitForFunction(() => document.querySelector('#vba-status').textContent === 'Break');
     await page.screenshot({ path: path.join(report, 'm7a-native-browser-form-break.png') });

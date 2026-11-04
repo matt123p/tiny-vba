@@ -9,6 +9,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     );
     std::fs::create_dir_all(&dir)?;
     let option = std::env::args().nth(2);
+    let metadata = option.as_deref() == Some("--metadata");
     let combo = option.as_deref() == Some("--combo-controls");
     let list = option.as_deref() == Some("--list-controls");
     let numeric = option.as_deref() == Some("--numeric-controls");
@@ -20,7 +21,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         Some("--boolean-controls") => true,
         Some(
             "--focus-events" | "--text-controls" | "--password-text" | "--numeric-controls"
-            | "--list-controls" | "--combo-controls",
+            | "--list-controls" | "--combo-controls" | "--metadata",
         ) => false,
         Some(_) => return Err("unknown fixture option".into()),
     };
@@ -40,6 +41,12 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         "Stop\r\nDebug.Print Entry.Text"
     };
     let mut text = String::from_utf8(fixture::export())?.replace("Debug.Print Entry.Text", body);
+    if metadata {
+        text = text.replace(
+            " ClientHeight",
+            " Tag = \"form metadata\"\r\n HelpContextID = 7\r\n ClientHeight",
+        );
+    }
     if focus {
         text = text.replace(
             "Option Explicit",
@@ -62,7 +69,9 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     std::fs::write(dir.join("NativeForm.frm"), text)?;
     std::fs::write(
         dir.join("NativeForm.frx"),
-        if combo {
+        if metadata {
+            fixture::metadata_companion()
+        } else if combo {
             fixture::combo_companion(3, 1)
         } else if list {
             fixture::list_companion()

@@ -47,3 +47,5 @@ limit, not a claim about Office's error behavior. Full M7A.4 scope is unchanged.
 Sources: [List](https://learn.microsoft.com/en-us/office/vba/language/reference/user-interface-help/list-property-microsoft-forms),
 [Column](https://learn.microsoft.com/en-us/office/vba/language/reference/user-interface-help/column-property),
 [Microsoft array-loading example](https://learn.microsoft.com/en-us/office/vba/language/reference/user-interface-help/listbox-control-column-columncount-list-properties-example).
+
+[ADR 0054](0054-native-list-array-readback.md) subsequently implements bounded List/Column readback and documents its remaining shape/evidence limits.

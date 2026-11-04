@@ -42,7 +42,7 @@ in M7A.4; a declared unsupported packet is not implementation evidence.
 | OptionButton | Value/group/binding, Change/Click | Native flat decode/runtime/input and root groups; binding/native edited save unsupported |
 | ToggleButton | Value/binding, Change/Click | Native flat decode/runtime/input; binding/native edited save unsupported |
 | ComboBox | Items/selection/columns/binding/style, Change/Click/drop/update events | Selected native unbound editable/drop-list packet; further list/binding/resource/lifecycle cases and edited save remain unsupported |
-| ListBox | Items/selection/columns/multiselect/binding, Change/Click | Selected native unbound indexed rows/columns, single selection, Value/Text and input; 2D List/Column loading and indexed/current-row Column implemented; array reads/further loading cases/multiple selection/bindings/save remain unsupported |
+| ListBox | Items/selection/columns/multiselect/binding, Change/Click | Selected native unbound indexed rows/columns, single selection, Value/Text and input; 2D List/Column loading/readback and indexed/current-row Column implemented; further shape/loading cases/multiple selection/bindings/save remain unsupported |
 | Frame | Caption/container/child Controls/grouping/tab behavior | UNSUPPORTED |
 | MultiPage | Pages/selected Value, child controls, Change | UNSUPPORTED |
 | TabStrip | Tabs/selected Value, Change | UNSUPPORTED |

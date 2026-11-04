@@ -6,11 +6,19 @@ Updated 2026-11-04. **IN PROGRESS. M7A.4 is not complete.** This record extends
 
 Implemented in shared tiny-vba:
 
+- [Native array readback](decisions/0054-native-list-array-readback.md): detached
+  zero-based two-dimensional List/Column snapshots for the current ten-column
+  unbound packet, singleton/empty cases, named Forms parameters and independent
+  lifetime across Clear/Stop. Further shape/loading/binding parity remains open.
+- [Native metadata and tips](decisions/0055-native-form-metadata-and-control-tips.md):
+  inert Tag/ControlTipText/HelpContextID decoding, ordinary per-instance state and
+  theme-injected runtime tips without focus/code execution. Actual Help/F1 routing,
+  native edited persistence and the broader property/platform packet remain open.
+
 - [Native list array loading](decisions/0053-native-list-array-loading.md): shared
   two-dimensional List and transposed Column assignment, independent source
   arrays/lower bounds and indexed/current-row Column access. Validation completes
-  before row/selection replacement and ordinary Change continuations. Whole-array
-  reads and additional array/list/binding behavior remain open.
+  before row/selection replacement and ordinary Change continuations. Additional array/list/binding behavior remains open.
 
 - [Native ComboBox](decisions/0052-native-combobox.md): selected editable/drop-list
   records, shared ordinary list rows, Value/Text/selection/matching and VM-owned
@@ -22,7 +30,7 @@ Implemented in shared tiny-vba:
   records, indexed ten-column row data, AddItem/RemoveItem/Clear, selection,
   Value/Text/column properties, ordinary Change/Click and authorized pointer/key
   input. Focus/validation, original resources and debugger continuations remain
-  intact. Whole-array reads/multiple-selection/binding and further list properties stay open.
+  intact. Multiple-selection/binding and further list properties stay open.
 
 - [Native SpinButton/ScrollBar](decisions/0050-native-spinbutton-and-scrollbar.md):
   distinct native resource packets, Long bounds/value/increments, orientation and
@@ -138,8 +146,7 @@ Remaining M7A.4 requirements, without reducing the milestone's scope:
 - Native Frame, MultiPage, TabStrip,
   Image and Excel RefEdit packets, including real container/resource identity,
   list/page collections, pictures, bindings and presentation. These remain refused.
-  ComboBox and ListBox now have selected unbound packets; whole-array
-  reads, additional loading cases, multiple selection, bindings and further presentation remain open. The selected numeric packet does not close all
+  ComboBox and ListBox now have selected unbound packets; further array-shape/loading cases, multiple selection, bindings and further presentation remain open. The selected numeric packet does not close all
   ScrollBar/SpinButton property/resource/presentation cases.
 - Applicable Office-supplied worksheet ActiveX/platform packets; third-party
   controls and COM/OCX loading remain outside scope.

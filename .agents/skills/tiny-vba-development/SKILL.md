@@ -250,3 +250,9 @@ Native ListBox/ComboBox bulk loading follows [ADR 0053](../../../docs/decisions/
 Keep source arrays independent, validate all cells before canonical replacement,
 and use ordinary control refresh/event continuations. No error-handler rank probes,
 new intrinsic or mutable host store; array reads and broader M7A.4 remain open.
+
+Native array readback follows [ADR 0054](../../../docs/decisions/0054-native-list-array-readback.md):
+copy canonical cells with explicit bounds, preserving Err, selection and events.
+[ADR 0055](../../../docs/decisions/0055-native-form-metadata-and-control-tips.md) keeps native
+metadata in ordinary fields and tooltip hover inert, bounded and theme-injected.
+Help/F1 routing, native persistence/removal and the broader M7A scope stay open.

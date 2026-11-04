@@ -68,6 +68,7 @@ and native save/reopen. See [ADR 0041](decisions/0041-worksheet-form-controls.md
   Selected native unbound ListBox rows/selection/input are implemented under ADR 0051.
   Native editable/drop-list ComboBox text/matching/drop input is implemented under ADR 0052.
   Shared 2D List/Column loading and indexed/current-row Column access follow ADR 0053.
+  ADR 0054 adds bounded array readback; ADR 0055 adds native metadata/control tips.
   Remaining requirements and integration are recorded there. Reuse the shared runtime
   behind native forms and close Office compatibility gaps for the inventoried
   standard controls. Match instance/default-instance behavior, lifecycle, modal/
