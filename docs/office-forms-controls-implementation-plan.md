@@ -222,8 +222,14 @@ Report load/compile/display/input/run/edit/save independently using PASS,
 MISMATCH, UNSUPPORTED and NOT_RUN. Office reference behavior is the target;
 unverified behavior remains a gap, never an invented replacement feature.
 
-FC0.1 initial path inventory is complete; FC0.2/FC0.3 are in progress. FC1.1 now
-has a bounded read-only native Button metadata decoder and save/reopen evidence.
-Next: preserve/reconcile source DrawingML identity and assignments before geometry,
-rendering and activation. Shared native UserForm codec/resource contracts remain
-next in their own layer. See the ledger for exact evidence and open capabilities.
+Current checkpoint (2026-11-04): FC0 inventory/contracts and the selected
+FC3.1–FC3.4 native import/attachment profile are complete. FC1–FC2 are complete
+for the declared native worksheet Form Control profile. FC3.5/FC4 remain in
+progress: the shared runtime now includes selected flat boolean/text/numeric/
+ListBox/ComboBox controls, array loading/readback and native metadata/control
+tips. Container/page/image/RefEdit, further binding/platform/property/lifecycle
+work and native edited UserForm persistence still require implementation.
+FC5 native editing/package writeback and FC6 custom-format removal remain open;
+original-byte retention and the legacy codec do not satisfy those requirements.
+See [implementation progress](implementation-progress.md), the [runtime scope](m7a4-native-runtime.md)
+and [inventory/ledger](m7a-inventory.md) for current evidence and remaining work.

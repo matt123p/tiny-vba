@@ -13,7 +13,14 @@ actual WASI (60 instance/11 decoder cases), UI/native/web gates PASS. Chromium
 native control-tip hover and List/Column snapshot round-trip/input/modal Stop/
 resume PASS; editor smoke and legacy form browser regressions also PASS. The
 actual normal-delay browser tooltip was visually inspected. Original M7 fixture/
-hash checks and changed Markdown targets PASS. Fork integration is in progress.
+hash checks and changed Markdown targets PASS. Both forks pin shared runtime
+revision `5cda307d`: GridCraft `00a3b295` and WordCraft `33de3c18`. Full CI
+(10/8 gates), seven native and seven actual Node 22 WASM package cases per fork,
+strict optional VBA/UI Clippy and optional VBA web builds PASS. Existing list/
+ComboBox cases now round-trip detached snapshots; the seventh package case
+covers decoded metadata, nominal Control access, runtime writes, authorized
+input and exact original XLSM/DOCM source/resource retention. The detailed
+breakdown's obsolete FC0/FC1 next-step footer now matches current progress.
 M7A remains IN PROGRESS for further array/list/binding semantics, native containers/
 pages/images/RefEdit, applicable platform controls and remaining lifecycle/input/
 property cases; actual Help/F1 routing is still unsupported. Native edited
