@@ -83,7 +83,7 @@ Implemented in shared tiny-vba:
 
 The design cap remains 128 controls, existing native resource limits remain in
 force, VM instances/locations/callback and instruction budgets remain authoritative.
-The legacy encoder refuses the three added native control families. Native edited
+The legacy encoder refuses the native-only added control families. Native edited
 export/save remains unimplemented until M7A.5; there is no conversion feature.
 
 Original Rust fixtures under MIT OR Apache-2.0 supply the evidence. No Microsoft-
@@ -96,6 +96,8 @@ is included or executed:
 - [Generic VM view regression](../crates/vba-vm/tests/classes.rs)
 - [Contextual property parser regression](../crates/vba-syntax/tests/property_keywords.rs)
 - [Chromium boolean-control harness](../tools/ui-browser/native-boolean-forms.cjs)
+- [Chromium native text harness](../tools/ui-browser/native-text-forms.cjs)
+- [Chromium native numeric harness](../tools/ui-browser/native-numeric-forms.cjs)
 - [Actual multi-instance render builder](../crates/vba-ui-egui/examples/native_instances_snapshots.rs)
 
 Validation and consumer integration status are recorded in

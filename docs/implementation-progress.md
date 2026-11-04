@@ -15,8 +15,23 @@ A focus regression found by immediate typing after resume is fixed by preserving
 stable paused control IDs and restoring focus before input. Stationary dragging
 also remains inert after a Scroll handler resets Value. Host glyph policy remains
 unchanged; tests explicitly opt into placeholders when fonts lack their Unicode.
-Consumer immutable-pin integration and final artifact checks follow. Full M7A.4 remains
-IN PROGRESS for the unchanged [remaining scope](m7a4-native-runtime.md).
+Both forks pin accepted shared revision `2ce3f205`: GridCraft `53f230cd` and
+WordCraft `37106fc3`. Full CI (10/8 gates respectively), four native and actual
+Node 22 WASM package/trust/input cases, strict optional VBA/UI Clippy and optional
+VBA web builds PASS. The additional XLSM/DOCM case checks typed numeric controls,
+trusted small/large steps and exact original project bytes after reopen. An
+unchanged WordCraft proofing timing case passed on an isolated retry and the
+subsequent full serial CI run. Chromium output was visually inspected; M7
+fixture/hash validation and changed Markdown links PASS. Unrelated GridCraft
+ribbon work remains outside these commits.
+
+Full M7A.4 remains IN PROGRESS for the unchanged [remaining scope](m7a4-native-runtime.md).
+Next implementation packet: unbound native ListBox/ComboBox, beginning with
+MS-OFORMS MorphData masks/DisplayStyle and ordinary canonical list/selection
+properties; follow through authorized UI input, debugger continuation and both
+forks. Container/page/image/binding/platform and remaining lifecycle contracts
+still require implementation; these selected numeric/text increments do not
+constitute full milestone completion.
 
 ## M7A.4 continued — native TextBox text and selection (2026-11-04)
 
