@@ -45,8 +45,8 @@ regressions PASS. No page errors were observed.
 
 GridCraft full CI PASS (10 steps); WordCraft full CI PASS (8 steps). New native
 XLSM/DOCM attachment regressions PASS both natively and in actual Node 22.23.4
-JavaScript/WASM (one per fork). Optional VBA UI tests and Word's `vba` browser build
-PASS. Original M7 selection still verifies all 12 hashes unchanged; this integrity
+JavaScript/WASM (one per fork). Optional VBA UI tests PASS (9 GridCraft, 12 WordCraft), as does Word's `vba`
+browser build. Original M7 selection still verifies all 12 hashes unchanged; this integrity
 check does not execute the historical macros. Relative documentation links and
 whitespace checks PASS. Consumer source pins are updated to the shared implementation
 commit; final pin resolution uses the local commit in Cargo's git cache, without

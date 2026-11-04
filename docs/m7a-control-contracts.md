@@ -38,9 +38,14 @@ are file-format defaults from MS-OFORMS, not undocumented VBE toolbox defaults.
 | Pictures / MouseIcon / custom pointers / non-cached class table | Native binary resource or reference-specific class | U; no resource execution/loading |
 | Container children | Native depth/sites and separate parent-control storage | U in v1; refuse instead of flattening |
 
-Selected textual properties are strings, dimensions are exposed as Single points,
-Enabled/Visible/TabStop are Boolean and TabIndex is Integer in the existing shared
-runtime. Import parses persisted fields, not VBA coercion. VBA calls retain the
+Selected textual properties are strings, control dimensions are exposed as Single
+points, and Enabled/Visible/TabStop are Boolean in the existing shared runtime.
+Native TabIndex is retained as signed 16-bit metadata; the existing runtime
+currently exposes a Long rank in the shared tab order. Exact native Integer/rank
+semantics remain M7A.4. Form client geometry reaches the designer; additional
+root Width/Height members and executable MSForms reference/type bindings are not
+claimed by import support. Import parses persisted fields, not VBA coercion.
+VBA calls retain the
 central coercion/error path. Geometry and state not representable by this profile
 refuse before attachment; future property error-number comparisons remain M7A.4/M8.5.
 

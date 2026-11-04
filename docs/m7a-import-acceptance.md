@@ -95,3 +95,11 @@ Fixture builder SHA-256 identities at acceptance (formatting differs by reposito
 | tiny-vba | `b69945fd23937cc093ef2a7799ec7732494ad2dbd1a7a61467348227263ac3a0` |
 | gridcraft | `70cfc51550677911491e7c011850dea2065b94291cce4a8adf37daca05369e88` |
 | wordcraft | `70cfc51550677911491e7c011850dea2065b94291cce4a8adf37daca05369e88` |
+
+Consumer pin verification: shared implementation commit `87a862a9f11a372e112d7c166b9a82d74c8e009d`.
+Both forks resolve that exact git revision and pass their native form package test
+with `--locked --offline`, after removing temporary working-tree source overrides.
+Full host CI/UI/JS-WASM gates above used the same implementation from the working
+checkout. The commit was fetched locally into Cargo's git cache; publication of
+consumer commits requires publishing the shared revision first. No remote push
+was performed by this task.
