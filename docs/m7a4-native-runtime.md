@@ -78,8 +78,10 @@ Remaining M7A.4 requirements, without reducing the milestone's scope:
   list/page collections, pictures, bindings and presentation. These remain refused.
 - Applicable Office-supplied worksheet ActiveX/platform packets; third-party
   controls and COM/OCX loading remain outside scope.
-- Accepted fork dependency pins and their native/WASM/package/UI integration
-  evidence; fresh Office build/OS/locale observations remain NOT_RUN under M8.5.
+- Fresh Office build/OS/locale observations remain NOT_RUN under M8.5. The two
+  forks now pin the accepted shared runtime increment and have native/WASM/
+  package/input-authorization regression evidence; broader milestone acceptance
+  still requires the remaining implementations above.
 
 Source basis: [MS-OFORMS cached classes](https://learn.microsoft.com/en-us/openspecs/office_file_formats/ms-oforms/5f649a6c-90df-4226-b8c7-2a7d98cd9647),
 [MorphData masks](https://learn.microsoft.com/en-us/openspecs/office_file_formats/ms-oforms/19014e19-67fa-4060-8c81-d1463809f117),

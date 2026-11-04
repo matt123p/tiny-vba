@@ -39,8 +39,19 @@ real VBA handler, pauses/resumes without replay, and preserves exact source.
 Light/dark/narrow/scaled/host renders were inspected; boolean glyph contrast was
 corrected using injected tokens. The original M7 fixture checker retains all twelve
 hashes. No Office-produced artifact or downloaded macro is included/executed.
-Consumer fork pins remain unchanged until their integration gates are run; no new
-native support is advertised in builds pinned to the earlier shared revision.
+Both forks now pin shared `d2de831892e5d2b17557de6b7abb00a83fdfc292`:
+GridCraft `8c7acc9a`, WordCraft `81b49a81`. Their new native boolean-instance
+package tests PASS natively and in actual Node 22 JavaScript/WASM, preserving
+original XLSM/DOCM project bytes. Real editor dispatch regressions PASS for
+untrusted launch and revoked-trust instance input, including pure VBA handlers.
+Both optional VBA web builds and strict optional VBA/UI Clippy PASS. GridCraft
+full CI passes all ten steps with the existing licensed craft-fonts input
+(`aced4137c022f1f587624d48e81ec77e1914a9cc`); the missing-input run failed two
+glyph tests. WordCraft full CI passes all eight steps with RUST_TEST_THREADS=1;
+a PDF timing check failed under concurrent load, then passed in isolation and
+in the complete rerun without code/threshold changes. These are regression and
+selected-profile integration results, not full M7A.4 completion or fresh Office
+observations.
 
 ## M7A.4 started — explicit native UserForm instances (2026-11-04)
 
