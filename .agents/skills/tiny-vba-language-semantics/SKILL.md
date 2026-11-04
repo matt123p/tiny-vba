@@ -209,3 +209,10 @@ UserForm display/default ownership from referenced code lifetime. Named control
 getters reload; inert inspection does not. Generic root release validates class/
 object and protects document code names. Internal release waits remain bounded,
 report Running and preserve slice quotas; Terminate runs only at normal finalization.
+
+IR 9 `class-enumerators-v9` under
+[ADR 0045](../../../docs/decisions/0045-class-and-native-collection-enumerators.md)
+validates public zero-argument Object-returning class enumerators. Keep older IR
+refusal, ordinary getter checkpoints, bounded forwarding roots, wait/cancel and
+active/parked snapshot lifetimes. Native Controls/UserForms snapshot canonical
+objects through the transient view; no second mutable registry or .tvform change.

@@ -61,7 +61,7 @@ and native save/reopen. See [ADR 0041](decisions/0041-worksheet-form-controls.md
   [first instance packet](m7a4-userform-instances.md) removes the explicit New
   restriction in shared tiny-vba and implements instance-bound windows, input and
   continuation. The [runtime increment](m7a4-native-runtime.md) adds boolean controls,
-  collections and property/input semantics. Remaining requirements and integration
+  collections, For Each enumeration and property/input semantics. Remaining requirements and integration
   are recorded there. Reuse the shared runtime
   behind native forms and close Office compatibility gaps for the inventoried
   standard controls. Match instance/default-instance behavior, lifecycle, modal/

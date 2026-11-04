@@ -20,7 +20,7 @@ use vba_values::{Location, Locations, ScalarKind, Value};
 type Result<T> = std::result::Result<T, Diagnostic>;
 pub const PROFILE: &str = runtime::PROFILE;
 pub fn capabilities() -> ir::Capabilities {
-    let mut c = ir::Capabilities::ir8_structural();
+    let mut c = ir::Capabilities::ir9_structural();
     c.profile = PROFILE.into();
 
     c
@@ -229,6 +229,7 @@ struct Frame {
     events: std::collections::VecDeque<classes::Delivery>,
     receiver: Option<vba_values::ObjectRef>,
     class_return: Option<ClassReturn>,
+    enumerator_owners: Vec<vba_values::ObjectRef>,
     enumerations: BTreeMap<ir::LocalSlot, Enumeration>,
     captured: Vec<Option<Location>>,
     handler: Handler,
@@ -1971,6 +1972,7 @@ impl Session {
             events: std::collections::VecDeque::new(),
             receiver,
             class_return: None,
+            enumerator_owners: Vec::new(),
             enumerations: BTreeMap::new(),
             captured,
             handler: Handler::default(),
@@ -2751,6 +2753,7 @@ impl Session {
                         .enumerations
                         .retain(|_, e| span.start() >= e.start && span.end() <= e.end);
                 }
+                self.top_mut()?.enumerator_owners.clear();
                 self.top_mut()?.checkpoint = Some(site);
                 if self.visit.is_none() {
                     self.visit_serial = self.visit_serial.checked_add(1).ok_or_else(resource)?;
@@ -2822,6 +2825,7 @@ impl Session {
                 if self.top()?.enumerations.len() >= 64 {
                     return Err(resource());
                 }
+                self.top_mut()?.enumerator_owners.clear();
                 self.top_mut()?.enumerations.insert(
                     state,
                     Enumeration {
@@ -3099,6 +3103,7 @@ impl Session {
             }
             I::Checkpoint(site) => {
                 self.top_mut()?.captured.fill(None);
+                self.top_mut()?.enumerator_owners.clear();
                 self.top_mut()?.checkpoint = Some(site);
                 self.visit = None;
                 self.advance()?;

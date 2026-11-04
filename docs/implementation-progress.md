@@ -1,5 +1,32 @@
 # Implementation progress
 
+## M7A.4 continued — class and native collection enumeration (2026-11-04)
+
+Implemented [ADR 0045](decisions/0045-class-and-native-collection-enumerators.md):
+IR 9 validates standard DISPID_NEWENUM metadata and invokes Object-returning
+getters through ordinary frames. Native Controls/UserForms now support bounded
+For Each, empty/nested loops and canonical child/form identity. Retained native
+enumerators own their collections; active/parked snapshots keep their objects
+alive through unload, Stop and resume. Forwarding chains are bounded and retain
+normal host permissions, error, wait and cancellation behavior. Document classes
+without a project enumerator continue forwarding to their bound host owner.
+No .tvform extension or second mutable object store is added.
+
+Authored regressions: five generic enumeration tests and 22 native form instance
+tests, including three new collection ownership/iteration cases. The full M7A.4
+remaining scope is preserved in [the runtime record](m7a4-native-runtime.md);
+focus/typed events, qualified and nominal bindings, implicit/As New, further
+control families and platform packets remain required. Fresh Office evidence
+remains NOT_RUN under M8.5. Shared `cargo xtask ci`, `wasm`, `wasm-run`,
+`ui`, `ui-native` and `web` PASS. All five generic and 22 native-instance
+regressions PASS natively and in actual WASI execution. Existing Chromium smoke,
+legacy forms, native forms and native boolean input harnesses PASS. A further
+authored browser fixture enumerates all seven controls during Initialize before
+the same modal input/Stop/resume/source-identity checks; it also PASSes. The
+rendered result was inspected. M7's two authored fixtures retain all twelve hashes.
+Fork immutable-pin integration and package/bridge enumeration checks follow.
+
+
 ## M7A.4 continued — native control properties and collections (2026-11-04)
 
 Implemented [ADR 0043](decisions/0043-native-controls-and-project-inspection.md)
@@ -22,7 +49,7 @@ keep this release outside VM slices and protect document roots; cancelled close
 and paused Reset retain their normal ownership semantics.
 
 M7A.4 remains IN PROGRESS. Additional default/control alias edge cases, typed focus and
-validation/events, collection enumeration/type binding, the remaining native
+validation/events, qualified collection access/type binding, the remaining native
 control/resource/binding/presentation families and platform packets remain open.
 M7A.5 edited native saving and M7A.6 removal are unchanged. No fresh Office run or
 full milestone sign-off is claimed. The runtime record keeps the completion gaps

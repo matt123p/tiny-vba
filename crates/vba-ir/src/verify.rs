@@ -130,6 +130,7 @@ fn validate(
             | IR6_VERSION
             | IR7_VERSION
             | IR8_VERSION
+            | IR9_VERSION
     ) || p.profile != caps.profile
         || !caps.ir_versions.contains(&p.ir_version)
     {
@@ -297,6 +298,37 @@ fn validate(
             }
             if field.nominal.is_some() && field.array.unwrap_or(field.kind) != ScalarKind::Object {
                 return Err(invalid("nominal class field kind"));
+            }
+        }
+        if let Some(member) = &class.enumerator {
+            if p.ir_version < IR9_VERSION {
+                return Err(incompatible("class enumerator requires IR 9"));
+            }
+            feature(p, caps, "class-enumerators-v9")?;
+            name(member)?;
+            budget.text(member)?;
+            let method = class
+                .methods
+                .iter()
+                .find(|m| {
+                    m.name.eq_ignore_ascii_case(member)
+                        && m.public
+                        && matches!(m.kind, ForeignKind::Get | ForeignKind::Call)
+                })
+                .ok_or_else(|| invalid("class enumerator member"))?;
+            let procedure = p
+                .procedures
+                .get(method.procedure.0 as usize)
+                .ok_or_else(|| invalid("class enumerator procedure"))?;
+            if procedure.kind != ProcedureKind::Function
+                || procedure
+                    .result
+                    .and_then(|slot| procedure.locals.get(slot.0 as usize))
+                    .map(|l| l.kind)
+                    != Some(ScalarKind::Object)
+                || !procedure.parameters.is_empty()
+            {
+                return Err(invalid("class enumerator signature"));
             }
         }
         if let Some(member) = &class.default_member {

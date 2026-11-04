@@ -275,7 +275,21 @@ pub fn compile_modules(
         }) {
             features.insert("host-events-v1".into());
         }
+        let enumerator = program.modules.get(class.module).and_then(|m| {
+            m.attributes.iter().find_map(|a| {
+                (a.path
+                    .get(1)
+                    .is_some_and(|n| n.spelling.eq_ignore_ascii_case("VB_UserMemId"))
+                    && ast::attribute_integer(a) == Some(-4))
+                .then(|| a.path.first().map(|n| n.spelling.clone()))
+                .flatten()
+            })
+        });
+        if enumerator.is_some() {
+            features.insert("class-enumerators-v9".into());
+        }
         classes.push(ir::Class {
+            enumerator,
             events: program
                 .procedures
                 .iter()
@@ -337,7 +351,9 @@ pub fn compile_modules(
     let mut ir = ir::Program {
         classes,
         nominal_locals,
-        ir_version: if features.contains("host-procedure-defaults-v1")
+        ir_version: if features.contains("class-enumerators-v9") {
+            ir::IR9_VERSION
+        } else if features.contains("host-procedure-defaults-v1")
             || features.contains("intrinsics-m6a-v1")
             || features.contains("string-comparison-context-v1")
         {

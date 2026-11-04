@@ -33,7 +33,9 @@ pub const IR5_VERSION: u32 = 5;
 pub const IR6_VERSION: u32 = 6;
 pub const IR7_VERSION: u32 = 7;
 pub const IR8_VERSION: u32 = 8;
-pub const FEATURES: [&str; 24] = [
+pub const IR9_VERSION: u32 = 9;
+pub const FEATURES: [&str; 25] = [
+    "class-enumerators-v9",
     "host-procedure-defaults-v1",
     "host-events-v1",
     "project-classes-v7",
@@ -466,6 +468,8 @@ pub struct Class {
     pub document: bool,
     pub predeclared: bool,
     pub default_member: Option<String>,
+    /// Public zero-argument object-returning member identified by DISPID_NEWENUM.
+    pub enumerator: Option<String>,
     pub source: SourceIndex,
     pub name: String,
     pub fields: Vec<ClassField>,
@@ -596,11 +600,19 @@ impl Capabilities {
                 .collect(),
             declarations: ScalarKind::ALL.into_iter().collect(),
         };
+        caps.features.remove("class-enumerators-v9");
         caps.features.remove("host-procedure-defaults-v1");
         caps.features.remove("intrinsics-m6a-v1");
         caps.features.remove("string-comparison-context-v1");
         caps.instructions.remove(&Opcode::IntrinsicCall);
         caps.instructions.remove(&Opcode::BinaryCompare);
+        caps
+    }
+    pub fn ir9_structural() -> Self {
+        let mut caps = Self::ir8_structural();
+        caps.profile = "ir9-structural".into();
+        caps.ir_versions.insert(IR9_VERSION);
+        caps.features.insert("class-enumerators-v9".into());
         caps
     }
     pub fn ir8_structural() -> Self {

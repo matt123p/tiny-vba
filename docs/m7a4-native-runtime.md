@@ -31,6 +31,11 @@ Implemented in shared tiny-vba:
   programmatic writes. Common control Name is read-only; TextBox no longer
   advertises the nonexistent Caption property. Form Name and bounded point sizes
   are available through generated ordinary properties.
+- Controls/UserForms For Each enumeration uses the IR 9 class-enumerator contract
+  in [ADR 0045](decisions/0045-class-and-native-collection-enumerators.md). Nested
+  and empty loops retain canonical objects through unload, Stop and resume;
+  collection queries remain inert and never load defaults. Native loop snapshots
+  now retain object lifetimes in active and parked frames.
 - Controls.Count and zero-based/name Item/default lookup preserve child identity.
   Names use the admitted ASCII identifier profile without requiring a locale
   service for internal lookup. UserForms.Count/Item/default lookup inspect live
@@ -40,7 +45,7 @@ Implemented in shared tiny-vba:
   be constructed explicitly.
 - A generic transient, read-only host view over canonical project objects, with
   stale/private/getter refusals and work/payload budgets. FormHost forwards host
-  intrinsic services and their waits. No second mutable object registry, new IR,
+  intrinsic services and their waits. No second mutable object registry or
   external dependency or custom form-format extension is introduced.
 
 The design cap remains 128 controls, existing native resource limits remain in
@@ -68,8 +73,10 @@ Remaining M7A.4 requirements, without reducing the milestone's scope:
 - Additional default/control-reference alias and reload edge cases against Office;
   full Activate/Deactivate ordering and modeless focus ownership. The selected
   replacement/code-lifetime cases are implemented under ADR 0044.
-- UserForms/Controls enumeration, qualified collection access, generic UserForm/
-  MSForms type bindings, and complete implicit/As New behavior.
+- Qualified collection access, generic UserForm/
+  MSForms type bindings, and complete implicit/As New behavior. Direct enumerator
+  cursor interfaces and collection structural-mutation parity also remain open;
+  For Each uses the existing bounded snapshot profile.
 - ActiveControl/SetFocus, Enter/Exit and Before/AfterUpdate with the native typed
   cancel arguments; keyboard/mouse/accelerator ordering, text selection, multiline,
   password and the remaining property/default/error/coercion contracts.

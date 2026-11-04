@@ -230,3 +230,10 @@ Controls/UserForms lookup and bounded transient project inspection. Canonical
 VM state remains authoritative; queries never load forms or invoke getters.
 Keep intrinsic providers/wait routing intact and do not extend .tvform. The
 milestone remains in progress with its remaining requirements recorded there.
+
+IR 9 `class-enumerators-v9` under
+[ADR 0045](../../../docs/decisions/0045-class-and-native-collection-enumerators.md)
+validates public zero-argument Object-returning class enumerators. Keep older IR
+refusal, ordinary getter checkpoints, bounded forwarding roots, wait/cancel and
+active/parked snapshot lifetimes. Native Controls/UserForms snapshot canonical
+objects through the transient view; no second mutable registry or .tvform change.

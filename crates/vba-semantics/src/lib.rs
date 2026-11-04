@@ -520,6 +520,7 @@ pub fn bind_with_references(
     }
     for parsed in parsed {
         let mut default_member: Option<String> = None;
+        let mut enumerator: Option<String> = None;
         for attribute in &parsed.module.attributes {
             let key = attribute
                 .path
@@ -538,10 +539,28 @@ pub fn bind_with_references(
                 let id = ast::attribute_integer(attribute)
                     .ok_or_else(|| err("invalid member ID", attribute.span))?;
                 if id == -4 {
-                    return Err(unsupported(
-                        "project-class enumerator attributes",
-                        attribute.span,
-                    ));
+                    let owner = attribute.path.first().map(|n| n.key()).unwrap_or_default();
+                    let valid = parsed.module.kind != ast::ModuleKind::Standard
+                        && key == "vb_usermemid"
+                        && parsed.module.procedures.iter().any(|p| {
+                            p.name.key() == owner
+                                && p.visibility != ast::Visibility::Private
+                                && p.parameters.is_empty()
+                                && (matches!(p.property, Some(ast::PropertyKind::Get))
+                                    || p.kind == ast::ProcedureKind::Function)
+                                && kind(p.result_type.as_ref(), &p.name, references)
+                                    .is_ok_and(|kind| kind == ScalarKind::Object)
+                        });
+                    if !valid {
+                        return Err(unsupported(
+                            "enumerator requires a public zero-argument Object function/getter",
+                            attribute.span,
+                        ));
+                    }
+                    if enumerator.as_ref().is_some_and(|name| name != &owner) {
+                        return Err(err("multiple enumerators", attribute.span));
+                    }
+                    enumerator = Some(owner);
                 }
                 if id == 0 {
                     let owner = attribute

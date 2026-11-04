@@ -177,3 +177,8 @@ Controls/UserForms lookup and bounded transient project inspection. Canonical
 VM state remains authoritative; queries never load forms or invoke getters.
 Keep intrinsic providers/wait routing intact and do not extend .tvform. The
 milestone remains in progress with its remaining requirements recorded there.
+
+[ADR 0045](decisions/0045-class-and-native-collection-enumerators.md) adds IR 9
+class enumerators and native Controls/UserForms For Each, including retained
+collection ownership and active/parked snapshot lifetimes. The broader M7A.4
+remaining scope stays in the [runtime record](m7a4-native-runtime.md).

@@ -202,3 +202,10 @@ OOXML/VML edited persistence, optional ControlFormat APIs and trusted widget inp
 Preserve original package data separately; failed joins stay inert and callbacks
 use the existing bridge. This is not MSForms/ActiveX or UserForm edited-save support.
 M7A.4 is in progress; fresh Office observations remain NOT_RUN under M8.5.
+
+IR 9 `class-enumerators-v9` under
+[ADR 0045](../../../docs/decisions/0045-class-and-native-collection-enumerators.md)
+validates public zero-argument Object-returning class enumerators. Keep older IR
+refusal, ordinary getter checkpoints, bounded forwarding roots, wait/cancel and
+active/parked snapshot lifetimes. Native Controls/UserForms snapshot canonical
+objects through the transient view; no second mutable registry or .tvform change.

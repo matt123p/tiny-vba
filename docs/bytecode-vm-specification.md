@@ -1,6 +1,6 @@
 # Bytecode and explicit-state VM specification
 
-Version: IR 1 base with versioned extensions through IR 8. Date: 2026-10-26. Status: adopted implementation contract under
+Version: IR 1 base with versioned extensions through IR 9. Date: 2026-10-26. Status: adopted implementation contract under
 [ADR 0004](decisions/0004-bytecode-vm-contract.md). M2 structural IR/verifier/lowering and M3 execution subset implemented. See [compiler](compiler.md) and [runtime](runtime.md).
 
 This document defines the M2/M3 instruction representation, verifier, calling convention and execution
@@ -642,3 +642,15 @@ returns named Unsupported.
 standard procedures. It requires IR 8 and explicit consumer capability. Earlier IR contracts
 retain required standard parameter metadata and expanded static call arguments. This is
 metadata for bounded host-mediated calls under ADR 0036; no instruction/protocol change.
+
+## IR 9 class enumerator metadata
+
+`class-enumerators-v9` adds optional `Class.enumerator`, naming a public
+zero-argument Object-returning Get/Call method for DISPID_NEWENUM. Verification
+requires IR 9, explicit capability, valid member ownership/result storage and
+its signature. Older consumers refuse the metadata. For Each calls the getter
+through an ordinary class frame, then forwards the returned object through the
+original verified enumeration site. No opcode or array-valued VBA getter is added.
+Native receiver chains are capped at 64 and remain roots through snapshot creation
+and host waits. Installed snapshots retain their native objects in active/parked
+frames. See [ADR 0045](decisions/0045-class-and-native-collection-enumerators.md).

@@ -76,7 +76,7 @@ fn procedure_and_field_default_member_metadata_execute_or_refuse_explicitly() ->
     }
     for (class, diagnostic) in [
         (
-            "Public Function NewEnum() As Object\nAttribute NewEnum.VB_UserMemId = -4\nEnd Function",
+            "Public Function NewEnum() As Long\nAttribute NewEnum.VB_UserMemId = -4\nEnd Function",
             "enumerator",
         ),
         (

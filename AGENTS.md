@@ -144,3 +144,9 @@ UserForm display/default ownership from referenced code lifetime. Named control
 getters reload; inert inspection does not. Generic root release validates class/
 object and protects document code names. Internal release waits remain bounded,
 report Running and preserve slice quotas; Terminate runs only at normal finalization.
+
+[ADR 0045](docs/decisions/0045-class-and-native-collection-enumerators.md) adds IR 9
+class enumerator metadata and native Controls/UserForms For Each. Preserve IR 1–8
+refusal, ordinary getter frames, nonreplayed waits, bounded receiver roots and
+active/parked snapshot object ownership. Native collection interfaces inspect
+canonical fields without another mutable store. M7A.4 remains in progress.

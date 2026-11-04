@@ -5,6 +5,8 @@ use crate::{
 };
 use vba_foreign::{Completion, ForeignError, HostCall, Reply};
 const GATE_OBJECT: u64 = u64::MAX;
+// Reserved form-interface range, disjoint from the gate itself. No object store.
+const ENUM_OBJECT_MIN: u64 = u64::MAX - 65536;
 #[derive(Default)]
 pub(crate) struct FormGate {
     next: u64,
@@ -26,6 +28,89 @@ pub(crate) struct FormHost<'a, H> {
     pub gate: &'a mut FormGate,
 }
 impl<H: Host> FormHost<'_, H> {
+    fn enumerate_collection(
+        &self,
+        call: HostCall,
+        objects: &dyn vba_foreign::ProjectObjectView,
+    ) -> Reply {
+        let result = (|| -> std::result::Result<Value, ForeignError> {
+            let error = |number, description: &str| ForeignError {
+                number,
+                description: description.into(),
+            };
+            if call.kind != vba_foreign::InvokeKind::Enumerate || !call.arguments.is_empty() {
+                return Err(error(438, "enumerator interface supports enumeration only"));
+            }
+            let owner = ObjectRef {
+                host: 0,
+                object: GATE_OBJECT - call.target.object,
+                generation: call.target.generation,
+            };
+            if !objects.instances("VbaFormEnumerator")?.contains(&owner) {
+                return Err(error(91, "stale collection enumerator"));
+            }
+            let Value::Object(owner) = objects.public_field(owner, "VbaOwner")? else {
+                return Err(error(91, "missing collection owner"));
+            };
+            let mut values = Vec::new();
+            if objects.instances("VbaFormControls")?.contains(&owner) {
+                let Value::Long(total) = objects.public_field(owner, "VbaTotal")? else {
+                    return Err(error(13, "invalid collection count"));
+                };
+                let Value::Array(entries) = objects.public_field(owner, "VbaEntries")? else {
+                    return Err(error(13, "invalid collection entries"));
+                };
+                let total = usize::try_from(total)
+                    .ok()
+                    .filter(|n| *n <= 128 && *n <= entries.elements().len())
+                    .ok_or_else(|| error(7, "collection budget"))?;
+                values.extend_from_slice(
+                    entries
+                        .elements()
+                        .get(..total)
+                        .ok_or_else(|| error(7, "collection budget"))?,
+                );
+            } else if objects.instances("VbaFormUserForms")?.contains(&owner) {
+                for component in &self.gate.components {
+                    for object in objects.instances(component)? {
+                        if objects.public_field(object, "VbaLoaded")? == Value::Boolean(true) {
+                            values.push(Value::Object(object));
+                        }
+                    }
+                }
+                values.sort_by_key(|value| {
+                    if let Value::Object(o) = value {
+                        o.object
+                    } else {
+                        0
+                    }
+                });
+            } else {
+                return Err(error(91, "stale collection enumerator"));
+            }
+            let mut array = if values.is_empty() {
+                vba_values::VbaArray::empty(ScalarKind::Variant, 0)
+            } else {
+                let upper =
+                    i32::try_from(values.len() - 1).map_err(|_| error(7, "collection budget"))?;
+                vba_values::VbaArray::new(ScalarKind::Variant, vec![(0, upper)], false)
+                    .map_err(|_| error(7, "collection allocation budget"))?
+            };
+            for (index, value) in values.into_iter().enumerate() {
+                array
+                    .set(index, value)
+                    .map_err(|_| error(7, "collection payload budget"))?;
+            }
+            Ok(Value::Array(array))
+        })();
+        match result {
+            Ok(value) => Reply::Complete(Completion {
+                value,
+                writes: vec![],
+            }),
+            Err(error) => Reply::Error(error),
+        }
+    }
     fn external_reply(&mut self, reply: Reply) -> Reply {
         if let Reply::Wait(actual) = reply {
             if self.gate.external_waits.len() >= 16 {
@@ -128,7 +213,36 @@ impl<H: Host> Host for FormHost<'_, H> {
         call: HostCall,
         objects: &dyn vba_foreign::ProjectObjectView,
     ) -> Reply {
+        if call.target.object >= ENUM_OBJECT_MIN && call.target.object != GATE_OBJECT {
+            return self.enumerate_collection(call, objects);
+        }
         if call.target.object == GATE_OBJECT && call.target.generation == GATE_OBJECT {
+            if call.member == "Enumerator" {
+                let Some(Value::Object(owner)) = call.arguments.first().map(|a| &a.value) else {
+                    return refusal("collection owner required");
+                };
+                if call.arguments.len() != 1
+                    || owner.host != 0
+                    || owner.object == 0
+                    || owner.object > 65536
+                {
+                    return refusal("invalid collection owner");
+                }
+                let valid = objects
+                    .instances("VbaFormEnumerator")
+                    .is_ok_and(|instances| instances.contains(owner));
+                if !valid {
+                    return refusal("unknown collection owner");
+                }
+                return Reply::Complete(Completion {
+                    value: Value::Object(ObjectRef {
+                        host: self.identity(),
+                        object: GATE_OBJECT - owner.object,
+                        generation: owner.generation,
+                    }),
+                    writes: vec![],
+                });
+            }
             if call.member != "Query" {
                 return self.invoke(call);
             }
@@ -1076,6 +1190,14 @@ impl Ide {
                 )?,
                 ModuleKind::Class,
             )?);
+            modules.push(parse(
+                &SourceFile::new(
+                    SourceId(u64::MAX - 7),
+                    "VbaFormEnumerator.cls".into(),
+                    crate::form_controls::enumerator_class(),
+                )?,
+                ModuleKind::Class,
+            )?);
             let components: Vec<_> = self
                 .forms
                 .values()
@@ -1115,6 +1237,12 @@ impl Ide {
     pub(crate) fn form_imports(&self) -> Vec<Import> {
         let mut imports = self.imports.clone();
         if !self.forms.is_empty() {
+            imports.push(Import {
+                name: "VbaFormEnumInterface".into(),
+                kind: vba_foreign::InvokeKind::Call,
+                root: "VbaFormsGate".into(),
+                member: Some("Enumerator".into()),
+            });
             imports.push(Import {
                 name: "VbaFormQuery".into(),
                 kind: vba_foreign::InvokeKind::Call,

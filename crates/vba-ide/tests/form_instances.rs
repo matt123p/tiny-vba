@@ -551,3 +551,60 @@ fn unloading_a_visible_form_does_not_raise_deactivate() -> R {
     assert_eq!(ide.output(), vec!["initialized", "terminated", "done"]);
     Ok(())
 }
+
+#[test]
+fn native_collections_enumerate_canonical_objects_in_order_without_loading_defaults() -> R {
+    let ide = setup(
+        "Sub Main()\nDim a As NativeForm,b As NativeForm,f As Object,c As Object,v As Variant,n As Long\nDebug.Print UserForms.Count\nFor Each f In UserForms\nErr.Raise 5\nNext f\nSet a=New NativeForm\nSet b=New NativeForm\na.Caption=\"first\"\nb.Caption=\"second\"\nFor Each f In UserForms\nDebug.Print f.Caption\nFor Each c In f.Controls\nDebug.Print c.Name\nIf c Is f.Entry Then c.Text=\"canonical\"\nNext c\nNext f\nDebug.Print a.Entry.Text\nDebug.Print b.Entry.Text\nFor Each v In a.Controls\nn=n+1\nNext v\nDebug.Print n\nEnd Sub",
+        Some(&fixture::SOURCE.replace("Debug.Print \"initialized\"", "")),
+    )?;
+    assert_eq!(ide.mode(), Mode::Completed, "{:?}", ide.diagnostics);
+    assert_eq!(
+        ide.output(),
+        vec![
+            "0",
+            "first",
+            "Heading",
+            "Entry",
+            "Apply",
+            "second",
+            "Heading",
+            "Entry",
+            "Apply",
+            "canonical",
+            "canonical",
+            "3"
+        ]
+    );
+    Ok(())
+}
+
+#[test]
+fn enumerated_controls_remain_live_after_form_unload_and_stop() -> R {
+    let mut ide = setup(
+        "Sub Main()\nDim a As NativeForm,c As Object\nSet a=New NativeForm\na.Show 0\nFor Each c In a.Controls\nIf c.Name=\"Heading\" Then\nUnload a\nStop\nEnd If\nDebug.Print c.Name\nNext c\nEnd Sub",
+        Some(&fixture::SOURCE.replace("Debug.Print \"initialized\"", "")),
+    )?;
+    assert_eq!(ide.mode(), Mode::Break, "{:?}", ide.diagnostics);
+    assert!(ide.form_instances()?.is_empty());
+    ide.dispatch(Action::Run, &mut NoHost)?;
+    settle(&mut ide)?;
+    assert_eq!(ide.mode(), Mode::Completed, "{:?}", ide.diagnostics);
+    assert_eq!(ide.output(), vec!["Heading", "Entry", "Apply"]);
+    Ok(())
+}
+
+#[test]
+fn retained_native_enumerator_owns_its_collection_after_unload() -> R {
+    let mut ide = setup(
+        "Sub Main()\nDim a As NativeForm,c As Object,e As Object\nSet a=New NativeForm\nSet e=a.Controls.VbaNewEnum\na.Show 0\nUnload a\nSet a=Nothing\nStop\nFor Each c In e\nDebug.Print c.Name\nNext c\nEnd Sub",
+        Some(&fixture::SOURCE.replace("Debug.Print \"initialized\"", "")),
+    )?;
+    assert_eq!(ide.mode(), Mode::Break, "{:?}", ide.diagnostics);
+    assert!(ide.form_instances()?.is_empty());
+    ide.dispatch(Action::Run, &mut NoHost)?;
+    settle(&mut ide)?;
+    assert_eq!(ide.mode(), Mode::Completed, "{:?}", ide.diagnostics);
+    assert_eq!(ide.output(), vec!["Heading", "Entry", "Apply"]);
+    Ok(())
+}

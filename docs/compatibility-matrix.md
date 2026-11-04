@@ -101,3 +101,11 @@ Nested loops, Next without a name, Exit For, zero iterations, numeric-string
 bounds, catchable invalid bounds and checkpoint resume have authored regressions.
 Food.xlsm was inspected read-only to identify its implicit counters; no workbook
 macro was executed, and this does not claim its clipboard/sort workflows run.
+
+M7A.4 collection enumeration: Controls/UserForms For Each is implemented under
+[ADR 0045](decisions/0045-class-and-native-collection-enumerators.md), including
+nested/empty loops, canonical identity and object lifetime through unload/Stop.
+IR 9 validates public zero-argument Object-returning class enumerators and rejects
+legacy targets. Retained native enumerators own their collections. Qualified
+access, implicit OLE/MSForms type bindings, direct cursor interfaces and structural-
+mutation parity remain gaps; no full M7A.4 claim.

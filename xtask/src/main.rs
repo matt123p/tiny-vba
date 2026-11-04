@@ -256,6 +256,8 @@ fn run() -> Result<(), Box<dyn Error>> {
                     "--test",
                     "attribute_execution",
                     "--test",
+                    "class_enumeration",
+                    "--test",
                     "execution",
                     "--locked",
                     "--target",

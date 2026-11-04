@@ -4,31 +4,42 @@ use crate::forms::ControlKind;
 pub(crate) fn collection_class() -> String {
     String::from(
         r#"Option Explicit
-Private entries(0 To 127) As Object
-Private total As Long
+Public VbaEntries As Variant
+Public VbaTotal As Long
+Private Sub Class_Initialize()
+Dim initial(0 To 127) As Object
+VbaEntries=initial
+End Sub
+Public Property Get VbaNewEnum() As Object
+Attribute VbaNewEnum.VB_UserMemId = -4
+Dim enumerator As VbaFormEnumerator
+Set enumerator=New VbaFormEnumerator
+Set enumerator.VbaOwner=Me
+Set VbaNewEnum=enumerator
+End Property
 Public Sub VbaAdd(ByVal control As Object)
-If total>=128 Then Err.Raise 7
-Set entries(total)=control
-total=total+1
+If VbaTotal>=128 Then Err.Raise 7
+Set VbaEntries(VbaTotal)=control
+VbaTotal=VbaTotal+1
 End Sub
 Public Property Get Count() As Long
-Count=total
+Count=VbaTotal
 End Property
 Public Property Get Item(ByVal index As Variant) As Object
 Attribute Item.VB_UserMemId = 0
 Dim i As Long
 If VarType(index)=8 Then
-For i=0 To total-1
-If VbaKey(entries(i).Name)=VbaKey(CStr(index)) Then
-Set Item=entries(i)
+For i=0 To VbaTotal-1
+If VbaKey(VbaEntries(i).Name)=VbaKey(CStr(index)) Then
+Set Item=VbaEntries(i)
 Exit Property
 End If
 Next i
 Err.Raise -2147024809
 Else
 i=CLng(index)
-If i<0 Or i>=total Then Err.Raise -2147024809
-Set Item=entries(i)
+If i<0 Or i>=VbaTotal Then Err.Raise -2147024809
+Set Item=VbaEntries(i)
 End If
 End Property
 Private Function VbaKey(ByVal value As String) As String
@@ -116,7 +127,7 @@ pub(crate) fn control_class(kind: ControlKind) -> String {
 
 pub(crate) fn userforms_class(components: &[String]) -> String {
     let mut source = String::from(
-        "Attribute VB_PredeclaredId = True\nOption Explicit\nPublic Property Get Count() As Long\nCount=VbaFormQuery(0,0)\nEnd Property\nPublic Property Get Item(ByVal index As Variant) As Object\nAttribute Item.VB_UserMemId = 0\nSet Item=VbaFormQuery(1,index)\nEnd Property\nPublic Function Add(ByVal component As String) As Object\n",
+        "Attribute VB_PredeclaredId = True\nOption Explicit\nPublic Property Get VbaNewEnum() As Object\nAttribute VbaNewEnum.VB_UserMemId = -4\nDim enumerator As VbaFormEnumerator\nSet enumerator=New VbaFormEnumerator\nSet enumerator.VbaOwner=Me\nSet VbaNewEnum=enumerator\nEnd Property\nPublic Property Get Count() As Long\nCount=VbaFormQuery(0,0)\nEnd Property\nPublic Property Get Item(ByVal index As Variant) As Object\nAttribute Item.VB_UserMemId = 0\nSet Item=VbaFormQuery(1,index)\nEnd Property\nPublic Function Add(ByVal component As String) As Object\n",
     );
     for name in components {
         source.push_str(&format!(
@@ -131,4 +142,11 @@ pub(crate) fn userforms_class(components: &[String]) -> String {
         source.push_str(key);
     }
     source
+}
+
+/// A retained native enumerator owns its collection through ordinary references.
+pub(crate) fn enumerator_class() -> String {
+    String::from(
+        "Public VbaOwner As Object\nPublic Property Get VbaNewEnum() As Object\nAttribute VbaNewEnum.VB_UserMemId = -4\nSet VbaNewEnum=VbaFormEnumInterface(Me)\nEnd Property\n",
+    )
 }

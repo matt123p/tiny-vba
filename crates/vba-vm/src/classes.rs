@@ -443,7 +443,16 @@ impl Session {
         if !class.document {
             return Ok(None);
         }
-        let member = if site.member.is_empty() {
+        let enumerating = matches!(
+            site.kind,
+            ir::ForeignKind::Enumerate | ir::ForeignKind::EnumerateObjects
+        );
+        let member = if enumerating {
+            let Some(member) = class.enumerator.as_deref() else {
+                return Ok(instance.document_owner);
+            };
+            member
+        } else if site.member.is_empty() {
             class.default_member.as_deref().unwrap_or("")
         } else {
             site.member.as_str()
@@ -581,7 +590,20 @@ impl Session {
         reference: Option<Location>,
         value: Value,
     ) -> Result<()> {
-        if matches!(kind, ir::ForeignKind::ValueGet) {
+        if matches!(
+            kind,
+            ir::ForeignKind::Enumerate | ir::ForeignKind::EnumerateObjects
+        ) {
+            if !matches!(value, Value::Object(_) | Value::Nothing) {
+                return Err(runtime_diagnostic(runtime::Error::Vba {
+                    number: 13,
+                    message: "enumerator must return an object".into(),
+                }));
+            }
+            // Re-enter the same verified enumeration site with the returned
+            // opaque enumerator. The getter has completed and is never replayed.
+            self.push_prepaid(value)
+        } else if matches!(kind, ir::ForeignKind::ValueGet) {
             self.push_prepaid(value)
         } else if matches!(kind, ir::ForeignKind::ArgumentGet) {
             self.host_result_reference = reference;
@@ -628,7 +650,18 @@ impl Session {
             ir::ForeignKind::DefaultSet => ir::ForeignKind::Set,
             kind => kind,
         };
-        let member = if site.member.is_empty() {
+        let enumerating = matches!(
+            site.kind,
+            ir::ForeignKind::Enumerate | ir::ForeignKind::EnumerateObjects
+        );
+        let member = if enumerating {
+            class.enumerator.as_deref().ok_or_else(|| {
+                runtime_diagnostic(runtime::Error::Vba {
+                    number: 438,
+                    message: "class has no enumerator".into(),
+                })
+            })?
+        } else if site.member.is_empty() {
             class.default_member.as_deref().ok_or_else(|| {
                 runtime_diagnostic(runtime::Error::Vba {
                     number: 438,
@@ -697,7 +730,9 @@ impl Session {
             .iter()
             .find(|m| {
                 m.name.eq_ignore_ascii_case(member)
-                    && (m.kind == kind
+                    && (enumerating
+                        && matches!(m.kind, ir::ForeignKind::Get | ir::ForeignKind::Call)
+                        || m.kind == kind
                         || kind == ir::ForeignKind::Call && m.kind == ir::ForeignKind::Get)
                     && (m.public || inside)
             })
@@ -781,6 +816,13 @@ impl Session {
             .result_reference
             .map(|s| self.location(s))
             .transpose()?;
+        if enumerating {
+            if self.top()?.enumerator_owners.len() >= 64 {
+                return Err(resource());
+            }
+            self.charge(64)?;
+            self.top_mut()?.enumerator_owners.push(object);
+        }
         self.next_receiver = Some(object);
         self.push_frame(procedure, arguments)?;
         self.top_mut()?.class_return = Some(ClassReturn::Invoke {
@@ -848,6 +890,14 @@ impl Session {
             ) {
                 if let Some(receiver) = frame.receiver {
                     visit(&Value::Object(receiver))?;
+                }
+                for cursor in frame.enumerations.values() {
+                    for value in cursor.values.elements() {
+                        visit(value)?;
+                    }
+                }
+                for owner in &frame.enumerator_owners {
+                    visit(&Value::Object(*owner))?;
                 }
                 for delivery in &frame.events {
                     visit(&Value::Object(delivery.receiver))?;

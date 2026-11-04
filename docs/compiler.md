@@ -242,8 +242,12 @@ objects captured by source retain their identity. No IR version changes.
 ## M6 metadata and host-event capability
 
 Owned attributes are nonexecutable. The supported `Property Get` default member
-uses integer attribute IDs (including signed zero); project enumerators, default
-fields/functions and unsupported activation requests diagnose explicitly.
+uses integer attribute IDs (including signed zero); default fields/functions and
+unsupported activation requests diagnose explicitly. IR 9 additionally admits
+public zero-argument Object-returning Function/Property Get enumerators with
+VB_UserMemId = -4 under class-enumerators-v9. Object results may use explicit
+nominal reference types such as stdole.IUnknown; malformed metadata and older targets
+refuse. See [ADR 0045](decisions/0045-class-and-native-collection-enumerators.md).
 Foreign nominal WithEvents fields require `host-events-v1`; older capability
 sets refuse them. The host supplies and validates actual event signatures before
 any callback runs. See [ADR 0029](decisions/0029-host-event-subscriptions.md) and

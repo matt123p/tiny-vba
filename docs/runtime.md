@@ -371,3 +371,10 @@ UserForm display/default ownership from referenced code lifetime. Named control
 getters reload; inert inspection does not. Generic root release validates class/
 object and protects document code names. Internal release waits remain bounded,
 report Running and preserve slice quotas; Terminate runs only at normal finalization.
+
+IR 9 class enumeration is defined by
+[ADR 0045](decisions/0045-class-and-native-collection-enumerators.md):
+verified DISPID_NEWENUM metadata invokes ordinary Object-returning getters before
+the existing bounded foreign enumeration path. Native forwarding receivers and
+active/parked enumeration snapshots remain lifetime roots. No Office class names,
+object registry, dependency edge or new opcode enter the VM.
