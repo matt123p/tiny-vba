@@ -1211,3 +1211,149 @@ fn native_scroll_user_steps_reverse_with_range_but_only_drag_raises_scroll() -> 
     );
     Ok(())
 }
+
+fn list_setup(main: &str, extra_source: &str) -> R<Ide> {
+    let mut ide = Ide::new();
+    let export = String::from_utf8(fixture::export())?.replace(
+        fixture::SOURCE,
+        &(fixture::SOURCE.to_owned() + extra_source),
+    );
+    ide.import_native_form_export(
+        "NativeForm.frm",
+        export.as_bytes(),
+        1252,
+        &[NativeFormResource {
+            name: "NativeForm.frx".into(),
+            bytes: fixture::list_companion(),
+        }],
+    )?;
+    assert!(ide.form_instances()?.is_empty());
+    ide.add_module("Main.bas", main)?;
+    ide.dispatch(Action::Run, &mut NoHost)?;
+    settle(&mut ide)?;
+    Ok(ide)
+}
+#[test]
+fn native_list_rows_columns_defaults_and_selection_use_canonical_class_state() -> R {
+    let ide = list_setup(
+        "Sub Main()\nDim f As New NativeForm,l As MSForms.ListBox\nSet l=f.List1\nDebug.Print l.ListCount,l.ListIndex,IsNull(l.Value),l.ColumnCount,l.BoundColumn,l.TextColumn\nl.AddItem \"alpha\"\nl.AddItem \"gamma\"\nl.AddItem \"beta\",1\nl.List(1,1)=\"B\"\nl.ListIndex=1\nDebug.Print l.List(0),l.List(1),l.List(2),l.Text,l.Value,l.Selected(1)\nl.AddItem \"first\",0\nDebug.Print l.ListIndex,l.Value\nl.RemoveItem 0\nDebug.Print l.ListIndex,l.Value\nl.BoundColumn=0\nDebug.Print l.Value\nl.Selected(1)=False\nDebug.Print l.ListIndex,IsNull(l.Value)\nl.BoundColumn=1\nl.Value=\"gamma\"\nDebug.Print l.ListIndex,l.Text\nl.RemoveItem 2\nDebug.Print l.ListIndex,IsNull(l.Value),l.ListCount\nl.Clear\nDebug.Print l.ListCount,l.ListIndex,IsNull(l.Value)\nOn Error Resume Next\nl.ListIndex=0\nDebug.Print Err.Number\nErr.Clear\nDebug.Print l.List(-1)\nDebug.Print Err.Number\nErr.Clear\nl.Value=\"missing\"\nDebug.Print Err.Number\nEnd Sub",
+        "",
+    )?;
+    assert_eq!(ide.mode(), Mode::Completed, "{:?}", ide.diagnostics);
+    assert_eq!(
+        ide.output(),
+        vec![
+            "initialized",
+            "0\t-1\tTrue\t2\t2\t1",
+            "alpha\tbeta\tgamma\tbeta\tB\tTrue",
+            "2\tB",
+            "1\tB",
+            "1",
+            "-1\tTrue",
+            "2\tgamma",
+            "-1\tTrue\t2",
+            "0\t-1\tTrue",
+            "380",
+            "381",
+            "380"
+        ]
+    );
+    Ok(())
+}
+#[test]
+fn native_list_input_commits_before_change_stop_and_resumes_click_once() -> R {
+    let mut ide = list_setup(
+        "Sub Main()\nNativeForm.List1.AddItem \"alpha\"\nNativeForm.List1.AddItem \"beta\"\nNativeForm.List1.BoundColumn=1\nNativeForm.Show 0\nEnd Sub",
+        "\r\nPrivate Sub List1_Change()\r\nDebug.Print List1.ListIndex,List1.Value\r\nStop\r\nEnd Sub\r\nPrivate Sub List1_Click()\r\nDebug.Print \"click\"\r\nEnd Sub\r\n",
+    )?;
+    assert_eq!(ide.mode(), Mode::Completed, "{:?}", ide.diagnostics);
+    let f = *ide.form_instances()?.first().ok_or("instance")?;
+    let original = ide.native_form(f.source).ok_or("native")?.clone();
+    ide.form_instance_list(f, 14, 1, &mut NoHost)?;
+    settle(&mut ide)?;
+    assert_eq!(ide.mode(), Mode::Break, "{:?}", ide.diagnostics);
+    assert_eq!(
+        ide.form_instance_field(f, Some(14), "ListIndex")?,
+        Value::Long(1)
+    );
+    assert_eq!(
+        ide.form_instance_field(f, Some(14), "Value")?,
+        Value::String(VbaString::from_utf8("beta")?)
+    );
+    assert_eq!(ide.output(), vec!["initialized", "1\tbeta"]);
+    assert!(ide.form_instance_list(f, 14, 0, &mut NoHost).is_err());
+    ide.dispatch(Action::Run, &mut NoHost)?;
+    settle(&mut ide)?;
+    assert_eq!(ide.output(), vec!["initialized", "1\tbeta", "click"]);
+    ide.form_instance_list(f, 14, 1, &mut NoHost)?;
+    settle(&mut ide)?;
+    assert_eq!(ide.output(), vec!["initialized", "1\tbeta", "click"]);
+    assert_eq!(ide.native_form(f.source), Some(&original));
+    assert!(ide.form_instance_list(f, 12, 0, &mut NoHost).is_err());
+    assert!(ide.form_instance_list(f, 14, 2, &mut NoHost).is_err());
+    Ok(())
+}
+
+#[test]
+fn native_list_locked_input_allows_programmatic_assignment_without_dirtying() -> R {
+    let mut ide = list_setup(
+        "Sub Main()\nNativeForm.List1.AddItem \"alpha\"\nNativeForm.List1.AddItem \"beta\"\nNativeForm.List1.BoundColumn=1\nNativeForm.List1.Locked=True\nNativeForm.Show 0\nEnd Sub",
+        "\r\nPrivate Sub List1_Enter()\r\nList1.ListIndex=0\r\nEnd Sub\r\n",
+    )?;
+    assert_eq!(ide.mode(), Mode::Completed, "{:?}", ide.diagnostics);
+    let f = *ide.form_instances()?.first().ok_or("instance")?;
+    ide.form_instance_list(f, 14, 1, &mut NoHost)?;
+    settle(&mut ide)?;
+    assert_eq!(ide.mode(), Mode::Completed, "{:?}", ide.diagnostics);
+    assert_eq!(
+        ide.form_instance_field(f, Some(14), "ListIndex")?,
+        Value::Long(0)
+    );
+    assert_eq!(
+        ide.form_instance_field(f, Some(14), "VbaDirty")?,
+        Value::Boolean(false)
+    );
+    // Programmatic Enter assignment worked while Locked prevented the physical edit.
+    assert_eq!(
+        ide.form_instance_field(f, Some(14), "Value")?,
+        Value::String(VbaString::from_utf8("alpha")?)
+    );
+    Ok(())
+}
+
+#[test]
+fn native_list_validation_cancellation_keeps_focus_and_suppresses_following_click() -> R {
+    let mut ide = list_setup(
+        "Sub Main()\nNativeForm.List1.AddItem \"alpha\"\nNativeForm.List1.AddItem \"beta\"\nNativeForm.List1.BoundColumn=1\nNativeForm.Show 0\nEnd Sub",
+        "\r\nPrivate Sub List1_BeforeUpdate(ByVal Cancel As MSForms.ReturnBoolean)\r\nCancel=True\r\nDebug.Print \"cancel\"\r\nEnd Sub\r\nPrivate Sub List1_AfterUpdate()\r\nErr.Raise 5\r\nEnd Sub\r\n",
+    )?;
+    assert_eq!(ide.mode(), Mode::Completed, "{:?}", ide.diagnostics);
+    let f = *ide.form_instances()?.first().ok_or("instance")?;
+    ide.form_instance_list(f, 14, 1, &mut NoHost)?;
+    settle(&mut ide)?;
+    let selected = ide.form_instance_field(f, None, "VbaList1")?;
+    assert_eq!(
+        ide.form_instance_field(f, None, "VbaActiveControl")?,
+        selected
+    );
+    assert_eq!(
+        ide.form_instance_field(f, Some(14), "VbaDirty")?,
+        Value::Boolean(true)
+    );
+    ide.form_instance_event(f, Some(13), None, &mut NoHost)?;
+    settle(&mut ide)?;
+    assert_eq!(ide.mode(), Mode::Completed, "{:?}", ide.diagnostics);
+    assert_eq!(ide.output(), vec!["initialized", "cancel"]);
+    assert!(ide.form_instance_visible(f));
+    assert_eq!(
+        ide.form_instance_field(f, None, "VbaActiveControl")?,
+        selected
+    );
+    assert_eq!(
+        ide.form_instance_field(f, Some(14), "ListIndex")?,
+        Value::Long(1)
+    );
+    ide.dispatch(Action::Reset, &mut NoHost)?;
+    assert!(ide.form_instance_list(f, 14, 0, &mut NoHost).is_err());
+    Ok(())
+}

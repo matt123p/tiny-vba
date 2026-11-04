@@ -317,6 +317,7 @@ fn site(r: &mut Reader<'_>) -> Result<Site> {
         17 => Kind::CommandButton,
         21 => Kind::Label,
         23 => Kind::TextBox,
+        24 => Kind::ListBox,
         26 => Kind::CheckBox,
         27 => Kind::OptionButton,
         28 => Kind::ToggleButton,
@@ -357,21 +358,24 @@ fn control(bytes: &[u8], site: Site) -> Result<Control> {
     if matches!(site.kind, Kind::SpinButton | Kind::ScrollBar) {
         return numeric_control(r, b, site);
     }
+    let listbox = site.kind == Kind::ListBox;
+    let mut list = None;
     let mut max_length = 0;
     let mut group_name = String::new();
     let mut locked = false;
     let mut text_behavior = super::TextBehavior::default();
     let (caption, text, width, height, enabled) = if matches!(
         site.kind,
-        Kind::TextBox | Kind::CheckBox | Kind::OptionButton | Kind::ToggleButton
+        Kind::TextBox | Kind::CheckBox | Kind::OptionButton | Kind::ToggleButton | Kind::ListBox
     ) {
-        let lo = mask(&mut b, 0x86c0_03ff, 0x8000_0100)?;
+        let allowed = 0x86c0_03ff | if listbox { 0x0022_3800 } else { 0 };
+        let lo = mask(&mut b, allowed, 0x8000_0100)?;
         let high = b.u32()?;
         if high & !1 != 0 {
             return Err(unsupported("extended MorphData properties"));
         }
         if (site.kind != Kind::OptionButton && high & 1 != 0)
-            || (site.kind == Kind::TextBox && lo & (1 << 23) != 0)
+            || (matches!(site.kind, Kind::TextBox | Kind::ListBox) && lo & (1 << 23) != 0)
             || (site.kind != Kind::TextBox && lo & ((1 << 3) | (1 << 9)) != 0)
         {
             return Err(unsupported(
@@ -405,6 +409,7 @@ fn control(bytes: &[u8], site: Site) -> Result<Control> {
             || field(&mut b, m, 6, 1, 1)?
                 != match site.kind {
                     Kind::TextBox => 1,
+                    Kind::ListBox => 2,
                     Kind::CheckBox => 4,
                     Kind::OptionButton => 5,
                     Kind::ToggleButton => 6,
@@ -416,6 +421,25 @@ fn control(bytes: &[u8], site: Site) -> Result<Control> {
         }
         text_behavior.password_char = u16::try_from(field(&mut b, m, 9, 2, 0)?)
             .map_err(|_| unsupported("native password character"))?;
+        if listbox {
+            let bound_column = field(&mut b, m, 11, 2, 1)? as u16;
+            let text_column = field(&mut b, m, 12, 2, 0xffff)? as u16 as i16;
+            let column_count = field(&mut b, m, 13, 2, 1)? as u16 as i16;
+            if field(&mut b, m, 17, 1, 0)? != 0 || field(&mut b, m, 21, 1, 0)? != 0 {
+                return Err(unsupported("ListBox list style or multiple selection"));
+            }
+            if !(-1..=10).contains(&column_count)
+                || bound_column > 10
+                || !(-1..=10).contains(&text_column)
+            {
+                return Err(unsupported("unbound ListBox column profile"));
+            }
+            list = Some(super::ListBehavior {
+                column_count,
+                bound_column,
+                text_column,
+            });
+        }
         let value = field(&mut b, m, 22, 4, 0)?;
         let caption = field(&mut b, m, 23, 4, 0)?;
         field(&mut b, m, 25, 4, 0)?;
@@ -428,6 +452,9 @@ fn control(bytes: &[u8], site: Site) -> Result<Control> {
         group_name = string(&mut b, group)?;
         if site.kind == Kind::TextBox && (!caption.is_empty() || !group_name.is_empty()) {
             return Err(unsupported("TextBox caption/group"));
+        }
+        if listbox && !value.is_empty() {
+            return Err(unsupported("persisted ListBox value without list data"));
         }
         (caption, value, w, h, flags & 2 != 0)
     } else {
@@ -487,6 +514,7 @@ fn control(bytes: &[u8], site: Site) -> Result<Control> {
         locked,
         text_behavior,
         numeric: None,
+        list,
     })
 }
 
@@ -557,6 +585,7 @@ fn numeric_control(r: Reader<'_>, mut b: Reader<'_>, site: Site) -> Result<Contr
         group_name: String::new(),
         locked: false,
         text_behavior: super::TextBehavior::default(),
+        list: None,
         numeric: Some(super::NumericBehavior {
             minimum,
             maximum,

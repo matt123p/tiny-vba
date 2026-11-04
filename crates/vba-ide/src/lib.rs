@@ -12,6 +12,7 @@ pub use vba_project::forms::companion_name as native_form_companion_name;
 pub use vba_project::forms::{NativeForm, Resource as NativeFormResource};
 mod form_controls;
 mod form_focus;
+mod form_list;
 mod form_numeric;
 mod form_project;
 mod form_text;

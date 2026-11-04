@@ -11,7 +11,7 @@ pub(crate) fn event(kind: ControlKind, name: &str) -> Option<(&'static str, bool
             return Some((event, cancel));
         }
     }
-    if kind == ControlKind::TextBox {
+    if matches!(kind, ControlKind::TextBox | ControlKind::ListBox) {
         for (event, cancel) in [("BeforeUpdate", true), ("AfterUpdate", false)] {
             if name.eq_ignore_ascii_case(event) {
                 return Some((event, cancel));
@@ -106,6 +106,14 @@ control.VbaSetTextSelection text,start,length
 Else
 control.VbaSetSelection start,length
 End If
+End Sub
+Public Sub VbaListInput(ByVal index As Long,ByVal row As Long)
+Dim control As Object
+Set control=VbaControls.Item(index)
+VbaMoveFocus control
+If Not (VbaActiveControl Is control) Then Exit Sub
+If Not VbaVisible Or Not VbaLoaded Or Not control.Enabled Or Not control.Visible Then Exit Sub
+control.VbaChoose row
 End Sub
 Public Sub VbaNumericInput(ByVal index As Long,ByVal mode As Long,ByVal value As Long,ByVal up As Boolean,ByVal large As Boolean)
 Dim control As Object

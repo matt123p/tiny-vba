@@ -313,3 +313,9 @@ Controls for [worksheet-form-controls-v1](docs/m7a-worksheet-controls.md).
 Model/engine/XLSX own state, commands and packaging; the optional adapter/shell own
 VBA bindings, trusted launches and input. No shared crate/dependency edge changed.
 Native UserForm semantics/persistence and .tvform removal remain M7A.4–M7A.7.
+
+[ADR 0051](docs/decisions/0051-native-unbound-listbox.md) adds selected native unbound
+ListBox decoding, ten-column indexed rows, selection/default Value and ordinary
+Change/Click frames. Authorized shared list input uses canonical state and
+preserves focus/validation and Stop/resume. Whole-array APIs, further list/binding
+semantics and ComboBox remain open with the unchanged broader M7A.4 scope.

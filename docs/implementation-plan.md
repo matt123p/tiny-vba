@@ -65,6 +65,7 @@ and native save/reopen. See [ADR 0041](decisions/0041-worksheet-form-controls.md
   qualified VBA.UserForms access, selected native focus/typed validation and
   native TextBox selection/input properties. Selected SpinButton/ScrollBar native
   records, properties and input/event paths are implemented under ADR 0050.
+  Selected native unbound ListBox rows/selection/input are implemented under ADR 0051.
   Remaining requirements and integration are recorded there. Reuse the shared runtime
   behind native forms and close Office compatibility gaps for the inventoried
   standard controls. Match instance/default-instance behavior, lifecycle, modal/

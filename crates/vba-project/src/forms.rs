@@ -23,6 +23,7 @@ pub enum Kind {
     ToggleButton,
     ScrollBar,
     SpinButton,
+    ListBox,
 }
 /// Coordinates are original signed HIMETRIC units, not pixels or points.
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -47,6 +48,14 @@ pub struct Control {
     pub locked: bool,
     pub text_behavior: TextBehavior,
     pub numeric: Option<NumericBehavior>,
+    pub list: Option<ListBehavior>,
+}
+/// Unbound, single-selection native ListBox configuration.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct ListBehavior {
+    pub column_count: i16,
+    pub bound_column: u16,
+    pub text_column: i16,
 }
 /// Native SpinButton/ScrollBar state, without executing control resources.
 #[derive(Clone, Debug, PartialEq, Eq)]

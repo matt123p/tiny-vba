@@ -114,6 +114,7 @@ impl Ide {
                 kind: match c.kind {
                     Kind::Label => ControlKind::Label,
                     Kind::TextBox => ControlKind::TextBox,
+                    Kind::ListBox => ControlKind::ListBox,
                     Kind::CommandButton => ControlKind::CommandButton,
                     Kind::CheckBox => ControlKind::CheckBox,
                     Kind::OptionButton => ControlKind::OptionButton,

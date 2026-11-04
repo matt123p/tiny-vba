@@ -342,3 +342,9 @@ SpinButton/ScrollBar decoding, Long properties, nominal interfaces and ordinary
 Change/spin/drag-only Scroll delivery. Shared arrows/track/thumb/keyboard input
 uses authorized callbacks and canonical state, including reversed ranges and
 pause/resume. Full [M7A.4](m7a4-native-runtime.md) remains in progress.
+
+[ADR 0051](decisions/0051-native-unbound-listbox.md) adds selected native unbound
+ListBox decoding, ten-column indexed rows, selection/default Value and ordinary
+Change/Click frames. Authorized shared list input uses canonical state and
+preserves focus/validation and Stop/resume. Whole-array APIs, further list/binding
+semantics and ComboBox remain open with the unchanged broader M7A.4 scope.

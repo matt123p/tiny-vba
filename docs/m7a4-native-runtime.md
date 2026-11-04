@@ -6,6 +6,12 @@ Updated 2026-11-04. **IN PROGRESS. M7A.4 is not complete.** This record extends
 
 Implemented in shared tiny-vba:
 
+- [Native unbound ListBox](decisions/0051-native-unbound-listbox.md): cached native
+  records, indexed ten-column row data, AddItem/RemoveItem/Clear, selection,
+  Value/Text/column properties, ordinary Change/Click and authorized pointer/key
+  input. Focus/validation, original resources and debugger continuations remain
+  intact. Whole-array/multiple-selection/binding and further list properties stay open.
+
 - [Native SpinButton/ScrollBar](decisions/0050-native-spinbutton-and-scrollbar.md):
   distinct native resource packets, Long bounds/value/increments, orientation and
   delay, canonical Change/SpinUp/SpinDown/drag-only Scroll, reversed ranges and
@@ -27,7 +33,7 @@ Implemented in shared tiny-vba:
   Leaf WithEvents interfaces keep their distinct event exposure.
 
 - [MSForms nominal types and qualified library access](decisions/0047-native-forms-nominal-types-and-library-access.md):
-  generic IR 11 class interfaces bind native UserForm/Control/Controls and eight leaf
+  generic IR 11 class interfaces bind native UserForm/Control/Controls and nine leaf
   types without a host object registry or COM. Specific leaf WithEvents preserves
   canonical objects while event allowlists hide bridge events; non-source Control
   connections refuse with error 459. Mutable ReturnBoolean/ReturnInteger holders
@@ -117,9 +123,11 @@ Remaining M7A.4 requirements, without reducing the milestone's scope:
   and remaining property/default/error/coercion contracts,
   including native dynamic TypeName. ADR 0048 implements the selected flat native
   focus/typed cancellation path, without claiming the full event/property matrix.
-- Native ComboBox, ListBox, Frame, MultiPage, TabStrip,
+- Native ComboBox, Frame, MultiPage, TabStrip,
   Image and Excel RefEdit packets, including real container/resource identity,
-  list/page collections, pictures, bindings and presentation. These remain refused. The selected numeric packet does not close all
+  list/page collections, pictures, bindings and presentation. These remain refused.
+  ListBox now has the selected unbound single-selection packet; whole-array
+  APIs, multiple selection, bindings and further presentation remain open. The selected numeric packet does not close all
   ScrollBar/SpinButton property/resource/presentation cases.
 - Applicable Office-supplied worksheet ActiveX/platform packets; third-party
   controls and COM/OCX loading remain outside scope.

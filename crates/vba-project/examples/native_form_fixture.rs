@@ -9,6 +9,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     );
     std::fs::create_dir_all(&dir)?;
     let option = std::env::args().nth(2);
+    let list = option.as_deref() == Some("--list-controls");
     let numeric = option.as_deref() == Some("--numeric-controls");
     let focus = option.as_deref() == Some("--focus-events");
     let text_controls = option.as_deref() == Some("--text-controls");
@@ -16,12 +17,15 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let boolean = match option.as_deref() {
         None => false,
         Some("--boolean-controls") => true,
-        Some("--focus-events" | "--text-controls" | "--password-text" | "--numeric-controls") => {
-            false
-        }
+        Some(
+            "--focus-events" | "--text-controls" | "--password-text" | "--numeric-controls"
+            | "--list-controls",
+        ) => false,
         Some(_) => return Err("unknown fixture option".into()),
     };
-    let body = if numeric {
+    let body = if list {
+        "Stop\r\nDebug.Print List1.ListIndex\r\nDebug.Print List1.Value"
+    } else if numeric {
         "Stop\r\nDebug.Print Spin1.Value\r\nDebug.Print Scroll1.Value"
     } else if boolean {
         "Stop\r\nDebug.Print Check1.Value\r\nDebug.Print ChoiceA.Value\r\nDebug.Print ChoiceB.Value\r\nDebug.Print Toggle1.Value"
@@ -43,13 +47,18 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     if text_controls {
         text=text.replace("Debug.Print \"initialized\"", "Entry.Text=\"\"\r\nEntry.Height=45\r\nEntry.Width=90\r\nApply.Top=110\r\nDebug.Print \"initialized\"");
     }
+    if list {
+        text=text.replace("Debug.Print \"initialized\"","List1.AddItem \"alpha\"\r\nList1.AddItem \"beta\"\r\nList1.AddItem \"gamma\"\r\nList1.List(0,1)=\"A\"\r\nList1.List(1,1)=\"B\"\r\nList1.List(2,1)=\"C\"\r\nList1.Left=120\r\nList1.Top=110\r\nList1.Width=160\r\nList1.Height=90\r\nDebug.Print \"initialized\"");
+    }
     if numeric {
         text=text.replace("Debug.Print \"initialized\"","Spin1.Left=120\r\nSpin1.Height=24\r\nScroll1.Left=120\r\nScroll1.Top=150\r\nScroll1.Width=120\r\nDebug.Print \"initialized\"");
     }
     std::fs::write(dir.join("NativeForm.frm"), text)?;
     std::fs::write(
         dir.join("NativeForm.frx"),
-        if numeric {
+        if list {
+            fixture::list_companion()
+        } else if numeric {
             fixture::numeric_companion()
         } else if boolean {
             fixture::boolean_companion()

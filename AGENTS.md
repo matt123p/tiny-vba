@@ -181,3 +181,8 @@ Keep Long state/events in ordinary classes, distinct binary records bounded and
 resource retention inert. Numeric input executes VBA and needs the same policy
 as other form commands. Preserve reversed bounds, error/coercion semantics and
 Change/spin/Scroll continuations. No .tvform expansion or full milestone sign-off.
+
+Native unbound ListBox follows [ADR 0051](docs/decisions/0051-native-unbound-listbox.md).
+Keep list/selection state in ordinary VM fields, bounded indexed row operations,
+executable input authorization, focus/validation and callback continuations. Do
+not expand .tvform or claim full list/binding/ComboBox/M7A.4 parity.

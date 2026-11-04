@@ -11,6 +11,7 @@ enum FormInput {
     Activate,
     Text { start: i32, length: i32 },
     Numeric(FormNumericInput),
+    List(i32),
 }
 /// Native numeric widget actions; values still pass through ordinary VBA properties.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -403,6 +404,7 @@ pub(crate) fn class_name(kind: ControlKind) -> &'static str {
         ControlKind::ToggleButton => "VbaFormToggleButton",
         ControlKind::ScrollBar => "VbaFormScrollBar",
         ControlKind::SpinButton => "VbaFormSpinButton",
+        ControlKind::ListBox => "VbaFormListBox",
     }
 }
 pub(crate) fn checked_handlers(
@@ -500,10 +502,11 @@ pub(crate) fn checked_handlers(
         }
         let control = form.controls.iter().find(|c| {
             (native
-                && p.name
-                    .spelling
-                    .get(c.name.len() + 1..)
-                    .is_some_and(|e| crate::form_numeric::event(c.kind, e).is_some())
+                && p.name.spelling.get(c.name.len() + 1..).is_some_and(|e| {
+                    crate::form_numeric::event(c.kind, e)
+                        .or_else(|| crate::form_list::event(c.kind, e))
+                        .is_some()
+                })
                 && p.name
                     .spelling
                     .get(..c.name.len() + 1)
@@ -512,7 +515,10 @@ pub(crate) fn checked_handlers(
                     .eq_ignore_ascii_case(&p.name.spelling)
                 || matches!(
                     c.kind,
-                    ControlKind::CheckBox | ControlKind::OptionButton | ControlKind::ToggleButton
+                    ControlKind::CheckBox
+                        | ControlKind::OptionButton
+                        | ControlKind::ToggleButton
+                        | ControlKind::ListBox
                 ) && format!("{}_Change", c.name).eq_ignore_ascii_case(&p.name.spelling)
         });
         let lifecycle = [
@@ -634,7 +640,10 @@ fn compiled_form(form: &Form, module: &Module, native: Option<&NativeForm>) -> R
         source.push_str(&format!("Dim {temp} As {}\nSet {temp}=New {}\n{temp}.Enabled={}\n{temp}.Visible={}\n{temp}.TabStop={}\n{temp}.VbaTabIndex={}\n{temp}.Left={}\n{temp}.Top={}\n{temp}.Width={}\n{temp}.Height={}\n",class_name(c.kind),class_name(c.kind),boolean(c.enabled),boolean(c.visible),boolean(c.tab_stop),form.tab_order.iter().position(|id|*id==c.id).unwrap_or(0),c.bounds.left,c.bounds.top,c.bounds.width,c.bounds.height));
         if !matches!(
             c.kind,
-            ControlKind::TextBox | ControlKind::ScrollBar | ControlKind::SpinButton
+            ControlKind::TextBox
+                | ControlKind::ScrollBar
+                | ControlKind::SpinButton
+                | ControlKind::ListBox
         ) {
             source.push_str(&format!("{temp}.Caption={}\n", vba_string(&c.caption)));
         }
@@ -666,6 +675,7 @@ fn compiled_form(form: &Form, module: &Module, native: Option<&NativeForm>) -> R
                     | ControlKind::CheckBox
                     | ControlKind::OptionButton
                     | ControlKind::ToggleButton
+                    | ControlKind::ListBox
             ) {
                 source.push_str(&format!("{temp}.Locked={}\n", boolean(control.locked)));
             }
@@ -673,6 +683,12 @@ fn compiled_form(form: &Form, module: &Module, native: Option<&NativeForm>) -> R
                 source.push_str(&format!(
                     "{temp}.GroupName={}\n",
                     vba_string(&control.group_name)
+                ));
+            }
+            if let Some(list) = &control.list {
+                source.push_str(&format!(
+                    "{temp}.VbaColumnCount={}\n{temp}.VbaBoundColumn={}\n{temp}.VbaTextColumn={}\n",
+                    list.column_count, list.bound_column, list.text_column
                 ));
             }
             if let Some(n) = &control.numeric {
@@ -1164,7 +1180,9 @@ impl Ide {
                 .is_some()
                 .then(|| crate::form_focus::event(c.kind, event))
                 .flatten();
-            let canonical = if let Some(name) = crate::form_numeric::event(c.kind, event) {
+            let canonical = if let Some(name) = crate::form_numeric::event(c.kind, event)
+                .or_else(|| crate::form_list::event(c.kind, event))
+            {
                 name
             } else if let Some((name, _)) = focus {
                 name
@@ -1272,6 +1290,7 @@ impl Ide {
                 ControlKind::ToggleButton,
                 ControlKind::ScrollBar,
                 ControlKind::SpinButton,
+                ControlKind::ListBox,
             ]
             .into_iter()
             .enumerate()
@@ -1484,6 +1503,11 @@ impl Ide {
             "passwordchar" => "VbaPasswordChar",
             "selstart" => "VbaSelStart",
             "sellength" => "VbaSelLength",
+            "listcount" => "VbaCount",
+            "listindex" => "VbaListIndex",
+            "columncount" => "VbaColumnCount",
+            "boundcolumn" => "VbaBoundColumn",
+            "textcolumn" => "VbaTextColumn",
             "value" => "VbaValue",
             "name" if control.is_some() => "VbaName",
             _ => field,
@@ -1598,6 +1622,19 @@ impl Ide {
             host,
         )
     }
+    /// Select one native ListBox row through authorized ordinary focus/event frames.
+    pub fn form_instance_list(
+        &mut self,
+        instance: FormInstance,
+        control: u32,
+        row: i32,
+        host: &mut impl Host,
+    ) -> Result<()> {
+        if self.native_form(instance.source).is_none() {
+            return Err(error("list input requires a native form"));
+        }
+        self.deliver_form_input(instance, Some(control), None, FormInput::List(row), host)
+    }
     pub fn form_instance_numeric(
         &mut self,
         instance: FormInstance,
@@ -1667,6 +1704,17 @@ impl Ide {
             {
                 return Err(error("control is disabled or hidden"));
             }
+            if let FormInput::List(row) = input {
+                if c.kind != ControlKind::ListBox {
+                    return Err(error("list input requires a ListBox"));
+                }
+                let Value::Long(count) = session.read_instance_field(object, "VbaCount")? else {
+                    return Err(error("invalid list state"));
+                };
+                if row < 0 || row >= count {
+                    return Err(error("list input row out of range"));
+                }
+            }
             if let FormInput::Numeric(action) = input
                 && (!matches!(c.kind, ControlKind::SpinButton | ControlKind::ScrollBar)
                     || c.kind == ControlKind::SpinButton
@@ -1683,7 +1731,17 @@ impl Ide {
             if input == FormInput::Activate && c.kind != ControlKind::CommandButton {
                 return Err(error("keyboard activation requires a CommandButton"));
             }
-            if let FormInput::Numeric(action) = input {
+            if let FormInput::List(row) = input {
+                let index = designer
+                    .form()
+                    .controls
+                    .iter()
+                    .position(|c| c.id == id)
+                    .and_then(|n| i32::try_from(n).ok())
+                    .ok_or_else(|| error("list control index"))?;
+                object = instance.object;
+                ("VbaListInput", vec![Value::Long(index), Value::Long(row)])
+            } else if let FormInput::Numeric(action) = input {
                 let index = designer
                     .form()
                     .controls

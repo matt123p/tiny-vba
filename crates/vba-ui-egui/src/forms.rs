@@ -1,5 +1,6 @@
 //! Reusable form designer and real runtime controls. All edits/events are explicit IDE commands.
 use super::*;
+mod list;
 mod numeric;
 mod text;
 use vba_ide::forms::{Align, Bounds, ControlKind, DesignEdit, SameSize};
@@ -19,6 +20,7 @@ pub enum FormCommand {
     InstanceEvent(vba_ide::FormInstance, Option<u32>, Option<String>),
     InstanceFocus(vba_ide::FormInstance, u32),
     InstanceActivate(vba_ide::FormInstance, u32),
+    InstanceList(vba_ide::FormInstance, u32, i32),
     InstanceNumeric(vba_ide::FormInstance, u32, vba_ide::FormNumericInput),
     InstanceText(vba_ide::FormInstance, u32, vba_ide::VbaString, (u32, u32)),
 }
@@ -66,6 +68,9 @@ pub(super) fn apply_form(
         FormCommand::Event(id, c, text) => ide.form_event(id, c, text, host),
         FormCommand::InstanceText(instance, control, text, selection) => {
             ide.form_instance_text(instance, control, text, selection, host)
+        }
+        FormCommand::InstanceList(instance, control, row) => {
+            ide.form_instance_list(instance, control, row, host)
         }
         FormCommand::InstanceNumeric(instance, control, input) => {
             ide.form_instance_numeric(instance, control, input, host)
@@ -322,8 +327,22 @@ impl EditorUi {
                                 .show(ui, |ui| {
                                     changed |=
                                         string_property(ui, "Control Name", &mut c.name, 64, theme);
-                                    changed |=
-                                        string_property(ui, "Caption", &mut c.caption, 1024, theme);
+                                    if matches!(
+                                        c.kind,
+                                        ControlKind::Label
+                                            | ControlKind::CommandButton
+                                            | ControlKind::CheckBox
+                                            | ControlKind::OptionButton
+                                            | ControlKind::ToggleButton
+                                    ) {
+                                        changed |= string_property(
+                                            ui,
+                                            "Caption",
+                                            &mut c.caption,
+                                            1024,
+                                            theme,
+                                        );
+                                    }
                                     if c.kind == ControlKind::TextBox {
                                         changed |=
                                             string_property(ui, "Text", &mut c.text, 16384, theme);
@@ -946,7 +965,7 @@ impl EditorUi {
                         let widget_id = ui.scope_id().with(("runtime.control", c.id));
                         if native && idle && keyboard_owner==Some(instance)
                             && !previous_focus.iter().any(|(owner,_,_)|*owner==instance)
-                            && matches!(c.kind,ControlKind::TextBox|ControlKind::SpinButton|ControlKind::ScrollBar)
+                            && matches!(c.kind,ControlKind::TextBox|ControlKind::SpinButton|ControlKind::ScrollBar|ControlKind::ListBox)
                             && ide.form_instance_field(instance,None,&format!("Vba{}",c.name)).ok()==ide.form_instance_field(instance,None,"VbaActiveControl").ok() {
                             ui.ctx().memory_mut(|m|m.request_focus(widget_id));
                         }
@@ -964,6 +983,7 @@ impl EditorUi {
                         }
                         ui.push_id(("runtime", c.id), |ui| {
                             ui.add_enabled_ui(enabled, |ui| match c.kind {
+                                ControlKind::ListBox => {list::ListBox{ide,instance,control:c,bounds,widget:widget_id,theme}.show(ui,commands);}
                                 ControlKind::SpinButton|ControlKind::ScrollBar=> {numeric::Numeric{ide,instance,control:c,bounds,widget:widget_id,theme}.show(ui,commands);}
                                 ControlKind::TextBox if native => { text::TextBox {ide,instance,control:c,bounds,widget:widget_id,enabled,theme}.show(ui,commands); }
                                 ControlKind::TextBox => {
@@ -1100,12 +1120,13 @@ impl EditorUi {
                         let active = ide.form_instance_field(instance, None, "VbaActiveControl").ok();
                         let active_id = focus.iter().find(|(_, control, _)| form.controls.iter().find(|c| c.id == *control).is_some_and(|c| ide.form_instance_field(instance, None, &format!("Vba{}",c.name)).ok() == active));
                         let requested = focus.iter().find(|(_, _, target)| Some(*target) == focused);
-                        let pending = commands.iter().any(|command| matches!(command, Command::Form(FormCommand::InstanceFocus(owner, _) | FormCommand::InstanceActivate(owner, _) | FormCommand::InstanceText(owner, _, _, _) | FormCommand::InstanceNumeric(owner, _, _) | FormCommand::InstanceEvent(owner, _, _)) if *owner == instance));
+                        let pending = commands.iter().any(|command| matches!(command, Command::Form(FormCommand::InstanceFocus(owner, _) | FormCommand::InstanceActivate(owner, _) | FormCommand::InstanceText(owner, _, _, _) | FormCommand::InstanceNumeric(owner, _, _) | FormCommand::InstanceList(owner, _, _) | FormCommand::InstanceEvent(owner, _, _)) if *owner == instance));
                         if let Some((_, control, _)) = requested && requested != active_id && !pending {
                             commands.push(Command::Form(FormCommand::InstanceFocus(instance, *control)));
                         }
                         // VBA owns the focus decision, including cancellation and debugger waits.
                         if let Some((_, _, target)) = active_id
+                            && focused != Some(*target)
                             && (requested.is_some() || focused.is_none() || pending || !previous_focus.iter().any(|(owner,_,_)| *owner==instance)) {
                             ui.ctx().memory_mut(|m| m.request_focus(*target));
                         }

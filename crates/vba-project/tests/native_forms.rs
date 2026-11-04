@@ -200,3 +200,67 @@ fn native_numeric_position_outside_range_refuses_the_whole_resource() {
     assert!(decode(&resource).is_err());
     assert!(decode(&original).is_ok());
 }
+
+#[test]
+fn unbound_native_listbox_uses_cached_identity_and_inert_column_metadata() {
+    let bytes = fixture::list_companion();
+    let form = decode(&bytes).unwrap();
+    let list = &form.design.controls[3];
+    assert_eq!(list.kind, forms::Kind::ListBox);
+    assert_eq!(list.name, "List1");
+    assert_eq!(
+        list.list,
+        Some(forms::ListBehavior {
+            column_count: 2,
+            bound_column: 2,
+            text_column: 1
+        })
+    );
+    assert!(list.text.is_empty());
+    assert!(
+        form.resources
+            .iter()
+            .any(|r| r.name == "NativeForm.frx" && r.bytes == bytes)
+    );
+}
+
+#[test]
+fn listbox_multiple_selection_and_external_list_resources_refuse_atomically() {
+    use std::io::{Cursor, Read, Write};
+    let companion = fixture::list_companion();
+    let mut file = cfb::CompoundFile::open(Cursor::new(companion[4..].to_vec())).unwrap();
+    let mut objects = Vec::new();
+    file.open_stream("/o")
+        .unwrap()
+        .read_to_end(&mut objects)
+        .unwrap();
+    let start = fixture::controls().iter().map(Vec::len).sum::<usize>();
+    // Replace the two persisted-column fields at the end with MultiSelect=1.
+    // Rebuild a separate original record; leave source/sites and exact original input intact.
+    let mut body = fixture::u32s(&[0x80202140, 0]);
+    body.extend([2, 0, 2, 0, 1, 0, 0, 0]); // List style, ColumnCount=2, MultiSelect=Multi, alignment
+    body.extend(fixture::u32s(&[6000, 1800]));
+    let mut unsupported = fixture::record(0x200, &body);
+    unsupported.extend(fixture::record(0x200, &[0; 4]));
+    assert_eq!(unsupported.len(), objects.len() - start);
+    objects[start..].copy_from_slice(&unsupported);
+    file.create_stream("/o")
+        .unwrap()
+        .write_all(&objects)
+        .unwrap();
+    let bytes = file.into_inner().into_inner();
+    let mut changed = (bytes.len() as u32).to_le_bytes().to_vec();
+    changed.extend(bytes);
+    assert!(decode(&changed).is_err());
+    assert!(decode(&companion).is_ok());
+    let mut extra = cfb::CompoundFile::open(Cursor::new(companion[4..].to_vec())).unwrap();
+    extra
+        .create_stream("/ExternalList")
+        .unwrap()
+        .write_all(b"refused")
+        .unwrap();
+    let bytes = extra.into_inner().into_inner();
+    let mut changed = (bytes.len() as u32).to_le_bytes().to_vec();
+    changed.extend(bytes);
+    assert!(decode(&changed).is_err());
+}

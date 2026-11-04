@@ -1,5 +1,24 @@
 # Implementation progress
 
+## M7A.4 continued — native unbound ListBox (2026-11-04)
+
+Implemented [ADR 0051](decisions/0051-native-unbound-listbox.md): cached native
+ListBox records and selected columns, ordinary bounded indexed rows and selection,
+AddItem/RemoveItem/Clear, Value/Text/columns and authorized actual pointer/key
+input. Change commits before an authored Stop and Click resumes once. Stable
+focus no longer resets the widget arrow-key filter on each render. Two decoder,
+four native runtime and one actual widget regression pass. Shared CI, WASM,
+actual WASI (47 native form-instance and nine decoder cases), UI/native/web gates
+PASS, with ten actual form-instance widget tests. Chromium native list/focus/
+numeric input and modal Stop/resume PASS; Unicode text, boolean, editor smoke
+and legacy form browser regressions also PASS. Light/dark/narrow/scaled/injected-host
+multi-instance list renders were inspected. Original M7 fixture/hash validation
+and changed Markdown targets PASS. Consumer immutable-pin integration follows. Full M7A.4 remains IN PROGRESS, including
+ComboBox, further list/binding APIs, containers/pages/images/platform and
+remaining lifecycle/property contracts in [the runtime record](m7a4-native-runtime.md).
+Next: native ComboBox editable/drop-list behavior using the same canonical list
+model, followed by the remaining list array/binding/container packets.
+
 ## M7A.4 continued — native numeric controls (2026-11-04)
 
 Implemented [ADR 0050](decisions/0050-native-spinbutton-and-scrollbar.md): native

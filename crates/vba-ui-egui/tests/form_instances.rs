@@ -698,3 +698,89 @@ fn native_scroll_drag_does_not_replay_stationary_input_after_a_handler_resets_va
     assert!(h.state().errors.is_empty(), "{:?}", h.state().errors);
     Ok(())
 }
+
+#[test]
+fn native_listbox_pointer_and_keyboard_select_canonical_rows() -> R {
+    let mut ide = Ide::new();
+    ide.import_native_form_export(
+        "NativeForm.frm",
+        &fixture::export(),
+        1252,
+        &[NativeFormResource {
+            name: "NativeForm.frx".into(),
+            bytes: fixture::list_companion(),
+        }],
+    )?;
+    ide.add_module("Main.bas","Sub Main()\nNativeForm.List1.AddItem \"alpha\"\nNativeForm.List1.AddItem \"beta\"\nNativeForm.List1.AddItem \"gamma\"\nNativeForm.List1.List(0,1)=\"A\"\nNativeForm.List1.List(1,1)=\"B\"\nNativeForm.List1.List(2,1)=\"C\"\nNativeForm.List1.Height=90\nNativeForm.Show 0\nEnd Sub")?;
+    ide.dispatch(Action::Run, &mut NoHost)?;
+    for _ in 0..100 {
+        ide.tick(&mut NoHost)?;
+        if ide.mode() == Mode::Completed {
+            break;
+        }
+    }
+    assert_eq!(ide.mode(), Mode::Completed, "{:?}", ide.diagnostics);
+    let f = *ide.form_instances()?.first().ok_or("instance")?;
+    let mut h = Harness::builder()
+        .with_size(egui::vec2(1400., 1000.))
+        .build_ui_state(
+            |ui, s: &mut State| {
+                for c in s.view.show(ui, &s.ide, Theme::light()) {
+                    if let Err(e) = apply(&mut s.ide, c, &mut NoHost) {
+                        s.errors.push(e.to_string());
+                    }
+                }
+                if let Err(e) = s.ide.tick(&mut NoHost) {
+                    s.errors.push(e.to_string());
+                }
+            },
+            State {
+                ide,
+                view: EditorUi::default(),
+                errors: vec![],
+            },
+        );
+    h.run_steps(5);
+    h.get_by_label("List1 row 1: beta | B").click();
+    h.run_steps(8);
+    assert_eq!(
+        h.state()
+            .ide
+            .form_instance_field(f, Some(14), "ListIndex")?,
+        vba_ide::Value::Long(1)
+    );
+    assert_eq!(
+        h.state().ide.form_instance_field(f, Some(14), "Value")?,
+        vba_ide::Value::String(vba_ide::VbaString::from_utf8("B")?)
+    );
+    h.key_press(egui::Key::ArrowDown);
+    h.run_steps(8);
+    assert_eq!(
+        h.state()
+            .ide
+            .form_instance_field(f, Some(14), "ListIndex")?,
+        vba_ide::Value::Long(2)
+    );
+    h.key_press(egui::Key::Home);
+    h.run_steps(8);
+    assert_eq!(
+        h.state()
+            .ide
+            .form_instance_field(f, Some(14), "ListIndex")?,
+        vba_ide::Value::Long(0)
+    );
+    h.key_press(egui::Key::End);
+    h.run_steps(8);
+    assert_eq!(
+        h.state()
+            .ide
+            .form_instance_field(f, Some(14), "ListIndex")?,
+        vba_ide::Value::Long(2)
+    );
+    assert!(h.state().errors.is_empty(), "{:?}", h.state().errors);
+    assert!(
+        vba_ui_egui::Command::Form(vba_ui_egui::FormCommand::InstanceList(f, 14, 0))
+            .executes_code()
+    );
+    Ok(())
+}

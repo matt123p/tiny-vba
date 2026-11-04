@@ -228,3 +228,8 @@ IR 11 class interfaces and Forms library bindings follow
 Preserve exact nominal identity and event-source/exposure, bounded immutable
 descriptors, restored-session validation and source-function alias shadowing.
 MSForms names stay in the IDE provider; no new store, COM or unsafe evaluation.
+
+Native unbound ListBox follows [ADR 0051](../../../docs/decisions/0051-native-unbound-listbox.md).
+Keep list/selection state in ordinary VM fields, bounded indexed row operations,
+executable input authorization, focus/validation and callback continuations. Do
+not expand .tvform or claim full list/binding/ComboBox/M7A.4 parity.

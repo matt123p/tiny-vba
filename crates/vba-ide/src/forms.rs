@@ -14,6 +14,7 @@ pub enum ControlKind {
     ToggleButton,
     ScrollBar,
     SpinButton,
+    ListBox,
 }
 impl ControlKind {
     pub fn name(self) -> &'static str {
@@ -26,11 +27,12 @@ impl ControlKind {
             Self::ToggleButton => "ToggleButton",
             Self::ScrollBar => "ScrollBar",
             Self::SpinButton => "SpinButton",
+            Self::ListBox => "ListBox",
         }
     }
     pub fn default_event(self) -> &'static str {
         match self {
-            Self::TextBox | Self::ScrollBar | Self::SpinButton => "Change",
+            Self::TextBox | Self::ScrollBar | Self::SpinButton | Self::ListBox => "Change",
             Self::Label
             | Self::CommandButton
             | Self::CheckBox

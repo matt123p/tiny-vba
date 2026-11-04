@@ -14,6 +14,7 @@ const TYPES: &[&str] = &[
     "ToggleButton",
     "ScrollBar",
     "SpinButton",
+    "ListBox",
     "ReturnBoolean",
     "ReturnInteger",
 ];
@@ -155,6 +156,7 @@ impl Ide {
             (ControlKind::ToggleButton, "ToggleButton"),
             (ControlKind::ScrollBar, "ScrollBar"),
             (ControlKind::SpinButton, "SpinButton"),
+            (ControlKind::ListBox, "ListBox"),
         ] {
             let mut specific = claim(name, true)?;
             specific.event_names = Some(match kind {
@@ -163,7 +165,10 @@ impl Ide {
                     vec!["Change".into(), "SpinUp".into(), "SpinDown".into()]
                 }
                 ControlKind::TextBox => vec!["Change".into()],
-                ControlKind::CheckBox | ControlKind::OptionButton | ControlKind::ToggleButton => {
+                ControlKind::CheckBox
+                | ControlKind::OptionButton
+                | ControlKind::ToggleButton
+                | ControlKind::ListBox => {
                     vec!["Change".into(), "Click".into()]
                 }
                 _ => vec!["Click".into()],
