@@ -1,5 +1,45 @@
 # Implementation progress
 
+## M7A.3 — native worksheet Form Controls (2026-11-04)
+
+Completed FC1–FC2 for [worksheet-form-controls-v1](m7a-worksheet-controls.md)
+under [ADR 0041](decisions/0041-worksheet-form-controls.md). GridCraft now joins
+worksheet/VML/ctrlProp/DrawingML identities into one existing Shape for Button,
+CheckBox, OptionButton, DropDown, ListBox, ScrollBar, Spinner, Label and GroupBox.
+Source conflicts stay inert. The model owns bindings/groups, engine commands own
+state/link writes, undo/recalc and placement, and the optional adapter/shell own
+selected Shapes/ControlFormat APIs and accessible native input. There is no new
+VM capability, shared dependency pin, mutable control registry or custom format.
+
+Assignments validate consent, source target and owner before mutation, commit the
+linked value before running one Sub, and retain Application.Caller/owner scope
+through break/resume. Busy/paused/waiting inputs refuse; Reset never replays them.
+Property writes stay inert. Native save patches known worksheet/VML/property fields,
+retains untouched parts/unknown XML and original VBA project data, and supports
+create/edit/delete/reopen. This is worksheet OOXML persistence, not UserForm resource
+encoding or binary VBA project writeback.
+
+Validation: GridCraft `cargo xtask ci` PASS (all 10 steps), optional VBA/UI
+clippy with `-D warnings` PASS, and regenerated/reference-checked VBA catalogue
+PASS (5,996 pinned pages). Focused native suites PASS: seven engine, ten XLSX,
+one real VBA, six actual-widget/trust/debugger/owner tests and the print regression.
+The broader optional UI regression run passed its existing tests; the new widget
+suite passed after dismissing the expected consent message through the actual UI.
+Actual Node 22.23.4 JS/WASM PASS: seven engine, ten XLSX and one VBA control test.
+The optional VBA web build PASS (existing wasm-only dead-code warning retained).
+Light/dark/scaled native captures were rendered and inspected; a worksheet-caption
+contrast issue under dark chrome was corrected. Shared `cargo xtask ci`, `wasm`
+and `wasm-run` PASS; the original M7 fixture check retains all 12 hashes. Relative
+Markdown links and whitespace checks PASS. No WordCraft implementation changes
+were needed; its worksheet-free host stays unchanged.
+Original independently authored Rust fixtures carry repository MIT OR Apache-2.0;
+no Office-produced file, asset or downloaded macro is included/executed. Fresh
+Office observations remain NOT_RUN under M8.5.
+
+Next: **M7A.4**, native UserForm instance/lifecycle/input/property semantics and
+broader standard MSForms controls. M7A.5 native UserForm editing/persistence,
+M7A.6 removal and M7A.7 full acceptance remain open; worksheet ActiveX is unsupported.
+
 ## M7A.1 and M7A.2 — native inventory/contracts and UserForm import/attachment (2026-11-04)
 
 Implemented `native-userform-import-v1` under
@@ -67,8 +107,8 @@ committing local source overrides.
   variants and full native default-instance/multi-instance/lifecycle parity remain
   M7A.4; none are implied by import acceptance.
 
-Next smallest worksheet task remains source DrawingML identity/assignment
-reconciliation before rendering/activation. Shared next work is FC3.5/FC4 native
+At the M7A.2 checkpoint, worksheet source identity/reconciliation and rendering
+were the next task; M7A.3 below completes that worksheet profile. Shared next work is FC3.5/FC4 native
 lifecycle and broader property/control packets. M7A.5 native edited persistence,
 M7A.6 `.tvform` removal and full M7A acceptance remain open. Fresh Office build/
 OS/locale comparisons remain NOT_RUN under M8.5.

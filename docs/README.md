@@ -32,7 +32,7 @@ records the owner-directed compatibility-only policy. M7A is in progress: the [i
 and partial native worksheet Button metadata reader. M7A.1/M7A.2 are complete for
 the selected native UserForm import/attachment profile under
 [ADR 0040](decisions/0040-native-userform-import-and-attachment.md) and the
-[control/format/host contract matrix](m7a-control-contracts.md). Native edited saving
+[control/format/host contract matrix](m7a-control-contracts.md). Native UserForm edited saving
 and `.tvform` removal are still open; current custom-format code remains legacy.
 
 [VBA attributes and Excel code-view investigation](vba-attributes-and-editor-projection.md)
@@ -156,3 +156,9 @@ separate from authored acceptance.
 - [ADR 0031: scalar Variant For controls](decisions/0031-variant-for-counters.md).
 
 - [ADR 0032: M6 sign-off and deferred Excel/Word comparison](decisions/0032-m6-sign-off-and-reference-comparison-deferral.md).
+
+M7A.3 (2026-11-04): GridCraft implements the nine standard native worksheet Form
+Controls for [worksheet-form-controls-v1](m7a-worksheet-controls.md).
+Model/engine/XLSX own state, commands and packaging; the optional adapter/shell own
+VBA bindings, trusted launches and input. No shared crate/dependency edge changed.
+Native UserForm semantics/persistence and .tvform removal remain M7A.4–M7A.7.

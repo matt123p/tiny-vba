@@ -195,3 +195,10 @@ shared/standalone/fork attachment. IDE -> project is a reviewed downward edge.
 Keep original resources separate from authored source/design, validate handlers
 before insertion, and never substitute .tvform or acknowledge edited native saves
 without the M7A.5 encoder. Full semantics, broader controls and removal remain open.
+
+M7A.3 completes [worksheet-form-controls-v1](../../../docs/m7a-worksheet-controls.md)
+under ADR 0041 in GridCraft: native Shape identity/state, engine bindings/undo/recalc,
+OOXML/VML edited persistence, optional ControlFormat APIs and trusted widget input.
+Preserve original package data separately; failed joins stay inert and callbacks
+use the existing bridge. This is not MSForms/ActiveX or UserForm edited-save support.
+M7A.4 is next; fresh Office observations remain NOT_RUN under M8.5.

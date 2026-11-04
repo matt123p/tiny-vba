@@ -307,3 +307,9 @@ The README images are original renders of tiny-vba's shared UI, not Microsoft
 Office screenshots. Their [capture sources and attribution](docs/images/README.md)
 are recorded alongside them. VBA, Excel, Word and PowerPoint are Microsoft
 trademarks; this independent project is not affiliated with or endorsed by Microsoft.
+
+M7A.3 (2026-11-04): GridCraft implements the nine standard native worksheet Form
+Controls for [worksheet-form-controls-v1](docs/m7a-worksheet-controls.md).
+Model/engine/XLSX own state, commands and packaging; the optional adapter/shell own
+VBA bindings, trusted launches and input. No shared crate/dependency edge changed.
+Native UserForm semantics/persistence and .tvform removal remain M7A.4–M7A.7.

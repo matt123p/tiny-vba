@@ -34,9 +34,9 @@ continue alongside M7A, but release acceptance depends on M7A completion.
 
 Status: **IN PROGRESS**, started 2026-11-04 on owner direction.
 The [inventory and work ledger](m7a-inventory.md) records FC0.1's audited paths,
-the completed import/attachment profile and partial native worksheet Button metadata slice.
-Interactive worksheet controls, native edited persistence and `.tvform` removal
-remain unimplemented; no full M7A acceptance is claimed.
+the completed import/attachment and native worksheet Form Control profiles.
+Native UserForm semantics/editing/persistence and `.tvform` removal remain open;
+no full M7A acceptance is claimed.
 Owner: tiny-vba reusable form codecs/model/runtime/editor; GridCraft worksheet
 controls/Excel bindings; both forks' document, trust, event and package integration.
 The [activated work breakdown](office-forms-controls-implementation-plan.md)
@@ -50,12 +50,13 @@ and inert package attachment in both forks. See the
 [completed task definitions and evidence](implementation-progress.md#completed-m7a1-and-m7a2-plan-scope)
 and [property/event/format/host contracts](m7a-control-contracts.md).
 Broader native variants, full Office lifecycle semantics, native edited saving and
-custom-format removal remain M7A.3–M7A.7; no full M7A sign-off is claimed.
+custom-format removal remain M7A.4–M7A.7; no full M7A sign-off is claimed.
 
-- **M7A.3 — Worksheet forms and controls (FC1–FC2; first metadata slice implemented):** implement the worksheet Button
-  and remaining standard Form Controls with actual Excel geometry, properties,
-  macro assignments, linked cells/list ranges, input, trust, event ordering and
-  save/reopen behavior. Use real fork commands and undo/recalculation paths.
+Completed checkpoint: **M7A.3 — Worksheet forms and controls (FC1–FC2)** for
+[worksheet-form-controls-v1](m7a-worksheet-controls.md): all nine standard families,
+source reconciliation, trusted input, live bindings, selected ControlFormat APIs
+and native save/reopen. See [ADR 0041](decisions/0041-worksheet-form-controls.md).
+
 - **M7A.4 — Office form/control semantics (FC3.5/FC4):** reuse the shared runtime
   behind native forms and close Office compatibility gaps for the inventoried
   standard controls. Match instance/default-instance behavior, lifecycle, modal/

@@ -130,18 +130,22 @@ build/OS/locale comparisons remain NOT_RUN under M8.5.
 | FC0.1 path inventory | DONE | Updated code paths above, both fork attachments and shell routes |
 | FC0.2 compatibility matrix | DONE | [Per-property/event/format/host contracts](m7a-control-contracts.md), selected defaults and explicit future packets |
 | FC0.3 contracts | DONE | ADR 0039 + ADR 0040; identities, limits, unsupported handling, atomicity, source/resources, persistence boundary |
-| FC1.1 native worksheet Button read | PARTIAL | 8 native + 8 JS/WASM tests; source DrawingML identity/reconciliation remains |
-| FC1.2–FC1.4 geometry/render/input/launch | NOT_STARTED | Complete native ID/source reconciliation and geometry/default policy first |
-| FC1.5 untouched save | Initial preservation regression PASS | Edited caption/anchor/assignment persistence not implemented |
-| FC2 / FC4 broader controls | NOT_STARTED | Implement native packets against the matrix; preserve explicit gaps |
+| FC1.1 native worksheet Button read | DONE for worksheet-form-controls-v1 | Native IDs, DrawingML/VML/property joins and conflict refusals |
+| FC1.2–FC1.4 geometry/render/input/launch | DONE for worksheet-form-controls-v1 | Native widgets, placement, pointer/keyboard, consent, owner scope and debugger continuation |
+| FC1.5 native worksheet save | DONE for worksheet-form-controls-v1 | Untouched bytes plus edited caption/anchor/assignment/state/create/delete/reopen |
+| FC2 worksheet Form Controls | DONE for worksheet-form-controls-v1 | Nine native families, bounded bindings/list state, selected Shape/ControlFormat APIs; [contract/evidence](m7a-worksheet-controls.md) |
+| FC4 broader UserForm controls | NOT_STARTED | Native MSForms packets remain M7A.4 |
 | FC3.1–FC3.4 native UserForm codecs/attachment | DONE for native-userform-import-v1 | Export + embedded parity, shared designer/runtime/debugger, standalone IO, XLSM/DOCM trust and byte retention |
 | FC3.5 native lifecycle parity | NOT_STARTED | Default/explicit multi-instance, exact Office lifecycle/focus/event order remain M7A.4 |
 | FC5 edited native persistence | NOT_STARTED | Required encoder, native resource and signature/cache contract |
 | FC6 remove .tvform | NOT_STARTED | Requires native replacement workflows; do not extend the legacy format |
 
-Next smallest worksheet task: preserve source DrawingML `cNvPr` identity, reconcile
-it with worksheet/VML/property metadata and test conflicting macro representations;
-then implement bounded native Button geometry/rendering and trusted activation.
-The next shared task is FC3.5/FC4 native lifecycle/property/input parity and
+M7A.3 completes the selected worksheet profile under ADR 0041. The next shared
+task is M7A.4 / FC3.5 / FC4 native lifecycle/property/input parity and
 broader native control packets against the completed contract matrix.
 No native resource layout, default or event order may be inferred from `.tvform`.
+
+M7A.3 update: the initial metadata-only description above is historical. The
+[current worksheet profile](m7a-worksheet-controls.md) supplies native rendering,
+input, bindings, host access and edited OOXML/VML persistence; ActiveX remains
+retained-only. No shared VM/UI dependency enters GridCraft's model/XLSX layers.

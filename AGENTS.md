@@ -116,3 +116,10 @@ keeping a parallel custom product format. Native edited package persistence need
 the reviewed encoder/writeback/signature path; original-byte retention alone
 cannot satisfy M7A. Do not treat the historical M2 format choice as authorization
 to extend `.tvform`. The main plan and ADR 0038 supersede that choice.
+
+M7A.3 completes [worksheet-form-controls-v1](docs/m7a-worksheet-controls.md)
+under ADR 0041 in GridCraft: native Shape identity/state, engine bindings/undo/recalc,
+OOXML/VML edited persistence, optional ControlFormat APIs and trusted widget input.
+Preserve original package data separately; failed joins stay inert and callbacks
+use the existing bridge. This is not MSForms/ActiveX or UserForm edited-save support.
+M7A.4 is next; fresh Office observations remain NOT_RUN under M8.5.

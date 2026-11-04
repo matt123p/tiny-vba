@@ -99,11 +99,11 @@ and modal continuation budgets/Reset/close behavior remain authoritative.
 
 | Surface | Properties / methods / event mechanism | Decode | Display / edit / execute | Native save |
 |---|---|---|---|---|
-| Worksheet Button | Shape ID/name, caption, anchor/style, macro assignment; Enabled/Visible/PrintObject/Placement; assigned no-argument Sub | Partial metadata from controls/ctrlProp/VML | U; DrawingML reconciliation first | original |
-| CheckBox / OptionButton | Value, linked cell, grouping, caption, assignment | Explicit unsupported type metadata where graph valid | U | original |
-| ListBox / DropDown | List range, linked cell, selection/index, assignment | U | U | original |
-| ScrollBar / Spinner | Value, min/max, increments, linked cell, assignment | U | U | original |
-| Label / GroupBox | Caption, geometry, grouping/container metadata | U | U | original |
+| Worksheet Button | Native ID/name, caption, point geometry, placement/state, assigned Sub | D with reconciled sources | Native widgets / existing commands / trusted bridge | Edited OOXML/VML |
+| CheckBox / OptionButton | Value, linked Boolean/index, mixed check state, radio grouping, assignment | D | Native / live binding / trusted assignment | Edited OOXML/VML |
+| ListBox / DropDown | Bounded list/range, one-based selection, simple/extended lists | D | Native / live range / selected ControlFormat | Edited OOXML/VML |
+| ScrollBar / Spinner | Value, min/max, increments, linked cell | D within explicit numeric-default profile | Native / undo/recalc / selected ControlFormat | Edited OOXML/VML |
+| Label / GroupBox | Caption, geometry, radio grouping / fmlaGroup | D | Native presentation; label text binding remains unsupported | Edited OOXML/VML |
 | Office-supplied worksheet ActiveX: CommandButton, Label, TextBox, CheckBox, OptionButton, ToggleButton, ComboBox, ListBox, ScrollBar, SpinButton, Image | Separate OLEObject/control identity, persisted MSForms class, typed properties and sheet code-name event sink; no assigned-macro substitution | U | U | original package graph only |
 | Additional Office-supplied ActiveX/container/RefEdit entries | Explicit class/reference/platform applicability audit before scheduling a packet | U | U | U |
 | Third-party/custom ActiveX/OLE controls | Outside authorized scope | U | U | U |
@@ -121,13 +121,13 @@ ActiveX event signatures are not inferred from Form Control assignments.
 | Embedded form | BaseClass + MODULESTREAMNAME designer storage + VBFrame + MS-OFORMS f/o | Shared decoder, fork package/trust | Independent embedded and XLSM/DOCM tests |
 | Designer/code/Properties/debugger | Caller SourceId -> shared validated design + authored class/event code | Shared IDE/UI, standalone and both forks | Existing UI and runtime; inert attachment and exact handler tests |
 | Native export/edited embedded save | Native source/resource encoder, cache/signature policy, revision checks, atomic commit | Shared encoder plus caller IO/package policy | U until M7A.5; no custom-format fallback |
-| Worksheet forms | Spreadsheet controls/ctrlProp/VML/DrawingML identities | GridCraft Excel profile | Partial metadata only, M7A.3 |
+| Worksheet forms | Spreadsheet controls/ctrlProp/VML/DrawingML identities | GridCraft Excel profile | [worksheet-form-controls-v1](m7a-worksheet-controls.md), M7A.3 |
 | Worksheet ActiveX | Separate Windows Office object/resource/event model | GridCraft platform packet | U; Office for Mac does not support worksheet ActiveX |
 | Rust host builds | Decode without Office/COM installation | Windows/macOS/Linux/BSD and browser/WASI toolchains | Actual tested environments recorded separately, not implied by target list |
 | Office observation | Exact Office build, OS, locale, property values/error types, event order, independent lawful specimens | M8.5 | NOT_RUN; public-reference and authored evidence stay distinct |
 
 Capability versions are internal API/acceptance labels, never new exchange formats:
-`native-userform-import-v1` (shared) and `worksheet-button-metadata-v1` (GridCraft).
+`native-userform-import-v1` (shared) and `worksheet-form-controls-v1` (GridCraft; includes the earlier read-only metadata API).
 Existing IR 8/ordinary class/event/debugger protocols are reused. Dependencies:
 reviewed cfb/encoding_rs, shared source/design limits, caller IO and fork trust/
 package retention. Only a downward IDE -> project edge is added; no host-shaped
@@ -155,3 +155,7 @@ References: [MS-OFORMS](https://learn.microsoft.com/en-us/openspecs/office_file_
 and [Excel worksheet controls](https://support.microsoft.com/en-gb/excel/overview-of-forms-form-controls-and-activex-controls-on-a-worksheet).
 Exact broader property defaults/signatures/error/event-order observations remain
 packet dependencies, not invented compatibility results from this inventory.
+
+M7A.3 is implemented for [the bounded worksheet profile](m7a-worksheet-controls.md)
+under [ADR 0041](decisions/0041-worksheet-form-controls.md). This does not add
+MSForms/UserForm properties or event semantics, binary project writeback or ActiveX.
