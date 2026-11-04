@@ -9,6 +9,7 @@ enum FormInput {
     Physical,
     Focus,
     Activate,
+    Text { start: i32, length: i32 },
 }
 const GATE_OBJECT: u64 = u64::MAX;
 // Reserved form-interface range, disjoint from the gate itself. No object store.
@@ -653,7 +654,13 @@ fn compiled_form(form: &Form, module: &Module, native: Option<&NativeForm>) -> R
                 ));
             }
             if c.kind == ControlKind::TextBox {
-                source.push_str(&format!("{temp}.MaxLength={}\n", control.max_length));
+                source.push_str(&format!("{temp}.MaxLength={}\n{temp}.MultiLine={}\n{temp}.WordWrap={}\n{temp}.EnterKeyBehavior={}\n{temp}.TabKeyBehavior={}\n{temp}.EnterFieldBehavior={}\n", control.max_length,boolean(control.text_behavior.multi_line),boolean(control.text_behavior.word_wrap),boolean(control.text_behavior.enter_key),boolean(control.text_behavior.tab_key),u8::from(control.text_behavior.recall_selection)));
+                if control.text_behavior.password_char != 0 {
+                    source.push_str(&format!(
+                        "{temp}.PasswordChar=ChrW({})\n",
+                        control.text_behavior.password_char
+                    ));
+                }
             }
             if c.kind == ControlKind::CommandButton {
                 source.push_str(&format!(
@@ -1429,6 +1436,9 @@ impl Ide {
             "default" => "VbaDefault",
             "cancel" => "VbaCancel",
             "maxlength" => "VbaMaxLength",
+            "passwordchar" => "VbaPasswordChar",
+            "selstart" => "VbaSelStart",
+            "sellength" => "VbaSelLength",
             "value" => "VbaValue",
             "name" if control.is_some() => "VbaName",
             _ => field,
@@ -1482,7 +1492,13 @@ impl Ide {
         text: Option<String>,
         host: &mut impl Host,
     ) -> Result<()> {
-        self.deliver_form_input(instance, control, text, FormInput::Physical, host)
+        self.deliver_form_input(
+            instance,
+            control,
+            text.map(|s| VbaString::from_utf8(&s)).transpose()?,
+            FormInput::Physical,
+            host,
+        )
     }
     /// Request native focus through the same authorized ordinary callback path as input.
     pub fn form_instance_focus(
@@ -1508,11 +1524,40 @@ impl Ide {
         }
         self.deliver_form_input(instance, Some(control), None, FormInput::Activate, host)
     }
+    /// Deliver text and UTF-16 selection atomically through ordinary validated callbacks.
+    pub fn form_instance_text(
+        &mut self,
+        instance: FormInstance,
+        control: u32,
+        text: VbaString,
+        selection: (u32, u32),
+        host: &mut impl Host,
+    ) -> Result<()> {
+        if self.native_form(instance.source).is_none() {
+            return Err(error("native text input requires a native form"));
+        }
+        let units = text.units().len();
+        let start = usize::try_from(selection.0).map_err(|_| error("text selection budget"))?;
+        let length = usize::try_from(selection.1).map_err(|_| error("text selection budget"))?;
+        if units > 16384 || start > units || length > units.saturating_sub(start) {
+            return Err(error("invalid native text/selection"));
+        }
+        self.deliver_form_input(
+            instance,
+            Some(control),
+            Some(text),
+            FormInput::Text {
+                start: i32::try_from(start).map_err(|_| error("text selection budget"))?,
+                length: i32::try_from(length).map_err(|_| error("text selection budget"))?,
+            },
+            host,
+        )
+    }
     fn deliver_form_input(
         &mut self,
         instance: FormInstance,
         control: Option<u32>,
-        text: Option<String>,
+        text: Option<VbaString>,
         input: FormInput,
         host: &mut impl Host,
     ) -> Result<()> {
@@ -1559,6 +1604,9 @@ impl Ide {
             {
                 return Err(error("control is disabled or hidden"));
             }
+            if matches!(input, FormInput::Text { .. }) && c.kind != ControlKind::TextBox {
+                return Err(error("text input requires a TextBox"));
+            }
             if input == FormInput::Activate && c.kind != ControlKind::CommandButton {
                 return Err(error("keyboard activation requires a CommandButton"));
             }
@@ -1577,13 +1625,10 @@ impl Ide {
                 ("VbaFocusIndex", vec![Value::Long(index)])
             } else if c.kind == ControlKind::TextBox {
                 let text = text.ok_or_else(|| error("text change requires text"))?;
-                if text.len() > 16384 {
+                if text.units().len() > 16384 {
                     return Err(error("control text budget"));
                 }
-                (
-                    "VbaSetText",
-                    vec![Value::String(VbaString::from_utf8(&text)?)],
-                )
+                ("VbaSetText", vec![Value::String(text)])
             } else {
                 if text.is_some() {
                     return Err(error("click does not accept text"));
@@ -1596,7 +1641,7 @@ impl Ide {
             }
             ("VbaClose", vec![Value::Integer(0)])
         };
-        if input == FormInput::Physical
+        if matches!(input, FormInput::Physical | FormInput::Text { .. })
             && self.native_forms.contains_key(&id)
             && let Some(control) = control
         {
@@ -1612,9 +1657,22 @@ impl Ide {
                 .filter(|_| handler == "VbaSetText")
                 .cloned()
                 .unwrap_or(Value::String(VbaString::from_utf8("")?));
+            let update = if matches!(input, FormInput::Text { .. }) {
+                session.read_instance_field(object, "VbaText")? != text
+            } else {
+                false
+            };
             object = instance.object;
             handler = "VbaInput";
             arguments = vec![Value::Long(index), text];
+            if let FormInput::Text { start, length } = input {
+                handler = "VbaTextInput";
+                arguments.extend([
+                    Value::Long(start),
+                    Value::Long(length),
+                    Value::Boolean(update),
+                ]);
+            }
         }
         session.schedule_instance_callback(object, handler, arguments)?;
         self.form_gate.components = self

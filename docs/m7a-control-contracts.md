@@ -33,7 +33,7 @@ are file-format defaults from MS-OFORMS, not undocumented VBE toolbox defaults.
 | Tag / HelpContextID / ControlTipText | Known frame/site strings/scalars retained in resources | P; no runtime property claim |
 | Window placement / StartUpPosition / ShowModal | VBFrame metadata retained; enabled/default-modal form required; explicit show modes use existing runtime | P for placement; disabled/default-modeless metadata U; parity M7A.4 |
 | Default / Cancel / Accelerator / TakeFocusOnClick changes | Native site/control flags or fields | Default/Cancel decoded and executed; other fields U |
-| Locked / multiline / password / MaxLength / scrolling changes | MorphData behavior fields or nondefault flags | Locked/MaxLength decoded and executed; other fields U |
+| Locked / multiline / password / MaxLength / scrolling changes | MorphData behavior fields or nondefault flags | Locked/MaxLength, multiline, password and selected Enter/Tab/field behavior decoded and executed; scrolling remains U |
 | ControlSource / RowSource / list metadata | Native binding/site fields | U; host binding packet M7A.4 |
 | Pictures / MouseIcon / custom pointers / non-cached class table | Native binary resource or reference-specific class | U; no resource execution/loading |
 | Container children | Native depth/sites and separate parent-control storage | U in v1; refuse instead of flattening |
@@ -58,7 +58,7 @@ unlisted property remains outside the selected import/runtime claim.
 | Native UserForm control | Property packet to complete | Events to complete | Decode | Display / edit | Execute | Native edited save |
 |---|---|---|---|---|---|---|
 | Label | Common caption/geometry/state; AutoSize, font, accelerator | Click; mouse/key/focus applicability audit | D/P | shared | Click() | U |
-| TextBox | Common geometry/state/Text/Value; selection, validation, text limits, multiline/password/binding | Change, Before/AfterUpdate, Enter/Exit, key/mouse | D/P | shared | Change, selected typed Enter/Exit/BeforeUpdate/AfterUpdate | U |
+| TextBox | Common geometry/state/Text/Value; UTF-16 selection, typed validation, text limits, multiline/password; binding remains U | Change, Before/AfterUpdate, Enter/Exit, key/mouse | D/P | shared | Change, selected typed Enter/Exit/BeforeUpdate/AfterUpdate | U |
 | CommandButton | Common caption/geometry/state; Default, Cancel, accelerator/focus | Click; key/mouse/focus | D/P | shared | Click() | U |
 | CheckBox | Value/TripleState, caption; binding remains U | Change/Click, user cycling/Locked; selected Enter/Exit; key/mouse/binding remain U | D/P | shared | selected Value/Change/Click | U |
 | OptionButton | Value/GroupName, caption; binding remains U | Change/Click/root grouping; selected Enter/Exit; key/mouse/binding remain U | D/P | shared | selected Value/Change/Click | U |

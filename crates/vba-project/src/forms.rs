@@ -43,6 +43,29 @@ pub struct Control {
     pub max_length: i32,
     pub group_name: String,
     pub locked: bool,
+    pub text_behavior: TextBehavior,
+}
+/// Selected native MorphData behavior; original resources remain separate.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct TextBehavior {
+    pub multi_line: bool,
+    pub word_wrap: bool,
+    pub enter_key: bool,
+    pub tab_key: bool,
+    pub recall_selection: bool,
+    pub password_char: u16,
+}
+impl Default for TextBehavior {
+    fn default() -> Self {
+        Self {
+            multi_line: false,
+            word_wrap: true,
+            enter_key: false,
+            tab_key: false,
+            recall_selection: false,
+            password_char: 0,
+        }
+    }
 }
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Design {

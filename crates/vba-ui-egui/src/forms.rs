@@ -1,5 +1,6 @@
 //! Reusable form designer and real runtime controls. All edits/events are explicit IDE commands.
 use super::*;
+mod text;
 use vba_ide::forms::{Align, Bounds, ControlKind, DesignEdit, SameSize};
 #[derive(Clone, Debug)]
 pub enum FormCommand {
@@ -17,6 +18,7 @@ pub enum FormCommand {
     InstanceEvent(vba_ide::FormInstance, Option<u32>, Option<String>),
     InstanceFocus(vba_ide::FormInstance, u32),
     InstanceActivate(vba_ide::FormInstance, u32),
+    InstanceText(vba_ide::FormInstance, u32, vba_ide::VbaString, (u32, u32)),
 }
 pub(super) fn apply_form(
     ide: &mut Ide,
@@ -60,6 +62,9 @@ pub(super) fn apply_form(
         FormCommand::Handler(id, c, event) => ide.generate_form_handler(id, c, &event),
         FormCommand::Run(id, modal) => ide.run_form(id, modal, host),
         FormCommand::Event(id, c, text) => ide.form_event(id, c, text, host),
+        FormCommand::InstanceText(instance, control, text, selection) => {
+            ide.form_instance_text(instance, control, text, selection, host)
+        }
         FormCommand::InstanceActivate(instance, control) => {
             ide.form_instance_activate(instance, control, host)
         }
@@ -710,6 +715,21 @@ impl EditorUi {
                     ctx.memory_mut(|m| m.request_focus(*target));
                 }
             }
+            let editing = if native && idle {
+                previous_focus
+                    .iter()
+                    .find(|(owner, _, target)| *owner == instance && Some(*target) == last_focus)
+                    .and_then(|(_, id, _)| {
+                        form.controls
+                            .iter()
+                            .find(|c| c.id == *id && c.kind == ControlKind::TextBox)
+                    })
+            } else {
+                None
+            };
+            let text_keys = editing
+                .map(|c| text::keyboard(ctx, ide, instance, c.id))
+                .unwrap_or_default();
             let mut ordered = previous_focus
                 .iter()
                 .filter(|(source, control, _)| {
@@ -756,7 +776,7 @@ impl EditorUi {
                     (egui::Modifiers::SHIFT, true),
                     (egui::Modifiers::NONE, false),
                 ] {
-                    if ctx.input_mut(|i| i.consume_key(modifiers, egui::Key::Tab)) {
+                    if !text_keys.1 && ctx.input_mut(|i| i.consume_key(modifiers, egui::Key::Tab)) {
                         let next = if backward {
                             (at + ordered.len() - 1) % ordered.len()
                         } else {
@@ -777,10 +797,35 @@ impl EditorUi {
                     }
                 }
             }
+            if editing.is_some()
+                && !text_keys.0
+                && !ordered.is_empty()
+                && !form.controls.iter().any(|c| {
+                    c.kind == ControlKind::CommandButton
+                        && ide
+                            .form_instance_field(instance, Some(c.id), "Default")
+                            .ok()
+                            == Some(vba_ide::Value::Boolean(true))
+                })
+                && ctx.input_mut(|i| i.consume_key(egui::Modifiers::NONE, egui::Key::Enter))
+            {
+                let at = ordered
+                    .iter()
+                    .position(|(_, _, target)| Some(*target) == last_focus)
+                    .unwrap_or(0);
+                if let Some((_, control, _)) = ordered.get((at + 1) % ordered.len()) {
+                    commands.push(Command::Form(FormCommand::InstanceFocus(
+                        instance, *control,
+                    )));
+                }
+            }
             if idle && keyboard_owner == Some(instance) {
                 for (key, property) in
                     [(egui::Key::Enter, "Default"), (egui::Key::Escape, "Cancel")]
                 {
+                    if key == egui::Key::Enter && text_keys.0 {
+                        continue;
+                    }
                     let focused = if key == egui::Key::Enter {
                         previous_focus
                             .iter()
@@ -905,6 +950,7 @@ impl EditorUi {
                         }
                         ui.push_id(("runtime", c.id), |ui| {
                             ui.add_enabled_ui(enabled, |ui| match c.kind {
+                                ControlKind::TextBox if native => { text::TextBox {ide,instance,control:c,bounds,widget:widget_id,enabled,theme}.show(ui,commands); }
                                 ControlKind::TextBox => {
                                     let mut text = ide
                                         .form_instance_field(instance, Some(c.id), "VbaText")
@@ -1039,7 +1085,7 @@ impl EditorUi {
                         let active = ide.form_instance_field(instance, None, "VbaActiveControl").ok();
                         let active_id = focus.iter().find(|(_, control, _)| form.controls.iter().find(|c| c.id == *control).is_some_and(|c| ide.form_instance_field(instance, None, &format!("Vba{}",c.name)).ok() == active));
                         let requested = focus.iter().find(|(_, _, target)| Some(*target) == focused);
-                        let pending = commands.iter().any(|command| matches!(command, Command::Form(FormCommand::InstanceFocus(owner, _) | FormCommand::InstanceActivate(owner, _) | FormCommand::InstanceEvent(owner, _, _)) if *owner == instance));
+                        let pending = commands.iter().any(|command| matches!(command, Command::Form(FormCommand::InstanceFocus(owner, _) | FormCommand::InstanceActivate(owner, _) | FormCommand::InstanceText(owner, _, _, _) | FormCommand::InstanceEvent(owner, _, _)) if *owner == instance));
                         if let Some((_, control, _)) = requested && requested != active_id && !pending {
                             commands.push(Command::Form(FormCommand::InstanceFocus(instance, *control)));
                         }

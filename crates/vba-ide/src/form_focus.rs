@@ -72,6 +72,7 @@ VbaExit previous,cancel
 If serial<>VbaFocusSerial Or Not VbaLoaded Or Not VbaVisible Then Exit Sub
 If cancel.Value Then Exit Sub
 End If
+If target.VbaKind=2 Then target.VbaEnterEdit
 VbaEnter target
 If serial<>VbaFocusSerial Or Not VbaLoaded Or Not VbaVisible Then Exit Sub
 If Not target.Enabled Or Not target.Visible Then Exit Sub
@@ -93,6 +94,18 @@ End If
 End If
 Next control
 If Not (best Is Nothing) Then VbaMoveFocus best
+End Sub
+Public Sub VbaTextInput(ByVal index As Long,ByVal text As String,ByVal start As Long,ByVal length As Long,ByVal update As Boolean)
+Dim control As Object
+Set control=VbaControls.Item(index)
+VbaMoveFocus control
+If Not (VbaActiveControl Is control) Then Exit Sub
+If Not VbaVisible Or Not VbaLoaded Or Not control.Enabled Or Not control.Visible Then Exit Sub
+If update Then
+control.VbaSetTextSelection text,start,length
+Else
+control.VbaSetSelection start,length
+End If
 End Sub
 Public Sub VbaInput(ByVal index As Long,ByVal text As String)
 Dim control As Object

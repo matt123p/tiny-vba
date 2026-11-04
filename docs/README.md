@@ -203,3 +203,9 @@ with typed mutable cancellation, ordinary frames and authorized UI focus/input.
 Programmatic writes do not schedule update events. Tab/Shift+Tab and pointer focus
 follow canonical VBA state through cancellation and debugger waits. The broader
 [M7A.4 scope](m7a4-native-runtime.md) remains in progress.
+
+[ADR 0049](decisions/0049-native-textbox-selection-and-input.md) implements native
+TextBox UTF-16 selection, multiline/wrap, Enter/Tab/field behavior and custom
+password masking through ordinary classes and authorized atomic input. Native
+metadata decoding remains inert; original resources and canonical text are
+preserved. The broader [M7A.4 scope](m7a4-native-runtime.md) remains in progress.

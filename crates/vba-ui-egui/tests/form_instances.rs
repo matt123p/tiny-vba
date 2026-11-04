@@ -303,3 +303,238 @@ fn native_tab_cancellation_and_shift_tab_follow_vba_active_control() -> R {
     assert!(h.state().errors.is_empty(), "{:?}", h.state().errors);
     Ok(())
 }
+
+#[test]
+fn native_multiline_text_and_selection_follow_actual_keyboard_input_in_utf16() -> R {
+    let mut ide = Ide::new();
+    let source=fixture::SOURCE.replace("Debug.Print \"initialized\"","Entry.MultiLine=True\r\nEntry.EnterKeyBehavior=True\r\nEntry.TabKeyBehavior=True\r\nEntry.EnterFieldBehavior=MSForms.fmEnterFieldBehaviorRecallSelection\r\nEntry.Text=\"\"\r\nDebug.Print \"initialized\"");
+    let export = String::from_utf8(fixture::export())?.replace(fixture::SOURCE, &source);
+    ide.import_native_form_export(
+        "NativeForm.frm",
+        export.as_bytes(),
+        1252,
+        &[NativeFormResource {
+            name: "NativeForm.frx".into(),
+            bytes: fixture::companion(),
+        }],
+    )?;
+    ide.add_module("Main.bas", "Sub Main()\nNativeForm.Show 0\nEnd Sub")?;
+    ide.dispatch(Action::Run, &mut NoHost)?;
+    for _ in 0..100 {
+        ide.tick(&mut NoHost)?;
+        if ide.mode() == Mode::Completed {
+            break;
+        }
+    }
+    let f = *ide.form_instances()?.first().ok_or("instance")?;
+    let mut h = Harness::builder()
+        .with_size(egui::vec2(1400., 1000.))
+        .build_ui_state(
+            |ui, s: &mut State| {
+                for c in s.view.show(ui, &s.ide, Theme::light()) {
+                    if let Err(e) = apply(&mut s.ide, c, &mut NoHost) {
+                        s.errors.push(e.to_string());
+                    }
+                }
+                if let Err(e) = s.ide.tick(&mut NoHost) {
+                    s.errors.push(e.to_string());
+                }
+            },
+            State {
+                ide,
+                view: EditorUi::default(),
+                errors: vec![],
+            },
+        );
+    h.run_steps(5);
+    h.event(egui::Event::Text("A😀".into()));
+    h.run_steps(8);
+    assert_eq!(
+        h.state()
+            .ide
+            .form_instance_field(f, Some(12), "VbaSelStart")?,
+        vba_ide::Value::Long(3)
+    );
+    h.key_press(egui::Key::Enter);
+    h.run_steps(8);
+    h.key_press(egui::Key::Tab);
+    h.run_steps(8);
+    h.event(egui::Event::Text("B".into()));
+    h.run_steps(8);
+    assert_eq!(
+        h.state().ide.form_instance_field(f, Some(12), "VbaText")?,
+        vba_ide::Value::String(vba_ide::VbaString::from_utf8("A😀\r\n\tB")?)
+    );
+    assert_eq!(
+        h.state()
+            .ide
+            .form_instance_field(f, Some(12), "VbaSelStart")?,
+        vba_ide::Value::Long(7)
+    );
+    h.key_press_modifiers(
+        egui::Modifiers {
+            ctrl: true,
+            command: true,
+            ..Default::default()
+        },
+        egui::Key::A,
+    );
+    h.run_steps(8);
+    assert_eq!(
+        h.state()
+            .ide
+            .form_instance_field(f, Some(12), "VbaSelLength")?,
+        vba_ide::Value::Long(7)
+    );
+    h.event(egui::Event::Text("x".into()));
+    h.run_steps(8);
+    assert_eq!(
+        h.state().ide.form_instance_field(f, Some(12), "VbaText")?,
+        vba_ide::Value::String(vba_ide::VbaString::from_utf8("x")?)
+    );
+    h.key_press(egui::Key::Home);
+    h.run_steps(8);
+    h.key_press_modifiers(egui::Modifiers::SHIFT, egui::Key::ArrowRight);
+    h.run_steps(8);
+    assert_eq!(
+        h.state()
+            .ide
+            .form_instance_field(f, Some(12), "VbaSelLength")?,
+        vba_ide::Value::Long(1)
+    );
+    assert_eq!(
+        h.state()
+            .ide
+            .form_instance_field(f, None, "VbaActiveControl")?,
+        h.state().ide.form_instance_field(f, None, "VbaEntry")?
+    );
+    assert!(h.state().errors.is_empty(), "{:?}", h.state().errors);
+    assert!(
+        vba_ui_egui::Command::Form(vba_ui_egui::FormCommand::InstanceText(
+            f,
+            12,
+            vba_ide::VbaString::from_utf8("x")?,
+            (0, 1)
+        ))
+        .executes_code()
+    );
+    Ok(())
+}
+
+#[test]
+fn native_persisted_password_uses_the_requested_mask_without_replacing_canonical_text() -> R {
+    let mut ide = Ide::new();
+    ide.import_native_form_export(
+        "NativeForm.frm",
+        &fixture::export(),
+        1252,
+        &[NativeFormResource {
+            name: "NativeForm.frx".into(),
+            bytes: fixture::text_companion(0x2c80081b, 42),
+        }],
+    )?;
+    ide.add_module("Main.bas", "Sub Main()\nNativeForm.Show 0\nEnd Sub")?;
+    ide.dispatch(Action::Run, &mut NoHost)?;
+    for _ in 0..100 {
+        ide.tick(&mut NoHost)?;
+        if ide.mode() == Mode::Completed {
+            break;
+        }
+    }
+    let f = *ide.form_instances()?.first().ok_or("instance")?;
+    let mut h = Harness::builder()
+        .with_size(egui::vec2(1400., 1000.))
+        .build_ui_state(
+            |ui, s: &mut State| {
+                for c in s.view.show(ui, &s.ide, Theme::light()) {
+                    if let Err(e) = apply(&mut s.ide, c, &mut NoHost) {
+                        s.errors.push(e.to_string());
+                    }
+                }
+                if let Err(e) = s.ide.tick(&mut NoHost) {
+                    s.errors.push(e.to_string());
+                }
+            },
+            State {
+                ide,
+                view: EditorUi::default(),
+                errors: vec![],
+            },
+        );
+    h.run_steps(5);
+    fn mask(shape: &egui::Shape) -> bool {
+        match shape {
+            egui::Shape::Text(text) => text.galley.job.text == "*******",
+            egui::Shape::Vec(shapes) => shapes.iter().any(mask),
+            _ => false,
+        }
+    }
+    assert!(h.output().shapes.iter().any(|clipped| mask(&clipped.shape)));
+    assert_eq!(
+        h.state().ide.form_instance_field(f, Some(12), "VbaText")?,
+        vba_ide::Value::String(vba_ide::VbaString::from_utf8("initial")?)
+    );
+    assert!(h.state().errors.is_empty(), "{:?}", h.state().errors);
+    Ok(())
+}
+
+#[test]
+fn native_text_caret_and_insertion_preserve_unpaired_utf16_units() -> R {
+    let mut ide = Ide::new();
+    let source=fixture::SOURCE.replace("Debug.Print \"initialized\"","Entry.EnterFieldBehavior=1\r\nEntry.Text=ChrW(55357) & \"z\"\r\nDebug.Print \"initialized\"");
+    let export = String::from_utf8(fixture::export())?.replace(fixture::SOURCE, &source);
+    ide.import_native_form_export(
+        "NativeForm.frm",
+        export.as_bytes(),
+        1252,
+        &[NativeFormResource {
+            name: "NativeForm.frx".into(),
+            bytes: fixture::companion(),
+        }],
+    )?;
+    ide.add_module("Main.bas", "Sub Main()\nNativeForm.Show 0\nEnd Sub")?;
+    ide.dispatch(Action::Run, &mut NoHost)?;
+    for _ in 0..100 {
+        ide.tick(&mut NoHost)?;
+        if ide.mode() == Mode::Completed {
+            break;
+        }
+    }
+    let f = *ide.form_instances()?.first().ok_or("instance")?;
+    let mut h = Harness::builder()
+        .with_size(egui::vec2(1400., 1000.))
+        .build_ui_state(
+            |ui, s: &mut State| {
+                for c in s.view.show(ui, &s.ide, Theme::light()) {
+                    if let Err(e) = apply(&mut s.ide, c, &mut NoHost) {
+                        s.errors.push(e.to_string());
+                    }
+                }
+                if let Err(e) = s.ide.tick(&mut NoHost) {
+                    s.errors.push(e.to_string());
+                }
+            },
+            State {
+                ide,
+                view: EditorUi::default(),
+                errors: vec![],
+            },
+        );
+    h.run_steps(5);
+    h.key_press(egui::Key::End);
+    h.run_steps(8);
+    h.key_press(egui::Key::Home);
+    h.run_steps(8);
+    assert_eq!(
+        h.state().ide.form_instance_field(f, Some(12), "VbaText")?,
+        vba_ide::Value::String(vba_ide::VbaString::from_units(vec![55357, 122])?)
+    );
+    h.event(egui::Event::Text("x".into()));
+    h.run_steps(8);
+    assert_eq!(
+        h.state().ide.form_instance_field(f, Some(12), "VbaText")?,
+        vba_ide::Value::String(vba_ide::VbaString::from_units(vec![120, 55357, 122])?)
+    );
+    assert!(h.state().errors.is_empty(), "{:?}", h.state().errors);
+    Ok(())
+}

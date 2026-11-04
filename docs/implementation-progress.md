@@ -1,5 +1,22 @@
 # Implementation progress
 
+## M7A.4 continued — native TextBox text and selection (2026-11-04)
+
+Implemented [ADR 0049](decisions/0049-native-textbox-selection-and-input.md):
+UTF-16 selection/replacement, multiline/wrap, Enter/Tab behavior, field-selection
+constants and native/custom password masking. Input commits text and selection
+atomically before ordinary Change callbacks and preserves typed validation/focus.
+A real Unicode widget regression also fixes missing-glyph panic without changing
+host fonts/global policy. Four new native instance and one decode case pass; actual multiline/selection,
+persisted password and isolated-surrogate widget cases cover the UI. Shared
+`cargo xtask ci`, `wasm`, `wasm-run`, `ui`, `ui-native` and `web` PASS, including
+40 native instance tests in native/WASI execution and seven actual widget cases.
+Chromium native text/password/focus/boolean input and editor/legacy form gates
+PASS; rendered text and password output was inspected. Original M7 hashes and
+changed Markdown links PASS. Consumer immutable-pin integration follows.
+Full M7A.4 remains IN PROGRESS with its unchanged remaining control/property/
+binding/platform requirements in [the runtime record](m7a4-native-runtime.md).
+
 ## M7A.4 continued — native container focus and validation (2026-11-04)
 
 Implemented [ADR 0048](decisions/0048-native-container-focus-and-validation.md):

@@ -1,0 +1,271 @@
+//! Rendering adapters translate the existing TextBox object's UTF-16 state to egui cursors.
+use super::*;
+use egui::{
+    text::{CCursor, CCursorRange},
+    widgets::text_edit::TextEditState,
+};
+
+fn positions(text: &str) -> impl Iterator<Item = usize> + '_ {
+    let mut chars = text.chars().peekable();
+    std::iter::from_fn(move || {
+        let c = chars.next()?;
+        let mut units = c.len_utf16();
+        if c == '\r' && chars.peek() == Some(&'\n') {
+            chars.next();
+            units += 1;
+        }
+        Some(units)
+    })
+}
+fn units_before(text: &str, chars: usize) -> usize {
+    positions(text).take(chars).sum()
+}
+fn chars_before(text: &str, units: usize) -> usize {
+    let mut consumed = 0usize;
+    positions(text)
+        .take_while(|width| {
+            let next = consumed.saturating_add(*width);
+            if next > units {
+                false
+            } else {
+                consumed = next;
+                true
+            }
+        })
+        .count()
+}
+fn selection(text: &str, range: CCursorRange) -> (u32, u32) {
+    let [start, end] = range.sorted_cursors();
+    let start = units_before(text, start.index.0);
+    let end = units_before(text, end.index.0);
+    (
+        u32::try_from(start).unwrap_or(u32::MAX),
+        u32::try_from(end.saturating_sub(start)).unwrap_or(u32::MAX),
+    )
+}
+/// Retain unchanged UTF-16 units, including isolated surrogates, around a UI edit.
+fn edit_value(
+    raw: &vba_ide::VbaString,
+    original: &str,
+    edited: &str,
+) -> vba_ide::Result<vba_ide::VbaString> {
+    let old = original.replace("\r\n", "\n");
+    let prefix = old
+        .chars()
+        .zip(edited.chars())
+        .take_while(|(a, b)| a == b)
+        .count();
+    let old_count = old.chars().count();
+    let new_count = edited.chars().count();
+    let suffix = old
+        .chars()
+        .rev()
+        .zip(edited.chars().rev())
+        .take(
+            old_count
+                .saturating_sub(prefix)
+                .min(new_count.saturating_sub(prefix)),
+        )
+        .take_while(|(a, b)| a == b)
+        .count();
+    let start = units_before(original, prefix);
+    let end = units_before(original, old_count.saturating_sub(suffix));
+    let invalid = || vba_ide::Diagnostic::new("VBA_IDE", "invalid text editing range");
+    let mut units = raw.units().get(..start).ok_or_else(invalid)?.to_vec();
+    let inserted = edited
+        .chars()
+        .skip(prefix)
+        .take(new_count.saturating_sub(prefix + suffix))
+        .collect::<String>()
+        .replace('\n', "\r\n");
+    units.extend(inserted.encode_utf16());
+    units.extend_from_slice(raw.units().get(end..).ok_or_else(invalid)?);
+    vba_ide::VbaString::from_units(units)
+}
+pub(super) struct TextBox<'a> {
+    pub ide: &'a Ide,
+    pub instance: vba_ide::FormInstance,
+    pub control: &'a vba_ide::forms::Control,
+    pub bounds: egui::Rect,
+    pub widget: egui::Id,
+    pub enabled: bool,
+    pub theme: Theme,
+}
+impl TextBox<'_> {
+    fn field(&self, name: &str) -> Option<vba_ide::Value> {
+        self.ide
+            .form_instance_field(self.instance, Some(self.control.id), name)
+            .ok()
+    }
+    fn boolean(&self, name: &str) -> bool {
+        self.field(name) == Some(vba_ide::Value::Boolean(true))
+    }
+    fn long(&self, name: &str) -> u32 {
+        match self.field(name) {
+            Some(vba_ide::Value::Long(n)) => u32::try_from(n).unwrap_or(0),
+            _ => 0,
+        }
+    }
+    pub(super) fn show(&self, ui: &mut egui::Ui, commands: &mut Vec<Command>) {
+        let Some(vba_ide::Value::String(raw)) = self.field("VbaText") else {
+            return;
+        };
+        let original = String::from_utf16_lossy(raw.units());
+        let mut text = original.replace("\r\n", "\n");
+        let multi = self.boolean("MultiLine");
+        let wrap = multi && self.boolean("WordWrap");
+        let locked = self.boolean("Locked");
+        let mask = self
+            .field("PasswordChar")
+            .map(control_text)
+            .unwrap_or_default()
+            .chars()
+            .next();
+        let maximum = match self.long("MaxLength") {
+            0 => 16384,
+            n => usize::try_from(n).unwrap_or(16384).min(16384),
+        };
+        let canonical = (self.long("VbaSelStart"), self.long("VbaSelLength"));
+        let start = usize::try_from(canonical.0).unwrap_or(0);
+        let end = start.saturating_add(usize::try_from(canonical.1).unwrap_or(0));
+        let desired = CCursorRange::two(
+            CCursor::new(chars_before(&original, start)),
+            CCursor::new(chars_before(&original, end)),
+        );
+        let mut state = TextEditState::load(ui.ctx(), self.widget).unwrap_or_default();
+        if state
+            .cursor
+            .char_range()
+            .is_none_or(|range| selection(&original, range) != canonical)
+        {
+            state.cursor.set_char_range(Some(desired));
+            state.store(ui.ctx(), self.widget);
+        }
+        let font = egui::TextStyle::Body.resolve(ui.style());
+        let mut layouter = |ui: &egui::Ui, buffer: &dyn egui::TextBuffer, width: f32| {
+            let display = buffer
+                .as_str()
+                .chars()
+                .map(|c| {
+                    if c == '\n' {
+                        if multi { '\n' } else { ' ' }
+                    } else {
+                        mask.unwrap_or(c)
+                    }
+                })
+                .collect::<String>();
+            ui.fonts_mut(|fonts| {
+                // Keep one displayed character per editing character without changing host fonts.
+                let display = display
+                    .chars()
+                    .map(|c| {
+                        if c.is_control() || fonts.has_glyph(&font, c) {
+                            c
+                        } else {
+                            '?'
+                        }
+                    })
+                    .collect::<String>();
+                fonts.layout(
+                    display,
+                    font.clone(),
+                    self.theme.text,
+                    if wrap { width } else { f32::INFINITY },
+                )
+            })
+        };
+        let copy = text.clone();
+        let mut readonly = copy.as_str();
+        let buffer: &mut dyn egui::TextBuffer = if locked { &mut readonly } else { &mut text };
+        let builder = if multi {
+            TextEdit::multiline(buffer)
+        } else {
+            TextEdit::singleline(buffer)
+        };
+        let mut child = ui.new_child(egui::UiBuilder::new().max_rect(self.bounds));
+        child.set_clip_rect(ui.clip_rect().intersect(self.bounds));
+        let output = builder
+            .id(self.widget)
+            .min_size(self.bounds.size())
+            .desired_width(self.bounds.width())
+            .char_limit(maximum)
+            .password(mask.is_some())
+            .layouter(&mut layouter)
+            .hint_text(&self.control.name)
+            .lock_focus(multi && self.boolean("TabKeyBehavior"))
+            .return_key(if multi {
+                Some(egui::KeyboardShortcut::new(
+                    egui::Modifiers::NONE,
+                    egui::Key::Enter,
+                ))
+            } else {
+                None
+            })
+            .show(&mut child);
+        output.response.widget_info(|| {
+            egui::WidgetInfo::labeled(
+                egui::accesskit::Role::TextInput,
+                self.enabled,
+                &self.control.name,
+            )
+        });
+        if let Some(range) = output.cursor_range {
+            let native = if output.response.changed() {
+                match edit_value(&raw, &original, &text) {
+                    Ok(value) => value,
+                    Err(e) => {
+                        commands.push(Command::Report(e.to_string()));
+                        return;
+                    }
+                }
+            } else {
+                raw.clone()
+            };
+            let selected = selection(&String::from_utf16_lossy(native.units()), range);
+            if output.response.changed() || output.response.has_focus() && selected != canonical {
+                commands.push(Command::Form(FormCommand::InstanceText(
+                    self.instance,
+                    self.control.id,
+                    native,
+                    selected,
+                )));
+            }
+        }
+    }
+}
+/// Adapt the documented control key policy before the ordinary Tab/default-button routing.
+pub(super) fn keyboard(
+    ctx: &egui::Context,
+    ide: &Ide,
+    instance: vba_ide::FormInstance,
+    control: u32,
+) -> (bool, bool) {
+    let flag = |name| {
+        ide.form_instance_field(instance, Some(control), name).ok()
+            == Some(vba_ide::Value::Boolean(true))
+    };
+    let multi = flag("MultiLine");
+    let mut newline = multi && flag("EnterKeyBehavior");
+    ctx.input_mut(|input| {
+        input.events.retain_mut(|event| {
+            if let egui::Event::Key {
+                key,
+                pressed: true,
+                modifiers,
+                ..
+            } = event
+                && modifiers.ctrl
+                && matches!(key, egui::Key::Enter | egui::Key::Tab)
+            {
+                if !multi {
+                    return false;
+                }
+                *key = egui::Key::Enter;
+                *modifiers = egui::Modifiers::NONE;
+                newline = true;
+            }
+            true
+        });
+    });
+    (newline, multi && flag("TabKeyBehavior"))
+}

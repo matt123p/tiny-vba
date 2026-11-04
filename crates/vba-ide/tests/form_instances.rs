@@ -998,3 +998,132 @@ fn native_focus_signatures_validate_atomically_and_handler_generation_is_typed()
     assert!(ide.generate_form_handler(id, Some(11), "Enter").is_err());
     Ok(())
 }
+
+#[test]
+fn native_text_selection_is_utf16_clamped_and_writable_without_focus() -> R {
+    let ide = setup(
+        "Sub Main()\nDim f As New NativeForm,t As MSForms.TextBox\nSet t=f.Entry\nt.Text=\"A\" & ChrW(55357) & ChrW(56832) & \"BC\"\nt.SelStart=1\nt.SelLength=2\nDebug.Print Len(t.SelText)\nDebug.Print AscW(VBA.Left(t.SelText,1))\nt.SelText=\"xy\"\nDebug.Print t.Text\nDebug.Print t.SelStart\nDebug.Print t.SelLength\nt.SelStart=999\nDebug.Print t.SelStart\nt.SelLength=999\nDebug.Print t.SelLength\nOn Error Resume Next\nt.SelStart=-1\nDebug.Print Err.Number\nDebug.Print t.SelStart\nErr.Clear\nt.SelLength=-1\nDebug.Print Err.Number\nDebug.Print t.SelLength\nEnd Sub",
+        None,
+    )?;
+    assert_eq!(ide.mode(), Mode::Completed, "{:?}", ide.diagnostics);
+    assert_eq!(
+        ide.output(),
+        vec![
+            "initialized",
+            "2",
+            "-10179",
+            "AxyBC",
+            "3",
+            "0",
+            "5",
+            "0",
+            "380",
+            "5",
+            "380",
+            "0"
+        ]
+    );
+    Ok(())
+}
+#[test]
+fn native_text_input_commits_selection_before_change_and_keeps_recalled_focus() -> R {
+    let source = fixture::SOURCE.to_owned()
+        + "\r\nPrivate Sub Entry_Change()\r\nDebug.Print Entry.SelStart\r\nDebug.Print Entry.SelLength\r\nStop\r\nEnd Sub\r\n";
+    let mut ide = setup(
+        "Sub Main()\nNativeForm.Entry.EnterFieldBehavior=MSForms.fmEnterFieldBehaviorRecallSelection\nNativeForm.Show\nEnd Sub",
+        Some(&source),
+    )?;
+    let f = *ide.form_instances()?.first().ok_or("instance")?;
+    ide.form_instance_text(
+        f,
+        12,
+        VbaString::from_utf8("a😀\r\nz")?,
+        (5, 1),
+        &mut NoHost,
+    )?;
+    settle(&mut ide)?;
+    assert_eq!(ide.mode(), Mode::Break, "{:?}", ide.diagnostics);
+    assert_eq!(ide.output(), vec!["initialized", "5", "1"]);
+    assert_eq!(
+        ide.form_instance_field(f, Some(12), "VbaSelStart")?,
+        Value::Long(5)
+    );
+    ide.dispatch(Action::Run, &mut NoHost)?;
+    settle(&mut ide)?;
+    assert_eq!(ide.mode(), Mode::Waiting);
+    assert!(
+        ide.form_instance_text(f, 12, VbaString::from_utf8("x")?, (2, 0), &mut NoHost)
+            .is_err()
+    );
+    assert_eq!(
+        ide.form_instance_field(f, Some(12), "VbaSelStart")?,
+        Value::Long(5)
+    );
+    ide.form_instance_focus(f, 13, &mut NoHost)?;
+    settle(&mut ide)?;
+    ide.form_instance_focus(f, 12, &mut NoHost)?;
+    settle(&mut ide)?;
+    assert_eq!(
+        ide.form_instance_field(f, Some(12), "VbaSelStart")?,
+        Value::Long(5)
+    );
+    assert_eq!(
+        ide.form_instance_field(f, Some(12), "VbaSelLength")?,
+        Value::Long(1)
+    );
+    Ok(())
+}
+#[test]
+fn native_text_metadata_initializes_flags_without_running_import_or_mutating_resources() -> R {
+    let mut ide = Ide::new();
+    let bytes = fixture::text_companion(0xacb0481b, 42);
+    let id = ide.import_native_form_export(
+        "NativeForm.frm",
+        &fixture::export(),
+        1252,
+        &[NativeFormResource {
+            name: "NativeForm.frx".into(),
+            bytes: bytes.clone(),
+        }],
+    )?;
+    assert!(ide.output().is_empty());
+    assert!(ide.form_instances()?.is_empty());
+    ide.add_module("Main.bas","Sub Main()\nNativeForm.Show 0\nDebug.Print NativeForm.Entry.MultiLine\nDebug.Print NativeForm.Entry.WordWrap\nDebug.Print NativeForm.Entry.EnterKeyBehavior\nDebug.Print NativeForm.Entry.PasswordChar\nDebug.Print NativeForm.Entry.SelLength\nEnd Sub")?;
+    ide.dispatch(Action::Run, &mut NoHost)?;
+    settle(&mut ide)?;
+    assert_eq!(ide.mode(), Mode::Completed, "{:?}", ide.diagnostics);
+    assert_eq!(
+        ide.output(),
+        vec!["initialized", "True", "True", "True", "*", "0"]
+    );
+    assert_eq!(
+        ide.native_form(id)
+            .ok_or("native")?
+            .resources
+            .get(1)
+            .ok_or("resource")?
+            .bytes,
+        bytes
+    );
+    Ok(())
+}
+
+#[test]
+fn native_caret_only_input_does_not_overwrite_a_value_changed_by_enter() -> R {
+    let source = fixture::SOURCE.replace(
+        "Option Explicit",
+        "Option Explicit\r\nPrivate entered As Long",
+    ) + "\r\nPrivate Sub Entry_Enter()\r\nentered=entered+1\r\nIf entered>1 Then Entry.Text=\"from enter\"\r\nEnd Sub\r\n";
+    let mut ide = setup(
+        "Sub Main()\nNativeForm.Show 0\nNativeForm.Apply.SetFocus\nEnd Sub",
+        Some(&source),
+    )?;
+    let f = *ide.form_instances()?.first().ok_or("instance")?;
+    ide.form_instance_text(f, 12, VbaString::from_utf8("initial")?, (0, 0), &mut NoHost)?;
+    settle(&mut ide)?;
+    assert_eq!(
+        text(&ide, f)?,
+        Value::String(VbaString::from_utf8("from enter")?)
+    );
+    Ok(())
+}

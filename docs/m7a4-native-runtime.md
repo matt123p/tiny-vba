@@ -6,6 +6,13 @@ Updated 2026-11-04. **IN PROGRESS. M7A.4 is not complete.** This record extends
 
 Implemented in shared tiny-vba:
 
+- [Native TextBox selection/input](decisions/0049-native-textbox-selection-and-input.md):
+  UTF-16 SelStart/SelLength/SelText and atomic input/cursor commits, native multiline,
+  word-wrap, Enter/Tab behavior, SelectAll/RecallSelection and custom password
+  characters. Programmatic state and actual Unicode keyboard input share ordinary
+  frames and existing Change/validation. Decoder flags and original resources stay
+  separate; the renderer preserves host fonts and canonical text on missing glyphs.
+
 - [Native container focus/validation](decisions/0048-native-container-focus-and-validation.md):
   read-only ActiveControl, SetFocus, first eligible tab selection, Enter/Exit and
   TextBox BeforeUpdate/AfterUpdate with mutable ByVal MSForms.ReturnBoolean cancellation.
@@ -98,8 +105,8 @@ Remaining M7A.4 requirements, without reducing the milestone's scope:
   parity. External class activation remains outside the project-only path.
   For Each uses the existing bounded snapshot profile.
 - Further focus/validation edge cases across recursive redirection, window/container
-  activation, boolean update timing and data binding; keyboard/mouse/accelerator ordering, text selection,
-  multiline/password and remaining property/default/error/coercion contracts,
+  activation, boolean update timing and data binding; typed keyboard/mouse/accelerator ordering, further text/selection edge cases
+  and remaining property/default/error/coercion contracts,
   including native dynamic TypeName. ADR 0048 implements the selected flat native
   focus/typed cancellation path, without claiming the full event/property matrix.
 - Native ComboBox, ListBox, Frame, MultiPage, TabStrip, ScrollBar, SpinButton,

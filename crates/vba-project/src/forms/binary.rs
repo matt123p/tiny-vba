@@ -355,18 +355,19 @@ fn control(bytes: &[u8], site: Site) -> Result<Control> {
     let mut max_length = 0;
     let mut group_name = String::new();
     let mut locked = false;
+    let mut text_behavior = super::TextBehavior::default();
     let (caption, text, width, height, enabled) = if matches!(
         site.kind,
         Kind::TextBox | Kind::CheckBox | Kind::OptionButton | Kind::ToggleButton
     ) {
-        let lo = mask(&mut b, 0x86c0_01ff, 0x8000_0100)?;
+        let lo = mask(&mut b, 0x86c0_03ff, 0x8000_0100)?;
         let high = b.u32()?;
         if high & !1 != 0 {
             return Err(unsupported("extended MorphData properties"));
         }
         if (site.kind != Kind::OptionButton && high & 1 != 0)
             || (site.kind == Kind::TextBox && lo & (1 << 23) != 0)
-            || (site.kind != Kind::TextBox && lo & (1 << 3) != 0)
+            || (site.kind != Kind::TextBox && lo & ((1 << 3) | (1 << 9)) != 0)
         {
             return Err(unsupported(
                 "MorphData property not applicable to native control class",
@@ -375,8 +376,20 @@ fn control(bytes: &[u8], site: Site) -> Result<Control> {
         let m = u64::from(lo);
         let flags = field(&mut b, m, 0, 4, 0x2c80_081b)?;
         locked = flags & 4 != 0;
-        if flags & !6 != 0x2c80_0819 {
+        let text_flags = if site.kind == Kind::TextBox {
+            0x80f0_4000
+        } else {
+            0
+        };
+        if flags & !(6 | text_flags) != 0x2c80_0819 & !text_flags {
             return Err(unsupported("TextBox behavior flags"));
+        }
+        if site.kind == Kind::TextBox {
+            text_behavior.multi_line = flags & (1 << 31) != 0;
+            text_behavior.word_wrap = flags & (1 << 23) != 0;
+            text_behavior.enter_key = flags & (1 << 20) != 0;
+            text_behavior.recall_selection = flags & (1 << 21) != 0;
+            text_behavior.tab_key = flags & (1 << 22) != 0;
         }
         field(&mut b, m, 1, 4, 0)?;
         field(&mut b, m, 2, 4, 0)?;
@@ -396,6 +409,8 @@ fn control(bytes: &[u8], site: Site) -> Result<Control> {
         {
             return Err(unsupported("TextBox display/scroll/mouse profile"));
         }
+        text_behavior.password_char = u16::try_from(field(&mut b, m, 9, 2, 0)?)
+            .map_err(|_| unsupported("native password character"))?;
         let value = field(&mut b, m, 22, 4, 0)?;
         let caption = field(&mut b, m, 23, 4, 0)?;
         field(&mut b, m, 25, 4, 0)?;
@@ -465,5 +480,6 @@ fn control(bytes: &[u8], site: Site) -> Result<Control> {
         max_length,
         group_name,
         locked,
+        text_behavior,
     })
 }

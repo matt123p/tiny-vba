@@ -136,3 +136,21 @@ fn native_boolean_controls_decode_persisted_states_and_group_names() {
     assert_eq!(form.design.controls[3].text, "0");
     assert_eq!(form.source, fixture::SOURCE);
 }
+
+#[test]
+fn native_text_behavior_packet_decodes_exact_flags_password_and_preserves_original() {
+    let flags =
+        (0x2c80081b | (1 << 31) | (1 << 20) | (1 << 21) | (1 << 22) | (1 << 14)) & !(1 << 23);
+    let bytes = fixture::text_companion(flags, 42);
+    let form = decode(&bytes).unwrap();
+    let text = &form.design.controls[1];
+    assert!(text.text_behavior.multi_line);
+    assert!(!text.text_behavior.word_wrap);
+    assert!(text.text_behavior.enter_key);
+    assert!(text.text_behavior.tab_key);
+    assert!(text.text_behavior.recall_selection);
+    assert_eq!(text.text_behavior.password_char, 42);
+    assert_eq!(text.text, "initial");
+    assert_eq!(form.resources[1].bytes, bytes);
+    assert!(decode(&fixture::text_companion(flags | (1 << 24), 42)).is_err());
+}

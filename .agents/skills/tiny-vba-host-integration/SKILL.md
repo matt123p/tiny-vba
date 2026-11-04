@@ -256,3 +256,10 @@ commands execute VBA and require the same authorization and modal ownership as
 input; widget focus follows canonical state after cancellation/Stop/resume.
 Preserve typed ByVal return identity, inert source/resources and leaf event
 exposure. Broader M7A.4 control/platform semantics remain open.
+
+Native TextBox behavior follows [ADR 0049](../../../docs/decisions/0049-native-textbox-selection-and-input.md).
+Keep UTF-16 text/selection canonical in ordinary classes, input/cursor commits
+atomic and executable input authorized. Preserve CRLF and scalar cursor mapping,
+native flags/resource identity, password masking and ordinary callback/debugger
+boundaries. Rendering must not replace host fonts/global policy or alter data on
+missing glyphs. No .tvform expansion or full M7A.4 acceptance is implied.

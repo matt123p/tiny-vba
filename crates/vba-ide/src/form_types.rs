@@ -71,6 +71,45 @@ impl Ide {
                 });
             }
         }
+        if let Some(ty) = library
+            .types
+            .iter()
+            .find(|ty| ty.name.eq_ignore_ascii_case("fmEnterFieldBehavior"))
+        {
+            if ty.kind != ReferenceTypeKind::Enum {
+                return Err(error("Forms enum conflicts with the native provider"));
+            }
+        } else {
+            library.types.push(ReferenceType {
+                name: "fmEnterFieldBehavior".into(),
+                kind: ReferenceTypeKind::Enum,
+            });
+        }
+        for (name, value) in [
+            ("fmEnterFieldBehaviorSelectAll", 0),
+            ("fmEnterFieldBehaviorRecallSelection", 1),
+        ] {
+            if let Some(existing) = library
+                .constants
+                .iter()
+                .find(|c| c.name.eq_ignore_ascii_case(name))
+            {
+                if existing.value != Value::Long(value)
+                    || existing
+                        .module
+                        .as_deref()
+                        .is_none_or(|m| !m.eq_ignore_ascii_case("fmEnterFieldBehavior"))
+                {
+                    return Err(error("Forms constant conflicts with the native provider"));
+                }
+            } else {
+                library.constants.push(vba_foreign::ReferenceConstant {
+                    name: name.into(),
+                    module: Some("fmEnterFieldBehavior".into()),
+                    value: Value::Long(value),
+                });
+            }
+        }
         ReferenceSet::new(libraries)
     }
     pub(crate) fn form_interfaces(
