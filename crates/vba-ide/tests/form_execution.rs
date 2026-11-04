@@ -390,14 +390,24 @@ fn form_component_rename_export_remove_and_layout_history_preserve_owned_design(
     Ok(())
 }
 #[test]
-fn explicit_new_form_instances_are_refused_before_constructor_effects() -> R {
-    let (mut ide, _) = fixture("Private Sub UserForm_Initialize()\nDebug.Print 99\nEnd Sub")?;
+fn explicit_new_form_instances_construct_without_loading_the_default_instance() -> R {
+    let (mut ide, id) = fixture("Private Sub UserForm_Initialize()\nDebug.Print 99\nEnd Sub")?;
     ide.add_module(
         "Main.bas",
-        "Sub Main()\nDim f As CustomerForm\nSet f=New VBAProject.CustomerForm\nf.Show\nEnd Sub",
+        "Sub Main()\nDim f As CustomerForm\nSet f=New VBAProject.CustomerForm\nf.Show 0\nEnd Sub",
     )?;
-    assert!(ide.dispatch(Action::Run, &mut NoHost).is_err());
-    assert!(ide.output().is_empty());
+    ide.dispatch(Action::Run, &mut NoHost)?;
+    settle(&mut ide)?;
+    assert_eq!(ide.mode(), Mode::Completed, "{:?}", ide.diagnostics);
+    assert_eq!(ide.output(), vec!["99".to_string()]);
+    assert!(!ide.form_visible(id));
+    let instances = ide.form_instances()?;
+    assert_eq!(instances.len(), 1);
+    let instance = *instances.first().ok_or("instance")?;
+    assert!(ide.form_instance_visible(instance));
+    ide.form_instance_event(instance, None, None, &mut NoHost)?;
+    settle(&mut ide)?;
+    assert!(ide.form_instances()?.is_empty());
     Ok(())
 }
 

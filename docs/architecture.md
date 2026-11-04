@@ -281,3 +281,11 @@ Controls for [worksheet-form-controls-v1](m7a-worksheet-controls.md).
 Model/engine/XLSX own state, commands and packaging; the optional adapter/shell own
 VBA bindings, trusted launches and input. No shared crate/dependency edge changed.
 Native UserForm semantics/persistence and .tvform removal remain M7A.4–M7A.7.
+
+M7A.4 has started under [ADR 0042](decisions/0042-userform-instance-routing.md).
+The [first instance packet](m7a4-userform-instances.md) removes the
+predeclared-only restriction in shared tiny-vba. FormInstance keys separate native
+runtime objects from designer/source IDs; UI input/window scopes use those keys.
+Read-only VM class queries never instantiate objects; active and parked receivers
+remain lifetime roots. Keep Reset/source/resources inert. Broader lifecycle,
+control/property packets, fork integration and fresh Office evidence remain open.

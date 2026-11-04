@@ -350,3 +350,11 @@ waits. Hosts own precommit/cancellation policy and asynchronous prompt delivery.
 `Ide::abort_host_wait(token, failure, host)` selects an embedding's fatal nested-error
 policy. It validates the active token, cancels the whole parked/modal stack and exposes
 a runtime diagnostic; it does not inject a catchable error into the original caller.
+
+M7A.4 has started under [ADR 0042](decisions/0042-userform-instance-routing.md).
+The [first instance packet](m7a4-userform-instances.md) removes the
+predeclared-only restriction in shared tiny-vba. FormInstance keys separate native
+runtime objects from designer/source IDs; UI input/window scopes use those keys.
+Read-only VM class queries never instantiate objects; active and parked receivers
+remain lifetime roots. Keep Reset/source/resources inert. Broader lifecycle,
+control/property packets, fork integration and fresh Office evidence remain open.

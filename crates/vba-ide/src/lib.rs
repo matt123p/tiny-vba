@@ -11,6 +11,7 @@ pub use vba_project::Limits as ProjectImportLimits;
 pub use vba_project::forms::companion_name as native_form_companion_name;
 pub use vba_project::forms::{NativeForm, Resource as NativeFormResource};
 mod form_project;
+pub use form_project::FormInstance;
 pub mod forms;
 mod history;
 mod host_calls;

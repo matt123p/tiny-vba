@@ -1,5 +1,35 @@
 # Implementation progress
 
+## M7A.4 started — explicit native UserForm instances (2026-11-04)
+
+The repositories were clean and synced before work began; M7A.3 was already
+committed/pushed in GridCraft (6d061ede) and tiny-vba (89b0b90).
+
+Implemented the first shared FC3.5 packet under [ADR 0042](decisions/0042-userform-instance-routing.md):
+explicit Set/New native forms now construct independent controls and handlers,
+coexist with default instances, and have separate runtime windows, focus and
+input identities. Modeless window ownership and normal last-reference cleanup
+reuse generated ordinary class state. Modal/nested callbacks retain their actual
+instance through debugger breaks and parked callers. Reset stays inert and source/
+design/native resources are preserved. Generic VM receiver/parked-frame lifetime
+roots fix premature collection without Office/UI dependencies or a new IR version.
+
+See [the scope/evidence record](m7a4-userform-instances.md). M7A.4 is not complete:
+default-instance replacement/alias details, the loaded UserForms collection/type
+surface, exact lifecycle/focus/property/event behavior, broader controls and fork
+integration remain open. Fresh Office observations remain NOT_RUN.
+
+Validation: shared `cargo xtask ci`, `wasm`, `wasm-run`, `ui`, `ui-native` and
+`web` PASS. Six new IDE native-instance tests, one actual egui multi-window/input
+test and one generic VM receiver-lifetime regression PASS; existing form/default/
+host-wait tests remain green. Existing browser smoke, form and native-form harnesses
+PASS, including a real modal handler breakpoint/resume and unchanged source.
+These browser regressions do not constitute a new multi-instance Chromium case.
+Light/dark/narrow/scaled/injected-host multi-instance views were rendered and
+inspected. The original M7 check retains all 12 artifact hashes. No external
+macro/Office-produced binary or vendor asset was added. Consumer fork pins are
+unchanged pending their integration packet; fresh Office observations stay NOT_RUN.
+
 ## M7A.3 — native worksheet Form Controls (2026-11-04)
 
 Completed FC1–FC2 for [worksheet-form-controls-v1](m7a-worksheet-controls.md)

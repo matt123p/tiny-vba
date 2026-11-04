@@ -841,7 +841,14 @@ impl Session {
                 }
                 Ok(())
             };
-            for frame in &self.frames {
+            for frame in self.frames.iter().chain(
+                self.suspended_invocations
+                    .iter()
+                    .flat_map(|invocation| &invocation.frames),
+            ) {
+                if let Some(receiver) = frame.receiver {
+                    visit(&Value::Object(receiver))?;
+                }
                 for delivery in &frame.events {
                     visit(&Value::Object(delivery.receiver))?;
                     for operand in &delivery.arguments {

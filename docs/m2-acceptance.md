@@ -43,9 +43,10 @@ signature; conflicting or unsupported event names fail explicitly. Renaming a
 control with existing handlers requires an explicit source migration; the
 Properties edit refuses it instead of silently disconnecting authored code.
 
-Forms in this profile execute through their predeclared project instance. Explicit
-`New FormType` is refused before constructor effects; general multi-instance
-UserForm display is outside this selected profile.
+Historically this profile restricted execution to predeclared instances. The
+[M7A.4 instance packet](m7a4-userform-instances.md) supersedes that restriction in
+shared tiny-vba: explicit Set/New instances have independent fields/windows/input.
+Exact broader Office instance/lifecycle semantics remain M7A.4 work.
 
 Run Form or F5 from the designer starts the form; Modal selects modal/modeless
 execution. TextBox uses Change; Label/CommandButton use Click. Control Caption,

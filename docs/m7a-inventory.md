@@ -136,7 +136,7 @@ build/OS/locale comparisons remain NOT_RUN under M8.5.
 | FC2 worksheet Form Controls | DONE for worksheet-form-controls-v1 | Nine native families, bounded bindings/list state, selected Shape/ControlFormat APIs; [contract/evidence](m7a-worksheet-controls.md) |
 | FC4 broader UserForm controls | NOT_STARTED | Native MSForms packets remain M7A.4 |
 | FC3.1–FC3.4 native UserForm codecs/attachment | DONE for native-userform-import-v1 | Export + embedded parity, shared designer/runtime/debugger, standalone IO, XLSM/DOCM trust and byte retention |
-| FC3.5 native lifecycle parity | NOT_STARTED | Default/explicit multi-instance, exact Office lifecycle/focus/event order remain M7A.4 |
+| FC3.5 native lifecycle parity | IN_PROGRESS | [Shared explicit instance packet](m7a4-userform-instances.md) implemented; default/collection/lifecycle/focus/event and fork gates remain |
 | FC5 edited native persistence | NOT_STARTED | Required encoder, native resource and signature/cache contract |
 | FC6 remove .tvform | NOT_STARTED | Requires native replacement workflows; do not extend the legacy format |
 

@@ -1261,6 +1261,38 @@ impl Session {
         self.instance_object(*object)?;
         Ok(*object)
     }
+    /// Inert, bounded inspection of live instances of a project class. This never
+    /// constructs a default instance or executes a property/lifecycle procedure.
+    pub fn class_instances(&self, name: &str) -> Result<Vec<vba_values::ObjectRef>> {
+        if name.len() > 128 {
+            return Err(command("project class name budget"));
+        }
+        let source = self
+            .program
+            .program()
+            .classes
+            .iter()
+            .find(|class| class.name.eq_ignore_ascii_case(name))
+            .map(|class| class.source)
+            .ok_or_else(|| command("unknown project class"))?;
+        Ok(self
+            .instances
+            .iter()
+            .filter(|instance| instance.alive && !instance.terminating && instance.source == source)
+            .map(|instance| instance.object)
+            .collect())
+    }
+    /// Validate one instance against its compiled class without allocating a snapshot.
+    pub fn is_class_instance(&self, object: vba_values::ObjectRef, name: &str) -> Result<bool> {
+        if name.len() > 128 {
+            return Err(command("project class name budget"));
+        }
+        let instance = self.instance_object(object)?;
+        Ok(!instance.terminating
+            && self.program.program().classes.iter().any(|class| {
+                class.source == instance.source && class.name.eq_ignore_ascii_case(name)
+            }))
+    }
     pub fn pending_callbacks(&self) -> usize {
         self.callbacks.len()
     }

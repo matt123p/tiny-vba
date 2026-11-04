@@ -85,7 +85,7 @@ into permission to load a library.
 |---|---|---|---|
 | Label / CommandButton Click | Private Sub `<Name>_Click()` | Real native-imported Button handler, modal return, breakpoint/resume | Full native input/focus ordering M7A.4 |
 | TextBox Change | Private Sub `<Name>_Change()` | Existing runtime path; native Value initializes without import-time event | Comprehensive native typing/programmatic Change packet M7A.4 |
-| UserForm Initialize / Activate / Deactivate / Terminate | Private Sub `UserForm_<Event>()` | Initialize inert during import; explicit Show then once; Reset cancels through existing runtime | Exact Office order and multi-instance/default-instance behavior M7A.4 |
+| UserForm Initialize / Activate / Deactivate / Terminate | Private Sub `UserForm_<Event>()` | Initialize inert during import; explicit Show then once; Reset cancels through existing runtime | Shared explicit instance routing implemented by [the M7A.4 packet](m7a4-userform-instances.md); exact Office order/default-instance parity remains open |
 | UserForm QueryClose | Private Sub `UserForm_QueryClose(Cancel As Integer, CloseMode As Integer)`; ByRef | Existing shared cancellation contract reused | Native source/resource lifecycle comparisons M7A.4/M8.5 |
 | Validation / key / mouse / additional events | Microsoft Forms signatures, including ReturnBoolean/ReturnInteger where applicable | U; never approximate event argument objects | Exact typed packet and independent reference evidence required |
 
@@ -159,3 +159,8 @@ packet dependencies, not invented compatibility results from this inventory.
 M7A.3 is implemented for [the bounded worksheet profile](m7a-worksheet-controls.md)
 under [ADR 0041](decisions/0041-worksheet-form-controls.md). This does not add
 MSForms/UserForm properties or event semantics, binary project writeback or ActiveX.
+
+M7A.4 first packet (shared): [explicit UserForm instances](m7a4-userform-instances.md)
+now have independent ordinary class state, windows and event keys. This supersedes
+the M2 predeclared-only restriction. It does not expand the native control decoder,
+claim full lifecycle parity or change existing fork dependency pins.

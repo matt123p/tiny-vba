@@ -219,7 +219,7 @@ pub struct EditorUi {
     pub form_report: Option<FormLayoutReport>,
     form_modal: bool,
     form_last_focus: Option<egui::Id>,
-    form_runtime_focus: Vec<(SourceId, u32, egui::Id)>,
+    form_runtime_focus: Vec<(vba_ide::FormInstance, u32, egui::Id)>,
     form_drag: Option<(SourceId, u32, bool, egui::Vec2)>,
     pub project_visible: bool,
     pub properties_visible: bool,

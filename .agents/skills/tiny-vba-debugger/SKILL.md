@@ -122,3 +122,11 @@ Keep raw source canonical; use CodeProjection for visible edits/coordinates and
 preserve hidden metadata/newline bytes through history and export. Attribute
 records never create executable checkpoints. Document rename requires host
 validation and revision-checked acknowledgement; unsupported hosts refuse.
+
+M7A.4 has started under [ADR 0042](../../../docs/decisions/0042-userform-instance-routing.md).
+The [first instance packet](../../../docs/m7a4-userform-instances.md) removes the
+predeclared-only restriction in shared tiny-vba. FormInstance keys separate native
+runtime objects from designer/source IDs; UI input/window scopes use those keys.
+Read-only VM class queries never instantiate objects; active and parked receivers
+remain lifetime roots. Keep Reset/source/resources inert. Broader lifecycle,
+control/property packets, fork integration and fresh Office evidence remain open.

@@ -742,3 +742,25 @@ fn mismatched_property_accessors_are_rejected_and_assignment_values_are_byval() 
     );
     Ok(())
 }
+
+#[test]
+fn active_method_receiver_remains_a_root_after_its_last_variable_is_cleared() -> R {
+    let mut s = session(
+        "Public owner As Counter\nFunction Answer() As Long\nSet owner=New Counter\nowner.ReleaseOwner owner\nAnswer=9\nEnd Function",
+        "Public n As Long\nPublic Sub ReleaseOwner(ByRef target As Counter)\nSet target=Nothing\nn=7\nDebug.Print n\nEnd Sub\nPrivate Sub Class_Terminate()\nDebug.Print 8\nEnd Sub",
+    )?;
+    assert!(s.class_instances("Counter")?.is_empty());
+    assert!(s.class_instances("Missing").is_err());
+    assert_eq!(
+        drive(&mut s)?,
+        Outcome::Completed(ReturnValue::Function(Value::Long(9)))
+    );
+    let output = s
+        .output()
+        .iter()
+        .map(|s| String::from_utf16_lossy(s.units()))
+        .collect::<Vec<_>>();
+    assert_eq!(output, vec!["7", "8"]);
+    assert!(s.class_instances("Counter")?.is_empty());
+    Ok(())
+}

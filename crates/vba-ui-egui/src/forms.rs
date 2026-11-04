@@ -14,6 +14,7 @@ pub enum FormCommand {
     Handler(SourceId, Option<u32>, String),
     Run(SourceId, bool),
     Event(SourceId, Option<u32>, Option<String>),
+    InstanceEvent(vba_ide::FormInstance, Option<u32>, Option<String>),
 }
 pub(super) fn apply_form(
     ide: &mut Ide,
@@ -57,6 +58,9 @@ pub(super) fn apply_form(
         FormCommand::Handler(id, c, event) => ide.generate_form_handler(id, c, &event),
         FormCommand::Run(id, modal) => ide.run_form(id, modal, host),
         FormCommand::Event(id, c, text) => ide.form_event(id, c, text, host),
+        FormCommand::InstanceEvent(instance, c, text) => {
+            ide.form_instance_event(instance, c, text, host)
+        }
     }
 }
 #[derive(Clone, Debug)]
@@ -635,18 +639,23 @@ impl EditorUi {
         }
         let last_focus = self.form_last_focus.take();
         let previous_focus = std::mem::take(&mut self.form_runtime_focus);
-        for module in &ide.modules {
-            let Some(designer) = ide.form(module.id).filter(|_| ide.form_visible(module.id)) else {
+        let Ok(instances) = ide.form_instances() else {
+            return;
+        };
+        for instance in instances {
+            let id = instance.source;
+            let Some(designer) = ide.form(id).filter(|_| ide.form_instance_visible(instance))
+            else {
                 continue;
             };
             let form = designer.form();
-            let id = module.id;
-            let idle = ide.form_can_deliver(id);
+            let idle = ide.form_instance_can_deliver(instance);
             let mut ordered = previous_focus
                 .iter()
-                .filter(|(source, _, _)| *source == id)
+                .filter(|(source, _, _)| *source == instance)
                 .map(|(_, control, target)| {
-                    let index = match ide.form_runtime_field(id, Some(*control), "TabIndex") {
+                    let index = match ide.form_instance_field(instance, Some(*control), "TabIndex")
+                    {
                         Ok(vba_ide::Value::Long(n)) => n,
                         _ => i32::MAX,
                     };
@@ -683,7 +692,7 @@ impl EditorUi {
                 window_theme(ui, theme);
                 ui.horizontal(|ui| {
                     ui.heading(
-                        ide.form_runtime_field(id, None, "Caption")
+                        ide.form_instance_field(instance, None, "Caption")
                             .map(control_text)
                             .unwrap_or_else(|_| form.caption.clone()),
                     );
@@ -691,7 +700,9 @@ impl EditorUi {
                         .add_enabled(idle, egui::Button::new(theme.label("Close Form")))
                         .clicked()
                     {
-                        commands.push(Command::Form(FormCommand::Event(id, None, None)));
+                        commands.push(Command::Form(FormCommand::InstanceEvent(
+                            instance, None, None,
+                        )));
                     }
                 });
                 ui.add_enabled_ui(idle, |ui| {
@@ -702,19 +713,23 @@ impl EditorUi {
                     );
                     let mut focus = Vec::new();
                     for c in &form.controls {
-                        if ide.form_runtime_field(id, Some(c.id), "Visible").ok()
+                        if ide
+                            .form_instance_field(instance, Some(c.id), "Visible")
+                            .ok()
                             != Some(vba_ide::Value::Boolean(true))
                         {
                             continue;
                         }
-                        let enabled = ide.form_runtime_field(id, Some(c.id), "Enabled").ok()
+                        let enabled = ide
+                            .form_instance_field(instance, Some(c.id), "Enabled")
+                            .ok()
                             == Some(vba_ide::Value::Boolean(true));
                         let caption = ide
-                            .form_runtime_field(id, Some(c.id), "Caption")
+                            .form_instance_field(instance, Some(c.id), "Caption")
                             .map(control_text)
                             .unwrap_or_else(|_| c.caption.clone());
-                        let number = |name: &str, fallback: f32| match ide.form_runtime_field(
-                            id,
+                        let number = |name: &str, fallback: f32| match ide.form_instance_field(
+                            instance,
                             Some(c.id),
                             name,
                         ) {
@@ -737,9 +752,12 @@ impl EditorUi {
                             ) * scale,
                         );
                         let widget_id = ui.scope_id().with(("runtime.control", c.id));
-                        let tab_stop = ide.form_runtime_field(id, Some(c.id), "TabStop").ok()
+                        let tab_stop = ide
+                            .form_instance_field(instance, Some(c.id), "TabStop")
+                            .ok()
                             == Some(vba_ide::Value::Boolean(true));
-                        let index = match ide.form_runtime_field(id, Some(c.id), "TabIndex") {
+                        let index = match ide.form_instance_field(instance, Some(c.id), "TabIndex")
+                        {
                             Ok(vba_ide::Value::Long(n)) => n,
                             _ => i32::MAX,
                         };
@@ -750,7 +768,7 @@ impl EditorUi {
                             ui.add_enabled_ui(enabled, |ui| match c.kind {
                                 ControlKind::TextBox => {
                                     let mut text = ide
-                                        .form_runtime_field(id, Some(c.id), "VbaText")
+                                        .form_instance_field(instance, Some(c.id), "VbaText")
                                         .map(control_text)
                                         .unwrap_or_default();
                                     let response = ui.put(
@@ -768,8 +786,8 @@ impl EditorUi {
                                         )
                                     });
                                     if response.changed() {
-                                        commands.push(Command::Form(FormCommand::Event(
-                                            id,
+                                        commands.push(Command::Form(FormCommand::InstanceEvent(
+                                            instance,
                                             Some(c.id),
                                             Some(text),
                                         )));
@@ -797,8 +815,8 @@ impl EditorUi {
                                         )
                                     });
                                     if response.clicked() {
-                                        commands.push(Command::Form(FormCommand::Event(
-                                            id,
+                                        commands.push(Command::Form(FormCommand::InstanceEvent(
+                                            instance,
                                             Some(c.id),
                                             None,
                                         )));
@@ -810,7 +828,7 @@ impl EditorUi {
                     rendered_focus.extend(
                         focus
                             .into_iter()
-                            .map(|(_, control, target)| (id, control, target)),
+                            .map(|(_, control, target)| (instance, control, target)),
                     );
                 });
                 if !idle {
@@ -822,11 +840,13 @@ impl EditorUi {
                     commands.push(Command::Action(Action::Reset));
                 }
             };
-            let scope = self
-                .scope
-                .unwrap_or(self.instance)
-                .with(("form.runtime", id.0));
-            if ide.mode() == Mode::Waiting && ide.form_is_modal(id) {
+            let scope = self.scope.unwrap_or(self.instance).with((
+                "form.runtime",
+                id.0,
+                instance.object.object,
+                instance.object.generation,
+            ));
+            if ide.mode() == Mode::Waiting && ide.form_instance_is_modal(instance) {
                 egui::Modal::new(scope)
                     .frame(
                         egui::Frame::new()
@@ -837,18 +857,22 @@ impl EditorUi {
                     )
                     .show(ctx, show);
             } else {
-                egui::Window::new(format!("{} — Running", form.name))
-                    .id(scope)
-                    .frame(
-                        egui::Frame::new()
-                            .fill(theme.chrome)
-                            .stroke(egui::Stroke::new(1.0, theme.border))
-                            .corner_radius(5)
-                            .inner_margin(8),
-                    )
-                    .collapsible(false)
-                    .resizable(false)
-                    .show(ctx, show);
+                egui::Window::new(
+                    ide.form_instance_field(instance, None, "Caption")
+                        .map(control_text)
+                        .unwrap_or_else(|_| form.caption.clone()),
+                )
+                .id(scope)
+                .frame(
+                    egui::Frame::new()
+                        .fill(theme.chrome)
+                        .stroke(egui::Stroke::new(1.0, theme.border))
+                        .corner_radius(5)
+                        .inner_margin(8),
+                )
+                .collapsible(false)
+                .resizable(false)
+                .show(ctx, show);
             }
             self.form_runtime_focus.extend(rendered_focus);
         }

@@ -307,6 +307,9 @@ fn compiled_form(form: &Form, module: &Module) -> Result<String> {
     source.push_str(
         "\nPublic VbaVisible As Boolean\nPublic VbaLoaded As Boolean\nPublic Caption As String\n",
     );
+    // A visible window retains its own instance until Hide/Unload; this is ordinary
+    // class state, not another object store or a special VM form type.
+    source.push_str(&format!("Private VbaDisplayOwner As {}\n", form.name));
     for c in &form.controls {
         source.push_str(&format!(
             "Public WithEvents {} As {}\n",
@@ -325,11 +328,11 @@ fn compiled_form(form: &Form, module: &Module) -> Result<String> {
         source.push_str(&format!("Set {}={temp}\n", c.name));
     }
     source.push_str(&call("UserForm_Initialize"));
-    source.push_str("End Sub\nPublic Sub VbaLoad()\nIf Not VbaLoaded Then Class_Initialize\nEnd Sub\nPublic Sub Show(Optional ByVal modal As Variant=1)\nIf modal<>0 And modal<>1 Then\nErr.Raise 5\nEnd If\nIf Not VbaLoaded Then Class_Initialize\nIf VbaVisible Then\nIf modal=1 Then Err.Raise 400\nExit Sub\nEnd If\nVbaVisible=True\n");
+    source.push_str("End Sub\nPublic Sub VbaLoad()\nIf Not VbaLoaded Then Class_Initialize\nEnd Sub\nPublic Sub Show(Optional ByVal modal As Variant=1)\nIf modal<>0 And modal<>1 Then\nErr.Raise 5\nEnd If\nIf Not VbaLoaded Then Class_Initialize\nIf VbaVisible Then\nIf modal=1 Then Err.Raise 400\nExit Sub\nEnd If\nSet VbaDisplayOwner=Me\nVbaVisible=True\n");
     source.push_str(&call("UserForm_Activate"));
     source.push_str("VbaFormWait Me,modal\nEnd Sub\nPublic Sub Hide()\nIf Not VbaLoaded Then Class_Initialize\nIf VbaVisible Then\nVbaVisible=False\n");
     source.push_str(&call("UserForm_Deactivate"));
-    source.push_str("End If\nEnd Sub\nPublic Property Get Visible() As Boolean\nVisible=VbaVisible\nEnd Property\nPublic Sub VbaClose(ByVal closeMode As Integer)\nIf Not VbaLoaded Then Exit Sub\nDim cancel As Integer\n");
+    source.push_str("End If\nSet VbaDisplayOwner=Nothing\nEnd Sub\nPublic Property Get Visible() As Boolean\nVisible=VbaVisible\nEnd Property\nPublic Sub VbaClose(ByVal closeMode As Integer)\nIf Not VbaLoaded Then Exit Sub\nDim cancel As Integer\n");
     if handlers.contains("userform_queryclose") {
         source.push_str("UserForm_QueryClose cancel,closeMode\n");
     }
@@ -367,9 +370,63 @@ fn compiled_form(form: &Form, module: &Module) -> Result<String> {
         }
     }
     source.push_str("End If\nEnd Sub\n");
+    if handlers.contains("userform_terminate") {
+        source.push_str("Private Sub Class_Terminate()\nIf VbaLoaded Then\nUserForm_Terminate\nEnd If\nEnd Sub\n");
+    }
     Ok(source)
 }
+/// A runtime instance is distinct from its source/designer and native control IDs.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct FormInstance {
+    pub source: SourceId,
+    pub object: ObjectRef,
+}
+
 impl Ide {
+    fn default_form_instance(&self, id: SourceId) -> Result<FormInstance> {
+        let form = self.forms.get(&id).ok_or_else(|| error("unknown form"))?;
+        let session = self
+            .session
+            .as_ref()
+            .ok_or_else(|| error("no form session"))?;
+        Ok(FormInstance {
+            source: id,
+            object: session.project_object(&form.form().name)?,
+        })
+    }
+    fn validate_form_instance(&self, instance: FormInstance) -> Result<()> {
+        let form = self
+            .forms
+            .get(&instance.source)
+            .ok_or_else(|| error("unknown form source"))?;
+        let session = self
+            .session
+            .as_ref()
+            .ok_or_else(|| error("no form session"))?;
+        if !session.is_class_instance(instance.object, &form.form().name)? {
+            return Err(error("stale or foreign form instance"));
+        }
+        Ok(())
+    }
+    /// Enumerate loaded native instances without constructing a predeclared instance.
+    pub fn form_instances(&self) -> Result<Vec<FormInstance>> {
+        let Some(session) = &self.session else {
+            return Ok(vec![]);
+        };
+        let mut result = Vec::new();
+        for (id, designer) in &self.forms {
+            for object in session.class_instances(&designer.form().name)? {
+                if session.read_instance_field(object, "VbaLoaded")? == Value::Boolean(true) {
+                    result.push(FormInstance {
+                        source: *id,
+                        object,
+                    });
+                }
+            }
+        }
+        Ok(result)
+    }
+
     pub(crate) fn rename_form_component(&mut self, id: SourceId, name: &str) -> Result<()> {
         if self.session.is_some() {
             return Err(error("reset before renaming a form"));
@@ -788,53 +845,6 @@ impl Ide {
             }
         }
         if !self.forms.is_empty() {
-            for parsed in &modules {
-                let tokens = parsed
-                    .module
-                    .tokens
-                    .iter()
-                    .filter(|t| {
-                        t.kind == vba_syntax::TokenKind::Word
-                            || parsed
-                                .module
-                                .source
-                                .text()
-                                .get(t.span.start() as usize..t.span.end() as usize)
-                                == Some(".")
-                    })
-                    .map(|t| {
-                        parsed
-                            .module
-                            .source
-                            .text()
-                            .get(t.span.start() as usize..t.span.end() as usize)
-                            .unwrap_or_default()
-                    })
-                    .collect::<Vec<_>>();
-                for (i, _) in tokens
-                    .iter()
-                    .enumerate()
-                    .filter(|(_, t)| t.eq_ignore_ascii_case("New"))
-                {
-                    let next = tokens.get(i + 1).copied().unwrap_or_default();
-                    let class = if next.eq_ignore_ascii_case("VBAProject")
-                        && tokens.get(i + 2) == Some(&".")
-                    {
-                        tokens.get(i + 3).copied().unwrap_or_default()
-                    } else {
-                        next
-                    };
-                    if self
-                        .forms
-                        .values()
-                        .any(|d| d.form().name.eq_ignore_ascii_case(class))
-                    {
-                        return Err(error(
-                            "explicit New form instances are unsupported; use the predeclared form instance",
-                        ));
-                    }
-                }
-            }
             for (i, kind) in [
                 ControlKind::Label,
                 ControlKind::TextBox,
@@ -915,12 +925,22 @@ impl Ide {
         control: Option<u32>,
         field: &str,
     ) -> Result<Value> {
+        self.form_instance_field(self.default_form_instance(id)?, control, field)
+    }
+    pub fn form_instance_field(
+        &self,
+        instance: FormInstance,
+        control: Option<u32>,
+        field: &str,
+    ) -> Result<Value> {
+        self.validate_form_instance(instance)?;
+        let id = instance.source;
         let designer = self.forms.get(&id).ok_or_else(|| error("unknown form"))?;
         let session = self
             .session
             .as_ref()
             .ok_or_else(|| error("no form session"))?;
-        let mut object = session.project_object(&designer.form().name)?;
+        let mut object = instance.object;
         if let Some(control) = control {
             let control = designer
                 .form()
@@ -947,27 +967,34 @@ impl Ide {
         session.read_instance_field(object, field)
     }
     pub fn form_is_modal(&self, id: SourceId) -> bool {
-        let Some(session) = &self.session else {
-            return false;
-        };
-        let Some(form) = self.forms.get(&id) else {
-            return false;
-        };
-        session
-            .pending_host_token()
-            .and_then(|token| self.form_gate.waits.get(&token))
-            .is_some_and(|object| {
-                session.project_object(&form.form().name).ok().as_ref() == Some(object)
-            })
+        self.default_form_instance(id)
+            .is_ok_and(|instance| self.form_instance_is_modal(instance))
+    }
+    pub fn form_instance_is_modal(&self, instance: FormInstance) -> bool {
+        self.validate_form_instance(instance).is_ok()
+            && self
+                .session
+                .as_ref()
+                .and_then(Session::pending_host_token)
+                .and_then(|token| self.form_gate.waits.get(&token))
+                == Some(&instance.object)
     }
     pub fn form_can_deliver(&self, id: SourceId) -> bool {
-        self.form_visible(id)
+        self.default_form_instance(id)
+            .is_ok_and(|instance| self.form_instance_can_deliver(instance))
+    }
+    pub fn form_instance_can_deliver(&self, instance: FormInstance) -> bool {
+        self.form_instance_visible(instance)
             && !self.stale
             && (self.mode() == Mode::Completed
-                || self.mode() == Mode::Waiting && self.form_is_modal(id))
+                || self.mode() == Mode::Waiting && self.form_instance_is_modal(instance))
     }
     pub fn form_visible(&self, id: SourceId) -> bool {
-        self.form_runtime_field(id, None, "VbaVisible")
+        self.default_form_instance(id)
+            .is_ok_and(|instance| self.form_instance_visible(instance))
+    }
+    pub fn form_instance_visible(&self, instance: FormInstance) -> bool {
+        self.form_instance_field(instance, None, "VbaVisible")
             .is_ok_and(|v| v == Value::Boolean(true))
     }
     pub fn form_event(
@@ -977,6 +1004,17 @@ impl Ide {
         text: Option<String>,
         host: &mut impl Host,
     ) -> Result<()> {
+        self.form_instance_event(self.default_form_instance(id)?, control, text, host)
+    }
+    pub fn form_instance_event(
+        &mut self,
+        instance: FormInstance,
+        control: Option<u32>,
+        text: Option<String>,
+        host: &mut impl Host,
+    ) -> Result<()> {
+        self.validate_form_instance(instance)?;
+        let id = instance.source;
         if self.stale
             || self.session_host
                 != Some(if host.identity() == 0 {
@@ -988,7 +1026,7 @@ impl Ide {
         {
             return Err(error("form events require an idle current form session"));
         }
-        if !self.form_can_deliver(id) {
+        if !self.form_instance_can_deliver(instance) {
             return Err(error(
                 "form is not visible or another invocation/modal form owns input",
             ));
@@ -998,7 +1036,7 @@ impl Ide {
             .session
             .as_mut()
             .ok_or_else(|| error("no form session"))?;
-        let mut object = session.project_object(&designer.form().name)?;
+        let mut object = instance.object;
         let (handler, arguments) = if let Some(id) = control {
             let c = designer
                 .form()

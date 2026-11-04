@@ -188,3 +188,11 @@ shared/standalone/fork attachment. IDE -> project is a reviewed downward edge.
 Keep original resources separate from authored source/design, validate handlers
 before insertion, and never substitute .tvform or acknowledge edited native saves
 without the M7A.5 encoder. Full semantics, broader controls and removal remain open.
+
+M7A.4 has started under [ADR 0042](../../../docs/decisions/0042-userform-instance-routing.md).
+The [first instance packet](../../../docs/m7a4-userform-instances.md) removes the
+predeclared-only restriction in shared tiny-vba. FormInstance keys separate native
+runtime objects from designer/source IDs; UI input/window scopes use those keys.
+Read-only VM class queries never instantiate objects; active and parked receivers
+remain lifetime roots. Keep Reset/source/resources inert. Broader lifecycle,
+control/property packets, fork integration and fresh Office evidence remain open.

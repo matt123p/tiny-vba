@@ -57,7 +57,10 @@ Completed checkpoint: **M7A.3 — Worksheet forms and controls (FC1–FC2)** for
 source reconciliation, trusted input, live bindings, selected ControlFormat APIs
 and native save/reopen. See [ADR 0041](decisions/0041-worksheet-form-controls.md).
 
-- **M7A.4 — Office form/control semantics (FC3.5/FC4):** reuse the shared runtime
+- **M7A.4 — Office form/control semantics (FC3.5/FC4; IN PROGRESS):** the
+  [first instance packet](m7a4-userform-instances.md) removes the explicit New
+  restriction in shared tiny-vba and implements instance-bound windows, input and
+  continuation. Remaining work and fork integration are recorded there. Reuse the shared runtime
   behind native forms and close Office compatibility gaps for the inventoried
   standard controls. Match instance/default-instance behavior, lifecycle, modal/
   modeless behavior, focus/tab order, properties, bindings, events, coercion and

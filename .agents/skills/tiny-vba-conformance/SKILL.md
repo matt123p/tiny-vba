@@ -134,4 +134,4 @@ under ADR 0041 in GridCraft: native Shape identity/state, engine bindings/undo/r
 OOXML/VML edited persistence, optional ControlFormat APIs and trusted widget input.
 Preserve original package data separately; failed joins stay inert and callbacks
 use the existing bridge. This is not MSForms/ActiveX or UserForm edited-save support.
-M7A.4 is next; fresh Office observations remain NOT_RUN under M8.5.
+M7A.4 is in progress; fresh Office observations remain NOT_RUN under M8.5.
