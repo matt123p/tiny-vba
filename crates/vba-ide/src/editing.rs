@@ -526,6 +526,7 @@ impl Ide {
         }
         self.modules.remove(index);
         self.forms.remove(&id);
+        self.native_forms.remove(&id);
         self.undo_edits.retain(|state| state.id != id);
         self.redo_edits.retain(|state| state.id != id);
         self.active = self.active.min(self.modules.len().saturating_sub(1));

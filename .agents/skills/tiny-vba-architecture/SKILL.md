@@ -186,5 +186,12 @@ preservation alone does not satisfy saving native edits.
 Initial FC1.1 native worksheet metadata lives in GridCraft XLSX, with no VM or
 UI dependency and no second writable model. [ADR 0039](../../../docs/decisions/0039-m7a-native-control-metadata.md)
 requires source DrawingML identity/assignment reconciliation before later native
-rendering or activation. Decode tests are not execution evidence. Shared native
-UserForm codecs, native edited persistence and custom-format removal remain open.
+rendering or activation. Decode tests are not execution evidence.
+
+M7A.1/M7A.2 implement [native-userform-import-v1](../../../docs/m7a-control-contracts.md)
+under [ADR 0040](../../../docs/decisions/0040-native-userform-import-and-attachment.md):
+bounded native export/embedded Label/TextBox/CommandButton decoding and inert
+shared/standalone/fork attachment. IDE -> project is a reviewed downward edge.
+Keep original resources separate from authored source/design, validate handlers
+before insertion, and never substitute .tvform or acknowledge edited native saves
+without the M7A.5 encoder. Full semantics, broader controls and removal remain open.

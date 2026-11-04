@@ -29,8 +29,11 @@ activates native UserForms, worksheet controls and native persistence before M8,
 and requires removal of `.tvform`. [ADR 0038](decisions/0038-native-office-forms-and-compatibility-only.md)
 records the owner-directed compatibility-only policy. M7A is in progress: the [inventory/ledger](m7a-inventory.md) and
 [ADR 0039](decisions/0039-m7a-native-control-metadata.md) record the audited paths
-and partial native worksheet Button metadata reader. Native UserForm codecs and
-`.tvform` removal are still open; current custom-format code remains legacy.
+and partial native worksheet Button metadata reader. M7A.1/M7A.2 are complete for
+the selected native UserForm import/attachment profile under
+[ADR 0040](decisions/0040-native-userform-import-and-attachment.md) and the
+[control/format/host contract matrix](m7a-control-contracts.md). Native edited saving
+and `.tvform` removal are still open; current custom-format code remains legacy.
 
 [VBA attributes and Excel code-view investigation](vba-attributes-and-editor-projection.md)
 documents hidden module/member metadata, recorded-macro attributes, the blank

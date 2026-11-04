@@ -140,7 +140,7 @@ pub(crate) fn project(text: &str, modules: &[Description]) -> Result<Vec<ModuleK
             "Module" => Some(ModuleKind::Standard),
             "Class" => Some(ModuleKind::Class),
             "Document" => Some(ModuleKind::Document),
-            "BaseClass" => return Err(unsupported("designer/UserForm modules")),
+            "BaseClass" => Some(ModuleKind::UserForm),
             _ => None,
         };
         if let Some(kind) = kind {

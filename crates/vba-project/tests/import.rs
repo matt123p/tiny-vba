@@ -159,7 +159,7 @@ fn unsupported_designers_activex_and_unknown_records_are_explicit() {
     f.streams.push(("/PROJECTlk".into(), vec![]));
     assert_eq!(code(&f), "VBA_PROJECT_UNSUPPORTED");
     let f = Fixture::new(1252, &[Spec::new("Form", "Form", "BaseClass")]);
-    assert_eq!(code(&f), "VBA_PROJECT_UNSUPPORTED");
+    assert_eq!(code(&f), "VBA_PROJECT_CORRUPT"); // Native designer declaration needs its storage.
     let mut f = fixture();
     replace(
         &mut f.dir,

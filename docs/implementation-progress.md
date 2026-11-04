@@ -1,5 +1,79 @@
 # Implementation progress
 
+## M7A.1 and M7A.2 — native inventory/contracts and UserForm import/attachment (2026-11-04)
+
+Implemented `native-userform-import-v1` under
+[ADR 0040](decisions/0040-native-userform-import-and-attachment.md) and the
+[control/property/event/format/host contracts](m7a-control-contracts.md).
+The [acceptance record](m7a-import-acceptance.md) distinguishes native export,
+embedded import, shared/host attachment and later persistence/semantics work.
+
+`vba-project` now returns distinct native UserForm components and bounded,
+inert VBFrame/f/o/site/control data for immediate Label/TextBox/CommandButton
+children. Export import accepts `.frm` plus explicitly supplied `.frx`, with no
+filesystem access or library activation in the decoder. Embedded import separately
+uses MODULESTREAMNAME storage, matching BaseClass/VB_Name/frame identity and exact
+source attributes/line endings. Original resources remain independent snapshots.
+Unknown controls/hierarchy/resources/behavior masks and malformed inputs refuse.
+Existing protected-project, PROJECTlk, container/decompression and work limits remain.
+
+The shared IDE maps native controls into its existing validated designer/runtime,
+Project Explorer, View Object/View Code, Properties and debugger. A reviewed
+IDE -> project edge is the only production dependency change. Native export
+attributes remain in authored source; generated support supplies missing attributes
+without duplicating them. Candidate handler validation precedes project mutation.
+Failed imports keep the project and source-ID allocation unchanged. Native forms
+cannot fall back to .tvform export or acknowledge modified native resources as
+saved without the future encoder.
+
+Standalone native IO reads the bounded validated companion; browser IO accepts
+explicit paired selection. GridCraft and WordCraft attach selected embedded forms
+inertly to their owner project and route native import through existing source
+workflows. Explicit trust still precedes host execution; modal handlers and
+breakpoint/resume/Reset use the existing runtime. Authored XLSM/DOCM regressions
+retain original project bytes on unchanged save/reopen. This is original-byte
+retention, not edited native persistence.
+
+Validation: shared `cargo xtask ci`, `cargo xtask wasm`, `cargo xtask wasm-run`
+and `cargo xtask ui` PASS; all nine new core codec/IDE tests run under actual WASI.
+Native imported-form renders PASS (seven light/dark/narrow/scaled/host/runtime
+captures, inspected), as do `cargo xtask ui-native` and an additional real native
+`.frm`/`.frx` capture. `cargo xtask web` PASS with isolated wasm-bindgen 0.2.126
+matching the repository pin. Chromium native-pair upload/designer/modal-handler/
+Stop/continue/source-integrity PASS; existing browser smoke and legacy-form
+regressions PASS. No page errors were observed.
+
+GridCraft full CI PASS (10 steps); WordCraft full CI PASS (8 steps). New native
+XLSM/DOCM attachment regressions PASS both natively and in actual Node 22.23.4
+JavaScript/WASM (one per fork). Optional VBA UI tests and Word's `vba` browser build
+PASS. Original M7 selection still verifies all 12 hashes unchanged; this integrity
+check does not execute the historical macros. Relative documentation links and
+whitespace checks PASS. Consumer source pins are updated to the shared implementation
+commit; final pin resolution uses the local commit in Cargo's git cache, without
+committing local source overrides.
+
+### Completed M7A.1 and M7A.2 plan scope
+
+- **M7A.1 — Inventory and contracts (FC0):** completed actual path audit, native
+  control/property/event/format/host matrix, lawful original fixture provenance,
+  platform/capability/dependency/identity/resource/atomicity/persistence contracts
+  and acceptance ledger. Broader runtime packets retain explicit unsupported and
+  unobserved dispositions rather than invented Office behavior.
+- **M7A.2 — Native UserForm codecs and attachment (FC3.1–FC3.4):** completed for
+  the reviewed flat Label/TextBox/CommandButton profile, with separate native
+  export-format and embedded import evidence, exact authored source and original
+  resources, shared designer/debugger/runtime and standalone/fork attachment.
+  Native export writing remains M7A.5. Containers/additional control/property
+  variants and full native default-instance/multi-instance/lifecycle parity remain
+  M7A.4; none are implied by import acceptance.
+
+Next smallest worksheet task remains source DrawingML identity/assignment
+reconciliation before rendering/activation. Shared next work is FC3.5/FC4 native
+lifecycle and broader property/control packets. M7A.5 native edited persistence,
+M7A.6 `.tvform` removal and full M7A acceptance remain open. Fresh Office build/
+OS/locale comparisons remain NOT_RUN under M8.5.
+
+
 ## M7A started — inventory and first native Button metadata slice (2026-11-04)
 
 Completed the initial FC0.1 code-path audit and published the

@@ -106,7 +106,10 @@ See [ADR 0038](docs/decisions/0038-native-office-forms-and-compatibility-only.md
 M7A is in progress; see [inventory/ledger](docs/m7a-inventory.md) and
 [ADR 0039](docs/decisions/0039-m7a-native-control-metadata.md). The initial native
 worksheet metadata reader is partial FC1.1; it does not render or execute controls.
-Native UserForm codecs and `.tvform` removal are still unimplemented. M7A covers native UserForms (`.frm`/`.frx` and
+M7A.1/M7A.2 implement selected native UserForm import and attachment under
+[ADR 0040](docs/decisions/0040-native-userform-import-and-attachment.md) and the
+[property/event/format/host contracts](docs/m7a-control-contracts.md). Native
+edited persistence and `.tvform` removal are still unimplemented. M7A covers native UserForms (`.frm`/`.frx` and
 embedded resources), Office controls, native editing/persistence and removal of
 the legacy `.tvform` codec/routes/examples. Reuse compatible internals without
 keeping a parallel custom product format. Native edited package persistence needs

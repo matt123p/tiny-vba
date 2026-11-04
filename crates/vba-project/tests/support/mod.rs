@@ -195,6 +195,12 @@ impl Fixture {
             streams.push(("/PROJECTwm".into(), wm.clone()));
         }
         for (name, bytes) in streams {
+            if let Some((parent, _)) = name.rsplit_once('/')
+                && !parent.is_empty()
+                && parent != "/VBA"
+            {
+                cfb.create_storage_all(parent).unwrap();
+            }
             cfb.create_stream(&name).unwrap().write_all(&bytes).unwrap();
         }
         cfb.into_inner().into_inner()

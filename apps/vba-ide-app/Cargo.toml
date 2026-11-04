@@ -26,3 +26,6 @@ image.workspace = true
 
 [lib]
 crate-type = ["cdylib", "rlib"]
+
+[dev-dependencies]
+cfb = "=0.14.0"

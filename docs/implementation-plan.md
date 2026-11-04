@@ -34,27 +34,24 @@ continue alongside M7A, but release acceptance depends on M7A completion.
 
 Status: **IN PROGRESS**, started 2026-11-04 on owner direction.
 The [inventory and work ledger](m7a-inventory.md) records FC0.1's audited paths,
-the seed control matrix and the partial native worksheet Button metadata slice.
-Native UserForm import, interactive worksheet controls and `.tvform` removal
-remain unimplemented; no M7A acceptance is claimed.
+the completed import/attachment profile and partial native worksheet Button metadata slice.
+Interactive worksheet controls, native edited persistence and `.tvform` removal
+remain unimplemented; no full M7A acceptance is claimed.
 Owner: tiny-vba reusable form codecs/model/runtime/editor; GridCraft worksheet
 controls/Excel bindings; both forks' document, trust, event and package integration.
 The [activated work breakdown](office-forms-controls-implementation-plan.md)
 retains FC0–FC5 IDs and adds FC6 for removal. M7A IDs below stay stable.
 
-- **M7A.1 — Inventory and contracts (FC0; in progress):** audit actual import/designer/runtime/
-  persistence paths and Office reference behavior. Publish a per-control/property/
-  event/format/host matrix, native fixture rights and provenance, supported platform
-  behavior, capability versions, dependencies and acceptance ledger. Cover UserForms,
-  worksheet Form Controls and applicable Office-supplied worksheet ActiveX controls
-  separately. FC0.1 initial inventory is done; continue FC0.2/FC0.3 contracts and
-  the partial worksheet Button slice. Native UserForm codec work can proceed
-  after its resource contracts are ready.
-- **M7A.2 — Native UserForm codecs and attachment (FC3.1–FC3.4):** bounded, inert
-  `.frm`/`.frx` and embedded designer-resource import; preserve authored source,
-  component/code names, resources and control hierarchy. Attach native forms to
-  shared View Object/View Code, Properties and debugger workflows in standalone,
-  GridCraft and WordCraft. Native export and embedded import have separate evidence.
+Completed checkpoints: **M7A.1 — Inventory and contracts (FC0)** and
+**M7A.2 — Native UserForm codecs and attachment (FC3.1–FC3.4)** for the declared
+`native-userform-import-v1` profile: immediate Label/TextBox/CommandButton children,
+separate native export and embedded input, shared designer/debugger attachment,
+and inert package attachment in both forks. See the
+[completed task definitions and evidence](implementation-progress.md#completed-m7a1-and-m7a2-plan-scope)
+and [property/event/format/host contracts](m7a-control-contracts.md).
+Broader native variants, full Office lifecycle semantics, native edited saving and
+custom-format removal remain M7A.3–M7A.7; no full M7A sign-off is claimed.
+
 - **M7A.3 — Worksheet forms and controls (FC1–FC2; first metadata slice implemented):** implement the worksheet Button
   and remaining standard Form Controls with actual Excel geometry, properties,
   macro assignments, linked cells/list ranges, input, trust, event ordering and

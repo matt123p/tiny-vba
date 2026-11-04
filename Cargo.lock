@@ -3321,11 +3321,13 @@ dependencies = [
 name = "vba-ide"
 version = "0.1.0"
 dependencies = [
+ "cfb",
  "vba-compiler",
  "vba-debug",
  "vba-diagnostics",
  "vba-foreign",
  "vba-ir",
+ "vba-project",
  "vba-runtime",
  "vba-syntax",
  "vba-values",
@@ -3336,6 +3338,7 @@ dependencies = [
 name = "vba-ide-app"
 version = "0.1.0"
 dependencies = [
+ "cfb",
  "eframe",
  "image",
  "js-sys",
@@ -3406,6 +3409,7 @@ dependencies = [
 name = "vba-ui-egui"
 version = "0.1.0"
 dependencies = [
+ "cfb",
  "egui",
  "egui_kittest",
  "vba-ide",

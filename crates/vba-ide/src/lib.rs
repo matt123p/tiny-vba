@@ -6,6 +6,10 @@ mod projection;
 pub use projection::CodeProjection;
 mod editing;
 pub mod form_archive;
+mod native_forms;
+pub use vba_project::Limits as ProjectImportLimits;
+pub use vba_project::forms::companion_name as native_form_companion_name;
+pub use vba_project::forms::{NativeForm, Resource as NativeFormResource};
 mod form_project;
 pub mod forms;
 mod history;
@@ -297,6 +301,7 @@ pub struct StopLocation {
     pub procedure: String,
 }
 pub struct Ide {
+    native_forms: BTreeMap<SourceId, NativeForm>,
     forms: BTreeMap<SourceId, forms::FormDesigner>,
     form_gate: form_project::FormGate,
     pub title: String,
@@ -353,6 +358,7 @@ impl Ide {
     pub fn new() -> Self {
         Self {
             forms: BTreeMap::new(),
+            native_forms: BTreeMap::new(),
             form_gate: Default::default(),
             title: "Untitled Project".into(),
             modules: vec![],
@@ -460,7 +466,9 @@ impl Ide {
         Ok(())
     }
     pub fn import_source_file(&mut self, name: &str, text: &str) -> Result<SourceId> {
-        if name.to_ascii_lowercase().ends_with(".tvform") {
+        if name.to_ascii_lowercase().ends_with(".frm") {
+            self.import_native_form_export(name, text.as_bytes(), 65001, &[])
+        } else if name.to_ascii_lowercase().ends_with(".tvform") {
             self.import_form(text)
         } else if name.to_ascii_lowercase().ends_with(".bas")
             || name.to_ascii_lowercase().ends_with(".cls")
@@ -664,6 +672,18 @@ impl Ide {
         self.changed()
     }
     pub fn mark_saved(&mut self, id: SourceId, revision: u64) -> Result<()> {
+        if let Some(original) = self.native_form(id)
+            && (self
+                .modules
+                .iter()
+                .find(|m| m.id == id)
+                .is_some_and(|m| m.text != original.source)
+                || self.forms.get(&id).is_some_and(|f| f.dirty()))
+        {
+            return Err(error(
+                "native form edits require a native encoder; save acknowledgment refused",
+            ));
+        }
         let module = self
             .modules
             .iter_mut()

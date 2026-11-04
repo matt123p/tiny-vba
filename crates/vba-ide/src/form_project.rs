@@ -164,7 +164,7 @@ fn control_class(kind: ControlKind) -> String {
     }
     s
 }
-fn checked_handlers(form: &Form, module: &Module) -> Result<BTreeSet<String>> {
+pub(crate) fn checked_handlers(form: &Form, module: &Module) -> Result<BTreeSet<String>> {
     let parsed = parse(&module.source()?, ModuleKind::Class)?;
     if !parsed.syntax_valid() {
         return Err(error("form source has syntax errors"));
@@ -290,7 +290,23 @@ fn compiled_form(form: &Form, module: &Module) -> Result<String> {
         }
     };
     let mut source = module.text.clone();
-    source.push_str(&format!("\nAttribute VB_Name = {}\nAttribute VB_PredeclaredId = True\nPublic VbaVisible As Boolean\nPublic VbaLoaded As Boolean\nPublic Caption As String\n",quoted(&form.name)));
+    let parsed = parse(&module.source()?, ModuleKind::Class)?;
+    let has = |name: &str| {
+        parsed.module.attributes.iter().any(|a| {
+            a.path
+                .first()
+                .is_some_and(|n| n.spelling.eq_ignore_ascii_case(name))
+        })
+    };
+    if !has("VB_Name") {
+        source.push_str(&format!("\nAttribute VB_Name = {}\n", quoted(&form.name)));
+    }
+    if !has("VB_PredeclaredId") {
+        source.push_str("\nAttribute VB_PredeclaredId = True\n");
+    }
+    source.push_str(
+        "\nPublic VbaVisible As Boolean\nPublic VbaLoaded As Boolean\nPublic Caption As String\n",
+    );
     for c in &form.controls {
         source.push_str(&format!(
             "Public WithEvents {} As {}\n",
@@ -452,7 +468,7 @@ impl Ide {
         }
         Ok(id)
     }
-    fn insert_form(&mut self, form: Form, source: &str) -> Result<SourceId> {
+    pub(crate) fn insert_form(&mut self, form: Form, source: &str) -> Result<SourceId> {
         if self.session.is_some() {
             return Err(error("reset before inserting a form"));
         }
@@ -497,6 +513,11 @@ impl Ide {
         self.insert_form(form, &source)
     }
     pub fn export_form(&self, id: SourceId) -> Result<String> {
+        if self.native_form(id).is_some() {
+            return Err(error(
+                "native UserForm save/export is not implemented yet; retain the original source/resources",
+            ));
+        }
         let form = self.forms.get(&id).ok_or_else(|| error("unknown form"))?;
         let module = self
             .modules

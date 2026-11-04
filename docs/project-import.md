@@ -29,7 +29,7 @@ project bytes in the embedding when byte-for-byte preservation matters.
 - Code pages 1250–1258, 874, 932, 936, 949, 950, 10000 and 65001 via encoding_rs without replacement decoding. Metadata Unicode must be well-formed UTF-16 and agree with MBCS identities. Representative 1252/1251/932/UTF-8 source and UTF-8 Unicode names have executable evidence; the full encoding mapping space is not exhaustively tested.
 
 Unknown encodings/records, platforms outside 0–3, nonstandard project LCIDs, nonzero library
-flags, UserForms/designers and ActiveX licence streams return explicit unsupported errors.
+flags, unknown designer/control variants and ActiveX licence streams return explicit unsupported errors.
 The profile checks metadata pairs strictly and refuses lossy/inconsistent identities.
 Source must contain exactly one matching VB_Name attribute. Malformed containers, missing required
 streams/records, unsafe/reserved/duplicate stream names and identity/type disagreements are errors.
@@ -92,3 +92,22 @@ separate assertions. Cache/source consistency remains `NotChecked`; a decoded
 project is not proof of valid P-code or a verified signature. The
 [writeback/signature contract](decisions/0037-m7-package-preservation-and-writeback.md)
 adds no encoder to this crate.
+
+## Native UserForms — M7A.2
+
+Under [ADR 0040](decisions/0040-native-userform-import-and-attachment.md),
+`ModuleKind::UserForm` and `Module::form` retain designer identity, exact source,
+attributes and native resources independently. A BaseClass declaration requires
+its MODULESTREAMNAME designer storage, VBFrame and native f/o streams. The initial
+profile accepts immediate cached Label/TextBox/CommandButton children; unknown
+classes, hierarchy/resources and behavioral variants refuse explicitly.
+
+`forms::decode_export` separately consumes native `.frm` bytes, explicit code page
+and caller-supplied `.frx` bytes. `forms::companion_name` returns only a validated
+local basename; no codec performs filesystem access. Record/object/site/string
+lengths, counts and resource budgets are checked before publishing a result.
+See the [native control/format/host contracts](m7a-control-contracts.md) for exact
+profile dispositions and limits. `Ide::attach_native_form` supplies the shared
+designer/code/debugger workflow without initialization or host authorization.
+Native edited saving/export is still unsupported; original snapshots do not
+represent saved source/design edits.

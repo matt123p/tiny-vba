@@ -6,7 +6,10 @@ Office forms plus removal of `.tvform`. [ADR 0038](decisions/0038-native-office-
 supersedes this document's former deferral. FC0–FC5 IDs remain stable; FC6 covers
 removal. The [inventory/ledger](m7a-inventory.md) and [ADR 0039](decisions/0039-m7a-native-control-metadata.md)
 record the first native worksheet metadata implementation. Native UserForms,
-interactive controls and removal remain open; this is not a native-forms sign-off.
+interactive worksheet controls and removal remain open; this is not a full native-forms sign-off.
+FC0 and FC3.1–FC3.4 are complete for the selected
+[native import/attachment profile](m7a-control-contracts.md), under
+[ADR 0040](decisions/0040-native-userform-import-and-attachment.md).
 Only Office-compatible behavior/formats belong in product scope.
 
 ## Problem and current support
@@ -17,7 +20,7 @@ Three distinct capabilities need separate treatment:
 |---|---|---|
 | Excel worksheet Form Controls | GridCraft preserves unsupported control package content for saving; does not display or operate it | Import, render, interact and retain macro/link metadata |
 | Legacy tiny-vba `.tvform` forms | Shared Label/TextBox/CommandButton designer/runtime and custom exchange still exist | Reuse suitable internals behind native Office forms; remove the custom format and its shipping workflows under FC6 |
-| Native VBA UserForms | `vba-project` explicitly refuses UserForms/designers; no `.frm`/`.frx` or binary designer import | Inert source/resource decoding, shared design mapping and runtime integration |
+| Native VBA UserForms | Selected flat Label/TextBox/CommandButton `.frm`/`.frx` and embedded import now attach to shared design/runtime and both fork packages | Broader properties/controls/lifecycle M7A.4; edited native saving M7A.5 |
 
 The local `examples/Food.xlsm` illustrates the first gap: sheet1 contains
 `Button 10`, shape ID 1034, assigned to `[0]!CopyIngredients`. It has worksheet
@@ -49,7 +52,7 @@ bounded callback queues, debugger frames and host continuations. Generated form
 support must remain separate from exact authored source. Do not add proposed
 crates, dependencies or bytecode capabilities until a concrete change needs them.
 
-## FC0 — Inventory and contracts
+## FC0 — Inventory and contracts (complete)
 
 - **FC0.1:** Inventory real import/render/save paths and independently authored
   fixtures. Inspect GridCraft `crates/xlsx/src/passthrough/read.rs`,
@@ -120,7 +123,7 @@ Owner: GridCraft. Depends on FC1's identity and lifecycle contracts.
 Exit: each supported type has import/render/input/linked-data/host-object/save
 evidence plus negative cases and explicit unsupported property diagnostics.
 
-## FC3 — Native VBA UserForm import
+## FC3 — Native VBA UserForm import (FC3.1–FC3.4 complete for selected profile)
 
 Owners: tiny-vba read-only decoder/shared IDE; forks attach package components.
 Depends on FC0; can proceed independently of FC2 after its contracts are ready.

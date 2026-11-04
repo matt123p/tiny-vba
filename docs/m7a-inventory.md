@@ -1,40 +1,42 @@
 # M7A native forms — implementation inventory and work ledger
 
-Updated 2026-11-04. **IN PROGRESS**. This is the FC0.1 code audit, initial FC0.2
-control matrix and first FC1.1 metadata slice under
+Updated 2026-11-04. **IN PROGRESS**. FC0 contracts and FC3.1–FC3.4 are complete for
+`native-userform-import-v1`; see the [control/property/event/format/host matrix](m7a-control-contracts.md)
+and [ADR 0040](decisions/0040-native-userform-import-and-attachment.md). The first FC1.1 metadata slice remains partial under
 [ADR 0038](decisions/0038-native-office-forms-and-compatibility-only.md) and
 [ADR 0039](decisions/0039-m7a-native-control-metadata.md). It is not M7A sign-off.
-Native UserForm import and `.tvform` removal remain unimplemented.
+Native import now supports flat Label/TextBox/CommandButton forms. Native edited
+persistence and `.tvform` removal remain unimplemented.
 
 ## Audited implementation paths — FC0.1
 
 | Surface / owner | Actual path and current boundary | Required native work |
 |---|---|---|
-| Shared project decode / tiny-vba | `crates/vba-project/src/lib.rs::decode` refuses `/PROJECTlk`; `text.rs` refuses PROJECT `BaseClass` designers | Bounded MS-OFORMS resource/component results; explicit reference/owner/source identities; retain inert/protected/corrupt/limit refusals |
-| Shared design/runtime / tiny-vba | `vba-ide/src/forms.rs` has Label/TextBox/CommandButton only, 128 controls and 2 MiB model limit. `form_project.rs` generates ordinary class/event support separately from authored source | Map native formats to validated internal data; audit instance/lifecycle/property/event differences before declaring compatibility |
-| Shared exchange / tiny-vba | `Ide::import_form` / `export_form` consume the custom archive. Standalone native/browser IO filters accept `.bas/.cls/.tvform`; `.frm/.frx` is not a native import workflow | Caller-supplied native source/companion resources, atomic attachment, native export and edited-source/resource encoding; remove custom routes after replacement |
+| Shared project decode / tiny-vba | `crates/vba-project/src/lib.rs::decode` retains `/PROJECTlk` refusal; `BaseClass` now yields a distinct UserForm with bounded designer resources | Implemented selected f/o/VBFrame resource/component result; broader controls/resources remain explicit gaps |
+| Shared design/runtime / tiny-vba | `vba-ide/src/forms.rs` has Label/TextBox/CommandButton only, 128 controls and 2 MiB model limit. `form_project.rs` generates ordinary class/event support separately from authored source | Native input now maps to validated design; instance/lifecycle/property/event gaps remain M7A.4 |
+| Shared exchange / tiny-vba | `Ide::import_form` / `export_form` consume the custom archive. Native `.frm/.frx` imports now attach through a caller-supplied bundle; native/browser IO routes accept the pair | Atomic native import implemented; native export and edited-resource encoding remain M7A.5; remove legacy routes in M7A.6 |
 | Worksheet package / GridCraft | `xlsx::passthrough::KeptReader::sheet_elements/vml` preserves `controls`, `ctrlProp` parts and VML. New `read_worksheet_controls` decodes a read-only Button snapshot | Finish DrawingML/VML reconciliation before native rendering/activation; preserve source graph separately from future writable state |
 | DrawingML shape identity / GridCraft | `xlsx::drawing::read_shape` reads nonempty `macro` into `on_action` but assigns model `id: 0`; source `cNvPr` identity is not retained as a native-control join key | Retain/reconcile native source identity; reject conflicting assignment/representation data; do not join by model sequence number or guessed caption |
 | Native cell checkbox / GridCraft | `engine::cmd::extra` and `extra::cells` use cell values/number-format state and normal commands | Do not mistake this implemented feature for a VML CheckBox or worksheet ActiveX implementation |
-| Workbook attachment / GridCraft | `vba::Bridge::import_project`, shared IDE and `ui-egui::vba` source routes; imported document names must match live workbook/sheets | Attach native form/resource components through the same project/trust/debugger lifecycle; native macro ownership and bounded activation |
-| Word attachment / WordCraft | `WordVbaProject::new` decodes standard/class/ThisDocument source inertly. `docx` retains the original project and direct related parts; shared editor routes source requests | Native form attachment and source/resource save acknowledgments; retain document identity and event/trust policy |
+| Workbook attachment / GridCraft | `vba::Bridge::import_project`, shared IDE and `ui-egui::vba` source routes; imported document names must match live workbook/sheets | Selected native package form attachment implemented; preserve trust/lifecycle ownership and expand semantics in M7A.4 |
+| Word attachment / WordCraft | `WordVbaProject::new` now also attaches selected native UserForms inertly. `docx` retains the original project and direct related parts; shared editor routes source requests | Selected native form attachment implemented; edited source/resource save remains M7A.5 |
 | Native persistence / all | M7 preserves original bytes. Neither shared editor nor forks encode edited embedded UserForm resources | Explicit native encoder/save path under ADR 0037; cache/signature invalidation, identity/revision checks and atomic file commit |
 
 The audit is based on inspected code, not planned APIs. No crate or dependency
 edge is added to the shared graph. Office package objects stay in their forks.
 
-## Control/property/event inventory — FC0.2 seed matrix
+## Initial inventory and current control disposition
 
-These are compatibility packets to audit, not claims of native implementation or
-an exhaustive property/signature contract. Each packet must later record exact
-Office signatures, defaults, errors, ordering and fixture coverage. Shared legacy
-runtime support does not establish native decode or persistence support.
+The completed FC0.2 [contract matrix](m7a-control-contracts.md) supersedes the
+initial seed families below with per-property/event/format/host dispositions.
+Additional runtime signatures/defaults/errors/ordering remain per-packet work
+in M7A.4; a declared unsupported packet is not implementation evidence.
 
 | Native UserForm control | Property/event families to audit | Current implementation |
 |---|---|---|
-| CommandButton | Caption/geometry, Enabled/Visible, default/cancel/focus, Click | Three-control shared legacy subset only; native resource decode/save UNSUPPORTED |
-| Label | Caption/geometry, formatting, visibility, Click | Three-control shared legacy subset only; native resource decode/save UNSUPPORTED |
-| TextBox | Text/Value, geometry, selection, validation, Change/focus/key events | Shared legacy Text/Change subset only; native resource decode/save UNSUPPORTED |
+| CommandButton | Caption/geometry, Enabled/Visible, default/cancel/focus, Click | Selected native decode + shared runtime; edited native save UNSUPPORTED |
+| Label | Caption/geometry, formatting, visibility, Click | Selected native decode + shared runtime; edited native save UNSUPPORTED |
+| TextBox | Text/Value, geometry, selection, validation, Change/focus/key events | Selected native decode + shared Text/Change runtime; edited native save UNSUPPORTED |
 | CheckBox | Value/three-state/group/binding, Change/Click | UNSUPPORTED |
 | OptionButton | Value/group/binding, Change/Click | UNSUPPORTED |
 | ToggleButton | Value/binding, Change/Click | UNSUPPORTED |
@@ -125,20 +127,21 @@ build/OS/locale comparisons remain NOT_RUN under M8.5.
 
 | Task | State | Evidence / dependency |
 |---|---|---|
-| FC0.1 path inventory | DONE for the initial audit | Inspected implementation paths above |
-| FC0.2 compatibility matrix | STARTED | Seed control/property/event/host matrix; detailed signatures/defaults and native resource packets remain |
-| FC0.3 contracts | STARTED | ADR 0039 defines first metadata slice; native UserForm resource/encoding/persistence contracts still needed |
+| FC0.1 path inventory | DONE | Updated code paths above, both fork attachments and shell routes |
+| FC0.2 compatibility matrix | DONE | [Per-property/event/format/host contracts](m7a-control-contracts.md), selected defaults and explicit future packets |
+| FC0.3 contracts | DONE | ADR 0039 + ADR 0040; identities, limits, unsupported handling, atomicity, source/resources, persistence boundary |
 | FC1.1 native worksheet Button read | PARTIAL | 8 native + 8 JS/WASM tests; source DrawingML identity/reconciliation remains |
 | FC1.2–FC1.4 geometry/render/input/launch | NOT_STARTED | Complete native ID/source reconciliation and geometry/default policy first |
 | FC1.5 untouched save | Initial preservation regression PASS | Edited caption/anchor/assignment persistence not implemented |
 | FC2 / FC4 broader controls | NOT_STARTED | Implement native packets against the matrix; preserve explicit gaps |
-| FC3 native UserForm codecs/attachment | NOT_STARTED | Review MS-OFORMS + `.frm`/`.frx` contracts and caller-supplied resources |
+| FC3.1–FC3.4 native UserForm codecs/attachment | DONE for native-userform-import-v1 | Export + embedded parity, shared designer/runtime/debugger, standalone IO, XLSM/DOCM trust and byte retention |
+| FC3.5 native lifecycle parity | NOT_STARTED | Default/explicit multi-instance, exact Office lifecycle/focus/event order remain M7A.4 |
 | FC5 edited native persistence | NOT_STARTED | Required encoder, native resource and signature/cache contract |
 | FC6 remove .tvform | NOT_STARTED | Requires native replacement workflows; do not extend the legacy format |
 
 Next smallest worksheet task: preserve source DrawingML `cNvPr` identity, reconcile
 it with worksheet/VML/property metadata and test conflicting macro representations;
 then implement bounded native Button geometry/rendering and trusted activation.
-The next shared task is a bounded native UserForm component/resource contract from
-[MS-OFORMS](https://learn.microsoft.com/en-us/openspecs/office_file_formats/ms-oforms/9c79701a-8c3e-4429-a139-b60ac3a1d50a).
+The next shared task is FC3.5/FC4 native lifecycle/property/input parity and
+broader native control packets against the completed contract matrix.
 No native resource layout, default or event order may be inferred from `.tvform`.

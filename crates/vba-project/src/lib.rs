@@ -2,6 +2,7 @@
 #![forbid(unsafe_code)]
 mod compression;
 mod directory;
+pub mod forms;
 mod text;
 pub use compression::decompress;
 pub use directory::{Information, Reference, ReferenceKind};
@@ -73,6 +74,7 @@ pub enum ModuleKind {
     Standard,
     Class,
     Document,
+    UserForm,
 }
 /// Stable directory ordinal within this decoded project, never a global source identity.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -101,6 +103,7 @@ pub struct Module {
     /// Decoded UTF-8 text; original project encoding is `Project::information.code_page`.
     pub source: String,
     pub attributes: Vec<Attribute>,
+    pub form: Option<forms::NativeForm>,
 }
 impl Module {
     /// The embedding owns global SourceId allocation. Text and line endings are unchanged.
@@ -110,10 +113,10 @@ impl Module {
             format!(
                 "{}{}",
                 self.name,
-                if self.kind == ModuleKind::Standard {
-                    ".bas"
-                } else {
-                    ".cls"
+                match self.kind {
+                    ModuleKind::Standard => ".bas",
+                    ModuleKind::UserForm => ".frm",
+                    _ => ".cls",
                 }
             ),
             self.source.clone(),
@@ -190,6 +193,7 @@ pub fn decode(bytes: &[u8], limits: &Limits) -> Result<Project> {
     cache.take(5)?;
     let mut modules = Vec::new();
     let mut total = 0usize;
+    let mut resource_total = 0usize;
     for (ordinal, (description, kind)) in descriptions.into_iter().zip(kinds).enumerate() {
         let stream = read_stream(
             &mut file,
@@ -214,6 +218,25 @@ pub fn decode(bytes: &[u8], limits: &Limits) -> Result<Project> {
             .ok_or_else(budget)?;
         let attributes = text::attributes(&source, &description.name)?;
         let code_name = (kind == ModuleKind::Document).then(|| description.name.clone());
+        let form = if kind == ModuleKind::UserForm {
+            let form = forms::embedded(
+                &mut file,
+                &description.stream,
+                &description.name,
+                &source,
+                information.code_page,
+                limits,
+            )?;
+            for resource in &form.resources {
+                resource_total = resource_total
+                    .checked_add(resource.bytes.len())
+                    .filter(|n| *n <= forms::MAX_RESOURCE_BYTES * 2)
+                    .ok_or_else(budget)?;
+            }
+            Some(form)
+        } else {
+            None
+        };
         modules.push(Module {
             id: ModuleId(u32::try_from(ordinal).map_err(|_| budget())?),
             name: description.name,
@@ -226,6 +249,7 @@ pub fn decode(bytes: &[u8], limits: &Limits) -> Result<Project> {
             doc_string: description.doc_string,
             source,
             attributes,
+            form,
         });
     }
     Ok(Project {

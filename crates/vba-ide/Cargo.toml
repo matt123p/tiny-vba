@@ -11,6 +11,7 @@ publish = false
 workspace = true
 
 [dependencies]
+vba-project.workspace = true
 vba-compiler.workspace = true
 vba-debug.workspace = true
 vba-diagnostics.workspace = true
@@ -20,3 +21,6 @@ vba-runtime.workspace = true
 vba-syntax.workspace = true
 vba-values.workspace = true
 vba-vm.workspace = true
+
+[dev-dependencies]
+cfb = "=0.14.0"

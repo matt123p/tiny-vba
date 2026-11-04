@@ -59,11 +59,11 @@ See the [M2 compiler contract](compiler.md) for supported source, API and struct
 | vba-vm | Frames, instruction pointer, budgets, inspection hooks; host-root binding and protocol checks | diagnostics, ir, values, runtime, foreign |
 | vba-debug | Breakpoint/step/inspection controller | diagnostics, vm |
 | vba-dap | Optional bounded M10 Debug Adapter Protocol frontend | ide, serde_json (=1.0.154) |
-| vba-project | Bounded read-only MS-OVBA source/project decoder | diagnostics, cfb (=0.14.0), encoding_rs (=0.8.42) |
+| vba-project | Bounded read-only MS-OVBA source/project and selected native UserForm decoder | diagnostics, cfb (=0.14.0), encoding_rs (=0.8.42) |
 | vba-testkit | Deterministic generic foreign host, trace support and bounded embedding driver | debug, diagnostics, foreign, ir, values, vm |
 | vba-conformance | Scenario validation, typed expectations and M4 outcome judgment; comparison/reports later | diagnostics, testkit, values, vm |
 | vba-cli | Source parsing, compilation/disassembly/execution, fixture validation and optional DAP stdio | conformance, diagnostics, syntax, compiler, ir, values, vm; dap optional |
-| vba-ide | Toolkit-independent source buffers, commands, compiler/debug-session orchestration and safe watches | compiler, debug, diagnostics, foreign, ir, runtime, syntax, values, vm |
+| vba-ide | Toolkit-independent source buffers, commands, compiler/debug-session orchestration and safe watches | compiler, debug, diagnostics, foreign, ir, project, runtime, syntax, values, vm |
 | vba-ui-egui | Reusable Classic editor/debugger rendering; explicit commands and scoped theme/IDs | ide, egui |
 | vba-ide-app | Native/browser shell, source IO, preferences and capture harness | ide, ui-egui, eframe; image native-only, js-sys/wasm-bindgen/futures/web-sys browser-only |
 | xtask | Maintenance/build/render commands | none |
@@ -120,7 +120,7 @@ Adopted scope: [ADR 0002](decisions/0002-editor-debugger-ui.md). Product contrac
 
 | Package | Responsibility | Allowed direction |
 |---|---|---|
-| vba-ide | Toolkit-independent editor/project/session state and actions | compiler, debug, diagnostics, foreign, IR, runtime, syntax, values, VM; no toolkit/IO |
+| vba-ide | Toolkit-independent editor/project/session state and actions | compiler, debug, diagnostics, foreign, IR, project, runtime, syntax, values, VM; no toolkit/IO |
 | vba-ui-egui | Embeddable editor/debugger panels | ide, egui and compatible UI support; no Gridcraft/Wordcraft dependency |
 | vba-ide-app | Standalone native/web application shell | ui-egui, ide; eframe/platform facilities at this layer |
 
@@ -262,5 +262,16 @@ Application forks own macro resolution policy, lifecycle events, prompts and nat
 [inventory](m7a-inventory.md) record the first GridCraft-owned native worksheet
 Button metadata decoder. It reads the fork's preserved graph into a bounded
 read-only snapshot, with no new shared crate/edge or VM authority. Full DrawingML
-identity reconciliation, UI/runtime activation, native UserForm codecs/edited
-persistence and removal of `.tvform` remain open.
+identity reconciliation and worksheet UI/runtime activation remain open.
+
+## M7A native UserForm import/attachment (2026-11-04)
+
+[ADR 0040](decisions/0040-native-userform-import-and-attachment.md) adds one
+reviewed IDE -> project edge. The headless project decoder owns native resource
+results; the IDE maps them into validated design/runtime data and retains original
+source/resources independently. Standalone and forks own IO, package identity,
+trust and atomic publication. No new runtime registry, VM instruction, production
+external dependency or library activation is added. See the
+[property/event/format/host contracts](m7a-control-contracts.md). M7A.1/M7A.2
+are complete for the selected three-control flat import profile; broader native
+semantics, native edited persistence and removal of `.tvform` remain open.

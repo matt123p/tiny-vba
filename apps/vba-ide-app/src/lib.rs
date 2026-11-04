@@ -98,9 +98,9 @@ impl App {
     }
     #[cfg(not(target_arch = "wasm32"))]
     pub fn open(&mut self, path: &std::path::Path) -> Result<(), Box<dyn std::error::Error>> {
-        let (name, text) = read_source(path)?;
+        let files = read_source_bundle(path)?;
         let mut project = Ide::new();
-        project.import_source_file(&name, &text)?;
+        project.import_source_bundle(&files, 1252)?;
         self.ide = project;
         if let Some(p) = self.ide.active_module().and_then(|m| m.procedures.first()) {
             self.ide.entry = p.name.clone();
@@ -171,7 +171,7 @@ impl App {
         if let Some(imported) = self.browser_files.take_import() {
             if matches!(self.file_request, Some(HostRequest::Import)) {
                 match imported {
-                    Ok((name, text)) => match self.ide.import_source_file(&name, &text) {
+                    Ok(files) => match self.ide.import_source_bundle(&files, 1252) {
                         Ok(_) => {
                             self.file_request = None;
                             self.view.form_view = self
@@ -193,13 +193,13 @@ impl App {
         if self.file_request.is_some() {
             let mut close = false;
             egui::Window::new("Source File").collapsible(false).show(ctx,|ui|{
-            ui.label("UTF-8 .bas/.cls source or .tvform source/design — Office binary projects are not rewritten.");
+            ui.label("VBA source or native .frm/.frx forms. Select both files in the browser. Native form saving is not yet available.");
             ui.add(egui::TextEdit::singleline(&mut self.path).hint_text("Source path")).on_hover_text("Source file path");
             #[cfg(not(target_arch="wasm32"))]
             if ui.button("Confirm Source File").clicked() && let Some(request)=self.file_request.clone() {
                 let path=std::path::PathBuf::from(&self.path);
                 let result:Result<(),Box<dyn std::error::Error>>=match request {
-                    HostRequest::Import=>read_source(&path).and_then(|(name,text)|self.ide.import_source_file(&name,&text).map(|_|()).map_err(Into::into)),
+                    HostRequest::Import=>read_source_bundle(&path).and_then(|files|self.ide.import_source_bundle(&files,1252).map(|_|()).map_err(Into::into)),
                     HostRequest::Save{id,text,revision,..}=>write_source(&path,&text).and_then(|()|self.ide.mark_saved(id,revision).map_err(Into::into)),
                     HostRequest::Export{text,..}=>write_source(&path,&text),_=>Ok(())
                 };
@@ -364,6 +364,52 @@ impl eframe::App for App {
                 .request_repaint_after(std::time::Duration::from_millis(16));
         }
     }
+}
+#[cfg(not(target_arch = "wasm32"))]
+pub fn read_source_bundle(
+    path: &std::path::Path,
+) -> Result<Vec<vba_ide::NativeFormResource>, Box<dyn std::error::Error>> {
+    use std::io::Read;
+    if !path
+        .extension()
+        .is_some_and(|e| e.eq_ignore_ascii_case("frm"))
+    {
+        let (name, text) = read_source(path)?;
+        return Ok(vec![vba_ide::NativeFormResource {
+            name,
+            bytes: text.into_bytes(),
+        }]);
+    }
+    fn read(path: &std::path::Path, limit: usize) -> Result<Vec<u8>, Box<dyn std::error::Error>> {
+        let file = std::fs::File::open(path)?;
+        if !file.metadata()?.is_file() {
+            return Err("Choose a regular native form file".into());
+        }
+        let mut bytes = Vec::new();
+        file.take(limit as u64 + 1).read_to_end(&mut bytes)?;
+        if bytes.len() > limit {
+            return Err("Native form resource size exceeded".into());
+        }
+        Ok(bytes)
+    }
+    let bytes = read(path, vba_ide::SourceFile::MAX_BYTES)?;
+    let companion = vba_ide::native_form_companion_name(
+        &bytes,
+        1252,
+        &vba_ide::ProjectImportLimits::default(),
+    )?;
+    let name = path
+        .file_name()
+        .and_then(|n| n.to_str())
+        .ok_or("invalid form filename")?
+        .to_owned();
+    let mut files = vec![vba_ide::NativeFormResource { name, bytes }];
+    if let Some(name) = companion {
+        let companion_path = path.with_file_name(&name);
+        let bytes = read(&companion_path, 4 * 1024 * 1024)?;
+        files.push(vba_ide::NativeFormResource { name, bytes });
+    }
+    Ok(files)
 }
 #[cfg(not(target_arch = "wasm32"))]
 pub fn read_source(path: &std::path::Path) -> Result<(String, String), Box<dyn std::error::Error>> {

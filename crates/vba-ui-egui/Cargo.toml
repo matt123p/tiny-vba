@@ -15,4 +15,5 @@ egui.workspace = true
 vba-ide.workspace = true
 
 [dev-dependencies]
+cfb = "=0.14.0"
 egui_kittest.workspace = true

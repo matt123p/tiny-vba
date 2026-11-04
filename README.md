@@ -97,9 +97,11 @@ event-handler navigation for the implemented **Label, TextBox and CommandButton*
 profile. Forms run through the real VM and can be debugged during modal or modeless
 interaction. Its current `.tvform` format is legacy code scheduled for removal.
 [M7A](docs/implementation-plan.md) is in progress to replace it with native Office UserForms,
-`.frm`/`.frx` exchange, controls and native persistence before M8. Native UserForm import
-is not implemented yet. The [M7A ledger](docs/m7a-inventory.md) records the first
-native worksheet Button metadata decoder and remaining form work. See the
+`.frm`/`.frx` exchange, controls and native persistence before M8. Native UserForm import now supports the declared flat Label/TextBox/CommandButton
+export and embedded profile, attached to the shared designer/runtime and debugger.
+Native saving and `.tvform` removal remain pending. The
+[M7A ledger](docs/m7a-inventory.md) records completed import work and the remaining
+worksheet, semantics and persistence tasks. See the
 [current shared form scope](docs/m2-acceptance.md).
 
 ## Debugger
