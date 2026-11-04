@@ -1,6 +1,6 @@
 # Bytecode and explicit-state VM specification
 
-Version: IR 1 base with versioned extensions through IR 10. Date: 2026-10-26. Status: adopted implementation contract under
+Version: IR 1 base with versioned extensions through IR 11. Date: 2026-10-26. Status: adopted implementation contract under
 [ADR 0004](decisions/0004-bytecode-vm-contract.md). M2 structural IR/verifier/lowering and M3 execution subset implemented. See [compiler](compiler.md) and [runtime](runtime.md).
 
 This document defines the M2/M3 instruction representation, verifier, calling convention and execution
@@ -666,3 +666,13 @@ ordinary Class_Initialize frames. The pending read/public field disposition
 survives Stop and initializer failure clears only the matching variable. Argument
 preparation preserves source order; inspection stays inert. See
 [ADR 0046](decisions/0046-lazy-project-class-variables.md).
+
+## IR 11 native class interfaces
+
+`class-interfaces-v11` adds Class.interfaces with external nominal identity, an
+event-source flag and optional event-name exposure. Verification requires IR 11,
+explicit capability, unique non-project identities, bounded descriptors and actual
+exposed events. Native type checking accepts exact identity or an explicit claim;
+event connection/delivery retains declared interface capability/exposure, including
+catchable error 459 for non-sources. Storage/query/verification work is bounded.
+No opcode is added. See [ADR 0047](decisions/0047-native-forms-nominal-types-and-library-access.md).

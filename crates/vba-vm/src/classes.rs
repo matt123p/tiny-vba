@@ -14,6 +14,7 @@ pub(super) struct Instance {
     pub source: ir::SourceIndex,
     pub document_owner: Option<vba_values::ObjectRef>,
     pub ty: vba_values::NominalType,
+    pub interfaces: Vec<ir::ClassInterface>,
     pub fields: Vec<Location>,
 }
 #[derive(Clone, Copy)]
@@ -89,6 +90,7 @@ impl Session {
             .name
             .strip_prefix("Event ")
             .ok_or_else(|| invariant("event name"))?;
+        let publisher_type = self.instance_object(publisher)?;
         let mut deliveries = Vec::new();
         let mut work = 0u64;
         for instance in self.instances.iter().filter(|i| i.alive && !i.terminating) {
@@ -124,6 +126,34 @@ impl Session {
                 }
                 if !field.with_events || self.store.read(*location)? != &Value::Object(publisher) {
                     continue;
+                }
+                if let Some(expected) = &field.nominal
+                    && expected != &publisher_type.ty
+                {
+                    work = work
+                        .checked_add(
+                            u64::try_from(publisher_type.interfaces.len())
+                                .map_err(|_| resource())?,
+                        )
+                        .ok_or_else(resource)?;
+                    let Some(interface) = publisher_type
+                        .interfaces
+                        .iter()
+                        .find(|interface| &interface.ty == expected && interface.events)
+                    else {
+                        continue;
+                    };
+                    if let Some(names) = &interface.event_names {
+                        work = work
+                            .checked_add(u64::try_from(names.len()).map_err(|_| resource())?)
+                            .ok_or_else(resource)?;
+                        if !names
+                            .iter()
+                            .any(|name| name.eq_ignore_ascii_case(event_name))
+                        {
+                            continue;
+                        }
+                    }
                 }
                 let handler_name = format!("{}_{}", field.name, event_name);
                 work = work
@@ -241,7 +271,19 @@ impl Session {
         if saved.len() > 1024 || !self.instances.is_empty() {
             return Err(command("instance restore requires fresh bounded heap"));
         }
-        self.charge(saved.len() * 512)?;
+        let interface_bytes = saved.iter().try_fold(0usize, |bytes, snapshot| {
+            let class = self
+                .program
+                .program()
+                .classes
+                .iter()
+                .find(|class| class.source == snapshot.source)
+                .ok_or_else(|| command("saved class source missing"))?;
+            bytes
+                .checked_add(class.interfaces.iter().map(interface_bytes).sum::<usize>())
+                .ok_or_else(resource)
+        })?;
+        self.charge(saved.len() * 512 + interface_bytes)?;
         let mut mapping = BTreeMap::new();
         let mut instances = Vec::new();
         let mut values = Vec::new();
@@ -293,6 +335,7 @@ impl Session {
                 source: class.source,
                 document_owner: snapshot.document_owner,
                 ty: vba_values::NominalType::new("VBAProject", "1", &class.name)?,
+                interfaces: class.interfaces.clone(),
                 fields: vec![],
             });
         }
@@ -501,7 +544,10 @@ impl Session {
         {
             return Err(resource());
         }
-        self.charge(256 + class.fields.len() * 256)?;
+        self.charge(
+            256 + class.fields.len() * 256
+                + class.interfaces.iter().map(interface_bytes).sum::<usize>(),
+        )?;
         let mut values = Vec::new();
         reserve(&mut values, class.fields.len())?;
         for field in &class.fields {
@@ -549,6 +595,7 @@ impl Session {
             source,
             document_owner: None,
             ty: vba_values::NominalType::new("VBAProject", "1", &class.name)?,
+            interfaces: class.interfaces.clone(),
             fields,
         });
         Ok(object)
@@ -1006,4 +1053,11 @@ impl Session {
             self.retire_instance(object)?;
         }
     }
+}
+
+fn interface_bytes(interface: &ir::ClassInterface) -> usize {
+    nominal_bytes(&interface.ty)
+        + interface.event_names.as_ref().map_or(0, |names| {
+            names.iter().map(|name| 64 + name.len()).sum::<usize>()
+        })
 }

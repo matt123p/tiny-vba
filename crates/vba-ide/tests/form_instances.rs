@@ -678,3 +678,154 @@ fn designer_run_constructs_non_predeclared_native_forms_without_a_default_refere
     assert_eq!(ide.output(), vec!["initialized"]);
     Ok(())
 }
+
+#[test]
+fn msforms_form_control_collection_and_leaf_types_preserve_canonical_native_identity() -> R {
+    let ide = setup(
+        "Sub Main()\nDim native As New NativeForm,f As MSForms.UserForm,aliasForm As UserForm,box As MSForms.TextBox,all As MSForms.Controls,c As MSForms.Control\nSet f=native\nSet box=f.Controls(\"Entry\")\nbox.Text=\"typed\"\nSet all=f.Controls\nFor Each c In all\nDebug.Print c.Name\nNext c\nSet aliasForm=f\nDebug.Print aliasForm.Controls(\"Entry\").Text\nOn Error Resume Next\nSet box=f.Controls(\"Heading\")\nDebug.Print Err.Number\nDebug.Print box.Text\nEnd Sub",
+        None,
+    )?;
+    assert_eq!(ide.mode(), Mode::Completed, "{:?}", ide.diagnostics);
+    assert_eq!(
+        ide.output(),
+        vec![
+            "initialized",
+            "Heading",
+            "Entry",
+            "Apply",
+            "typed",
+            "13",
+            "typed"
+        ]
+    );
+    Ok(())
+}
+#[test]
+fn msforms_textbox_with_events_uses_the_existing_native_control_event() -> R {
+    let source = fixture::SOURCE
+        .replace(
+            "Option Explicit",
+            "Option Explicit\r\nPrivate WithEvents viewer As MSForms.TextBox",
+        )
+        .replace(
+            "Debug.Print \"initialized\"",
+            "Set viewer=Entry\r\nDebug.Print \"initialized\"",
+        )
+        + "\r\nPrivate Sub viewer_Change()\r\nDebug.Print viewer.Text\r\nEnd Sub\r\n";
+    let ide = setup(
+        "Sub Main()\nDim f As New NativeForm\nf.Entry.Text=\"event\"\nEnd Sub",
+        Some(&source),
+    )?;
+    assert_eq!(ide.mode(), Mode::Completed, "{:?}", ide.diagnostics);
+    assert_eq!(ide.output(), vec!["initialized", "event"]);
+    Ok(())
+}
+#[test]
+fn generic_msforms_control_event_connection_refuses_without_changing_the_source() -> R {
+    let source = fixture::SOURCE.replace(
+        "Option Explicit",
+        "Option Explicit\r\nPrivate WithEvents viewer As MSForms.Control",
+    ) + "\r\nPublic Sub TryConnect()\r\nOn Error Resume Next\r\nSet viewer=Entry\r\nDebug.Print Err.Number\r\nDebug.Print viewer Is Nothing\r\nEnd Sub\r\n";
+    let ide = setup(
+        "Sub Main()\nDim f As New NativeForm\nf.TryConnect\nEnd Sub",
+        Some(&source),
+    )?;
+    assert_eq!(ide.mode(), Mode::Completed, "{:?}", ide.diagnostics);
+    assert_eq!(ide.output(), vec!["initialized", "459", "True"]);
+    Ok(())
+}
+#[test]
+fn internal_native_return_factories_supply_mutable_msforms_byval_event_argument_objects() -> R {
+    // These are internal bridge factories, not an Office macro fixture or public creation API.
+    let ide = setup(
+        "Sub Main()\nDim cancel As MSForms.ReturnBoolean,key As MSForms.ReturnInteger\nSet cancel=New VbaFormReturnBoolean\nSet key=New VbaFormReturnInteger\nMutate cancel,key\nDebug.Print CBool(cancel)\nDebug.Print CLng(key)\nEnd Sub\nSub Mutate(ByVal cancel As MSForms.ReturnBoolean,ByVal key As MSForms.ReturnInteger)\ncancel=True\nkey=65\nEnd Sub",
+        None,
+    )?;
+    assert_eq!(ide.mode(), Mode::Completed, "{:?}", ide.diagnostics);
+    assert_eq!(ide.output(), vec!["True", "65"]);
+    Ok(())
+}
+
+#[test]
+fn qualified_vba_userforms_lookup_and_enumeration_survive_a_project_function_shadow() -> R {
+    let ide = setup(
+        "Sub Main()\nDim f As New NativeForm,g As MSForms.UserForm,n As Long\nDebug.Print UserForms()\nDebug.Print VBA.UserForms.Count\nf.Show 0\nSet g=VBA.UserForms(0)\nDebug.Print g Is f\nFor Each g In VBA.UserForms\nn=n+1\nNext g\nDebug.Print n\nSet g=VBA.UserForms.Item(0)\nDebug.Print g Is f\nEnd Sub\nFunction UserForms() As Long\nUserForms=17\nEnd Function",
+        None,
+    )?;
+    assert_eq!(ide.mode(), Mode::Completed, "{:?}", ide.diagnostics);
+    assert_eq!(
+        ide.output(),
+        vec!["17", "0", "initialized", "True", "1", "True"]
+    );
+    Ok(())
+}
+#[test]
+fn native_type_binding_respects_missing_or_conflicting_references_without_import_execution() -> R {
+    use vba_foreign::{ReferenceLibrary, ReferenceSet, ReferenceType, ReferenceTypeKind};
+    for available in [false, true] {
+        let mut ide = setup("Sub Main()\nEnd Sub", None)?;
+        let id = ide
+            .modules
+            .iter()
+            .find(|module| module.name == "NativeForm.frm")
+            .ok_or("form source")?
+            .id;
+        let original = ide.native_form(id).ok_or("native form")?.clone();
+        ide.dispatch(Action::Reset, &mut NoHost)?;
+        ide.configure_reference_bindings(ReferenceSet::new(vec![ReferenceLibrary {
+            name: "MSForms".into(),
+            version: "2.0".into(),
+            available,
+            types: if available {
+                vec![ReferenceType {
+                    name: "TextBox".into(),
+                    kind: ReferenceTypeKind::Enum,
+                }]
+            } else {
+                vec![]
+            },
+            constants: vec![],
+        }])?)?;
+        let error = ide
+            .dispatch(Action::Compile, &mut NoHost)
+            .err()
+            .ok_or("reference refusal")?;
+        if available {
+            assert!(error.message.contains("conflicts"));
+        } else {
+            assert_eq!(error.code, "VBA0131");
+        }
+        assert!(ide.output().is_empty());
+        assert!(ide.form_instances()?.is_empty());
+        assert_eq!(
+            ide.native_form(id).ok_or("native form")?.resources,
+            original.resources
+        );
+        assert_eq!(
+            ide.native_form(id).ok_or("native form")?.source,
+            original.source
+        );
+    }
+    Ok(())
+}
+
+#[test]
+fn msforms_event_interfaces_do_not_expose_generated_private_bridge_events() -> R {
+    let source = fixture::SOURCE
+        .replace(
+            "Option Explicit",
+            "Option Explicit\r\nPrivate WithEvents viewer As MSForms.TextBox",
+        )
+        .replace(
+            "Debug.Print \"initialized\"",
+            "Set viewer=Entry\r\nDebug.Print \"initialized\"",
+        )
+        + "\r\nPrivate Sub viewer_VbaTabChanged()\r\nErr.Raise 5\r\nEnd Sub\r\nPrivate Sub viewer_Change()\r\nDebug.Print viewer.Text\r\nEnd Sub\r\n";
+    let ide = setup(
+        "Sub Main()\nDim f As New NativeForm\nf.Entry.TabIndex=0\nf.Entry.Text=\"standard\"\nEnd Sub",
+        Some(&source),
+    )?;
+    assert_eq!(ide.mode(), Mode::Completed, "{:?}", ide.diagnostics);
+    assert_eq!(ide.output(), vec!["initialized", "standard"]);
+    Ok(())
+}

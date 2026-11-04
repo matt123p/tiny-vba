@@ -23,6 +23,10 @@ fn push<T>(v: &mut Vec<T>, item: T) -> Result<()> {
 }
 #[derive(Clone, Debug)]
 pub struct CompileOptions {
+    /// Library function spelling -> (standard source module, public Function).
+    pub procedure_aliases: BTreeMap<String, (String, String)>,
+    /// Class name -> external nominal interfaces supplied by the embedding.
+    pub class_interfaces: BTreeMap<String, Vec<ir::ClassInterface>>,
     pub references: vba_foreign::ReferenceSet,
     pub imports: Vec<vba_foreign::Import>,
     pub entry: String,
@@ -37,6 +41,8 @@ pub struct CompileOptions {
 impl Default for CompileOptions {
     fn default() -> Self {
         Self {
+            procedure_aliases: BTreeMap::new(),
+            class_interfaces: BTreeMap::new(),
             references: vba_foreign::ReferenceSet::default(),
             imports: Vec::new(),
             entry: "Answer".into(),
@@ -66,13 +72,64 @@ pub fn compile_modules(
     {
         return Err(error("invalid entry/revision/profile identifier"));
     }
-    let program = bound::bind_with_references(
+    let program = bound::bind_with_procedure_aliases(
         modules,
         &options.entry,
         &options.imports,
         &options.references,
         &options.document_members,
+        &options.procedure_aliases,
     )?;
+    if options.class_interfaces.len() > 256 {
+        return Err(resource());
+    }
+    let mut interface_classes = BTreeSet::new();
+    let mut interface_metadata = 0usize;
+    for (name, interfaces) in &options.class_interfaces {
+        if name.len() > 128
+            || !interface_classes.insert(name.to_ascii_lowercase())
+            || !program
+                .classes
+                .iter()
+                .any(|class| class.name.eq_ignore_ascii_case(name))
+            || interfaces.len() > 32
+        {
+            return Err(error("invalid class interface owner/budget"));
+        }
+        for interface in interfaces {
+            let ty = &interface.ty;
+            interface_metadata = interface_metadata
+                .checked_add(256 + ty.library().len() + ty.version().len() + ty.name().len())
+                .ok_or_else(resource)?;
+            if let Some(names) = &interface.event_names {
+                if names.len() > 128 {
+                    return Err(resource());
+                }
+                for name in names {
+                    if name.len() > 256 {
+                        return Err(resource());
+                    }
+                    interface_metadata = interface_metadata
+                        .checked_add(64 + name.len())
+                        .ok_or_else(resource)?;
+                }
+            }
+            if interface_metadata > options.limits.metadata_bytes.min(1024 * 1024) {
+                return Err(resource());
+            }
+            if ty.library() == "vbaproject"
+                || options
+                    .references
+                    .object_type(&format!("{}.{}", ty.library(), ty.name()))?
+                    .as_ref()
+                    != Some(ty)
+            {
+                return Err(error(
+                    "class interface is not declared by the explicit reference snapshot",
+                ));
+            }
+        }
+    }
     let mut sources = Vec::new();
     for module in &program.modules {
         let module_name = module
@@ -295,7 +352,17 @@ pub fn compile_modules(
         if enumerator.is_some() {
             features.insert("class-enumerators-v9".into());
         }
+        let interfaces = options
+            .class_interfaces
+            .iter()
+            .find(|(name, _)| name.eq_ignore_ascii_case(&class.name))
+            .map(|(_, interfaces)| interfaces.clone())
+            .unwrap_or_default();
+        if !interfaces.is_empty() {
+            features.insert("class-interfaces-v11".into());
+        }
         classes.push(ir::Class {
+            interfaces,
             enumerator,
             events: program
                 .procedures
@@ -361,7 +428,9 @@ pub fn compile_modules(
     let mut ir = ir::Program {
         classes,
         nominal_locals,
-        ir_version: if features.contains("auto-instancing-v10") {
+        ir_version: if features.contains("class-interfaces-v11") {
+            ir::IR11_VERSION
+        } else if features.contains("auto-instancing-v10") {
             ir::IR10_VERSION
         } else if features.contains("class-enumerators-v9") {
             ir::IR9_VERSION

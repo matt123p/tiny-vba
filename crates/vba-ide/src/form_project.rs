@@ -379,7 +379,7 @@ fn vba_string(s: &str) -> String {
 fn boolean(b: bool) -> &'static str {
     if b { "True" } else { "False" }
 }
-fn class_name(kind: ControlKind) -> &'static str {
+pub(crate) fn class_name(kind: ControlKind) -> &'static str {
     match kind {
         ControlKind::Label => "VbaFormLabel",
         ControlKind::TextBox => "VbaFormTextBox",
@@ -1198,6 +1198,19 @@ impl Ide {
                 )?,
                 ModuleKind::Class,
             )?);
+            for (offset, name, kind) in [
+                (8, "ReturnBoolean", "Boolean"),
+                (9, "ReturnInteger", "Integer"),
+            ] {
+                modules.push(parse(
+                    &SourceFile::new(
+                        SourceId(u64::MAX - offset),
+                        format!("VbaForm{name}.cls"),
+                        crate::form_controls::return_class(kind),
+                    )?,
+                    ModuleKind::Class,
+                )?);
+            }
             let components: Vec<_> = self
                 .forms
                 .values()
@@ -1213,7 +1226,7 @@ impl Ide {
             )?);
             let mut support =
                 String::from("Public Const vbModal As Long=1\nPublic Const vbModeless As Long=0\n");
-            support.push_str("Public Function UserForms(Optional ByVal index As Variant) As Object\nIf IsMissing(index) Then\nSet UserForms=VbaFormUserForms\nElse\nSet UserForms=VbaFormUserForms.Item(index)\nEnd If\nEnd Function\n");
+            support.push_str("Public Function VbaUserForms(Optional ByVal index As Variant) As Object\nIf IsMissing(index) Then\nSet VbaUserForms=VbaFormUserForms\nElse\nSet VbaUserForms=VbaFormUserForms.Item(index)\nEnd If\nEnd Function\n");
             for (id, designer) in &self.forms {
                 let module = self
                     .modules

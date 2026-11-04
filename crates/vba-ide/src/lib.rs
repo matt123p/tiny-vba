@@ -12,6 +12,7 @@ pub use vba_project::forms::companion_name as native_form_companion_name;
 pub use vba_project::forms::{NativeForm, Resource as NativeFormResource};
 mod form_controls;
 mod form_project;
+mod form_types;
 pub use form_project::FormInstance;
 pub mod forms;
 mod history;
@@ -866,6 +867,8 @@ impl Ide {
     }
     fn compile(&mut self) -> Result<VerifiedProgram> {
         let modules = self.form_modules()?;
+        let references = self.form_references()?;
+        let class_interfaces = self.form_interfaces(&references)?;
         compile_modules(
             &modules,
             &CompileOptions {
@@ -873,7 +876,9 @@ impl Ide {
                 revision: format!("ide-{}", self.revision),
                 capabilities: vba_vm::capabilities(),
                 imports: self.form_imports(),
-                references: self.reference_bindings.clone(),
+                references,
+                class_interfaces,
+                procedure_aliases: self.form_procedure_aliases(),
                 document_members: self.document_members.clone(),
                 ..Default::default()
             },
@@ -916,6 +921,8 @@ impl Ide {
             .try_reserve(1)
             .map_err(|_| error("temporary callback module allocation budget"))?;
         modules.push(parsed);
+        let references = self.form_references()?;
+        let class_interfaces = self.form_interfaces(&references)?;
         compile_modules(
             &modules,
             &CompileOptions {
@@ -923,7 +930,9 @@ impl Ide {
                 revision: format!("ide-{}-idle-callback", self.revision),
                 capabilities: vba_vm::capabilities(),
                 imports: self.form_imports(),
-                references: self.reference_bindings.clone(),
+                references,
+                class_interfaces,
+                procedure_aliases: self.form_procedure_aliases(),
                 document_members: self.document_members.clone(),
                 ..Default::default()
             },

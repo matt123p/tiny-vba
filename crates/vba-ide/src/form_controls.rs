@@ -150,3 +150,10 @@ pub(crate) fn enumerator_class() -> String {
         "Public VbaOwner As Object\nPublic Property Get VbaNewEnum() As Object\nAttribute VbaNewEnum.VB_UserMemId = -4\nSet VbaNewEnum=VbaFormEnumInterface(Me)\nEnd Property\n",
     )
 }
+
+/// Mutable return objects preserve ByVal object identity in Forms event signatures.
+pub(crate) fn return_class(kind: &str) -> String {
+    format!(
+        "Public VbaValue As {kind}\nPublic Property Get Value() As {kind}\nAttribute Value.VB_UserMemId = 0\nValue=VbaValue\nEnd Property\nPublic Property Let Value(ByVal value As {kind})\nVbaValue=value\nEnd Property\n"
+    )
+}

@@ -516,6 +516,24 @@ pub fn bind_with_references(
     references: &vba_foreign::ReferenceSet,
     document_members: &BTreeMap<String, Vec<String>>,
 ) -> Result<BoundProgram> {
+    bind_with_procedure_aliases(
+        parsed,
+        entry,
+        imports,
+        references,
+        document_members,
+        &BTreeMap::new(),
+    )
+}
+/// Explicit embedding-owned library function names mapped to ordinary source procedures.
+pub fn bind_with_procedure_aliases(
+    parsed: &[ast::ParseResult],
+    entry: &str,
+    imports: &[vba_foreign::Import],
+    references: &vba_foreign::ReferenceSet,
+    document_members: &BTreeMap<String, Vec<String>>,
+    procedure_aliases: &BTreeMap<String, (String, String)>,
+) -> Result<BoundProgram> {
     vba_foreign::validate_imports(imports)?;
     if parsed.is_empty() || parsed.len() > 256 {
         return Err(Diagnostic::new("VBA0111", "source count limit"));
@@ -1087,6 +1105,81 @@ pub fn bind_with_references(
                 .push(id);
         }
     }
+    if procedure_aliases.len() > 256 {
+        return Err(Diagnostic::new("VBA0111", "procedure alias limit"));
+    }
+    let mut aliases = BTreeMap::new();
+    let mut scope_names = BTreeSet::new();
+    let mut standard_modules = BTreeMap::<String, Vec<usize>>::new();
+    if !procedure_aliases.is_empty() {
+        for (index, module) in modules.iter().enumerate() {
+            let name = module_name(module).to_ascii_lowercase();
+            budget.charge(512 + name.len(), module.source.span(0, 0)?)?;
+            scope_names.insert(name.clone());
+            if module.kind == ast::ModuleKind::Standard {
+                standard_modules.entry(name).or_default().push(index);
+            }
+        }
+    }
+    for (alias, (owner, member)) in procedure_aliases {
+        let valid = |name: &str| {
+            !name.is_empty()
+                && name.len() <= 128
+                && name.as_bytes().first().is_some_and(u8::is_ascii_alphabetic)
+                && name
+                    .bytes()
+                    .all(|byte| byte.is_ascii_alphanumeric() || byte == b'_')
+        };
+        if alias.len() > 257
+            || !(1..=2).contains(&alias.split('.').count())
+            || !alias.split('.').all(valid)
+            || !valid(owner)
+            || !valid(member)
+        {
+            return Err(Diagnostic::new(
+                "VBA0110",
+                "invalid procedure alias identifier",
+            ));
+        }
+        let owners = standard_modules
+            .get(&owner.to_ascii_lowercase())
+            .filter(|owners| owners.len() == 1)
+            .ok_or_else(|| {
+                Diagnostic::new("VBA0110", "procedure alias module is missing or ambiguous")
+            })?;
+        let module = *owners
+            .first()
+            .ok_or_else(|| Diagnostic::new("VBA0110", "procedure alias module missing"))?;
+        let id = lookup
+            .local
+            .get(&(module, member.to_ascii_lowercase()))
+            .copied()
+            .filter(|id| {
+                signatures.get(*id).is_some_and(|signature| {
+                    signature.kind == ast::ProcedureKind::Function
+                        && matches!(
+                            signature.visibility,
+                            ast::Visibility::Public | ast::Visibility::Default
+                        )
+                })
+            })
+            .ok_or_else(|| {
+                Diagnostic::new(
+                    "VBA0110",
+                    "procedure alias requires a public standard Function",
+                )
+            })?;
+        if aliases.insert(alias.to_ascii_lowercase(), id).is_some() {
+            return Err(Diagnostic::new("VBA0110", "duplicate procedure alias"));
+        }
+        budget.charge(
+            512 + alias.len() + owner.len() + member.len(),
+            signatures
+                .get(id)
+                .ok_or_else(|| Diagnostic::new("VBA0110", "alias signature missing"))?
+                .span,
+        )?;
+    }
     let constant_names: BTreeSet<_> = module_constants
         .iter()
         .flat_map(|m| m.keys().cloned())
@@ -1109,6 +1202,8 @@ pub fn bind_with_references(
             }
         }
         let mut binder = Binder {
+            procedure_aliases: &aliases,
+            scope_names: &scope_names,
             budget: &mut budget,
             lookup: &lookup,
             constant_names: &constant_names,
@@ -1304,6 +1399,8 @@ struct Lookup {
     public: BTreeMap<String, Vec<usize>>,
 }
 struct Binder<'a> {
+    procedure_aliases: &'a BTreeMap<String, usize>,
+    scope_names: &'a BTreeSet<String>,
     classes: &'a [Class],
     budget: &'a mut Budget,
     lookup: &'a Lookup,
@@ -1327,6 +1424,30 @@ struct Binder<'a> {
     implicit_me: Vec<String>,
 }
 impl Binder<'_> {
+    fn procedure_alias(&self, expr: &ast::Expr) -> Option<usize> {
+        if self.procedure_aliases.is_empty() {
+            return None;
+        }
+        let path = reference_path(expr)?;
+        let root = path.split('.').next()?.to_ascii_lowercase();
+        if self.symbols.contains_key(&root)
+            || self
+                .lookup
+                .local
+                .contains_key(&(self.signature.module, root.clone()))
+            || self.lookup.public.contains_key(&root)
+            || self.scope_names.contains(&root)
+            || self
+                .imports
+                .iter()
+                .any(|import| import.name.eq_ignore_ascii_case(&root))
+        {
+            return None;
+        }
+        self.procedure_aliases
+            .get(&path.to_ascii_lowercase())
+            .copied()
+    }
     fn local(
         &mut self,
         name: &str,
@@ -1543,6 +1664,12 @@ impl Binder<'_> {
         {
             return Err(err(
                 "host import is not writable; declare a local to shadow it",
+                name.span,
+            ));
+        }
+        if self.procedure_aliases.contains_key(&name.key()) {
+            return Err(err(
+                "library function is not writable; declare a local to shadow it",
                 name.span,
             ));
         }
@@ -2729,6 +2856,23 @@ impl Binder<'_> {
     }
     fn expr(&mut self, expr: &ast::Expr) -> Result<Expr> {
         self.budget.charge(256, expr.span)?;
+        let (target, arguments) = if let ast::ExprKind::Apply {
+            target, arguments, ..
+        } = &expr.kind
+        {
+            (target.as_ref(), arguments.as_slice())
+        } else {
+            (expr, &[][..])
+        };
+        if let Some(procedure) = self.procedure_alias(target) {
+            return Ok(Expr {
+                span: expr.span,
+                kind: ExprKind::Call {
+                    procedure,
+                    arguments: self.arguments(procedure, arguments, expr.span)?,
+                },
+            });
+        }
         if let Some(path) = reference_path(expr)
             && path.contains('.')
             && let Some(root) = path.split('.').next()
@@ -3232,6 +3376,9 @@ impl Binder<'_> {
                 object,
                 ..
             } => {
+                if self.procedure_alias(target).is_some() {
+                    return Err(err("library function is not writable", target.span));
+                }
                 if let ast::ExprKind::Apply {
                     target: array,
                     arguments,
@@ -3480,6 +3627,15 @@ impl Binder<'_> {
             ast::StatementKind::Call {
                 target, arguments, ..
             } => {
+                if let Some(procedure) = self.procedure_alias(target) {
+                    return Ok(Statement {
+                        site,
+                        kind: StatementKind::Call {
+                            procedure,
+                            arguments: self.arguments(procedure, arguments, site.span)?,
+                        },
+                    });
+                }
                 if let ast::ExprKind::Member {
                     target: object,
                     name,

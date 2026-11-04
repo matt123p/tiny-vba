@@ -222,3 +222,9 @@ IR 10 scalar As New is defined by
 exact nominal local/field/persistent metadata, inert declaration/inspection/Set
 targets, source-order ByRef preparation, ordinary constructor frames and failed
 initialization retry. No external activation or mutable registry is added.
+
+IR 11 class interfaces and Forms library bindings follow
+[ADR 0047](../../../docs/decisions/0047-native-forms-nominal-types-and-library-access.md).
+Preserve exact nominal identity and event-source/exposure, bounded immutable
+descriptors, restored-session validation and source-function alias shadowing.
+MSForms names stay in the IDE provider; no new store, COM or unsafe evaluation.

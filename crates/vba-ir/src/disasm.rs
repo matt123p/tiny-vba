@@ -56,6 +56,21 @@ fn render(out: &mut Output, p: &Program) -> fmt::Result {
             s.file.name()
         )?;
     }
+    for class in &p.classes {
+        for interface in &class.interfaces {
+            let ty = &interface.ty;
+            writeln!(
+                out,
+                "class-interface {:?} library={:?} version={:?} type={:?} events={} names={:?}",
+                class.name,
+                ty.library(),
+                ty.version(),
+                ty.name(),
+                interface.events,
+                interface.event_names
+            )?;
+        }
+    }
     for nominal in &p.nominal_locals {
         writeln!(
             out,

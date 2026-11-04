@@ -155,3 +155,9 @@ canonical fields without another mutable store. M7A.4 remains in progress.
 project-class/native-form As New. Preserve exact nominal storage/field aliases,
 lazy reads, inert inspection, source-order ByRef evaluation and initializer
 Stop/failure/retry. No external activation or per-location registry is added.
+
+[ADR 0047](docs/decisions/0047-native-forms-nominal-types-and-library-access.md) adds
+IR 11 class interfaces and native Forms type/library bindings. Keep older IR
+refusal, exact nominal identity, event-source/exposure checks, restoration budgets
+and source alias shadowing. Forms names belong in the IDE provider, never the VM.
+Source/reference attachment and inspection stay inert; no COM/registry is added.

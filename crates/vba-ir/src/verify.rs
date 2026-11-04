@@ -132,6 +132,7 @@ fn validate(
             | IR8_VERSION
             | IR9_VERSION
             | IR10_VERSION
+            | IR11_VERSION
     ) || p.profile != caps.profile
         || !caps.ir_versions.contains(&p.ir_version)
     {
@@ -173,6 +174,46 @@ fn validate(
         }
         feature(p, caps, "project-classes-v7")?;
         name(&class.name)?;
+        bound(class.interfaces.len(), 32)?;
+        if !class.interfaces.is_empty() {
+            if p.ir_version < IR11_VERSION {
+                return Err(incompatible("class interfaces require IR 11"));
+            }
+            feature(p, caps, "class-interfaces-v11")?;
+        }
+        let mut interfaces = BTreeSet::new();
+        budget.table(class.interfaces.len())?;
+        for interface in &class.interfaces {
+            let ty = &interface.ty;
+            budget.text(ty.library())?;
+            budget.text(ty.version())?;
+            budget.text(ty.name())?;
+            if let Some(names) = &interface.event_names {
+                if !interface.events {
+                    return Err(invalid("non-event interface exposure list"));
+                }
+                bound(names.len(), 128)?;
+                let mut exposed = BTreeSet::new();
+                for event_name in names {
+                    name(event_name)?;
+                    budget.text(event_name)?;
+                    budget.table(class.events.len())?;
+                    if !exposed.insert(event_name.to_ascii_lowercase())
+                        || !class.events.iter().any(|event| {
+                            p.procedures
+                                .get(event.0 as usize)
+                                .and_then(|procedure| procedure.name.strip_prefix("Event "))
+                                .is_some_and(|name| name.eq_ignore_ascii_case(event_name))
+                        })
+                    {
+                        return Err(invalid("unknown or duplicate interface event"));
+                    }
+                }
+            }
+            if ty.library() == "vbaproject" || !interfaces.insert(ty) {
+                return Err(invalid("duplicate or project-class interface identity"));
+            }
+        }
         bound(class.fields.len(), 4096)?;
         bound(class.methods.len(), 4096)?;
         bound(class.events.len(), 4096)?;
@@ -223,17 +264,32 @@ fn validate(
                 if field.kind != ScalarKind::Object || field.array.is_some() {
                     return Err(invalid("WithEvents scalar shape"));
                 }
-                if !ty.library().eq_ignore_ascii_case("VBAProject") {
+                let project = ty.library().eq_ignore_ascii_case("VBAProject");
+                if !project {
                     feature(p, caps, "host-events-v1")?;
-                } else {
-                    if ty.version() != "1" {
-                        return Err(invalid("WithEvents project version"));
-                    }
-                    let publisher = p
-                        .classes
+                }
+                if project
+                    && (ty.version() != "1"
+                        || !p
+                            .classes
+                            .iter()
+                            .any(|class| class.name.eq_ignore_ascii_case(ty.name())))
+                {
+                    return Err(invalid("WithEvents project class/version"));
+                }
+                budget.table(
+                    p.classes
                         .iter()
-                        .find(|c| c.name.eq_ignore_ascii_case(ty.name()))
-                        .ok_or_else(|| invalid("WithEvents class"))?;
+                        .map(|class| class.interfaces.len() + 1)
+                        .sum(),
+                )?;
+                for publisher in p.classes.iter().filter(|class| {
+                    project && class.name.eq_ignore_ascii_case(ty.name())
+                        || class
+                            .interfaces
+                            .iter()
+                            .any(|interface| interface.events && &interface.ty == ty)
+                }) {
                     budget.table(p.classes.len())?;
                     budget.table(publisher.events.len())?;
                     for event in &publisher.events {
@@ -245,6 +301,19 @@ fn validate(
                             .name
                             .strip_prefix("Event ")
                             .ok_or_else(|| invalid("event name"))?;
+                        if !project
+                            && !publisher.interfaces.iter().any(|interface| {
+                                &interface.ty == ty
+                                    && interface.events
+                                    && interface.event_names.as_ref().is_none_or(|names| {
+                                        names
+                                            .iter()
+                                            .any(|name| name.eq_ignore_ascii_case(event_name))
+                                    })
+                            })
+                        {
+                            continue;
+                        }
                         let handler_name = format!("{}_{}", field.name, event_name);
                         budget.table(class.methods.len())?;
                         if let Some(handler) = class

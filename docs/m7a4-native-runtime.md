@@ -6,6 +6,14 @@ Updated 2026-11-04. **IN PROGRESS. M7A.4 is not complete.** This record extends
 
 Implemented in shared tiny-vba:
 
+- [MSForms nominal types and qualified library access](decisions/0047-native-forms-nominal-types-and-library-access.md):
+  generic IR 11 class interfaces bind native UserForm/Control/Controls and six leaf
+  types without a host object registry or COM. Specific leaf WithEvents preserves
+  canonical objects while event allowlists hide bridge events; non-source Control
+  connections refuse with error 459. Mutable ReturnBoolean/ReturnInteger holders
+  preserve ByVal object identity for later event delivery. VBA.UserForms supports
+  Count/Item/index/For Each even when a project function shadows bare UserForms.
+
 - [Lazy As New](decisions/0046-lazy-project-class-variables.md) for scalar project
   classes/native forms, module/static and per-instance variables, canonical ByRef,
   Nothing re-creation, constructor Stop/failure/retry and inert debugger inspection
@@ -78,14 +86,14 @@ Remaining M7A.4 requirements, without reducing the milestone's scope:
 - Additional default/control-reference alias and reload edge cases against Office;
   full Activate/Deactivate ordering and modeless focus ownership. The selected
   replacement/code-lifetime cases are implemented under ADR 0044.
-- Qualified collection access, generic UserForm/
-  MSForms type bindings, additional implicit/alias behavior and As New arrays.
-  External class activation remains outside the supported project-only path. Direct enumerator
-  cursor interfaces and collection structural-mutation parity also remain open;
+- Additional implicit/alias behavior, As New arrays, empty-project/dynamic
+  collection cases, direct enumerator cursor interfaces and structural-mutation
+  parity. External class activation remains outside the project-only path.
   For Each uses the existing bounded snapshot profile.
 - ActiveControl/SetFocus, Enter/Exit and Before/AfterUpdate with the native typed
   cancel arguments; keyboard/mouse/accelerator ordering, text selection, multiline,
-  password and the remaining property/default/error/coercion contracts.
+  password and the remaining property/default/error/coercion contracts, including
+  native dynamic TypeName. Typed reference binding alone does not implement these.
 - Native ComboBox, ListBox, Frame, MultiPage, TabStrip, ScrollBar, SpinButton,
   Image and Excel RefEdit packets, including real container/resource identity,
   list/page collections, pictures, bindings and presentation. These remain refused.

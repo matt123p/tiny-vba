@@ -21,7 +21,7 @@ use vba_values::{Location, Locations, ScalarKind, Value};
 type Result<T> = std::result::Result<T, Diagnostic>;
 pub const PROFILE: &str = runtime::PROFILE;
 pub fn capabilities() -> ir::Capabilities {
-    let mut c = ir::Capabilities::ir10_structural();
+    let mut c = ir::Capabilities::ir11_structural();
     c.profile = PROFILE.into();
 
     c
@@ -1704,6 +1704,32 @@ impl Session {
         )?;
         self.check_value(location, &value)?;
         if self.event_connections.contains_key(&location) {
+            if let Value::Object(object) = &value
+                && object.host == 0
+                && let Some(expected) = self.nominal_types.get(&location)
+            {
+                let instance = self.instance_object(*object)?;
+                let work = instance.interfaces.len();
+                let event_source = &instance.ty == expected
+                    || instance
+                        .interfaces
+                        .iter()
+                        .any(|interface| &interface.ty == expected && interface.events);
+                self.counters.type_checks = self
+                    .counters
+                    .type_checks
+                    .checked_add(u64::try_from(work).map_err(|_| resource())?)
+                    .ok_or_else(resource)?;
+                if self.counters.type_checks > self.limits.instructions {
+                    return Err(resource());
+                }
+                if !event_source {
+                    return Err(runtime_diagnostic(runtime::Error::Vba {
+                        number: 459,
+                        message: "This component doesn't support the set of events".into(),
+                    }));
+                }
+            }
             self.next_connection = self.next_connection.checked_add(1).ok_or_else(resource)?;
             self.event_connections.insert(
                 location,
@@ -2488,6 +2514,7 @@ impl Session {
             "VBA_RUNTIME_438" => (FailureKind::Runtime, Some(438)),
             "VBA_RUNTIME_449" => (FailureKind::Runtime, Some(449)),
             "VBA_RUNTIME_450" => (FailureKind::Runtime, Some(450)),
+            "VBA_RUNTIME_459" => (FailureKind::Runtime, Some(459)),
             "VBA0001" => (FailureKind::Unsupported, None),
             "VBA0031" | "VBA0003" => (FailureKind::ResourceLimit, None),
             "VBA0033" | "VBA0006" => (FailureKind::HostProtocol, None),
@@ -4219,6 +4246,21 @@ fn check_nominal(
                             })
                         })?;
                     if &instance.ty != expected {
+                        *checks = checks
+                            .checked_add(
+                                u64::try_from(instance.interfaces.len()).map_err(|_| resource())?,
+                            )
+                            .ok_or_else(resource)?;
+                        if *checks > limit {
+                            return Err(resource());
+                        }
+                        if instance
+                            .interfaces
+                            .iter()
+                            .any(|interface| &interface.ty == expected)
+                        {
+                            continue;
+                        }
                         return Err(runtime_diagnostic(runtime::Error::Vba {
                             number: 13,
                             message: "project class type mismatch".into(),
@@ -4312,6 +4354,7 @@ fn runtime_diagnostic(error: runtime::Error) -> Diagnostic {
                 438 => "VBA_RUNTIME_438",
                 449 => "VBA_RUNTIME_449",
                 450 => "VBA_RUNTIME_450",
+                459 => "VBA_RUNTIME_459",
                 _ => "VBA0030",
             },
             message,

@@ -35,7 +35,9 @@ pub const IR7_VERSION: u32 = 7;
 pub const IR8_VERSION: u32 = 8;
 pub const IR9_VERSION: u32 = 9;
 pub const IR10_VERSION: u32 = 10;
-pub const FEATURES: [&str; 26] = [
+pub const IR11_VERSION: u32 = 11;
+pub const FEATURES: [&str; 27] = [
+    "class-interfaces-v11",
     "auto-instancing-v10",
     "class-enumerators-v9",
     "host-procedure-defaults-v1",
@@ -467,7 +469,16 @@ pub struct ClassMethod {
     pub public: bool,
 }
 #[derive(Clone, Debug)]
+pub struct ClassInterface {
+    pub ty: vba_values::NominalType,
+    pub events: bool,
+    /// None exposes the class's event set; Some restricts this interface to named events.
+    pub event_names: Option<Vec<String>>,
+}
+#[derive(Clone, Debug)]
 pub struct Class {
+    /// Explicit embedding-owned nominal interface identities; never implicit activation.
+    pub interfaces: Vec<ClassInterface>,
     pub events: Vec<ProcedureId>,
     pub document: bool,
     pub predeclared: bool,
@@ -604,6 +615,7 @@ impl Capabilities {
                 .collect(),
             declarations: ScalarKind::ALL.into_iter().collect(),
         };
+        caps.features.remove("class-interfaces-v11");
         caps.features.remove("auto-instancing-v10");
         caps.features.remove("class-enumerators-v9");
         caps.features.remove("host-procedure-defaults-v1");
@@ -611,6 +623,13 @@ impl Capabilities {
         caps.features.remove("string-comparison-context-v1");
         caps.instructions.remove(&Opcode::IntrinsicCall);
         caps.instructions.remove(&Opcode::BinaryCompare);
+        caps
+    }
+    pub fn ir11_structural() -> Self {
+        let mut caps = Self::ir10_structural();
+        caps.profile = "ir11-structural".into();
+        caps.ir_versions.insert(IR11_VERSION);
+        caps.features.insert("class-interfaces-v11".into());
         caps
     }
     pub fn ir10_structural() -> Self {

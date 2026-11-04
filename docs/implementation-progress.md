@@ -1,5 +1,31 @@
 # Implementation progress
 
+## M7A.4 continued — Forms type bindings and library access (2026-11-04)
+
+Implemented [ADR 0047](decisions/0047-native-forms-nominal-types-and-library-access.md):
+generic IR 11 class-interface identity/event exposure, native MSForms provider
+metadata, UserForm/Control/Controls/leaf type storage and ordinary mutable return
+objects. WithEvents uses canonical native controls and hides private bridge
+events; generic non-source connections refuse with catchable error 459. Explicit
+source-function aliases supply VBA.UserForms lookup/enumeration while honoring
+project shadows and existing references. Six generic interface, four alias and
+32 native instance regressions PASS natively and in actual WASI execution. Shared
+`cargo xtask ci`, `wasm`, `wasm-run`, `ui`, `ui-native` and `web` PASS. Chromium
+smoke, legacy forms and native forms PASS. The boolean-input harness additionally
+checks an authored MSForms.CheckBox WithEvents handler, typed control enumeration
+and qualified VBA.UserForms access during Initialize. Input, Stop/resume, exact
+source and page-error checks PASS; the rendered result was inspected. Fork
+immutable-pin integration follows.
+Focus/typed event delivery and broader native control/property/platform scope
+remain open in [the runtime record](m7a4-native-runtime.md); M7A.4 is not complete.
+
+Both forks accepted the preceding enumeration/As New revision b95a38a2:
+GridCraft 2b2615d5 and WordCraft d67bb55d pin it and PASS full CI, native/actual
+Node 22 WASM package/trust/input cases and strict optional VBA/UI Clippy.
+The authored package case verifies no loaded form before first As New reference,
+canonical control/UserForms enumeration and exact original VBA bytes on reopen.
+Unrelated GridCraft Developer-ribbon edits were preserved outside these commits.
+
 ## M7A.4 continued — lazy class/form variables (2026-11-04)
 
 Implemented [ADR 0046](decisions/0046-lazy-project-class-variables.md): scalar

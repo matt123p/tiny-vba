@@ -145,3 +145,10 @@ instance storage, canonical ByRef preparation and constructor Stop/failure/retry
 Reads construct only when Nothing; declaration/Set targets and inspection remain
 inert. Arrays and external activation refuse explicitly. Native designer launch
 constructs non-predeclared forms explicitly. Broader M7A.4 requirements remain open.
+
+[ADR 0047](decisions/0047-native-forms-nominal-types-and-library-access.md) adds
+IR 11 nominal class interfaces with bounded event exposure. The native Forms
+provider binds MSForms form/control/collection/return types and qualified
+VBA.UserForms through explicit source-function aliases; scope shadows and missing
+references remain authoritative. Ordinary canonical values/frames are retained.
+This is not full native lifecycle/event/control parity or edited persistence.
