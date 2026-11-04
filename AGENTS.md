@@ -161,3 +161,10 @@ IR 11 class interfaces and native Forms type/library bindings. Keep older IR
 refusal, exact nominal identity, event-source/exposure checks, restoration budgets
 and source alias shadowing. Forms names belong in the IDE provider, never the VM.
 Source/reference attachment and inspection stay inert; no COM/registry is added.
+
+Native container focus/validation follows [ADR 0048](docs/decisions/0048-native-container-focus-and-validation.md).
+Keep ActiveControl and dirty/cancel state in ordinary generated classes. Focus
+commands execute VBA and require the same authorization and modal ownership as
+input; widget focus follows canonical state after cancellation/Stop/resume.
+Preserve typed ByVal return identity, inert source/resources and leaf event
+exposure. Broader M7A.4 control/platform semantics remain open.

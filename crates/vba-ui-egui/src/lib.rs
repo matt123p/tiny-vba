@@ -57,7 +57,11 @@ impl Command {
                 | Self::Immediate(_)
                 | Self::IsolatedImmediate(_)
                 | Self::Form(
-                    FormCommand::Run(..) | FormCommand::Event(..) | FormCommand::InstanceEvent(..)
+                    FormCommand::Run(..)
+                        | FormCommand::Event(..)
+                        | FormCommand::InstanceEvent(..)
+                        | FormCommand::InstanceFocus(..)
+                        | FormCommand::InstanceActivate(..)
                 )
         )
     }
@@ -235,6 +239,7 @@ pub struct EditorUi {
     pub form_report: Option<FormLayoutReport>,
     form_modal: bool,
     form_last_focus: Option<egui::Id>,
+    form_active_control: Vec<(vba_ide::FormInstance, Option<vba_ide::ObjectRef>)>,
     form_runtime_focus: Vec<(vba_ide::FormInstance, u32, egui::Id)>,
     form_drag: Option<(SourceId, u32, bool, egui::Vec2)>,
     pub project_visible: bool,
@@ -312,6 +317,7 @@ impl Default for EditorUi {
             form_drag: None,
             form_runtime_focus: vec![],
             form_last_focus: None,
+            form_active_control: vec![],
             project_visible: true,
             properties_visible: true,
             pane: Pane::Locals,

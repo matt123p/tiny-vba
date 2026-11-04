@@ -6,12 +6,19 @@ Updated 2026-11-04. **IN PROGRESS. M7A.4 is not complete.** This record extends
 
 Implemented in shared tiny-vba:
 
+- [Native container focus/validation](decisions/0048-native-container-focus-and-validation.md):
+  read-only ActiveControl, SetFocus, first eligible tab selection, Enter/Exit and
+  TextBox BeforeUpdate/AfterUpdate with mutable ByVal MSForms.ReturnBoolean cancellation.
+  Physical input follows validation in ordinary frames. Tab/Shift+Tab and pointer
+  requests preserve canonical focus across cancellation, Stop/resume and Reset.
+  Leaf WithEvents interfaces keep their distinct event exposure.
+
 - [MSForms nominal types and qualified library access](decisions/0047-native-forms-nominal-types-and-library-access.md):
   generic IR 11 class interfaces bind native UserForm/Control/Controls and six leaf
   types without a host object registry or COM. Specific leaf WithEvents preserves
   canonical objects while event allowlists hide bridge events; non-source Control
   connections refuse with error 459. Mutable ReturnBoolean/ReturnInteger holders
-  preserve ByVal object identity for later event delivery. VBA.UserForms supports
+  preserve ByVal object identity for typed event delivery. VBA.UserForms supports
   Count/Item/index/For Each even when a project function shadows bare UserForms.
 
 - [Lazy As New](decisions/0046-lazy-project-class-variables.md) for scalar project
@@ -90,10 +97,11 @@ Remaining M7A.4 requirements, without reducing the milestone's scope:
   collection cases, direct enumerator cursor interfaces and structural-mutation
   parity. External class activation remains outside the project-only path.
   For Each uses the existing bounded snapshot profile.
-- ActiveControl/SetFocus, Enter/Exit and Before/AfterUpdate with the native typed
-  cancel arguments; keyboard/mouse/accelerator ordering, text selection, multiline,
-  password and the remaining property/default/error/coercion contracts, including
-  native dynamic TypeName. Typed reference binding alone does not implement these.
+- Further focus/validation edge cases across recursive redirection, window/container
+  activation, boolean update timing and data binding; keyboard/mouse/accelerator ordering, text selection,
+  multiline/password and remaining property/default/error/coercion contracts,
+  including native dynamic TypeName. ADR 0048 implements the selected flat native
+  focus/typed cancellation path, without claiming the full event/property matrix.
 - Native ComboBox, ListBox, Frame, MultiPage, TabStrip, ScrollBar, SpinButton,
   Image and Excel RefEdit packets, including real container/resource identity,
   list/page collections, pictures, bindings and presentation. These remain refused.

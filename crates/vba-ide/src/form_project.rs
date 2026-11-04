@@ -4,6 +4,12 @@ use crate::{
     *,
 };
 use vba_foreign::{Completion, ForeignError, HostCall, Reply};
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum FormInput {
+    Physical,
+    Focus,
+    Activate,
+}
 const GATE_OBJECT: u64 = u64::MAX;
 // Reserved form-interface range, disjoint from the gate itself. No object store.
 const ENUM_OBJECT_MIN: u64 = u64::MAX - 65536;
@@ -389,7 +395,11 @@ pub(crate) fn class_name(kind: ControlKind) -> &'static str {
         ControlKind::ToggleButton => "VbaFormToggleButton",
     }
 }
-pub(crate) fn checked_handlers(form: &Form, module: &Module) -> Result<BTreeSet<String>> {
+pub(crate) fn checked_handlers(
+    form: &Form,
+    module: &Module,
+    native: bool,
+) -> Result<BTreeSet<String>> {
     let parsed = parse(&module.source()?, ModuleKind::Class)?;
     if !parsed.syntax_valid() {
         return Err(error("form source has syntax errors"));
@@ -411,6 +421,7 @@ pub(crate) fn checked_handlers(form: &Form, module: &Module) -> Result<BTreeSet<
             "caption",
             "visible",
             "controls",
+            "activecontrol",
             "name",
             "width",
             "height",
@@ -437,6 +448,7 @@ pub(crate) fn checked_handlers(form: &Form, module: &Module) -> Result<BTreeSet<
                 "caption",
                 "visible",
                 "controls",
+                "activecontrol",
                 "name",
                 "width",
                 "height",
@@ -465,6 +477,7 @@ pub(crate) fn checked_handlers(form: &Form, module: &Module) -> Result<BTreeSet<
                 "visible",
                 "caption",
                 "controls",
+                "activecontrol",
                 "name",
                 "width",
                 "height",
@@ -490,7 +503,28 @@ pub(crate) fn checked_handlers(form: &Form, module: &Module) -> Result<BTreeSet<
             "userform_queryclose",
         ]
         .contains(&key.as_str());
-        if control.is_some() || lifecycle {
+        let focus = native
+            .then(|| {
+                form.controls.iter().find_map(|c| {
+                    let prefix = format!("{}_", c.name);
+                    p.name
+                        .spelling
+                        .get(prefix.len()..)
+                        .filter(|_| {
+                            p.name
+                                .spelling
+                                .get(..prefix.len())
+                                .is_some_and(|s| s.eq_ignore_ascii_case(&prefix))
+                        })
+                        .and_then(|name| crate::form_focus::event(c.kind, name))
+                })
+            })
+            .flatten();
+        if let Some((_, cancel)) = focus {
+            if !crate::form_focus::valid_handler(p, cancel) {
+                return Err(error("invalid native focus/validation event signature"));
+            }
+        } else if control.is_some() || lifecycle {
             let query = key == "userform_queryclose";
             if p.kind != vba_syntax::ProcedureKind::Sub
                 || p.property.is_some()
@@ -522,7 +556,7 @@ pub(crate) fn checked_handlers(form: &Form, module: &Module) -> Result<BTreeSet<
 }
 fn compiled_form(form: &Form, module: &Module, native: Option<&NativeForm>) -> Result<String> {
     form.validate()?;
-    let handlers = checked_handlers(form, module)?;
+    let handlers = checked_handlers(form, module, native.is_some())?;
     let call = |name: &str| {
         if handlers.contains(&name.to_ascii_lowercase()) {
             format!("{name}\n")
@@ -633,6 +667,9 @@ fn compiled_form(form: &Form, module: &Module, native: Option<&NativeForm>) -> R
     source.push_str(&call("UserForm_Initialize"));
     source.push_str("End Sub\nPublic Sub VbaLoad()\nIf Not VbaLoaded Then Class_Initialize\nEnd Sub\nPublic Sub Show(Optional ByVal modal As Variant=1)\nIf modal<>0 And modal<>1 Then\nErr.Raise 5\nEnd If\nIf Not VbaLoaded Then Class_Initialize\nIf VbaVisible Then\nIf modal=1 Then Err.Raise 400\nExit Sub\nEnd If\nSet VbaDisplayOwner=Me\nVbaVisible=True\n");
     source.push_str(&call("UserForm_Activate"));
+    if native.is_some() {
+        source.push_str("If VbaVisible And VbaLoaded Then VbaInitialFocus\n");
+    }
     source.push_str("VbaFormWait Me,modal\nEnd Sub\nPublic Sub Hide()\nIf Not VbaLoaded Then Class_Initialize\nIf VbaVisible Then\nVbaVisible=False\n");
     source.push_str(&call("UserForm_Deactivate"));
     source.push_str("End If\nSet VbaDisplayOwner=Nothing\nEnd Sub\nPublic Property Get Visible() As Boolean\nVisible=VbaVisible\nEnd Property\nPublic Sub VbaClose(ByVal closeMode As Integer)\nIf Not VbaLoaded Then Exit Sub\nDim cancel As Integer\n");
@@ -641,6 +678,9 @@ fn compiled_form(form: &Form, module: &Module, native: Option<&NativeForm>) -> R
     }
     source.push_str("If cancel=0 Then\nVbaVisible=False\nSet VbaDisplayOwner=Nothing\n");
     source.push_str("VbaLoaded=False\n");
+    if native.is_some() {
+        source.push_str("Set VbaActiveControl=Nothing\n");
+    }
     for c in &form.controls {
         source.push_str(&format!("Set Vba{}=Nothing\n", c.name));
     }
@@ -673,6 +713,9 @@ fn compiled_form(form: &Form, module: &Module, native: Option<&NativeForm>) -> R
                 source.push_str(&format!("Private Sub Vba{0}_Vba{property}Changed(ByVal value As Boolean)\nVbaRoleChange Vba{0},{role}\nEnd Sub\n",c.name));
             }
         }
+    }
+    if native.is_some() {
+        source.push_str(&crate::form_focus::members(form, &handlers));
     }
     if handlers.contains("userform_terminate") {
         source.push_str("Private Sub Class_Terminate()\nUserForm_Terminate\nEnd Sub\n");
@@ -802,7 +845,7 @@ impl Ide {
         self.revision
             .checked_add(1)
             .ok_or_else(|| error("project revision budget"))?;
-        checked_handlers(&form, &module)?;
+        checked_handlers(&form, &module, self.native_form(id).is_some())?;
         self.forms
             .get_mut(&id)
             .ok_or_else(|| error("unknown form"))?
@@ -870,7 +913,7 @@ impl Ide {
             syntax_diagnostics: vec![],
             symbols: vec![],
         };
-        checked_handlers(&form, &candidate)?;
+        checked_handlers(&form, &candidate, false)?;
         self.insert_form(form, &source)
     }
     pub fn export_form(&self, id: SourceId) -> Result<String> {
@@ -1074,7 +1117,14 @@ impl Ide {
                 .iter()
                 .find(|c| c.id == control)
                 .ok_or_else(|| error("unknown control"))?;
-            let canonical = if event.eq_ignore_ascii_case(c.kind.default_event()) {
+            let focus = self
+                .native_form(id)
+                .is_some()
+                .then(|| crate::form_focus::event(c.kind, event))
+                .flatten();
+            let canonical = if let Some((name, _)) = focus {
+                name
+            } else if event.eq_ignore_ascii_case(c.kind.default_event()) {
                 c.kind.default_event()
             } else if event.eq_ignore_ascii_case("Change")
                 && matches!(
@@ -1086,7 +1136,14 @@ impl Ide {
             } else {
                 return Err(error("unsupported control event"));
             };
-            (format!("{}_{}", c.name, canonical), "")
+            (
+                format!("{}_{}", c.name, canonical),
+                if focus.is_some_and(|(_, cancel)| cancel) {
+                    "ByVal Cancel As MSForms.ReturnBoolean"
+                } else {
+                    ""
+                },
+            )
         } else {
             let canonical = [
                 "Initialize",
@@ -1112,7 +1169,7 @@ impl Ide {
             .iter()
             .find(|m| m.id == id)
             .ok_or_else(|| error("unknown form source"))?;
-        checked_handlers(form, module)?;
+        checked_handlers(form, module, self.native_form(id).is_some())?;
         if let Some(p) = module
             .procedures
             .iter()
@@ -1425,6 +1482,41 @@ impl Ide {
         text: Option<String>,
         host: &mut impl Host,
     ) -> Result<()> {
+        self.deliver_form_input(instance, control, text, FormInput::Physical, host)
+    }
+    /// Request native focus through the same authorized ordinary callback path as input.
+    pub fn form_instance_focus(
+        &mut self,
+        instance: FormInstance,
+        control: u32,
+        host: &mut impl Host,
+    ) -> Result<()> {
+        if self.native_form(instance.source).is_none() {
+            return Err(error("native focus requires a native form"));
+        }
+        self.deliver_form_input(instance, Some(control), None, FormInput::Focus, host)
+    }
+    /// Default/Cancel keyboard activation clicks a button without moving control focus.
+    pub fn form_instance_activate(
+        &mut self,
+        instance: FormInstance,
+        control: u32,
+        host: &mut impl Host,
+    ) -> Result<()> {
+        if self.native_form(instance.source).is_none() {
+            return Err(error("native activation requires a native form"));
+        }
+        self.deliver_form_input(instance, Some(control), None, FormInput::Activate, host)
+    }
+    fn deliver_form_input(
+        &mut self,
+        instance: FormInstance,
+        control: Option<u32>,
+        text: Option<String>,
+        input: FormInput,
+        host: &mut impl Host,
+    ) -> Result<()> {
+        let focus = input == FormInput::Focus;
         self.validate_form_instance(instance)?;
         let id = instance.source;
         if self.stale
@@ -1449,7 +1541,7 @@ impl Ide {
             .as_mut()
             .ok_or_else(|| error("no form session"))?;
         let mut object = instance.object;
-        let (handler, arguments) = if let Some(id) = control {
+        let (mut handler, mut arguments) = if let Some(id) = control {
             let c = designer
                 .form()
                 .controls
@@ -1467,7 +1559,23 @@ impl Ide {
             {
                 return Err(error("control is disabled or hidden"));
             }
-            if c.kind == ControlKind::TextBox {
+            if input == FormInput::Activate && c.kind != ControlKind::CommandButton {
+                return Err(error("keyboard activation requires a CommandButton"));
+            }
+            if focus {
+                if c.kind == ControlKind::Label {
+                    return Err(error("labels cannot receive focus"));
+                }
+                let index = designer
+                    .form()
+                    .controls
+                    .iter()
+                    .position(|c| c.id == id)
+                    .and_then(|index| i32::try_from(index).ok())
+                    .ok_or_else(|| error("unknown native control index"))?;
+                object = instance.object;
+                ("VbaFocusIndex", vec![Value::Long(index)])
+            } else if c.kind == ControlKind::TextBox {
                 let text = text.ok_or_else(|| error("text change requires text"))?;
                 if text.len() > 16384 {
                     return Err(error("control text budget"));
@@ -1488,6 +1596,26 @@ impl Ide {
             }
             ("VbaClose", vec![Value::Integer(0)])
         };
+        if input == FormInput::Physical
+            && self.native_forms.contains_key(&id)
+            && let Some(control) = control
+        {
+            let index = designer
+                .form()
+                .controls
+                .iter()
+                .position(|c| c.id == control)
+                .and_then(|index| i32::try_from(index).ok())
+                .ok_or_else(|| error("unknown native control index"))?;
+            let text = arguments
+                .first()
+                .filter(|_| handler == "VbaSetText")
+                .cloned()
+                .unwrap_or(Value::String(VbaString::from_utf8("")?));
+            object = instance.object;
+            handler = "VbaInput";
+            arguments = vec![Value::Long(index), text];
+        }
         session.schedule_instance_callback(object, handler, arguments)?;
         self.form_gate.components = self
             .forms

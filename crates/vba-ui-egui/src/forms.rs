@@ -15,6 +15,8 @@ pub enum FormCommand {
     Run(SourceId, bool),
     Event(SourceId, Option<u32>, Option<String>),
     InstanceEvent(vba_ide::FormInstance, Option<u32>, Option<String>),
+    InstanceFocus(vba_ide::FormInstance, u32),
+    InstanceActivate(vba_ide::FormInstance, u32),
 }
 pub(super) fn apply_form(
     ide: &mut Ide,
@@ -58,6 +60,12 @@ pub(super) fn apply_form(
         FormCommand::Handler(id, c, event) => ide.generate_form_handler(id, c, &event),
         FormCommand::Run(id, modal) => ide.run_form(id, modal, host),
         FormCommand::Event(id, c, text) => ide.form_event(id, c, text, host),
+        FormCommand::InstanceActivate(instance, control) => {
+            ide.form_instance_activate(instance, control, host)
+        }
+        FormCommand::InstanceFocus(instance, control) => {
+            ide.form_instance_focus(instance, control, host)
+        }
         FormCommand::InstanceEvent(instance, c, text) => {
             ide.form_instance_event(instance, c, text, host)
         }
@@ -635,8 +643,10 @@ impl EditorUi {
         if matches!(ide.mode(), Mode::Break | Mode::Stale) {
             self.form_runtime_focus.clear();
             self.form_last_focus = None;
+            self.form_active_control.clear();
             return;
         }
+        let previous_active = std::mem::take(&mut self.form_active_control);
         let last_focus = self.form_last_focus.take();
         let previous_focus = std::mem::take(&mut self.form_runtime_focus);
         let Ok(instances) = ide.form_instances() else {
@@ -667,9 +677,49 @@ impl EditorUi {
             };
             let form = designer.form();
             let idle = ide.form_instance_can_deliver(instance);
+            let native = ide.native_form(id).is_some();
+            if native {
+                let active = match ide.form_instance_field(instance, None, "VbaActiveControl") {
+                    Ok(vba_ide::Value::Object(object)) => Some(object),
+                    _ => None,
+                };
+                let changed = previous_active
+                    .iter()
+                    .find(|(owner, _)| *owner == instance)
+                    .is_none_or(|(_, old)| *old != active);
+                self.form_active_control.push((instance, active));
+                if idle
+                    && changed
+                    && keyboard_owner == Some(instance)
+                    && let Some((_, _, target)) =
+                        previous_focus.iter().find(|(owner, control, _)| {
+                            *owner == instance
+                                && form.controls.iter().find(|c| c.id == *control).is_some_and(
+                                    |c| {
+                                        ide.form_instance_field(
+                                            instance,
+                                            None,
+                                            &format!("Vba{}", c.name),
+                                        )
+                                        .ok()
+                                            == active.map(vba_ide::Value::Object)
+                                    },
+                                )
+                        })
+                {
+                    ctx.memory_mut(|m| m.request_focus(*target));
+                }
+            }
             let mut ordered = previous_focus
                 .iter()
-                .filter(|(source, _, _)| *source == instance)
+                .filter(|(source, control, _)| {
+                    *source == instance
+                        && (!native
+                            || ide
+                                .form_instance_field(instance, Some(*control), "TabStop")
+                                .ok()
+                                == Some(vba_ide::Value::Boolean(true)))
+                })
                 .map(|(_, control, target)| {
                     let index = match ide.form_instance_field(instance, Some(*control), "TabIndex")
                     {
@@ -681,9 +731,26 @@ impl EditorUi {
                 .collect::<Vec<_>>();
             ordered.sort_by_key(|(index, control, _)| (*index, *control));
             if idle
-                && let Some(at) = ordered
-                    .iter()
-                    .position(|(_, _, target)| Some(*target) == last_focus)
+                && (!native
+                    || previous_focus.iter().any(|(owner, _, target)| {
+                        *owner == instance && Some(*target) == last_focus
+                    }))
+                && let Some(at) = ordered.iter().position(|(_, control, target)| {
+                    if native {
+                        form.controls
+                            .iter()
+                            .find(|c| c.id == *control)
+                            .is_some_and(|c| {
+                                ide.form_instance_field(instance, None, &format!("Vba{}", c.name))
+                                    .ok()
+                                    == ide
+                                        .form_instance_field(instance, None, "VbaActiveControl")
+                                        .ok()
+                            })
+                    } else {
+                        Some(*target) == last_focus
+                    }
+                })
             {
                 for (modifiers, backward) in [
                     (egui::Modifiers::SHIFT, true),
@@ -695,11 +762,17 @@ impl EditorUi {
                         } else {
                             (at + 1) % ordered.len()
                         };
-                        if let Some((_, _, target)) = ordered.get(next) {
-                            ctx.memory_mut(|m| {
-                                m.move_focus(egui::FocusDirection::None);
-                                m.request_focus(*target);
-                            });
+                        if let Some((_, control, target)) = ordered.get(next) {
+                            if native {
+                                commands.push(Command::Form(FormCommand::InstanceFocus(
+                                    instance, *control,
+                                )));
+                            } else {
+                                ctx.memory_mut(|m| {
+                                    m.move_focus(egui::FocusDirection::None);
+                                    m.request_focus(*target);
+                                });
+                            }
                         }
                     }
                 }
@@ -736,11 +809,11 @@ impl EditorUi {
                         })
                     }) && ctx.input_mut(|input| input.consume_key(egui::Modifiers::NONE, key))
                     {
-                        commands.push(Command::Form(FormCommand::InstanceEvent(
-                            instance,
-                            Some(control.id),
-                            None,
-                        )));
+                        commands.push(Command::Form(if native {
+                            FormCommand::InstanceActivate(instance, control.id)
+                        } else {
+                            FormCommand::InstanceEvent(instance, Some(control.id), None)
+                        }));
                     }
                 }
             }
@@ -827,7 +900,7 @@ impl EditorUi {
                             Ok(vba_ide::Value::Integer(n)) => i32::from(n),
                             _ => i32::MAX,
                         };
-                        if enabled && tab_stop {
+                        if enabled && if native { c.kind != ControlKind::Label } else { tab_stop } {
                             focus.push((index, c.id, widget_id));
                         }
                         ui.push_id(("runtime", c.id), |ui| {
@@ -940,7 +1013,7 @@ impl EditorUi {
                                     {
                                         target.2 = response.id;
                                     }
-                                    if !tab_stop {
+                                    if (native && c.kind == ControlKind::Label) || (!native && !tab_stop) {
                                         response.surrender_focus();
                                     }
                                     response.widget_info(|| {
@@ -960,6 +1033,21 @@ impl EditorUi {
                                 }
                             });
                         });
+                    }
+                    if native && idle && keyboard_owner == Some(instance) {
+                        let focused = ui.ctx().memory(|m| m.focused());
+                        let active = ide.form_instance_field(instance, None, "VbaActiveControl").ok();
+                        let active_id = focus.iter().find(|(_, control, _)| form.controls.iter().find(|c| c.id == *control).is_some_and(|c| ide.form_instance_field(instance, None, &format!("Vba{}",c.name)).ok() == active));
+                        let requested = focus.iter().find(|(_, _, target)| Some(*target) == focused);
+                        let pending = commands.iter().any(|command| matches!(command, Command::Form(FormCommand::InstanceFocus(owner, _) | FormCommand::InstanceActivate(owner, _) | FormCommand::InstanceEvent(owner, _, _)) if *owner == instance));
+                        if let Some((_, control, _)) = requested && requested != active_id && !pending {
+                            commands.push(Command::Form(FormCommand::InstanceFocus(instance, *control)));
+                        }
+                        // VBA owns the focus decision, including cancellation and debugger waits.
+                        if let Some((_, _, target)) = active_id
+                            && (requested.is_some() || focused.is_none() || pending || !previous_focus.iter().any(|(owner,_,_)| *owner==instance)) {
+                            ui.ctx().memory_mut(|m| m.request_focus(*target));
+                        }
                     }
                     rendered_focus.extend(
                         focus

@@ -829,3 +829,172 @@ fn msforms_event_interfaces_do_not_expose_generated_private_bridge_events() -> R
     assert_eq!(ide.output(), vec!["initialized", "standard"]);
     Ok(())
 }
+
+#[test]
+fn native_programmatic_focus_preserves_identity_and_uses_container_enter_exit() -> R {
+    let source = fixture::SOURCE.to_owned()
+        + "\r\nPrivate Sub Entry_Enter()\r\nDebug.Print \"entry enter\"\r\nEnd Sub\r\nPrivate Sub Entry_Exit(ByVal Cancel As MSForms.ReturnBoolean)\r\nDebug.Print \"entry exit\"\r\nEnd Sub\r\nPrivate Sub Entry_BeforeUpdate(ByVal Cancel As MSForms.ReturnBoolean)\r\nDebug.Print \"unexpected update\"\r\nEnd Sub\r\nPrivate Sub Apply_Enter()\r\nDebug.Print \"apply enter\"\r\nEnd Sub\r\n";
+    let ide = setup(
+        "Sub Main()\nDim f As New NativeForm\nf.Show 0\nDebug.Print f.ActiveControl Is f.Entry\nf.Entry.Text=\"programmatic\"\nf.Apply.TabStop=False\nf.Apply.SetFocus\nDebug.Print f.ActiveControl Is f.Apply\nf.Entry.Enabled=False\nOn Error Resume Next\nf.Entry.SetFocus\nDebug.Print Err.Number\nDebug.Print f.ActiveControl Is f.Apply\nEnd Sub",
+        Some(&source),
+    )?;
+    assert_eq!(ide.mode(), Mode::Completed, "{:?}", ide.diagnostics);
+    assert_eq!(
+        ide.output(),
+        vec![
+            "initialized",
+            "entry enter",
+            "True",
+            "entry exit",
+            "apply enter",
+            "True",
+            "2110",
+            "True"
+        ]
+    );
+    let f = *ide.form_instances()?.first().ok_or("instance")?;
+    assert_eq!(
+        ide.form_instance_field(f, None, "VbaActiveControl")?,
+        ide.form_instance_field(f, None, "VbaApply")?
+    );
+    assert_eq!(
+        ide.modules
+            .iter()
+            .find(|m| m.id == f.source)
+            .ok_or("source")?
+            .text,
+        source
+    );
+    Ok(())
+}
+#[test]
+fn native_before_update_cancel_and_resume_precede_exit_enter_and_click() -> R {
+    let source = fixture::SOURCE.replace(
+        "Option Explicit",
+        "Option Explicit\r\nPrivate attempts As Long",
+    ) + "\r\nPrivate Sub Entry_BeforeUpdate(ByVal Cancel As MSForms.ReturnBoolean)\r\nattempts=attempts+1\r\nDebug.Print \"before\"\r\nStop\r\nIf attempts=1 Then Cancel=True\r\nEnd Sub\r\nPrivate Sub Entry_AfterUpdate()\r\nDebug.Print \"after\"\r\nEnd Sub\r\nPrivate Sub Entry_Exit(ByVal Cancel As MSForms.ReturnBoolean)\r\nDebug.Print \"exit\"\r\nEnd Sub\r\nPrivate Sub Apply_Enter()\r\nDebug.Print \"enter\"\r\nEnd Sub\r\n";
+    let mut ide = setup(
+        "Sub Main()\nNativeForm.Show\nDebug.Print \"returned\"\nEnd Sub",
+        Some(&source),
+    )?;
+    let f = *ide.form_instances()?.first().ok_or("instance")?;
+    ide.form_instance_event(f, Some(12), Some("edited".into()), &mut NoHost)?;
+    settle(&mut ide)?;
+    ide.form_instance_event(f, Some(13), None, &mut NoHost)?;
+    settle(&mut ide)?;
+    assert_eq!(ide.mode(), Mode::Break, "{:?}", ide.diagnostics);
+    assert_eq!(
+        ide.form_instance_field(f, None, "VbaActiveControl")?,
+        ide.form_instance_field(f, None, "VbaEntry")?
+    );
+    assert!(ide.form_instance_focus(f, 13, &mut NoHost).is_err());
+    ide.dispatch(Action::Run, &mut NoHost)?;
+    settle(&mut ide)?;
+    assert_eq!(ide.mode(), Mode::Waiting, "{:?}", ide.diagnostics);
+    assert_eq!(ide.output(), vec!["initialized", "before"]);
+    assert_eq!(
+        ide.form_instance_field(f, None, "VbaActiveControl")?,
+        ide.form_instance_field(f, None, "VbaEntry")?
+    );
+    ide.form_instance_event(f, Some(13), None, &mut NoHost)?;
+    settle(&mut ide)?;
+    assert_eq!(ide.mode(), Mode::Break);
+    ide.dispatch(Action::Run, &mut NoHost)?;
+    settle(&mut ide)?;
+    for _ in 0..10 {
+        ide.tick(&mut NoHost)?;
+        settle(&mut ide)?;
+    }
+    assert_eq!(ide.mode(), Mode::Completed, "{:?}", ide.diagnostics);
+    assert_eq!(
+        ide.output(),
+        vec![
+            "initialized",
+            "before",
+            "before",
+            "after",
+            "exit",
+            "enter",
+            "edited",
+            "returned"
+        ]
+    );
+    Ok(())
+}
+#[test]
+fn native_exit_cancel_keeps_focus_and_reset_drops_a_parked_typed_argument() -> R {
+    let source = fixture::SOURCE.to_owned()
+        + "\r\nPrivate Sub Entry_Exit(ByVal Cancel As MSForms.ReturnBoolean)\r\nCancel.Value=True\r\nDebug.Print \"cancelled\"\r\nStop\r\nEnd Sub\r\nPrivate Sub UserForm_Terminate()\r\nDebug.Print \"terminated\"\r\nEnd Sub\r\n";
+    let mut ide = setup("Sub Main()\nNativeForm.Show\nEnd Sub", Some(&source))?;
+    let f = *ide.form_instances()?.first().ok_or("instance")?;
+    let resources = ide.native_form(f.source).ok_or("native")?.resources.clone();
+    ide.form_instance_focus(f, 13, &mut NoHost)?;
+    settle(&mut ide)?;
+    assert_eq!(ide.mode(), Mode::Break);
+    assert_eq!(ide.output(), vec!["initialized", "cancelled"]);
+    ide.dispatch(Action::Run, &mut NoHost)?;
+    settle(&mut ide)?;
+    assert_eq!(
+        ide.form_instance_field(f, None, "VbaActiveControl")?,
+        ide.form_instance_field(f, None, "VbaEntry")?
+    );
+    ide.form_instance_focus(f, 13, &mut NoHost)?;
+    settle(&mut ide)?;
+    assert_eq!(ide.mode(), Mode::Break);
+    ide.dispatch(Action::Reset, &mut NoHost)?;
+    assert!(ide.output().is_empty());
+    assert!(ide.form_instances()?.is_empty());
+    assert_eq!(
+        ide.native_form(f.source).ok_or("native")?.resources,
+        resources
+    );
+    assert_eq!(
+        ide.modules
+            .iter()
+            .find(|m| m.id == f.source)
+            .ok_or("source")?
+            .text,
+        source
+    );
+    assert!(ide.form_instance_focus(f, 13, &mut NoHost).is_err());
+    Ok(())
+}
+#[test]
+fn native_focus_signatures_validate_atomically_and_handler_generation_is_typed() -> R {
+    for signature in [
+        "Cancel As MSForms.ReturnBoolean",
+        "ByVal Cancel As Integer",
+        "ByRef Cancel As MSForms.ReturnBoolean",
+    ] {
+        let source = fixture::SOURCE.to_owned()
+            + &format!("\r\nPrivate Sub Entry_Exit({signature})\r\nEnd Sub\r\n");
+        assert!(
+            setup("Sub Main()\nEnd Sub", Some(&source)).is_err(),
+            "{signature}"
+        );
+    }
+    let mut ide = Ide::new();
+    let id = ide.import_native_form_export(
+        "NativeForm.frm",
+        &fixture::export(),
+        1252,
+        &[NativeFormResource {
+            name: "NativeForm.frx".into(),
+            bytes: fixture::companion(),
+        }],
+    )?;
+    ide.generate_form_handler(id, Some(12), "BeforeUpdate")?;
+    ide.generate_form_handler(id, Some(12), "Exit")?;
+    let source = &ide
+        .modules
+        .iter()
+        .find(|m| m.id == id)
+        .ok_or("source")?
+        .text;
+    assert!(source.contains("Entry_BeforeUpdate(ByVal Cancel As MSForms.ReturnBoolean)"));
+    assert!(source.contains("Entry_Exit(ByVal Cancel As MSForms.ReturnBoolean)"));
+    assert!(ide.output().is_empty());
+    assert!(ide.form_instances()?.is_empty());
+    assert!(ide.generate_form_handler(id, Some(11), "Enter").is_err());
+    Ok(())
+}

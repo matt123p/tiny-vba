@@ -123,3 +123,10 @@ provider binds MSForms form/control/collection/return types and qualified
 VBA.UserForms through explicit source-function aliases; scope shadows and missing
 references remain authoritative. Ordinary canonical values/frames are retained.
 This is not full native lifecycle/event/control parity or edited persistence.
+
+[ADR 0048](decisions/0048-native-container-focus-and-validation.md) adds selected
+flat native ActiveControl/SetFocus and container Enter/Exit/BeforeUpdate/AfterUpdate
+with typed mutable cancellation, ordinary frames and authorized UI focus/input.
+Programmatic writes do not schedule update events. Tab/Shift+Tab and pointer focus
+follow canonical VBA state through cancellation and debugger waits. The broader
+[M7A.4 scope](m7a4-native-runtime.md) remains in progress.

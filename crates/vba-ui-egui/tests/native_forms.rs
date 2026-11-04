@@ -33,7 +33,9 @@ fn native_import_reaches_project_explorer_properties_and_actual_runtime_controls
     )?;
     let mut view = EditorUi::default();
     view.form_view = true;
+    // Native Show now also runs ordinary initial-focus frames before settling.
     let mut h = Harness::builder()
+        .with_max_steps(8)
         .with_size(egui::vec2(1400.0, 1000.0))
         .build_ui_state(
             draw,

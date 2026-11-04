@@ -1,5 +1,23 @@
 # Implementation progress
 
+## M7A.4 continued — native container focus and validation (2026-11-04)
+
+Implemented [ADR 0048](decisions/0048-native-container-focus-and-validation.md):
+ActiveControl/SetFocus and selected Enter/Exit/BeforeUpdate/AfterUpdate delivery
+with typed mutable ByVal cancellation, ordinary input/focus frames and authorized
+UI commands. Cancellation keeps canonical and widget focus together; native
+text/click input follows validation. Programmatic writes do not schedule update
+events. Four new IDE cases and an actual Tab/cancel/Shift+Tab test PASS locally.
+Shared `cargo xtask ci`, `wasm`, `wasm-run`, `ui`, `ui-native` and `web` PASS.
+All 36 native instance cases PASS natively and in actual WASI execution; four
+actual instance/input widget cases PASS. Chromium native typed focus and boolean
+input gates PASS, including subsequent typing after cancellation and event order
+through Stop/resume. Native/legacy forms and general browser smoke regressions
+also PASS; rendered cancellation output was inspected. Default/Cancel keyboard
+activation preserves the current control focus. Original M7 fixture hashes remain
+intact. Fork immutable-pin integration follows. Full M7A.4 remains
+IN PROGRESS for its unchanged [remaining scope](m7a4-native-runtime.md).
+
 ## M7A.4 continued — Forms type bindings and library access (2026-11-04)
 
 Implemented [ADR 0047](decisions/0047-native-forms-nominal-types-and-library-access.md):
@@ -14,8 +32,9 @@ project shadows and existing references. Six generic interface, four alias and
 smoke, legacy forms and native forms PASS. The boolean-input harness additionally
 checks an authored MSForms.CheckBox WithEvents handler, typed control enumeration
 and qualified VBA.UserForms access during Initialize. Input, Stop/resume, exact
-source and page-error checks PASS; the rendered result was inspected. Fork
-immutable-pin integration follows.
+source and page-error checks PASS; the rendered result was inspected. Both forks accepted immutable revision d94a7a33: GridCraft f7ac1279 and
+WordCraft ee3d8a90 PASS full CI, native/actual Node 22 WASM package/trust/input
+tests, optional VBA/UI Clippy and optional VBA web builds.
 Focus/typed event delivery and broader native control/property/platform scope
 remain open in [the runtime record](m7a4-native-runtime.md); M7A.4 is not complete.
 

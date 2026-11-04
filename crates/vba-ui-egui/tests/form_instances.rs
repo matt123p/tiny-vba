@@ -104,6 +104,7 @@ fn native_default_and_cancel_buttons_receive_enter_and_escape() -> R {
                 break;
             }
         }
+        let f = *ide.form_instances()?.first().ok_or("instance")?;
         let mut h = Harness::builder()
             .with_size(egui::vec2(1400., 1000.))
             .build_ui_state(
@@ -135,6 +136,12 @@ fn native_default_and_cancel_buttons_receive_enter_and_escape() -> R {
         h.run_steps(8);
         assert!(h.state().errors.is_empty(), "{:?}", h.state().errors);
         assert_eq!(h.state().ide.output(), vec!["initialized", "initial"]);
+        assert_eq!(
+            h.state()
+                .ide
+                .form_instance_field(f, None, "VbaActiveControl")?,
+            h.state().ide.form_instance_field(f, None, "VbaEntry")?
+        );
         assert!(
             !h.state()
                 .ide
@@ -205,5 +212,94 @@ fn native_boolean_widgets_route_input_to_canonical_values_and_radio_groups() -> 
         h.state().ide.form_instance_field(f, Some(15), "Value")?,
         vba_ide::Value::Boolean(false)
     );
+    Ok(())
+}
+
+#[test]
+fn native_tab_cancellation_and_shift_tab_follow_vba_active_control() -> R {
+    let mut ide = Ide::new();
+    let source = fixture::SOURCE.replace(
+        "Option Explicit",
+        "Option Explicit\r\nPrivate exits As Long",
+    ) + "\r\nPrivate Sub Entry_Exit(ByVal Cancel As MSForms.ReturnBoolean)\r\nexits=exits+1\r\nIf exits=1 Then Cancel=True\r\nDebug.Print exits\r\nEnd Sub\r\nPrivate Sub Apply_Enter()\r\nDebug.Print \"apply enter\"\r\nEnd Sub\r\n";
+    let export = String::from_utf8(fixture::export())?.replace(fixture::SOURCE, &source);
+    ide.import_native_form_export(
+        "NativeForm.frm",
+        export.as_bytes(),
+        1252,
+        &[NativeFormResource {
+            name: "NativeForm.frx".into(),
+            bytes: fixture::companion(),
+        }],
+    )?;
+    ide.add_module("Main.bas", "Sub Main()\nNativeForm.Show 0\nEnd Sub")?;
+    ide.dispatch(Action::Run, &mut NoHost)?;
+    for _ in 0..100 {
+        ide.tick(&mut NoHost)?;
+        if ide.mode() == Mode::Completed {
+            break;
+        }
+    }
+    let f = *ide.form_instances()?.first().ok_or("instance")?;
+    let mut h = Harness::builder()
+        .with_size(egui::vec2(1400., 1000.))
+        .build_ui_state(
+            |ui, s: &mut State| {
+                for c in s.view.show(ui, &s.ide, Theme::light()) {
+                    if let Err(e) = apply(&mut s.ide, c, &mut NoHost) {
+                        s.errors.push(e.to_string());
+                    }
+                }
+                if let Err(e) = s.ide.tick(&mut NoHost) {
+                    s.errors.push(e.to_string());
+                }
+            },
+            State {
+                ide,
+                view: EditorUi::default(),
+                errors: vec![],
+            },
+        );
+    assert!(
+        vba_ui_egui::Command::Form(vba_ui_egui::FormCommand::InstanceFocus(f, 13)).executes_code()
+    );
+    h.run_steps(5);
+    h.get(
+        egui_kittest::kittest::By::new()
+            .label("Entry")
+            .role(egui::accesskit::Role::TextInput),
+    )
+    .click();
+    h.run_steps(3);
+    h.key_press(egui::Key::Tab);
+    h.run_steps(8);
+    assert_eq!(
+        h.state()
+            .ide
+            .form_instance_field(f, None, "VbaActiveControl")?,
+        h.state().ide.form_instance_field(f, None, "VbaEntry")?
+    );
+    assert_eq!(h.state().ide.output(), vec!["initialized", "1"]);
+    h.key_press(egui::Key::Tab);
+    h.run_steps(8);
+    assert_eq!(
+        h.state()
+            .ide
+            .form_instance_field(f, None, "VbaActiveControl")?,
+        h.state().ide.form_instance_field(f, None, "VbaApply")?
+    );
+    assert_eq!(
+        h.state().ide.output(),
+        vec!["initialized", "1", "2", "apply enter"]
+    );
+    h.key_press_modifiers(egui::Modifiers::SHIFT, egui::Key::Tab);
+    h.run_steps(8);
+    assert_eq!(
+        h.state()
+            .ide
+            .form_instance_field(f, None, "VbaActiveControl")?,
+        h.state().ide.form_instance_field(f, None, "VbaEntry")?
+    );
+    assert!(h.state().errors.is_empty(), "{:?}", h.state().errors);
     Ok(())
 }

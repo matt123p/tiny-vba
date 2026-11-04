@@ -61,8 +61,11 @@ End Function
 
 pub(crate) fn control_class(kind: ControlKind) -> String {
     let mut s = String::from(
-        "Option Explicit\nPublic VbaName As String\nPublic Property Get Name() As String\nName=VbaName\nEnd Property\nPublic Enabled As Boolean\nPublic Visible As Boolean\nPublic TabStop As Boolean\nPublic VbaTabIndex As Integer\nPublic Event VbaTabChanged(ByVal previous As Integer,ByVal requested As Integer)\nPublic Property Get TabIndex() As Integer\nTabIndex=VbaTabIndex\nEnd Property\nPublic Property Let TabIndex(ByVal value As Integer)\nIf value<0 Then Err.Raise 380\nRaiseEvent VbaTabChanged(VbaTabIndex,value)\nEnd Property\n",
+        "Option Explicit\nPublic VbaName As String\nPublic VbaDirty As Boolean\nPublic Property Get Name() As String\nName=VbaName\nEnd Property\nPublic Enabled As Boolean\nPublic Visible As Boolean\nPublic TabStop As Boolean\nPublic VbaTabIndex As Integer\nPublic Event VbaTabChanged(ByVal previous As Integer,ByVal requested As Integer)\nPublic Property Get TabIndex() As Integer\nTabIndex=VbaTabIndex\nEnd Property\nPublic Property Let TabIndex(ByVal value As Integer)\nIf value<0 Then Err.Raise 380\nRaiseEvent VbaTabChanged(VbaTabIndex,value)\nEnd Property\n",
     );
+    if kind != ControlKind::Label {
+        s.push_str("Public VbaFocusConfirmed As Boolean\nPublic Event VbaFocusRequested(ByVal target As Object)\nPublic Sub SetFocus()\nVbaFocusConfirmed=False\nRaiseEvent VbaFocusRequested(Me)\nIf Not VbaFocusConfirmed Then Err.Raise 2110\nEnd Sub\n");
+    }
     let kind_code = match kind {
         ControlKind::Label => 1,
         ControlKind::TextBox => 2,
@@ -112,7 +115,7 @@ pub(crate) fn control_class(kind: ControlKind) -> String {
         }
         s.push_str("End Sub\n");
     } else if kind == ControlKind::TextBox {
-        s.push_str("Public VbaText As String\nPublic VbaMaxLength As Long\nPublic Locked As Boolean\nPublic Event Change\nPublic Property Get MaxLength() As Long\nMaxLength=VbaMaxLength\nEnd Property\nPublic Property Let MaxLength(ByVal value As Long)\nIf value<0 Then Err.Raise 380\nVbaMaxLength=value\nEnd Property\nPublic Property Get Text() As String\nText=VbaText\nEnd Property\nPublic Property Let Text(ByVal value As String)\nIf VbaText<>value Then\nVbaText=value\nRaiseEvent Change\nEnd If\nEnd Property\nPublic Property Get Value() As String\nAttribute Value.VB_UserMemId = 0\nValue=VbaText\nEnd Property\nPublic Property Let Value(ByVal value As String)\nMe.Text=value\nEnd Property\nPublic Sub VbaSetText(ByVal value As String)\nIf Locked Then Exit Sub\nIf VbaMaxLength>0 And Len(value)>VbaMaxLength Then value=VBA.Left(value,VbaMaxLength)\nMe.Text=value\nEnd Sub\n");
+        s.push_str("Public VbaText As String\nPublic VbaMaxLength As Long\nPublic Locked As Boolean\nPublic Event Change\nPublic Property Get MaxLength() As Long\nMaxLength=VbaMaxLength\nEnd Property\nPublic Property Let MaxLength(ByVal value As Long)\nIf value<0 Then Err.Raise 380\nVbaMaxLength=value\nEnd Property\nPublic Property Get Text() As String\nText=VbaText\nEnd Property\nPublic Property Let Text(ByVal value As String)\nIf VbaText<>value Then\nVbaText=value\nRaiseEvent Change\nEnd If\nEnd Property\nPublic Property Get Value() As String\nAttribute Value.VB_UserMemId = 0\nValue=VbaText\nEnd Property\nPublic Property Let Value(ByVal value As String)\nMe.Text=value\nEnd Property\nPublic Sub VbaSetText(ByVal value As String)\nIf Locked Then Exit Sub\nIf VbaMaxLength>0 And Len(value)>VbaMaxLength Then value=VBA.Left(value,VbaMaxLength)\nIf VbaText<>value Then VbaDirty=True\nMe.Text=value\nEnd Sub\n");
     } else {
         s.push_str("Public Event Click\nPublic Sub VbaClick()\nRaiseEvent Click\nEnd Sub\n");
     }

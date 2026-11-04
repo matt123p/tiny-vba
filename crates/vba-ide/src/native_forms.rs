@@ -177,7 +177,7 @@ impl Ide {
             syntax_diagnostics: vec![],
             symbols: vec![],
         };
-        crate::form_project::checked_handlers(&form, &candidate)?;
+        crate::form_project::checked_handlers(&form, &candidate, true)?;
         let id = self.insert_form(form, &native.source)?;
         for diagnostic in &native.diagnostics {
             self.message(diagnostic);

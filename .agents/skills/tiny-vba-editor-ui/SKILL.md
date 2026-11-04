@@ -153,3 +153,10 @@ Controls/UserForms lookup and bounded transient project inspection. Canonical
 VM state remains authoritative; queries never load forms or invoke getters.
 Keep intrinsic providers/wait routing intact and do not extend .tvform. The
 milestone remains in progress with its remaining requirements recorded there.
+
+Native container focus/validation follows [ADR 0048](../../../docs/decisions/0048-native-container-focus-and-validation.md).
+Keep ActiveControl and dirty/cancel state in ordinary generated classes. Focus
+commands execute VBA and require the same authorization and modal ownership as
+input; widget focus follows canonical state after cancellation/Stop/resume.
+Preserve typed ByVal return identity, inert source/resources and leaf event
+exposure. Broader M7A.4 control/platform semantics remain open.
