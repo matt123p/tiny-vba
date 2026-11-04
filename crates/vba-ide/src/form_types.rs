@@ -15,6 +15,7 @@ const TYPES: &[&str] = &[
     "ScrollBar",
     "SpinButton",
     "ListBox",
+    "ComboBox",
     "ReturnBoolean",
     "ReturnInteger",
 ];
@@ -75,6 +76,18 @@ impl Ide {
             }
         }
         for (enum_name, constants) in [
+            (
+                "fmStyle",
+                &[("fmStyleDropDownCombo", 0), ("fmStyleDropDownList", 2)][..],
+            ),
+            (
+                "fmMatchEntry",
+                &[
+                    ("fmMatchEntryFirstLetter", 0),
+                    ("fmMatchEntryComplete", 1),
+                    ("fmMatchEntryNone", 2),
+                ][..],
+            ),
             (
                 "fmEnterFieldBehavior",
                 &[
@@ -157,6 +170,7 @@ impl Ide {
             (ControlKind::ScrollBar, "ScrollBar"),
             (ControlKind::SpinButton, "SpinButton"),
             (ControlKind::ListBox, "ListBox"),
+            (ControlKind::ComboBox, "ComboBox"),
         ] {
             let mut specific = claim(name, true)?;
             specific.event_names = Some(match kind {
@@ -165,6 +179,9 @@ impl Ide {
                     vec!["Change".into(), "SpinUp".into(), "SpinDown".into()]
                 }
                 ControlKind::TextBox => vec!["Change".into()],
+                ControlKind::ComboBox => {
+                    vec!["Change".into(), "Click".into(), "DropButtonClick".into()]
+                }
                 ControlKind::CheckBox
                 | ControlKind::OptionButton
                 | ControlKind::ToggleButton

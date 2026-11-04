@@ -14,6 +14,9 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         .nth(1)
         .unwrap_or_else(|| "reports/ui".into());
     std::fs::create_dir_all(&folder)?;
+    let combos = std::env::args()
+        .nth(2)
+        .is_some_and(|option| option == "--combo-controls");
     let lists = std::env::args()
         .nth(2)
         .is_some_and(|option| option == "--list-controls");
@@ -31,19 +34,27 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             1252,
             &[NativeFormResource {
                 name: "NativeForm.frx".into(),
-                bytes: if lists {
+                bytes: if combos {
+                    fixture::combo_companion(3, 1)
+                } else if lists {
                     fixture::list_companion()
                 } else {
                     fixture::boolean_companion()
                 },
             }],
         )?;
-        let main = if lists {
+        let main = if lists || combos {
             "Sub Main()\nDim a As New NativeForm,b As New NativeForm\na.Caption=\"First window\"\nb.Caption=\"Second window\"\na.List1.AddItem \"alpha\"\na.List1.AddItem \"beta\"\na.List1.List(0,1)=\"A\"\na.List1.List(1,1)=\"B\"\na.List1.ListIndex=1\nb.List1.AddItem \"separate instance\"\nb.List1.List(0,1)=\"C\"\nb.List1.ListIndex=0\na.Show 0\nb.Show 0\nEnd Sub"
         } else {
             "Sub Main()\nDim a As NativeForm,b As NativeForm\nSet a=New NativeForm\nSet b=New NativeForm\na.Caption=\"First window\"\nb.Caption=\"Second window\"\na.Entry.Text=\"Value one\"\nb.Entry.Text=\"Value two\"\na.Show 0\nb.Show 0\nEnd Sub"
         };
-        ide.add_module("Main.bas", main)?;
+        let main = if combos {
+            main.replace("List1", "Combo1")
+                .replace("b.Show 0\nEnd Sub", "b.Show 0\na.Combo1.DropDown\nEnd Sub")
+        } else {
+            main.into()
+        };
+        ide.add_module("Main.bas", &main)?;
         ide.dispatch(Action::Run, &mut NoHost)?;
         for _ in 0..100 {
             ide.tick(&mut NoHost)?;
@@ -69,7 +80,9 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                 },
             );
         h.run_steps(5);
-        let prefix = if lists {
+        let prefix = if combos {
+            "m7a4-combo-instances"
+        } else if lists {
             "m7a4-list-instances"
         } else {
             "m7a4-instances"

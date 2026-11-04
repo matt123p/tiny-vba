@@ -1,6 +1,5 @@
-//! Unbound native ListBox data remains in ordinary VBA class fields and frames.
-pub(crate) fn members() -> &'static str {
-    r#"
+//! Ordinary list fields and shared row/column operations for native list controls.
+pub(crate) const STATE: &str = r#"
 Public Locked As Boolean
 Public VbaItems As Variant
 Public VbaCount As Long
@@ -12,7 +11,8 @@ Public VbaBoundColumn As Long
 Public VbaTextColumn As Long
 Public Event Change
 Public Event Click
-Private Sub Class_Initialize()
+"#;
+pub(crate) const INSTANCE: &str = r#"Private Sub Class_Initialize()
 VbaItems=VBA.Array()
 VbaListIndex=-1
 VbaValue=Null
@@ -77,7 +77,8 @@ End If
 Next row
 Err.Raise 380
 End Property
-Public Property Get ColumnCount() As Long
+"#;
+pub(crate) const COLUMNS: &str = r#"Public Property Get ColumnCount() As Long
 ColumnCount=VbaColumnCount
 End Property
 Public Property Let ColumnCount(ByVal value As Long)
@@ -104,7 +105,8 @@ If column< -1 Or column>10 Then Err.Raise 380
 VbaTextColumn=column
 VbaRefresh
 End Property
-Public Property Get List(ByVal row As Long,Optional ByVal column As Long=0) As Variant
+"#;
+pub(crate) const CELLS: &str = r#"Public Property Get List(ByVal row As Long,Optional ByVal column As Long=0) As Variant
 If row<0 Or row>=VbaCount Or column<0 Or column>9 Then Err.Raise 381
 List=VbaItems(row*10+column)
 End Property
@@ -116,7 +118,8 @@ If VBA.Len(text)>16384 Then Err.Raise 7
 VbaItems(row*10+column)=text
 If row=VbaListIndex Then VbaRefresh
 End Property
-Public Property Get Selected(ByVal row As Long) As Boolean
+"#;
+pub(crate) const SELECTED: &str = r#"Public Property Get Selected(ByVal row As Long) As Boolean
 If row<0 Or row>=VbaCount Then Err.Raise 381
 Selected=(row=VbaListIndex)
 End Property
@@ -128,7 +131,8 @@ ElseIf row=VbaListIndex Then
 Me.ListIndex=-1
 End If
 End Property
-Public Sub AddItem(Optional ByVal item As Variant,Optional ByVal varIndex As Variant)
+"#;
+pub(crate) const ROWS: &str = r#"Public Sub AddItem(Optional ByVal item As Variant,Optional ByVal varIndex As Variant)
 Dim index As Long,i As Long,text As String,data() As Variant
 index=VbaCount
 If Not VBA.IsMissing(varIndex) Then index=VBA.CLng(varIndex)
@@ -180,7 +184,8 @@ VbaCount=0
 VbaListIndex=-1
 VbaRefresh
 End Sub
-Private Sub VbaRefresh()
+"#;
+pub(crate) const REFRESH: &str = r#"Private Sub VbaRefresh()
 Dim previous As Variant,nextValue As Variant,nextText As String,column As Long,changed As Boolean
 previous=VbaValue
 nextValue=Null
@@ -214,22 +219,33 @@ RaiseEvent Change
 If Not VBA.IsNull(nextValue) Then RaiseEvent Click
 End If
 End Sub
-Public Sub VbaChoose(ByVal row As Long)
+"#;
+pub(crate) const CHOOSE: &str = r#"Public Sub VbaChoose(ByVal row As Long)
 If Locked Then Exit Sub
 If row<0 Or row>=VbaCount Then Err.Raise 380
 If row=VbaListIndex Then Exit Sub
 VbaDirty=True
 Me.ListIndex=row
 End Sub
-"#
+"#;
+pub(crate) fn members() -> String {
+    [
+        STATE, INSTANCE, COLUMNS, CELLS, SELECTED, ROWS, REFRESH, CHOOSE,
+    ]
+    .concat()
 }
-
 pub(crate) fn event(kind: crate::forms::ControlKind, name: &str) -> Option<&'static str> {
-    (kind == crate::forms::ControlKind::ListBox)
-        .then(|| {
-            ["Change", "Click"]
-                .into_iter()
-                .find(|e| e.eq_ignore_ascii_case(name))
-        })
-        .flatten()
+    if kind == crate::forms::ControlKind::ListBox && name.eq_ignore_ascii_case("DropButtonClick") {
+        return None;
+    }
+    (matches!(
+        kind,
+        crate::forms::ControlKind::ListBox | crate::forms::ControlKind::ComboBox
+    ))
+    .then(|| {
+        ["Change", "Click", "DropButtonClick"]
+            .into_iter()
+            .find(|e| e.eq_ignore_ascii_case(name))
+    })
+    .flatten()
 }

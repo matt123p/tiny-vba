@@ -318,6 +318,7 @@ fn site(r: &mut Reader<'_>) -> Result<Site> {
         21 => Kind::Label,
         23 => Kind::TextBox,
         24 => Kind::ListBox,
+        25 => Kind::ComboBox,
         26 => Kind::CheckBox,
         27 => Kind::OptionButton,
         28 => Kind::ToggleButton,
@@ -359,6 +360,9 @@ fn control(bytes: &[u8], site: Site) -> Result<Control> {
         return numeric_control(r, b, site);
     }
     let listbox = site.kind == Kind::ListBox;
+    let combobox = site.kind == Kind::ComboBox;
+    let list_control = listbox || combobox;
+    let mut combo = None;
     let mut list = None;
     let mut max_length = 0;
     let mut group_name = String::new();
@@ -366,17 +370,31 @@ fn control(bytes: &[u8], site: Site) -> Result<Control> {
     let mut text_behavior = super::TextBehavior::default();
     let (caption, text, width, height, enabled) = if matches!(
         site.kind,
-        Kind::TextBox | Kind::CheckBox | Kind::OptionButton | Kind::ToggleButton | Kind::ListBox
+        Kind::TextBox
+            | Kind::CheckBox
+            | Kind::OptionButton
+            | Kind::ToggleButton
+            | Kind::ListBox
+            | Kind::ComboBox
     ) {
-        let allowed = 0x86c0_03ff | if listbox { 0x0022_3800 } else { 0 };
+        let allowed = 0x86c0_03ff
+            | if listbox {
+                0x0022_3800
+            } else if combobox {
+                0x0003_7800
+            } else {
+                0
+            };
         let lo = mask(&mut b, allowed, 0x8000_0100)?;
         let high = b.u32()?;
         if high & !1 != 0 {
             return Err(unsupported("extended MorphData properties"));
         }
         if (site.kind != Kind::OptionButton && high & 1 != 0)
-            || (matches!(site.kind, Kind::TextBox | Kind::ListBox) && lo & (1 << 23) != 0)
-            || (site.kind != Kind::TextBox && lo & ((1 << 3) | (1 << 9)) != 0)
+            || (matches!(site.kind, Kind::TextBox | Kind::ListBox | Kind::ComboBox)
+                && lo & (1 << 23) != 0)
+            || (!matches!(site.kind, Kind::TextBox | Kind::ComboBox) && lo & (1 << 3) != 0)
+            || (site.kind != Kind::TextBox && lo & (1 << 9) != 0)
         {
             return Err(unsupported(
                 "MorphData property not applicable to native control class",
@@ -387,6 +405,8 @@ fn control(bytes: &[u8], site: Site) -> Result<Control> {
         locked = flags & 4 != 0;
         let text_flags = if site.kind == Kind::TextBox {
             0x80f0_4000
+        } else if combobox {
+            0x0020_5000
         } else {
             0
         };
@@ -405,27 +425,44 @@ fn control(bytes: &[u8], site: Site) -> Result<Control> {
         max_length = i32::try_from(field(&mut b, m, 3, 4, 0)?)
             .map_err(|_| unsupported("TextBox MaxLength exceeds Long"))?;
         field(&mut b, m, 4, 1, 0)?;
-        if field(&mut b, m, 5, 1, 0)? != 0
-            || field(&mut b, m, 6, 1, 1)?
-                != match site.kind {
-                    Kind::TextBox => 1,
-                    Kind::ListBox => 2,
-                    Kind::CheckBox => 4,
-                    Kind::OptionButton => 5,
-                    Kind::ToggleButton => 6,
-                    _ => 1,
-                }
+        let scroll = field(&mut b, m, 5, 1, 0)?;
+        let display = field(&mut b, m, 6, 1, 1)?;
+        let expected = match site.kind {
+            Kind::TextBox => 1,
+            Kind::ListBox => 2,
+            Kind::ComboBox => display,
+            Kind::CheckBox => 4,
+            Kind::OptionButton => 5,
+            Kind::ToggleButton => 6,
+            _ => 1,
+        };
+        if scroll != 0
+            || display != expected
+            || (combobox && ![3, 7].contains(&display))
             || field(&mut b, m, 7, 1, 0)? != 0
         {
-            return Err(unsupported("TextBox display/scroll/mouse profile"));
+            return Err(unsupported("native display/scroll/mouse profile"));
+        }
+        if combobox && display == 3 && flags & (1 << 14) == 0 {
+            return Err(unsupported("editable ComboBox flags"));
         }
         text_behavior.password_char = u16::try_from(field(&mut b, m, 9, 2, 0)?)
             .map_err(|_| unsupported("native password character"))?;
-        if listbox {
+        if list_control {
             let bound_column = field(&mut b, m, 11, 2, 1)? as u16;
             let text_column = field(&mut b, m, 12, 2, 0xffff)? as u16 as i16;
             let column_count = field(&mut b, m, 13, 2, 1)? as u16 as i16;
-            if field(&mut b, m, 17, 1, 0)? != 0 || field(&mut b, m, 21, 1, 0)? != 0 {
+            let list_rows = if combobox {
+                field(&mut b, m, 14, 2, 8)? as u16
+            } else {
+                8
+            };
+            let matching = if combobox {
+                field(&mut b, m, 16, 1, 1)? as u8
+            } else {
+                1
+            };
+            if field(&mut b, m, 17, 1, 0)? != 0 || (listbox && field(&mut b, m, 21, 1, 0)? != 0) {
                 return Err(unsupported("ListBox list style or multiple selection"));
             }
             if !(-1..=10).contains(&column_count)
@@ -433,6 +470,18 @@ fn control(bytes: &[u8], site: Site) -> Result<Control> {
                 || !(-1..=10).contains(&text_column)
             {
                 return Err(unsupported("unbound ListBox column profile"));
+            }
+            if combobox {
+                if matching > 2 || list_rows == 0 || list_rows > 32767 {
+                    return Err(unsupported("ComboBox matching/list rows"));
+                }
+                combo = Some(super::ComboBehavior {
+                    style: if display == 3 { 0 } else { 2 },
+                    match_entry: matching,
+                    match_required: flags & (1 << 12) != 0,
+                    list_rows,
+                });
+                text_behavior.recall_selection = flags & (1 << 21) != 0;
             }
             list = Some(super::ListBehavior {
                 column_count,
@@ -453,7 +502,7 @@ fn control(bytes: &[u8], site: Site) -> Result<Control> {
         if site.kind == Kind::TextBox && (!caption.is_empty() || !group_name.is_empty()) {
             return Err(unsupported("TextBox caption/group"));
         }
-        if listbox && !value.is_empty() {
+        if (listbox || combobox && display == 7) && !value.is_empty() {
             return Err(unsupported("persisted ListBox value without list data"));
         }
         (caption, value, w, h, flags & 2 != 0)
@@ -515,6 +564,7 @@ fn control(bytes: &[u8], site: Site) -> Result<Control> {
         text_behavior,
         numeric: None,
         list,
+        combo,
     })
 }
 
@@ -586,6 +636,7 @@ fn numeric_control(r: Reader<'_>, mut b: Reader<'_>, site: Site) -> Result<Contr
         locked: false,
         text_behavior: super::TextBehavior::default(),
         list: None,
+        combo: None,
         numeric: Some(super::NumericBehavior {
             minimum,
             maximum,

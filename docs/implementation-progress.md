@@ -1,5 +1,25 @@
 # Implementation progress
 
+## M7A.4 continued — native ComboBox (2026-11-04)
+
+Implemented [ADR 0052](decisions/0052-native-combobox.md): editable/drop-list
+records, shared ordinary list rows, Value/Text/selection/matching and VM-owned
+drop state. Physical input uses existing authorization, focus/validation and
+Change/Click/DropButtonClick continuations. F4 belongs to a focused ComboBox;
+Enter closes its list and navigation keeps it open. Native resource, five runtime
+and two actual widget cases PASS. Shared CI, WASM, actual WASI (52 form-instance
+and ten decoder cases), UI/native/web gates PASS, with 12 actual widget cases.
+Chromium ComboBox completion/F4/navigation/Enter/modal Stop/resume PASS, as do
+list/focus/text/numeric/boolean, editor smoke and legacy form browser regressions.
+Light/dark/narrow/scaled/injected-host popup renders were inspected. The popup
+uses the injected theme rather than inheriting a mismatched global frame.
+Original M7 fixture/hash checks and changed Markdown targets PASS. Consumer
+immutable-pin integration follows.
+Full M7A.4 remains IN PROGRESS for further list APIs/bindings/resources,
+containers/pages/images/RefEdit, platform and remaining lifecycle/property cases.
+Next: whole-array List/Column APIs and remaining list semantics before container
+resource/collection packets. Fresh Office comparisons remain NOT_RUN under M8.5.
+
 ## M7A.4 continued — native unbound ListBox (2026-11-04)
 
 Implemented [ADR 0051](decisions/0051-native-unbound-listbox.md): cached native

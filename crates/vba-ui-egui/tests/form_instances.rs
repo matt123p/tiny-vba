@@ -784,3 +784,177 @@ fn native_listbox_pointer_and_keyboard_select_canonical_rows() -> R {
     );
     Ok(())
 }
+
+#[test]
+fn native_combo_popup_and_keyboard_use_canonical_selection_and_drop_state() -> R {
+    let mut ide = Ide::new();
+    ide.import_native_form_export(
+        "NativeForm.frm",
+        &fixture::export(),
+        1252,
+        &[NativeFormResource {
+            name: "NativeForm.frx".into(),
+            bytes: fixture::combo_companion(3, 1),
+        }],
+    )?;
+    ide.add_module("Main.bas","Sub Main()\nNativeForm.Combo1.AddItem \"Alpha\"\nNativeForm.Combo1.AddItem \"Beta\"\nNativeForm.Combo1.List(0,1)=\"A\"\nNativeForm.Combo1.List(1,1)=\"B\"\nNativeForm.Show 0\nEnd Sub")?;
+    ide.dispatch(Action::Run, &mut NoHost)?;
+    for _ in 0..100 {
+        ide.tick(&mut NoHost)?;
+        if ide.mode() == Mode::Completed {
+            break;
+        }
+    }
+    let f = *ide.form_instances()?.first().ok_or("instance")?;
+    let mut h = Harness::builder()
+        .with_size(egui::vec2(1400., 1000.))
+        .build_ui_state(
+            |ui, s: &mut State| {
+                for c in s.view.show(ui, &s.ide, Theme::light()) {
+                    if let Err(e) = apply(&mut s.ide, c, &mut NoHost) {
+                        s.errors.push(e.to_string());
+                    }
+                }
+                if let Err(e) = s.ide.tick(&mut NoHost) {
+                    s.errors.push(e.to_string());
+                }
+            },
+            State {
+                ide,
+                view: EditorUi::default(),
+                errors: vec![],
+            },
+        );
+    h.run_steps(5);
+    h.get_by_label("Combo1").click();
+    h.run_steps(5);
+    h.event(egui::Event::Text("a".into()));
+    h.run_steps(8);
+    assert_eq!(
+        h.state().ide.form_instance_field(f, Some(14), "VbaText")?,
+        vba_ide::Value::String(vba_ide::VbaString::from_utf8("Alpha")?)
+    );
+    h.get_by_label("Combo1 Drop down").click();
+    h.run_steps(8);
+    assert_eq!(
+        h.state()
+            .ide
+            .form_instance_field(f, Some(14), "VbaDropVisible")?,
+        vba_ide::Value::Boolean(true)
+    );
+    h.key_press(egui::Key::ArrowDown);
+    h.run_steps(8);
+    assert_eq!(
+        h.state()
+            .ide
+            .form_instance_field(f, Some(14), "ListIndex")?,
+        vba_ide::Value::Long(1)
+    );
+    assert_eq!(
+        h.state()
+            .ide
+            .form_instance_field(f, Some(14), "VbaDropVisible")?,
+        vba_ide::Value::Boolean(true)
+    );
+    h.key_press(egui::Key::Enter);
+    h.run_steps(8);
+    assert_eq!(
+        h.state()
+            .ide
+            .form_instance_field(f, Some(14), "VbaDropVisible")?,
+        vba_ide::Value::Boolean(false)
+    );
+    h.key_press(egui::Key::F4);
+    h.run_steps(8);
+    h.get_by_label("Combo1 row 0: Alpha | A").click();
+    h.run_steps(8);
+    assert_eq!(
+        h.state().ide.form_instance_field(f, Some(14), "Value")?,
+        vba_ide::Value::String(vba_ide::VbaString::from_utf8("A")?)
+    );
+    assert_eq!(
+        h.state().ide.mode(),
+        Mode::Completed,
+        "{:?}",
+        h.state().ide.diagnostics
+    );
+    assert!(h.state().errors.is_empty(), "{:?}", h.state().errors);
+    assert!(
+        vba_ui_egui::Command::Form(vba_ui_egui::FormCommand::InstanceDrop(f, 14, true))
+            .executes_code()
+    );
+    Ok(())
+}
+
+#[test]
+fn native_drop_list_combo_is_readonly_and_pointer_selection_closes_the_list() -> R {
+    let mut ide = Ide::new();
+    ide.import_native_form_export(
+        "NativeForm.frm",
+        &fixture::export(),
+        1252,
+        &[NativeFormResource {
+            name: "NativeForm.frx".into(),
+            bytes: fixture::combo_companion(7, 2),
+        }],
+    )?;
+    ide.add_module("Main.bas","Sub Main()\nNativeForm.Combo1.AddItem \"Alpha\"\nNativeForm.Combo1.AddItem \"Beta\"\nNativeForm.Combo1.List(0,1)=\"A\"\nNativeForm.Combo1.List(1,1)=\"B\"\nNativeForm.Show 0\nEnd Sub")?;
+    ide.dispatch(Action::Run, &mut NoHost)?;
+    for _ in 0..100 {
+        ide.tick(&mut NoHost)?;
+        if ide.mode() == Mode::Completed {
+            break;
+        }
+    }
+    let f = *ide.form_instances()?.first().ok_or("instance")?;
+    let mut h = Harness::builder()
+        .with_size(egui::vec2(1400., 1000.))
+        .build_ui_state(
+            |ui, s: &mut State| {
+                for c in s.view.show(ui, &s.ide, Theme::light()) {
+                    if let Err(e) = apply(&mut s.ide, c, &mut NoHost) {
+                        s.errors.push(e.to_string());
+                    }
+                }
+                if let Err(e) = s.ide.tick(&mut NoHost) {
+                    s.errors.push(e.to_string());
+                }
+            },
+            State {
+                ide,
+                view: EditorUi::default(),
+                errors: vec![],
+            },
+        );
+    h.run_steps(5);
+    h.get_by_label("Combo1").click();
+    h.run_steps(8);
+    h.get_by_label("Combo1 row 1: Beta | B").click();
+    h.run_steps(8);
+    assert_eq!(
+        h.state().ide.form_instance_field(f, Some(14), "Value")?,
+        vba_ide::Value::String(vba_ide::VbaString::from_utf8("B")?)
+    );
+    assert_eq!(
+        h.state()
+            .ide
+            .form_instance_field(f, Some(14), "VbaDropVisible")?,
+        vba_ide::Value::Boolean(false)
+    );
+    h.key_press(egui::Key::ArrowUp);
+    h.run_steps(8);
+    assert_eq!(
+        h.state()
+            .ide
+            .form_instance_field(f, Some(14), "ListIndex")?,
+        vba_ide::Value::Long(0)
+    );
+    assert_eq!(
+        h.state().ide.mode(),
+        Mode::Completed,
+        "{:?}",
+        h.state().ide.diagnostics
+    );
+    assert!(h.state().errors.is_empty(), "{:?}", h.state().errors);
+    Ok(())
+}

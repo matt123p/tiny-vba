@@ -12,6 +12,8 @@ enum FormInput {
     Text { start: i32, length: i32 },
     Numeric(FormNumericInput),
     List(i32),
+    Navigate(i32),
+    Drop(bool),
 }
 /// Native numeric widget actions; values still pass through ordinary VBA properties.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -405,6 +407,7 @@ pub(crate) fn class_name(kind: ControlKind) -> &'static str {
         ControlKind::ScrollBar => "VbaFormScrollBar",
         ControlKind::SpinButton => "VbaFormSpinButton",
         ControlKind::ListBox => "VbaFormListBox",
+        ControlKind::ComboBox => "VbaFormComboBox",
     }
 }
 pub(crate) fn checked_handlers(
@@ -519,6 +522,7 @@ pub(crate) fn checked_handlers(
                         | ControlKind::OptionButton
                         | ControlKind::ToggleButton
                         | ControlKind::ListBox
+                        | ControlKind::ComboBox
                 ) && format!("{}_Change", c.name).eq_ignore_ascii_case(&p.name.spelling)
         });
         let lifecycle = [
@@ -644,6 +648,7 @@ fn compiled_form(form: &Form, module: &Module, native: Option<&NativeForm>) -> R
                 | ControlKind::ScrollBar
                 | ControlKind::SpinButton
                 | ControlKind::ListBox
+                | ControlKind::ComboBox
         ) {
             source.push_str(&format!("{temp}.Caption={}\n", vba_string(&c.caption)));
         }
@@ -676,6 +681,7 @@ fn compiled_form(form: &Form, module: &Module, native: Option<&NativeForm>) -> R
                     | ControlKind::OptionButton
                     | ControlKind::ToggleButton
                     | ControlKind::ListBox
+                    | ControlKind::ComboBox
             ) {
                 source.push_str(&format!("{temp}.Locked={}\n", boolean(control.locked)));
             }
@@ -684,6 +690,12 @@ fn compiled_form(form: &Form, module: &Module, native: Option<&NativeForm>) -> R
                     "{temp}.GroupName={}\n",
                     vba_string(&control.group_name)
                 ));
+            }
+            if let Some(combo) = &control.combo {
+                source.push_str(&format!("{temp}.VbaStyle={}\n{temp}.VbaMatchEntry={}\n{temp}.MatchRequired={}\n{temp}.VbaListRows={}\n{temp}.VbaMaxLength={}\n{temp}.VbaEnterFieldBehavior={}\n{temp}.VbaText={}\n",combo.style,combo.match_entry,boolean(combo.match_required),combo.list_rows,control.max_length,u8::from(control.text_behavior.recall_selection),vba_string(&control.text)));
+                if !control.text.is_empty() {
+                    source.push_str(&format!("{temp}.VbaValue={}\n", vba_string(&control.text)));
+                }
             }
             if let Some(list) = &control.list {
                 source.push_str(&format!(
@@ -750,7 +762,14 @@ fn compiled_form(form: &Form, module: &Module, native: Option<&NativeForm>) -> R
     source.push_str("Private Sub VbaRoleChange(ByVal origin As Object,ByVal role As Integer)\nDim i As Long,peer As Object\nFor i=0 To VbaControls.Count-1\nSet peer=VbaControls.Item(i)\nIf Not (peer Is origin) Then\nIf peer.VbaKind=3 Then\nIf role=0 Then\npeer.VbaDefault=False\nElse\npeer.VbaCancel=False\nEnd If\nEnd If\nEnd If\nNext i\nEnd Sub\n");
     source.push_str("Private Sub VbaOptionSelected(ByVal origin As Object)\nDim i As Long,peer As Object\nFor i=0 To VbaControls.Count-1\nSet peer=VbaControls.Item(i)\nIf Not (peer Is origin) Then\nIf peer.VbaKind=5 Then\nIf peer.GroupName=origin.GroupName Then peer.Value=False\nEnd If\nEnd If\nNext i\nEnd Sub\n");
     for c in &form.controls {
-        for event in ["Click", "Change", "Scroll", "SpinUp", "SpinDown"] {
+        for event in [
+            "Click",
+            "Change",
+            "Scroll",
+            "SpinUp",
+            "SpinDown",
+            "DropButtonClick",
+        ] {
             let handler = format!("{}_{}", c.name, event);
             if handlers.contains(&handler.to_ascii_lowercase()) {
                 source.push_str(&format!(
@@ -1291,6 +1310,7 @@ impl Ide {
                 ControlKind::ScrollBar,
                 ControlKind::SpinButton,
                 ControlKind::ListBox,
+                ControlKind::ComboBox,
             ]
             .into_iter()
             .enumerate()
@@ -1503,6 +1523,9 @@ impl Ide {
             "passwordchar" => "VbaPasswordChar",
             "selstart" => "VbaSelStart",
             "sellength" => "VbaSelLength",
+            "style" => "VbaStyle",
+            "matchentry" => "VbaMatchEntry",
+            "listrows" => "VbaListRows",
             "listcount" => "VbaCount",
             "listindex" => "VbaListIndex",
             "columncount" => "VbaColumnCount",
@@ -1622,6 +1645,38 @@ impl Ide {
             host,
         )
     }
+    /// Open/close a ComboBox through ordinary authorized focus/event frames.
+    pub fn form_instance_drop(
+        &mut self,
+        instance: FormInstance,
+        control: u32,
+        opened: bool,
+        host: &mut impl Host,
+    ) -> Result<()> {
+        if self.native_form(instance.source).is_none() {
+            return Err(error("drop input requires a native form"));
+        }
+        self.deliver_form_input(instance, Some(control), None, FormInput::Drop(opened), host)
+    }
+    /// Navigate a ComboBox without dismissing its open list.
+    pub fn form_instance_list_navigation(
+        &mut self,
+        instance: FormInstance,
+        control: u32,
+        row: i32,
+        host: &mut impl Host,
+    ) -> Result<()> {
+        if self.native_form(instance.source).is_none() {
+            return Err(error("navigation requires a native form"));
+        }
+        self.deliver_form_input(
+            instance,
+            Some(control),
+            None,
+            FormInput::Navigate(row),
+            host,
+        )
+    }
     /// Select one native ListBox row through authorized ordinary focus/event frames.
     pub fn form_instance_list(
         &mut self,
@@ -1704,9 +1759,12 @@ impl Ide {
             {
                 return Err(error("control is disabled or hidden"));
             }
-            if let FormInput::List(row) = input {
-                if c.kind != ControlKind::ListBox {
+            if let FormInput::List(row) | FormInput::Navigate(row) = input {
+                if !matches!(c.kind, ControlKind::ListBox | ControlKind::ComboBox) {
                     return Err(error("list input requires a ListBox"));
+                }
+                if matches!(input, FormInput::Navigate(_)) && c.kind != ControlKind::ComboBox {
+                    return Err(error("list navigation requires a ComboBox"));
                 }
                 let Value::Long(count) = session.read_instance_field(object, "VbaCount")? else {
                     return Err(error("invalid list state"));
@@ -1725,13 +1783,37 @@ impl Ide {
             {
                 return Err(error("invalid numeric control input"));
             }
-            if matches!(input, FormInput::Text { .. }) && c.kind != ControlKind::TextBox {
+            if matches!(input, FormInput::Text { .. })
+                && !matches!(c.kind, ControlKind::TextBox | ControlKind::ComboBox)
+            {
                 return Err(error("text input requires a TextBox"));
             }
             if input == FormInput::Activate && c.kind != ControlKind::CommandButton {
                 return Err(error("keyboard activation requires a CommandButton"));
             }
-            if let FormInput::List(row) = input {
+            if matches!(input, FormInput::Text { .. })
+                && c.kind == ControlKind::ComboBox
+                && session.read_instance_field(object, "VbaStyle")? != Value::Long(0)
+            {
+                return Err(error("drop-list ComboBox does not accept typed text"));
+            }
+            if let FormInput::Drop(opened) = input {
+                if c.kind != ControlKind::ComboBox {
+                    return Err(error("drop input requires a ComboBox"));
+                }
+                let index = designer
+                    .form()
+                    .controls
+                    .iter()
+                    .position(|c| c.id == id)
+                    .and_then(|n| i32::try_from(n).ok())
+                    .ok_or_else(|| error("combo control index"))?;
+                object = instance.object;
+                (
+                    "VbaDropInput",
+                    vec![Value::Long(index), Value::Boolean(opened)],
+                )
+            } else if let FormInput::List(row) | FormInput::Navigate(row) = input {
                 let index = designer
                     .form()
                     .controls
@@ -1740,7 +1822,14 @@ impl Ide {
                     .and_then(|n| i32::try_from(n).ok())
                     .ok_or_else(|| error("list control index"))?;
                 object = instance.object;
-                ("VbaListInput", vec![Value::Long(index), Value::Long(row)])
+                (
+                    "VbaListInput",
+                    vec![
+                        Value::Long(index),
+                        Value::Long(row),
+                        Value::Boolean(!matches!(input, FormInput::Navigate(_))),
+                    ],
+                )
             } else if let FormInput::Numeric(action) = input {
                 let index = designer
                     .form()
@@ -1777,7 +1866,7 @@ impl Ide {
                     .ok_or_else(|| error("unknown native control index"))?;
                 object = instance.object;
                 ("VbaFocusIndex", vec![Value::Long(index)])
-            } else if c.kind == ControlKind::TextBox {
+            } else if matches!(c.kind, ControlKind::TextBox | ControlKind::ComboBox) {
                 let text = text.ok_or_else(|| error("text change requires text"))?;
                 if text.units().len() > 16384 {
                     return Err(error("control text budget"));

@@ -1357,3 +1357,183 @@ fn native_list_validation_cancellation_keeps_focus_and_suppresses_following_clic
     assert!(ide.form_instance_list(f, 14, 0, &mut NoHost).is_err());
     Ok(())
 }
+
+fn combo_setup(main: &str, extra: &str, style: u8, matching: u8) -> R<Ide> {
+    let mut ide = Ide::new();
+    let export = String::from_utf8(fixture::export())?
+        .replace(fixture::SOURCE, &(fixture::SOURCE.to_owned() + extra));
+    ide.import_native_form_export(
+        "NativeForm.frm",
+        export.as_bytes(),
+        1252,
+        &[NativeFormResource {
+            name: "NativeForm.frx".into(),
+            bytes: fixture::combo_companion(style, matching),
+        }],
+    )?;
+    assert!(ide.output().is_empty());
+    ide.add_module("Main.bas", main)?;
+    ide.dispatch(Action::Run, &mut NoHost)?;
+    settle(&mut ide)?;
+    Ok(ide)
+}
+#[test]
+fn native_combo_editable_value_text_rows_and_style_use_ordinary_class_properties() -> R {
+    let ide = combo_setup(
+        "Sub Main()\nDim f As New NativeForm,c As MSForms.ComboBox\nSet c=f.Combo1\nDebug.Print c.Style,c.MatchEntry,c.ListRows\nc.AddItem \"Alpha\"\nc.AddItem \"Beta\"\nc.List(0,1)=\"A\"\nc.List(1,1)=\"B\"\nc.Value=\"free\"\nDebug.Print c.ListIndex,c.Text,c.Value,c.MatchFound\nc.Text=\"Beta\"\nDebug.Print c.ListIndex,c.Text,c.Value,c.MatchFound\nc.Value=\"A\"\nDebug.Print c.ListIndex,c.Text,c.Value\nc.Value=Null\nDebug.Print c.ListIndex,IsNull(c.Value)\nc.Style=MSForms.fmStyleDropDownList\nOn Error Resume Next\nc.Value=\"free\"\nDebug.Print Err.Number\nErr.Clear\nc.MatchEntry=8\nDebug.Print Err.Number\nEnd Sub",
+        "",
+        3,
+        1,
+    )?;
+    assert_eq!(ide.mode(), Mode::Completed, "{:?}", ide.diagnostics);
+    assert_eq!(
+        ide.output(),
+        vec![
+            "initialized",
+            "0\t1\t5",
+            "-1\tfree\tfree\tFalse",
+            "1\tBeta\tB\tTrue",
+            "0\tAlpha\tA",
+            "-1\tTrue",
+            "380",
+            "380"
+        ]
+    );
+    Ok(())
+}
+#[test]
+fn native_combo_input_completes_commits_then_pauses_change_before_click() -> R {
+    let mut ide = combo_setup(
+        "Sub Main()\nNativeForm.Combo1.AddItem \"Alpha\"\nNativeForm.Combo1.AddItem \"Beta\"\nNativeForm.Combo1.List(0,1)=\"A\"\nNativeForm.Combo1.List(1,1)=\"B\"\nNativeForm.Show 0\nEnd Sub",
+        "\r\nPrivate Sub Combo1_Change()\r\nDebug.Print Combo1.Text\r\nStop\r\nEnd Sub\r\nPrivate Sub Combo1_Click()\r\nDebug.Print \"click\"\r\nEnd Sub\r\n",
+        3,
+        1,
+    )?;
+    assert_eq!(ide.mode(), Mode::Completed, "{:?}", ide.diagnostics);
+    let f = *ide.form_instances()?.first().ok_or("instance")?;
+    ide.form_instance_text(f, 14, VbaString::from_utf8("a")?, (1, 0), &mut NoHost)?;
+    settle(&mut ide)?;
+    assert_eq!(ide.mode(), Mode::Break, "{:?}", ide.diagnostics);
+    assert_eq!(
+        ide.form_instance_field(f, Some(14), "ListIndex")?,
+        Value::Long(0)
+    );
+    assert_eq!(
+        ide.form_instance_field(f, Some(14), "SelStart")?,
+        Value::Long(1)
+    );
+    assert_eq!(
+        ide.form_instance_field(f, Some(14), "SelLength")?,
+        Value::Long(4)
+    );
+    assert_eq!(ide.output(), vec!["initialized", "Alpha"]);
+    ide.dispatch(Action::Run, &mut NoHost)?;
+    settle(&mut ide)?;
+    assert_eq!(ide.output(), vec!["initialized", "Alpha", "click"]);
+    Ok(())
+}
+
+#[test]
+fn native_combo_none_matching_preserves_utf16_and_match_required_blocks_exit() -> R {
+    let mut ide = combo_setup(
+        "Sub Main()\nNativeForm.Combo1.AddItem \"valid\"\nNativeForm.Combo1.MatchRequired=True\nNativeForm.Show 0\nEnd Sub",
+        "",
+        3,
+        2,
+    )?;
+    let f = *ide.form_instances()?.first().ok_or("instance")?;
+    ide.form_instance_text(f, 14, VbaString::from_utf8("a😀")?, (3, 0), &mut NoHost)?;
+    settle(&mut ide)?;
+    assert_eq!(ide.mode(), Mode::Completed, "{:?}", ide.diagnostics);
+    assert_eq!(
+        ide.form_instance_field(f, Some(14), "VbaText")?,
+        Value::String(VbaString::from_utf8("a😀")?)
+    );
+    assert_eq!(
+        ide.form_instance_field(f, Some(14), "SelStart")?,
+        Value::Long(3)
+    );
+    ide.form_instance_event(f, Some(13), None, &mut NoHost)?;
+    settle(&mut ide)?;
+    assert!(ide.form_instance_visible(f));
+    assert_eq!(
+        ide.form_instance_field(f, None, "VbaActiveControl")?,
+        ide.form_instance_field(f, None, "VbaCombo1")?
+    );
+    ide.form_instance_text(f, 14, VbaString::from_utf8("valid")?, (5, 0), &mut NoHost)?;
+    settle(&mut ide)?;
+    ide.form_instance_event(f, Some(13), None, &mut NoHost)?;
+    settle(&mut ide)?;
+    assert!(!ide.form_instance_visible(f));
+    Ok(())
+}
+#[test]
+fn native_combo_drop_state_and_navigation_preserve_ordinary_event_continuations() -> R {
+    let mut ide = combo_setup(
+        "Sub Main()\nNativeForm.Combo1.AddItem \"Alpha\"\nNativeForm.Combo1.AddItem \"Beta\"\nNativeForm.Show 0\nEnd Sub",
+        "\r\nPrivate Sub Combo1_DropButtonClick()\r\nDebug.Print \"drop\"\r\nStop\r\nEnd Sub\r\n",
+        7,
+        2,
+    )?;
+    let f = *ide.form_instances()?.first().ok_or("instance")?;
+    ide.form_instance_drop(f, 14, true, &mut NoHost)?;
+    settle(&mut ide)?;
+    assert_eq!(ide.mode(), Mode::Break, "{:?}", ide.diagnostics);
+    assert_eq!(
+        ide.form_instance_field(f, Some(14), "VbaDropVisible")?,
+        Value::Boolean(true)
+    );
+    ide.dispatch(Action::Run, &mut NoHost)?;
+    settle(&mut ide)?;
+    ide.form_instance_list_navigation(f, 14, 1, &mut NoHost)?;
+    settle(&mut ide)?;
+    assert_eq!(
+        ide.form_instance_field(f, Some(14), "VbaDropVisible")?,
+        Value::Boolean(true)
+    );
+    assert!(
+        ide.form_instance_text(f, 14, VbaString::from_utf8("free")?, (4, 0), &mut NoHost)
+            .is_err()
+    );
+    ide.form_instance_list(f, 14, 1, &mut NoHost)?;
+    settle(&mut ide)?;
+    assert_eq!(ide.mode(), Mode::Break);
+    assert_eq!(
+        ide.form_instance_field(f, Some(14), "VbaDropVisible")?,
+        Value::Boolean(false)
+    );
+    ide.dispatch(Action::Run, &mut NoHost)?;
+    settle(&mut ide)?;
+    assert_eq!(ide.output(), vec!["initialized", "drop", "drop"]);
+    Ok(())
+}
+
+#[test]
+fn native_combo_ambiguous_completion_and_deletion_do_not_replay_a_definite_click() -> R {
+    let ide = combo_setup(
+        "Sub Main()\nNativeForm.Combo1.BoundColumn=1\nNativeForm.Combo1.AddItem \"Alpha\"\nNativeForm.Combo1.AddItem \"Alpine\"\nNativeForm.Show 0\nEnd Sub",
+        "\r\nPrivate Sub Combo1_Change()\r\nDebug.Print \"change\"\r\nEnd Sub\r\nPrivate Sub Combo1_Click()\r\nDebug.Print \"click\"\r\nEnd Sub\r\n",
+        3,
+        1,
+    );
+    let mut ide = ide?;
+    assert_eq!(ide.mode(), Mode::Completed, "{:?}", ide.diagnostics);
+    let f = *ide.form_instances()?.first().ok_or("instance")?;
+    ide.form_instance_text(f, 14, VbaString::from_utf8("a")?, (1, 0), &mut NoHost)?;
+    settle(&mut ide)?;
+    assert_eq!(ide.output(), vec!["initialized", "change"]);
+    ide.form_instance_text(f, 14, VbaString::from_utf8("Alph")?, (4, 0), &mut NoHost)?;
+    settle(&mut ide)?;
+    assert_eq!(ide.output(), vec!["initialized", "change", "click"]);
+    ide.form_instance_text(f, 14, VbaString::from_utf8("Alph")?, (4, 0), &mut NoHost)?;
+    settle(&mut ide)?;
+    assert_eq!(
+        ide.form_instance_field(f, Some(14), "VbaText")?,
+        Value::String(VbaString::from_utf8("Alph")?)
+    );
+    assert_eq!(
+        ide.output(),
+        vec!["initialized", "change", "click", "change"]
+    );
+    Ok(())
+}

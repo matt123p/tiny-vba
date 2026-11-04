@@ -63,7 +63,7 @@ unlisted property remains outside the selected import/runtime claim.
 | CheckBox | Value/TripleState, caption; binding remains U | Change/Click, user cycling/Locked; selected Enter/Exit; key/mouse/binding remain U | D/P | shared | selected Value/Change/Click | U |
 | OptionButton | Value/GroupName, caption; binding remains U | Change/Click/root grouping; selected Enter/Exit; key/mouse/binding remain U | D/P | shared | selected Value/Change/Click | U |
 | ToggleButton | Value/TripleState, caption; binding remains U | Change/Click/user cycling/Locked; selected Enter/Exit; key/mouse/binding remain U | D/P | shared | selected Value/Change/Click | U |
-| ComboBox | List/RowSource, Value/Text, ListIndex, columns/style/matching/binding | Change/Click/DropButtonClick, update/focus/input | U | U | U | U |
+| ComboBox | Selected unbound rows/columns, Value/Text/style/matching/selection; further list/binding APIs remain U | Selected Change/Click/DropButtonClick and input/focus/update | D/P | shared | selected packet | U |
 | ListBox | Selected unbound indexed rows, ListCount/ListIndex/Selected, Value/Text/columns; array APIs, multiple selection and bindings remain U | Selected Change/Click, input/focus/update | D/P | shared | selected packet | U |
 | Frame | Caption, Controls/container/group/tab behavior | Click, applicable focus/input | U | U | U | U |
 | MultiPage | Pages/Controls/Value, child identities/layout | Change, applicable focus/input | U | U | U | U |

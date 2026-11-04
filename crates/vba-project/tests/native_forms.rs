@@ -264,3 +264,30 @@ fn listbox_multiple_selection_and_external_list_resources_refuse_atomically() {
     changed.extend(bytes);
     assert!(decode(&changed).is_err());
 }
+
+#[test]
+fn native_combo_styles_matching_and_columns_are_decoded_without_activation() {
+    for (display, style) in [(3, 0), (7, 2)] {
+        let bytes = fixture::combo_companion(display, 2);
+        let form = decode(&bytes).unwrap();
+        let c = &form.design.controls[3];
+        assert_eq!(c.kind, forms::Kind::ComboBox);
+        assert_eq!(
+            c.combo,
+            Some(forms::ComboBehavior {
+                style,
+                match_entry: 2,
+                match_required: false,
+                list_rows: 5
+            })
+        );
+        assert_eq!(c.list.as_ref().unwrap().bound_column, 2);
+        assert!(
+            form.resources
+                .iter()
+                .any(|r| r.name == "NativeForm.frx" && r.bytes == bytes)
+        );
+    }
+    assert!(decode(&fixture::combo_companion(5, 2)).is_err());
+    assert!(decode(&fixture::combo_companion(3, 9)).is_err());
+}

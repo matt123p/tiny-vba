@@ -233,3 +233,9 @@ Native unbound ListBox follows [ADR 0051](../../../docs/decisions/0051-native-un
 Keep list/selection state in ordinary VM fields, bounded indexed row operations,
 executable input authorization, focus/validation and callback continuations. Do
 not expand .tvform or claim full list/binding/ComboBox/M7A.4 parity.
+
+Native ComboBox follows [ADR 0052](../../../docs/decisions/0052-native-combobox.md).
+Reuse ordinary list rows, canonical UTF-16 text/selection/drop state and existing
+locale services/refusals. Preserve authorized input, typed validation, source/
+resource identity and nonreplayed Change/Click/drop continuations. No new codec,
+COM or second mutable store; broader M7A.4 work stays explicit.

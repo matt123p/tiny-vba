@@ -24,6 +24,7 @@ pub enum Kind {
     ScrollBar,
     SpinButton,
     ListBox,
+    ComboBox,
 }
 /// Coordinates are original signed HIMETRIC units, not pixels or points.
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -49,8 +50,17 @@ pub struct Control {
     pub text_behavior: TextBehavior,
     pub numeric: Option<NumericBehavior>,
     pub list: Option<ListBehavior>,
+    pub combo: Option<ComboBehavior>,
 }
-/// Unbound, single-selection native ListBox configuration.
+/// Native ComboBox style and matching metadata; never an activated external control.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct ComboBehavior {
+    pub style: i32,
+    pub match_entry: u8,
+    pub match_required: bool,
+    pub list_rows: u16,
+}
+/// Unbound, single-selection native list configuration.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct ListBehavior {
     pub column_count: i16,

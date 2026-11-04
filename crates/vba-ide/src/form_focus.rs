@@ -11,7 +11,10 @@ pub(crate) fn event(kind: ControlKind, name: &str) -> Option<(&'static str, bool
             return Some((event, cancel));
         }
     }
-    if matches!(kind, ControlKind::TextBox | ControlKind::ListBox) {
+    if matches!(
+        kind,
+        ControlKind::TextBox | ControlKind::ListBox | ControlKind::ComboBox
+    ) {
         for (event, cancel) in [("BeforeUpdate", true), ("AfterUpdate", false)] {
             if name.eq_ignore_ascii_case(event) {
                 return Some((event, cancel));
@@ -58,6 +61,11 @@ Dim serial As Long,previous As Object,cancel As MSForms.ReturnBoolean
 serial=VbaFocusSerial
 Set previous=VbaActiveControl
 If Not (previous Is Nothing) Then
+If previous.VbaKind=10 Then
+If previous.MatchRequired And Not previous.MatchFound Then Exit Sub
+If previous.VbaDropVisible Then previous.VbaSetDrop False
+If serial<>VbaFocusSerial Or Not VbaLoaded Or Not VbaVisible Then Exit Sub
+End If
 If previous.VbaDirty Then
 Set cancel=New VbaFormReturnBoolean
 VbaBeforeUpdate previous,cancel
@@ -72,7 +80,7 @@ VbaExit previous,cancel
 If serial<>VbaFocusSerial Or Not VbaLoaded Or Not VbaVisible Then Exit Sub
 If cancel.Value Then Exit Sub
 End If
-If target.VbaKind=2 Then target.VbaEnterEdit
+If target.VbaKind=2 Or target.VbaKind=10 Then target.VbaEnterEdit
 VbaEnter target
 If serial<>VbaFocusSerial Or Not VbaLoaded Or Not VbaVisible Then Exit Sub
 If Not target.Enabled Or Not target.Visible Then Exit Sub
@@ -107,13 +115,27 @@ Else
 control.VbaSetSelection start,length
 End If
 End Sub
-Public Sub VbaListInput(ByVal index As Long,ByVal row As Long)
+Public Sub VbaDropInput(ByVal index As Long,ByVal opened As Boolean)
+Dim control As Object
+Set control=VbaControls.Item(index)
+If opened Then
+VbaMoveFocus control
+If Not (VbaActiveControl Is control) Then Exit Sub
+End If
+If Not VbaVisible Or Not VbaLoaded Or Not control.Enabled Or Not control.Visible Then Exit Sub
+control.VbaSetDrop opened
+End Sub
+Public Sub VbaListInput(ByVal index As Long,ByVal row As Long,ByVal commit As Boolean)
 Dim control As Object
 Set control=VbaControls.Item(index)
 VbaMoveFocus control
 If Not (VbaActiveControl Is control) Then Exit Sub
 If Not VbaVisible Or Not VbaLoaded Or Not control.Enabled Or Not control.Visible Then Exit Sub
+If commit Then
 control.VbaChoose row
+Else
+control.VbaNavigate row
+End If
 End Sub
 Public Sub VbaNumericInput(ByVal index As Long,ByVal mode As Long,ByVal value As Long,ByVal up As Boolean,ByVal large As Boolean)
 Dim control As Object
@@ -135,7 +157,7 @@ VbaMoveFocus control
 If Not (VbaActiveControl Is control) Then Exit Sub
 End If
 If Not VbaVisible Or Not VbaLoaded Or Not control.Enabled Or Not control.Visible Then Exit Sub
-If control.VbaKind=2 Then
+If control.VbaKind=2 Or control.VbaKind=10 Then
 control.VbaSetText text
 Else
 control.VbaClick

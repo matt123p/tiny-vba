@@ -148,3 +148,9 @@ ListBox decoding, ten-column indexed rows, selection/default Value and ordinary
 Change/Click frames. Authorized shared list input uses canonical state and
 preserves focus/validation and Stop/resume. Whole-array APIs, further list/binding
 semantics and ComboBox remain open with the unchanged broader M7A.4 scope.
+
+[ADR 0052](decisions/0052-native-combobox.md) adds the selected native editable/
+drop-list ComboBox packet, shared ordinary list rows, text/selection/matching and
+VM-owned drop state. Authorized input preserves focus/validation and debugger
+continuations; contextual F4 leaves the editor shortcut intact elsewhere. Locale
+limits, further properties/bindings/resources and broader M7A.4 remain open.

@@ -115,6 +115,7 @@ impl Ide {
                     Kind::Label => ControlKind::Label,
                     Kind::TextBox => ControlKind::TextBox,
                     Kind::ListBox => ControlKind::ListBox,
+                    Kind::ComboBox => ControlKind::ComboBox,
                     Kind::CommandButton => ControlKind::CommandButton,
                     Kind::CheckBox => ControlKind::CheckBox,
                     Kind::OptionButton => ControlKind::OptionButton,

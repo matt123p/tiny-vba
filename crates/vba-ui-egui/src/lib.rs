@@ -65,6 +65,8 @@ impl Command {
                         | FormCommand::InstanceText(..)
                         | FormCommand::InstanceNumeric(..)
                         | FormCommand::InstanceList(..)
+                        | FormCommand::InstanceDrop(..)
+                        | FormCommand::InstanceNavigate(..)
                 )
         )
     }
@@ -1111,7 +1113,20 @@ if let Some(instancing)=m.instancing(){ui.label(theme.label("Instancing"));ui.la
             self.project_visible = true;
             self.focus_project = true;
         }
-        if ctx.input_mut(|i| i.consume_key(egui::Modifiers::NONE, egui::Key::F4)) {
+        let combo_owns_f4 = self
+            .form_runtime_focus
+            .iter()
+            .any(|(owner, control, target)| {
+                ctx.memory(|m| m.has_focus(*target))
+                    && ide.form_instance_can_deliver(*owner)
+                    && ide.form(owner.source).is_some_and(|designer| {
+                        designer.form().controls.iter().any(|c| {
+                            c.id == *control && c.kind == vba_ide::forms::ControlKind::ComboBox
+                        })
+                    })
+            });
+        if !combo_owns_f4 && ctx.input_mut(|i| i.consume_key(egui::Modifiers::NONE, egui::Key::F4))
+        {
             self.project_visible = true;
             self.properties_visible = true;
         }
