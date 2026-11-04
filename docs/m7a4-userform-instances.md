@@ -58,3 +58,8 @@ coverage remains the M7A.2 three-control profile. Native saving stays M7A.5;
 .tvform removal stays M7A.6. Forks remain pinned to their last accepted shared
 revision until their separate integration gates are run; this packet alone does
 not advertise new instance behavior in already-pinned GridCraft/WordCraft builds.
+
+The later [native runtime increment](m7a4-native-runtime.md), ADR 0043 and
+[ADR 0044](decisions/0044-userform-window-and-code-lifetime.md) supersede this
+first increment's control inventory, unload/default ownership and Terminate path.
+The first increment remains historical evidence, not the full milestone contract.

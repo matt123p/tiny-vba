@@ -35,6 +35,7 @@ pub fn parse(source: &SourceFile, kind: ModuleKind) -> PResult<ParseResult> {
         ordinal: 0,
         diagnostics: lexed.diagnostics,
         member_attributes: Vec::new(),
+        property_result: None,
     };
     let mut module = Module {
         source: source.clone(),
@@ -89,6 +90,7 @@ struct Parser<'a> {
     ordinal: u32,
     diagnostics: Vec<Diagnostic>,
     member_attributes: Vec<Attribute>,
+    property_result: Option<String>,
 }
 impl Parser<'_> {
     fn token(&self) -> &Token {
@@ -197,8 +199,15 @@ impl Parser<'_> {
         self.depth -= 1;
         result
     }
+    fn reserved_identifier(&self) -> bool {
+        reserved(self.text())
+            && !self
+                .property_result
+                .as_ref()
+                .is_some_and(|name| name.eq_ignore_ascii_case(self.text()))
+    }
     fn name(&mut self) -> PResult<Name> {
-        if self.token().kind != TokenKind::Word || reserved(self.text()) {
+        if self.token().kind != TokenKind::Word || self.reserved_identifier() {
             return Err(self.error("expected identifier"));
         }
         let token = self.bump();
@@ -431,9 +440,9 @@ impl Parser<'_> {
                 Diagnostic::new("VBA0101", "attribute requires its own physical line").at(start),
             );
         }
-        let mut path = vec![self.name()?];
+        let mut path = vec![self.member_name()?];
         while self.eat(".") {
-            path.push(self.name()?);
+            path.push(self.member_name()?);
         }
         self.require("=")?;
         let value = self.attribute_literal()?;
@@ -551,7 +560,11 @@ impl Parser<'_> {
         } else {
             ProcedureKind::Function
         };
-        let name = self.name()?;
+        let name = if property.is_some() {
+            self.member_name()?
+        } else {
+            self.name()?
+        };
         let parenthesized = self.eat("(");
         if !parenthesized && !event {
             return Err(self.error("expected ("));
@@ -633,7 +646,10 @@ impl Parser<'_> {
             self.member_attributes.push(attribute);
             self.separators();
         }
-        let body = self.block()?;
+        self.property_result = property.as_ref().map(|_| name.spelling.clone());
+        let body = self.block();
+        self.property_result = None;
+        let body = body?;
         let end_start = self.require("End")?.span;
         self.require(if property.is_some() {
             "Property"
@@ -842,7 +858,7 @@ impl Parser<'_> {
                 explicit: true,
             }
         } else {
-            if self.token().kind != TokenKind::Word || reserved(self.text()) {
+            if self.token().kind != TokenKind::Word || self.reserved_identifier() {
                 // Let/Set are handled explicitly; other statement keywords fail closed.
                 if !self.at("Let") && !self.at("Set") && !self.at(".") {
                     return Err(self.unsupported("statement kind"));
@@ -1138,7 +1154,7 @@ impl Parser<'_> {
                 self.require(")")?;
                 ExprKind::Parenthesized(Box::new(inner))
             }
-            TokenKind::Word if !reserved(self.text()) => {
+            TokenKind::Word if !self.reserved_identifier() => {
                 return self.target(true);
             }
             TokenKind::Symbol if self.text() == "." => {

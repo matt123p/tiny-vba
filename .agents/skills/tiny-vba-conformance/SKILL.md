@@ -135,3 +135,10 @@ OOXML/VML edited persistence, optional ControlFormat APIs and trusted widget inp
 Preserve original package data separately; failed joins stay inert and callbacks
 use the existing bridge. This is not MSForms/ActiveX or UserForm edited-save support.
 M7A.4 is in progress; fresh Office observations remain NOT_RUN under M8.5.
+
+M7A.4 now also includes the [native runtime increment](../../../docs/m7a4-native-runtime.md)
+under ADR 0043: six flat control families, selected property/input semantics,
+Controls/UserForms lookup and bounded transient project inspection. Canonical
+VM state remains authoritative; queries never load forms or invoke getters.
+Keep intrinsic providers/wait routing intact and do not extend .tvform. The
+milestone remains in progress with its remaining requirements recorded there.

@@ -46,10 +46,10 @@ fn unknown_control_class_duplicate_site_depth_external_binding_and_bad_sizes_ref
     let f = &base[0].1;
     let site = f.windows(4).position(|w| w == [0xf5, 1, 0, 0]).unwrap();
     for (offset, bytes) in [
-        (site + 22, vec![26, 0]), // cached CheckBox outside the declared profile
+        (site + 22, vec![24, 0]), // cached ListBox outside the declared profile
         (site + 4, vec![255, 255, 255, 127]), // hostile name string length
         (site, vec![0xf5, 0x21, 0, 0]), // ControlSource binding unsupported
-        (site + 12, vec![0x17, 0, 0, 0]), // default button flag is separate M7A.4 work
+        (site + 12, vec![0x17, 0, 0, 0]), // default button flag is invalid on a Label
         (site + 16, vec![255, 255, 255, 127]), // hostile object stream size
     ] {
         let mut streams = base.clone();

@@ -289,3 +289,16 @@ runtime objects from designer/source IDs; UI input/window scopes use those keys.
 Read-only VM class queries never instantiate objects; active and parked receivers
 remain lifetime roots. Keep Reset/source/resources inert. Broader lifecycle,
 control/property packets, fork integration and fresh Office evidence remain open.
+
+M7A.4 now also includes the [native runtime increment](m7a4-native-runtime.md)
+under ADR 0043: six flat control families, selected property/input semantics,
+Controls/UserForms lookup and bounded transient project inspection. Canonical
+VM state remains authoritative; queries never load forms or invoke getters.
+Keep intrinsic providers/wait routing intact and do not extend .tvform. The
+milestone remains in progress with its remaining requirements recorded there.
+
+[ADR 0044](decisions/0044-userform-window-and-code-lifetime.md) separates
+UserForm display/default ownership from referenced code lifetime. Named control
+getters reload; inert inspection does not. Generic root release validates class/
+object and protects document code names. Internal release waits remain bounded,
+report Running and preserve slice quotas; Terminate runs only at normal finalization.

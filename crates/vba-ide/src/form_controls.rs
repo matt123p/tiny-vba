@@ -1,0 +1,134 @@
+//! Generated ordinary classes for native control properties and root Controls.
+use crate::forms::ControlKind;
+
+pub(crate) fn collection_class() -> String {
+    String::from(
+        r#"Option Explicit
+Private entries(0 To 127) As Object
+Private total As Long
+Public Sub VbaAdd(ByVal control As Object)
+If total>=128 Then Err.Raise 7
+Set entries(total)=control
+total=total+1
+End Sub
+Public Property Get Count() As Long
+Count=total
+End Property
+Public Property Get Item(ByVal index As Variant) As Object
+Attribute Item.VB_UserMemId = 0
+Dim i As Long
+If VarType(index)=8 Then
+For i=0 To total-1
+If VbaKey(entries(i).Name)=VbaKey(CStr(index)) Then
+Set Item=entries(i)
+Exit Property
+End If
+Next i
+Err.Raise -2147024809
+Else
+i=CLng(index)
+If i<0 Or i>=total Then Err.Raise -2147024809
+Set Item=entries(i)
+End If
+End Property
+Private Function VbaKey(ByVal value As String) As String
+Dim i As Long, code As Long, result As String
+If Len(value)>128 Then Err.Raise -2147024809
+For i=1 To Len(value)
+code=AscW(Mid(value,i,1))
+If code>=65 And code<=90 Then
+result=result & ChrW(code+32)
+Else
+result=result & Mid(value,i,1)
+End If
+Next i
+VbaKey=result
+End Function
+"#,
+    )
+}
+
+pub(crate) fn control_class(kind: ControlKind) -> String {
+    let mut s = String::from(
+        "Option Explicit\nPublic VbaName As String\nPublic Property Get Name() As String\nName=VbaName\nEnd Property\nPublic Enabled As Boolean\nPublic Visible As Boolean\nPublic TabStop As Boolean\nPublic VbaTabIndex As Integer\nPublic Event VbaTabChanged(ByVal previous As Integer,ByVal requested As Integer)\nPublic Property Get TabIndex() As Integer\nTabIndex=VbaTabIndex\nEnd Property\nPublic Property Let TabIndex(ByVal value As Integer)\nIf value<0 Then Err.Raise 380\nRaiseEvent VbaTabChanged(VbaTabIndex,value)\nEnd Property\n",
+    );
+    let kind_code = match kind {
+        ControlKind::Label => 1,
+        ControlKind::TextBox => 2,
+        ControlKind::CommandButton => 3,
+        ControlKind::CheckBox => 4,
+        ControlKind::OptionButton => 5,
+        ControlKind::ToggleButton => 6,
+    };
+    s.push_str(&format!(
+        "Public Property Get VbaKind() As Integer\nVbaKind={kind_code}\nEnd Property\n"
+    ));
+    if kind != ControlKind::TextBox {
+        s.push_str("Public Caption As String\n");
+    }
+    for (name, minimum) in [
+        ("Left", -32767),
+        ("Top", -32767),
+        ("Width", 0),
+        ("Height", 0),
+    ] {
+        s.push_str(&format!("Public Vba{name} As Single\nPublic Property Get {name}() As Single\n{name}=Vba{name}\nEnd Property\nPublic Property Let {name}(ByVal value As Single)\nIf value<{minimum} Or value>32767 Then Err.Raise 380\nVba{name}=value\nEnd Property\n"));
+    }
+    if matches!(
+        kind,
+        ControlKind::CheckBox | ControlKind::OptionButton | ControlKind::ToggleButton
+    ) {
+        if kind == ControlKind::OptionButton {
+            s.push_str("Public GroupName As String\n");
+        }
+        s.push_str("Public VbaValue As Variant\nPublic Locked As Boolean\nPublic TripleState As Boolean\nPublic Event Click\nPublic Event Change\nPublic Event VbaSelected\nPublic Property Get Value() As Variant\nAttribute Value.VB_UserMemId = 0\nValue=VbaValue\nEnd Property\nPublic Property Let Value(ByVal value As Variant)\nDim normalized As Variant\nIf IsNull(value) Then\nnormalized=Null\nElse\nnormalized=CBool(value)\nEnd If\nIf IsNull(normalized) And IsNull(VbaValue) Then Exit Property\nIf Not IsNull(normalized) And Not IsNull(VbaValue) Then\nIf normalized=VbaValue Then Exit Property\nEnd If\nVbaValue=normalized\n");
+        if kind == ControlKind::OptionButton {
+            s.push_str(
+                "If Not IsNull(VbaValue) Then\nIf VbaValue Then RaiseEvent VbaSelected\nEnd If\n",
+            );
+        }
+        s.push_str("RaiseEvent Change\nIf Not IsNull(VbaValue) Then\n");
+        if kind == ControlKind::OptionButton {
+            s.push_str("If VbaValue Then RaiseEvent Click\n");
+        } else {
+            s.push_str("RaiseEvent Click\n");
+        }
+        s.push_str("End If\nEnd Property\nPublic Sub VbaClick()\nIf Locked Then Exit Sub\n");
+        if kind == ControlKind::OptionButton {
+            s.push_str("Me.Value=True\n");
+        } else {
+            s.push_str("If IsNull(VbaValue) Then\nMe.Value=False\nElseIf VbaValue Then\nIf TripleState Then\nMe.Value=Null\nElse\nMe.Value=False\nEnd If\nElse\nMe.Value=True\nEnd If\n");
+        }
+        s.push_str("End Sub\n");
+    } else if kind == ControlKind::TextBox {
+        s.push_str("Public VbaText As String\nPublic VbaMaxLength As Long\nPublic Locked As Boolean\nPublic Event Change\nPublic Property Get MaxLength() As Long\nMaxLength=VbaMaxLength\nEnd Property\nPublic Property Let MaxLength(ByVal value As Long)\nIf value<0 Then Err.Raise 380\nVbaMaxLength=value\nEnd Property\nPublic Property Get Text() As String\nText=VbaText\nEnd Property\nPublic Property Let Text(ByVal value As String)\nIf VbaText<>value Then\nVbaText=value\nRaiseEvent Change\nEnd If\nEnd Property\nPublic Property Get Value() As String\nAttribute Value.VB_UserMemId = 0\nValue=VbaText\nEnd Property\nPublic Property Let Value(ByVal value As String)\nMe.Text=value\nEnd Property\nPublic Sub VbaSetText(ByVal value As String)\nIf Locked Then Exit Sub\nIf VbaMaxLength>0 And Len(value)>VbaMaxLength Then value=VBA.Left(value,VbaMaxLength)\nMe.Text=value\nEnd Sub\n");
+    } else {
+        s.push_str("Public Event Click\nPublic Sub VbaClick()\nRaiseEvent Click\nEnd Sub\n");
+    }
+    if kind == ControlKind::CommandButton {
+        s.push_str("Public Property Get Value() As Boolean\nAttribute Value.VB_UserMemId = 0\nValue=False\nEnd Property\nPublic Property Let Value(ByVal value As Boolean)\nIf value Then RaiseEvent Click\nEnd Property\n");
+        for property in ["Default", "Cancel"] {
+            s.push_str(&format!("Public Vba{property} As Boolean\nPublic Event Vba{property}Changed(ByVal value As Boolean)\nPublic Property Get {property}() As Boolean\n{property}=Vba{property}\nEnd Property\nPublic Property Let {property}(ByVal value As Boolean)\nVba{property}=value\nIf value Then RaiseEvent Vba{property}Changed(value)\nEnd Property\n"));
+        }
+    }
+    s
+}
+
+pub(crate) fn userforms_class(components: &[String]) -> String {
+    let mut source = String::from(
+        "Attribute VB_PredeclaredId = True\nOption Explicit\nPublic Property Get Count() As Long\nCount=VbaFormQuery(0,0)\nEnd Property\nPublic Property Get Item(ByVal index As Variant) As Object\nAttribute Item.VB_UserMemId = 0\nSet Item=VbaFormQuery(1,index)\nEnd Property\nPublic Function Add(ByVal component As String) As Object\n",
+    );
+    for name in components {
+        source.push_str(&format!(
+            "If VbaKey(component)=\"{}\" Then\nSet Add=New {name}\nExit Function\nEnd If\n",
+            name.to_ascii_lowercase()
+        ));
+    }
+    source.push_str("Err.Raise 424\nEnd Function\n");
+    // Native component/control identifiers share the same bounded ASCII name profile.
+    if let Some((_, key)) = collection_class().split_once("Private Function VbaKey") {
+        source.push_str("Private Function VbaKey");
+        source.push_str(key);
+    }
+    source
+}

@@ -642,6 +642,23 @@ impl EditorUi {
         let Ok(instances) = ide.form_instances() else {
             return;
         };
+        let keyboard_owner = instances
+            .iter()
+            .copied()
+            .find(|instance| ide.form_instance_is_modal(*instance))
+            .or_else(|| {
+                previous_focus
+                    .iter()
+                    .find(|(_, _, target)| Some(*target) == last_focus)
+                    .map(|(instance, _, _)| *instance)
+            })
+            .or_else(|| {
+                instances
+                    .iter()
+                    .rev()
+                    .copied()
+                    .find(|instance| ide.form_instance_visible(*instance))
+            });
         for instance in instances {
             let id = instance.source;
             let Some(designer) = ide.form(id).filter(|_| ide.form_instance_visible(instance))
@@ -656,7 +673,7 @@ impl EditorUi {
                 .map(|(_, control, target)| {
                     let index = match ide.form_instance_field(instance, Some(*control), "TabIndex")
                     {
-                        Ok(vba_ide::Value::Long(n)) => n,
+                        Ok(vba_ide::Value::Integer(n)) => i32::from(n),
                         _ => i32::MAX,
                     };
                     (index, *control, *target)
@@ -687,6 +704,46 @@ impl EditorUi {
                     }
                 }
             }
+            if idle && keyboard_owner == Some(instance) {
+                for (key, property) in
+                    [(egui::Key::Enter, "Default"), (egui::Key::Escape, "Cancel")]
+                {
+                    let focused = if key == egui::Key::Enter {
+                        previous_focus
+                            .iter()
+                            .find(|(owner, _, target)| {
+                                *owner == instance && Some(*target) == last_focus
+                            })
+                            .and_then(|(_, control, _)| {
+                                form.controls.iter().find(|c| {
+                                    c.id == *control && c.kind == ControlKind::CommandButton
+                                })
+                            })
+                    } else {
+                        None
+                    };
+                    let chosen = focused.or_else(|| {
+                        form.controls.iter().find(|c| {
+                            c.kind == ControlKind::CommandButton
+                                && ide.form_instance_field(instance, Some(c.id), property).ok()
+                                    == Some(vba_ide::Value::Boolean(true))
+                        })
+                    });
+                    if let Some(control) = chosen.filter(|c| {
+                        ["Enabled", "Visible"].iter().all(|property| {
+                            ide.form_instance_field(instance, Some(c.id), property).ok()
+                                == Some(vba_ide::Value::Boolean(true))
+                        })
+                    }) && ctx.input_mut(|input| input.consume_key(egui::Modifiers::NONE, key))
+                    {
+                        commands.push(Command::Form(FormCommand::InstanceEvent(
+                            instance,
+                            Some(control.id),
+                            None,
+                        )));
+                    }
+                }
+            }
             let mut rendered_focus = Vec::new();
             let show = |ui: &mut egui::Ui| {
                 window_theme(ui, theme);
@@ -707,8 +764,17 @@ impl EditorUi {
                 });
                 ui.add_enabled_ui(idle, |ui| {
                     let scale = 4.0 / 3.0;
+                    let dimension = |name: &str, fallback: f32| match ide
+                        .form_instance_field(instance, None, name)
+                    {
+                        Ok(vba_ide::Value::Single(n)) => n,
+                        _ => fallback,
+                    };
                     let (rect, _) = ui.allocate_exact_size(
-                        egui::vec2(form.width * scale, form.height * scale),
+                        egui::vec2(
+                            dimension("Width", form.width) * scale,
+                            dimension("Height", form.height) * scale,
+                        ),
                         egui::Sense::hover(),
                     );
                     let mut focus = Vec::new();
@@ -758,7 +824,7 @@ impl EditorUi {
                             == Some(vba_ide::Value::Boolean(true));
                         let index = match ide.form_instance_field(instance, Some(c.id), "TabIndex")
                         {
-                            Ok(vba_ide::Value::Long(n)) => n,
+                            Ok(vba_ide::Value::Integer(n)) => i32::from(n),
                             _ => i32::MAX,
                         };
                         if enabled && tab_stop {
@@ -771,11 +837,29 @@ impl EditorUi {
                                         .form_instance_field(instance, Some(c.id), "VbaText")
                                         .map(control_text)
                                         .unwrap_or_default();
+                                    let locked = ide
+                                        .form_instance_field(instance, Some(c.id), "Locked")
+                                        .ok()
+                                        == Some(vba_ide::Value::Boolean(true));
+                                    let max_length = match ide.form_instance_field(
+                                        instance,
+                                        Some(c.id),
+                                        "MaxLength",
+                                    ) {
+                                        Ok(vba_ide::Value::Long(n)) if n > 0 => {
+                                            usize::try_from(n).unwrap_or(16384).min(16384)
+                                        }
+                                        _ => 16384,
+                                    };
+                                    let readonly_copy = text.clone();
+                                    let mut readonly = readonly_copy.as_str();
+                                    let buffer: &mut dyn egui::TextBuffer =
+                                        if locked { &mut readonly } else { &mut text };
                                     let response = ui.put(
                                         bounds,
-                                        TextEdit::singleline(&mut text)
+                                        TextEdit::singleline(buffer)
                                             .id(widget_id)
-                                            .char_limit(16384)
+                                            .char_limit(max_length)
                                             .hint_text(&c.name),
                                     );
                                     response.widget_info(|| {
@@ -790,6 +874,58 @@ impl EditorUi {
                                             instance,
                                             Some(c.id),
                                             Some(text),
+                                        )));
+                                    }
+                                }
+                                ControlKind::CheckBox
+                                | ControlKind::OptionButton
+                                | ControlKind::ToggleButton => {
+                                    let value = ide
+                                        .form_instance_field(instance, Some(c.id), "Value")
+                                        .unwrap_or(vba_ide::Value::Boolean(false));
+                                    let mut selected = value == vba_ide::Value::Boolean(true);
+                                    let response = ui
+                                        .scope(|ui| {
+                                            // Functional outlines use the injected text token.
+                                            let widgets = &mut ui.visuals_mut().widgets;
+                                            for visual in [
+                                                &mut widgets.inactive,
+                                                &mut widgets.hovered,
+                                                &mut widgets.active,
+                                                &mut widgets.noninteractive,
+                                            ] {
+                                                visual.bg_stroke =
+                                                    egui::Stroke::new(1., theme.text);
+                                            }
+                                            match c.kind {
+                                                ControlKind::CheckBox => ui.put(
+                                                    bounds,
+                                                    egui::Checkbox::new(&mut selected, caption)
+                                                        .indeterminate(
+                                                            value == vba_ide::Value::Null,
+                                                        ),
+                                                ),
+                                                ControlKind::OptionButton => ui.put(
+                                                    bounds,
+                                                    egui::RadioButton::new(selected, caption),
+                                                ),
+                                                _ => ui.put(
+                                                    bounds,
+                                                    egui::Button::new(caption).selected(selected),
+                                                ),
+                                            }
+                                        })
+                                        .inner;
+                                    if let Some(target) =
+                                        focus.iter_mut().find(|(_, control, _)| *control == c.id)
+                                    {
+                                        target.2 = response.id;
+                                    }
+                                    if response.clicked() {
+                                        commands.push(Command::Form(FormCommand::InstanceEvent(
+                                            instance,
+                                            Some(c.id),
+                                            None,
                                         )));
                                     }
                                 }

@@ -59,6 +59,14 @@ pub fn encode(form: &Form, source: &str) -> Result<String> {
         form.height
     );
     for c in &form.controls {
+        if !matches!(
+            c.kind,
+            ControlKind::Label | ControlKind::TextBox | ControlKind::CommandButton
+        ) {
+            return Err(error(
+                "native controls have no .tvform encoding; edited native export is not implemented",
+            ));
+        }
         out.push_str(&format!(
             "C\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\n",
             c.id,

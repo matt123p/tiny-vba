@@ -8,8 +8,10 @@ const GATE_OBJECT: u64 = u64::MAX;
 #[derive(Default)]
 pub(crate) struct FormGate {
     next: u64,
+    pub(crate) components: BTreeSet<String>,
     external_waits: BTreeMap<u64, u64>,
     pub(crate) waits: BTreeMap<u64, ObjectRef>,
+    pub(crate) releases: BTreeMap<u64, (String, ObjectRef)>,
     pub(crate) ready: BTreeSet<u64>,
 }
 impl FormGate {
@@ -22,6 +24,23 @@ impl FormGate {
 pub(crate) struct FormHost<'a, H> {
     pub host: &'a mut H,
     pub gate: &'a mut FormGate,
+}
+impl<H: Host> FormHost<'_, H> {
+    fn external_reply(&mut self, reply: Reply) -> Reply {
+        if let Reply::Wait(actual) = reply {
+            if self.gate.external_waits.len() >= 16 {
+                self.host.cancel(actual);
+                return refusal("embedding wait budget");
+            }
+            let Some(token) = self.gate.token() else {
+                self.host.cancel(actual);
+                return refusal("embedding wait token budget");
+            };
+            self.gate.external_waits.insert(token, actual);
+            return Reply::Wait(token);
+        }
+        reply
+    }
 }
 fn complete() -> Reply {
     Reply::Complete(Completion {
@@ -49,19 +68,35 @@ impl<H: Host> Host for FormHost<'_, H> {
     fn invoke(&mut self, call: HostCall) -> Reply {
         if call.target.object != GATE_OBJECT || call.target.generation != GATE_OBJECT {
             let reply = self.host.invoke(call);
-            if let Reply::Wait(actual) = reply {
-                if self.gate.external_waits.len() >= 16 {
-                    self.host.cancel(actual);
-                    return refusal("embedding wait budget");
-                }
-                let Some(token) = self.gate.token() else {
-                    self.host.cancel(actual);
-                    return refusal("embedding wait token budget");
-                };
-                self.gate.external_waits.insert(token, actual);
-                return Reply::Wait(token);
+            return self.external_reply(reply);
+        }
+        if call.member == "Release" && call.arguments.len() == 2 {
+            let (Some(Value::String(component)), Some(Value::Object(object))) = (
+                call.arguments.first().map(|a| &a.value),
+                call.arguments.get(1).map(|a| &a.value),
+            ) else {
+                return refusal("form release owner required");
+            };
+            if component.units().len() > 64 {
+                return refusal("form owner name budget");
             }
-            return reply;
+            let Ok(component) = String::from_utf16(component.units()) else {
+                return refusal("invalid form owner name");
+            };
+            if !self
+                .gate
+                .components
+                .iter()
+                .any(|name| name.eq_ignore_ascii_case(&component))
+                || self.gate.releases.len() >= 8
+            {
+                return refusal("unknown form owner or release budget");
+            }
+            let Some(token) = self.gate.token() else {
+                return refusal("form token budget");
+            };
+            self.gate.releases.insert(token, (component, *object));
+            return Reply::Wait(token);
         }
         if call.member != "Wait" || call.arguments.len() != 2 {
             return refusal("unsupported form gate invocation");
@@ -88,6 +123,97 @@ impl<H: Host> Host for FormHost<'_, H> {
         self.gate.waits.insert(token, *object);
         Reply::Wait(token)
     }
+    fn invoke_with_project(
+        &mut self,
+        call: HostCall,
+        objects: &dyn vba_foreign::ProjectObjectView,
+    ) -> Reply {
+        if call.target.object == GATE_OBJECT && call.target.generation == GATE_OBJECT {
+            if call.member != "Query" {
+                return self.invoke(call);
+            }
+            let result = (|| -> std::result::Result<Value, ForeignError> {
+                if call.arguments.len() != 2
+                    || call
+                        .arguments
+                        .iter()
+                        .any(|argument| argument.name.is_some())
+                {
+                    return Err(ForeignError {
+                        number: 450,
+                        description: "UserForms query arguments".into(),
+                    });
+                }
+                let mut loaded = Vec::new();
+                for component in &self.gate.components {
+                    for object in objects.instances(component)? {
+                        if objects.public_field(object, "VbaLoaded")? == Value::Boolean(true) {
+                            loaded.push(object);
+                        }
+                    }
+                }
+                loaded.sort_by_key(|object| object.object);
+                let mode = call.arguments.first().map(|a| &a.value);
+                if mode == Some(&Value::Integer(0)) || mode == Some(&Value::Long(0)) {
+                    return Ok(Value::Long(i32::try_from(loaded.len()).map_err(|_| {
+                        ForeignError {
+                            number: 7,
+                            description: "UserForms collection budget".into(),
+                        }
+                    })?));
+                }
+                if mode != Some(&Value::Integer(1)) && mode != Some(&Value::Long(1)) {
+                    return Err(ForeignError {
+                        number: 5,
+                        description: "unknown UserForms query".into(),
+                    });
+                }
+                let Value::Long(index) = vba_runtime::bind(
+                    ScalarKind::Long,
+                    &call
+                        .arguments
+                        .get(1)
+                        .ok_or(ForeignError {
+                            number: 450,
+                            description: "UserForms index required".into(),
+                        })?
+                        .value,
+                )
+                .map_err(|_| ForeignError {
+                    number: 13,
+                    description: "UserForms index type mismatch".into(),
+                })?
+                else {
+                    return Err(ForeignError {
+                        number: 13,
+                        description: "UserForms index type mismatch".into(),
+                    });
+                };
+                usize::try_from(index)
+                    .ok()
+                    .and_then(|index| loaded.get(index))
+                    .copied()
+                    .map(Value::Object)
+                    .ok_or(ForeignError {
+                        number: 9,
+                        description: "UserForms index out of range".into(),
+                    })
+            })();
+            return match result {
+                Ok(value) => Reply::Complete(Completion {
+                    value,
+                    writes: vec![],
+                }),
+                Err(error) => Reply::Error(error),
+            };
+        }
+        let reply = self.host.invoke_with_project(call, objects);
+        self.external_reply(reply)
+    }
+    fn invoke_intrinsic(&mut self, call: vba_foreign::HostIntrinsicCall) -> Reply {
+        let reply = self.host.invoke_intrinsic(call);
+        self.external_reply(reply)
+    }
     fn resume(&mut self, token: u64) -> Reply {
         if let Some(actual) = self.gate.external_waits.remove(&token) {
             let reply = self.host.resume(actual);
@@ -97,9 +223,10 @@ impl<H: Host> Host for FormHost<'_, H> {
             }
             return reply;
         }
-        if self.gate.waits.contains_key(&token) {
+        if self.gate.waits.contains_key(&token) || self.gate.releases.contains_key(&token) {
             if self.gate.ready.remove(&token) {
                 self.gate.waits.remove(&token);
+                self.gate.releases.remove(&token);
                 complete()
             } else {
                 Reply::Wait(token)
@@ -113,7 +240,7 @@ impl<H: Host> Host for FormHost<'_, H> {
             self.host.cancel(actual);
             return;
         }
-        if self.gate.waits.remove(&token).is_some() {
+        if self.gate.waits.remove(&token).is_some() || self.gate.releases.remove(&token).is_some() {
             self.gate.ready.remove(&token);
         } else {
             self.host.cancel(token);
@@ -143,26 +270,10 @@ fn class_name(kind: ControlKind) -> &'static str {
         ControlKind::Label => "VbaFormLabel",
         ControlKind::TextBox => "VbaFormTextBox",
         ControlKind::CommandButton => "VbaFormCommandButton",
+        ControlKind::CheckBox => "VbaFormCheckBox",
+        ControlKind::OptionButton => "VbaFormOptionButton",
+        ControlKind::ToggleButton => "VbaFormToggleButton",
     }
-}
-fn control_class(kind: ControlKind) -> String {
-    let mut s = String::from(
-        "Option Explicit\nPublic Caption As String\nPublic Enabled As Boolean\nPublic Visible As Boolean\nPublic TabStop As Boolean\nPublic TabIndex As Long\n",
-    );
-    for (name, minimum) in [
-        ("Left", -32767),
-        ("Top", -32767),
-        ("Width", 0),
-        ("Height", 0),
-    ] {
-        s.push_str(&format!("Public Vba{name} As Single\nPublic Property Get {name}() As Single\n{name}=Vba{name}\nEnd Property\nPublic Property Let {name}(ByVal value As Single)\nIf value<{minimum} Or value>32767 Then Err.Raise 380\nVba{name}=value\nEnd Property\n"));
-    }
-    if kind == ControlKind::TextBox {
-        s.push_str("Public VbaText As String\nPublic Event Change\nPublic Property Get Text() As String\nText=VbaText\nEnd Property\nPublic Property Let Text(ByVal value As String)\nIf VbaText<>value Then\nVbaText=value\nRaiseEvent Change\nEnd If\nEnd Property\nPublic Property Get Value() As String\nValue=VbaText\nEnd Property\nPublic Property Let Value(ByVal value As String)\nMe.Text=value\nEnd Property\nPublic Sub VbaSetText(ByVal value As String)\nMe.Text=value\nEnd Sub\n");
-    } else {
-        s.push_str("Public Event Click\nPublic Sub VbaClick()\nRaiseEvent Click\nEnd Sub\n");
-    }
-    s
 }
 pub(crate) fn checked_handlers(form: &Form, module: &Module) -> Result<BTreeSet<String>> {
     let parsed = parse(&module.source()?, ModuleKind::Class)?;
@@ -185,6 +296,10 @@ pub(crate) fn checked_handlers(form: &Form, module: &Module) -> Result<BTreeSet<
             "hide",
             "caption",
             "visible",
+            "controls",
+            "name",
+            "width",
+            "height",
             "class_initialize",
             "class_terminate",
         ]
@@ -207,6 +322,10 @@ pub(crate) fn checked_handlers(form: &Form, module: &Module) -> Result<BTreeSet<
                 "hide",
                 "caption",
                 "visible",
+                "controls",
+                "name",
+                "width",
+                "height",
                 "class_initialize",
                 "class_terminate",
             ]
@@ -231,6 +350,10 @@ pub(crate) fn checked_handlers(form: &Form, module: &Module) -> Result<BTreeSet<
                 "hide",
                 "visible",
                 "caption",
+                "controls",
+                "name",
+                "width",
+                "height",
             ]
             .contains(&key.as_str())
         {
@@ -240,6 +363,10 @@ pub(crate) fn checked_handlers(form: &Form, module: &Module) -> Result<BTreeSet<
         }
         let control = form.controls.iter().find(|c| {
             format!("{}_{}", c.name, c.kind.default_event()).eq_ignore_ascii_case(&p.name.spelling)
+                || matches!(
+                    c.kind,
+                    ControlKind::CheckBox | ControlKind::OptionButton | ControlKind::ToggleButton
+                ) && format!("{}_Change", c.name).eq_ignore_ascii_case(&p.name.spelling)
         });
         let lifecycle = [
             "userform_initialize",
@@ -279,7 +406,7 @@ pub(crate) fn checked_handlers(form: &Form, module: &Module) -> Result<BTreeSet<
     }
     Ok(names)
 }
-fn compiled_form(form: &Form, module: &Module) -> Result<String> {
+fn compiled_form(form: &Form, module: &Module, native: Option<&NativeForm>) -> Result<String> {
     form.validate()?;
     let handlers = checked_handlers(form, module)?;
     let call = |name: &str| {
@@ -305,27 +432,89 @@ fn compiled_form(form: &Form, module: &Module) -> Result<String> {
         source.push_str("\nAttribute VB_PredeclaredId = True\n");
     }
     source.push_str(
-        "\nPublic VbaVisible As Boolean\nPublic VbaLoaded As Boolean\nPublic Caption As String\n",
+        "\nPublic VbaVisible As Boolean\nPublic VbaLoaded As Boolean\nPublic VbaCaption As String\nPublic Property Get Caption() As String\nIf Not VbaLoaded Then Class_Initialize\nCaption=VbaCaption\nEnd Property\nPublic Property Let Caption(ByVal value As String)\nIf Not VbaLoaded Then Class_Initialize\nVbaCaption=value\nEnd Property\nPrivate VbaControls As VbaFormControls\nPublic Property Get Controls(Optional ByVal index As Variant) As Object\nIf Not VbaLoaded Then Class_Initialize\nIf IsMissing(index) Then\nSet Controls=VbaControls\nElse\nSet Controls=VbaControls.Item(index)\nEnd If\nEnd Property\n",
     );
+    source.push_str(&format!(
+        "Public Property Get Name() As String\nName={}\nEnd Property\n",
+        quoted(&form.name)
+    ));
+    for property in ["Width", "Height"] {
+        source.push_str(&format!("Public Vba{property} As Single\nPublic Property Get {property}() As Single\nIf Not VbaLoaded Then Class_Initialize\n{property}=Vba{property}\nEnd Property\nPublic Property Let {property}(ByVal value As Single)\nIf Not VbaLoaded Then Class_Initialize\nIf value<0 Or value>32767 Then Err.Raise 380\nVba{property}=value\nEnd Property\n"));
+    }
     // A visible window retains its own instance until Hide/Unload; this is ordinary
     // class state, not another object store or a special VM form type.
     source.push_str(&format!("Private VbaDisplayOwner As {}\n", form.name));
     for c in &form.controls {
         source.push_str(&format!(
-            "Public WithEvents {} As {}\n",
+            "Public WithEvents Vba{} As {}\n",
             c.name,
             class_name(c.kind)
         ));
     }
-    source.push_str("Private Sub Class_Initialize()\nVbaLoaded=True\nVbaVisible=False\n");
-    source.push_str(&format!("Caption={}\n", vba_string(&form.caption)));
+    for c in &form.controls {
+        source.push_str(&format!("Public Property Get {0}() As {1}\nIf Not VbaLoaded Then Class_Initialize\nSet {0}=Vba{0}\nEnd Property\n",c.name,class_name(c.kind)));
+    }
+    source.push_str("Private Sub Class_Initialize()\nVbaLoaded=True\nVbaVisible=False\nSet VbaControls=New VbaFormControls\n");
+    source.push_str(&format!(
+        "VbaCaption={}\nVbaWidth={}\nVbaHeight={}\n",
+        vba_string(&form.caption),
+        form.width,
+        form.height
+    ));
     for c in &form.controls {
         let temp = format!("VbaInit{}", c.id);
-        source.push_str(&format!("Dim {temp} As {}\nSet {temp}=New {}\n{temp}.Caption={}\n{temp}.Enabled={}\n{temp}.Visible={}\n{temp}.TabStop={}\n{temp}.TabIndex={}\n{temp}.Left={}\n{temp}.Top={}\n{temp}.Width={}\n{temp}.Height={}\n",class_name(c.kind),class_name(c.kind),vba_string(&c.caption),boolean(c.enabled),boolean(c.visible),boolean(c.tab_stop),form.tab_order.iter().position(|id|*id==c.id).unwrap_or(0),c.bounds.left,c.bounds.top,c.bounds.width,c.bounds.height));
+        source.push_str(&format!("Dim {temp} As {}\nSet {temp}=New {}\n{temp}.Enabled={}\n{temp}.Visible={}\n{temp}.TabStop={}\n{temp}.VbaTabIndex={}\n{temp}.Left={}\n{temp}.Top={}\n{temp}.Width={}\n{temp}.Height={}\n",class_name(c.kind),class_name(c.kind),boolean(c.enabled),boolean(c.visible),boolean(c.tab_stop),form.tab_order.iter().position(|id|*id==c.id).unwrap_or(0),c.bounds.left,c.bounds.top,c.bounds.width,c.bounds.height));
+        if c.kind != ControlKind::TextBox {
+            source.push_str(&format!("{temp}.Caption={}\n", vba_string(&c.caption)));
+        }
         if c.kind == ControlKind::TextBox {
             source.push_str(&format!("{temp}.VbaText={}\n", vba_string(&c.text)));
         }
-        source.push_str(&format!("Set {}={temp}\n", c.name));
+        if matches!(
+            c.kind,
+            ControlKind::CheckBox | ControlKind::OptionButton | ControlKind::ToggleButton
+        ) {
+            let initial = match c.text.as_str() {
+                "1" => "True",
+                "0" => "False",
+                "" if native.is_none() => "False",
+                _ => "Null",
+            };
+            source.push_str(&format!("{temp}.VbaValue={initial}\n"));
+        }
+        source.push_str(&format!(
+            "{temp}.VbaName={}\nSet Vba{}={temp}\nVbaControls.VbaAdd {temp}\n",
+            vba_string(&c.name),
+            c.name
+        ));
+        if let Some(control) = native.and_then(|n| n.design.controls.iter().find(|n| n.id == c.id))
+        {
+            if matches!(
+                c.kind,
+                ControlKind::TextBox
+                    | ControlKind::CheckBox
+                    | ControlKind::OptionButton
+                    | ControlKind::ToggleButton
+            ) {
+                source.push_str(&format!("{temp}.Locked={}\n", boolean(control.locked)));
+            }
+            if c.kind == ControlKind::OptionButton {
+                source.push_str(&format!(
+                    "{temp}.GroupName={}\n",
+                    vba_string(&control.group_name)
+                ));
+            }
+            if c.kind == ControlKind::TextBox {
+                source.push_str(&format!("{temp}.MaxLength={}\n", control.max_length));
+            }
+            if c.kind == ControlKind::CommandButton {
+                source.push_str(&format!(
+                    "{temp}.VbaDefault={}\n{temp}.VbaCancel={}\n",
+                    boolean(control.default),
+                    boolean(control.cancel)
+                ));
+            }
+        }
     }
     source.push_str(&call("UserForm_Initialize"));
     source.push_str("End Sub\nPublic Sub VbaLoad()\nIf Not VbaLoaded Then Class_Initialize\nEnd Sub\nPublic Sub Show(Optional ByVal modal As Variant=1)\nIf modal<>0 And modal<>1 Then\nErr.Raise 5\nEnd If\nIf Not VbaLoaded Then Class_Initialize\nIf VbaVisible Then\nIf modal=1 Then Err.Raise 400\nExit Sub\nEnd If\nSet VbaDisplayOwner=Me\nVbaVisible=True\n");
@@ -336,42 +525,43 @@ fn compiled_form(form: &Form, module: &Module) -> Result<String> {
     if handlers.contains("userform_queryclose") {
         source.push_str("UserForm_QueryClose cancel,closeMode\n");
     }
-    source.push_str("If cancel=0 Then\nHide\n");
-    source.push_str(&call("UserForm_Terminate"));
+    source.push_str("If cancel=0 Then\nVbaVisible=False\nSet VbaDisplayOwner=Nothing\n");
     source.push_str("VbaLoaded=False\n");
     for c in &form.controls {
-        source.push_str(&format!("Set {}=Nothing\n", c.name));
+        source.push_str(&format!("Set Vba{}=Nothing\n", c.name));
     }
-    // Unload clears authored scalar/object fields; arrays retain the documented fixed layout via Erase.
-    let parsed = parse(&module.source()?, ModuleKind::Class)?;
-    for d in &parsed.module.declarations {
-        if d.constant.is_some() {
-            continue;
+    source.push_str("Set VbaControls=Nothing\n");
+    // Unload drops the displayed state and its default reference, not aliased code state.
+    source.push_str(&format!("VbaFormRelease {},Me\n", quoted(&form.name)));
+    source.push_str("End If\nEnd Sub\n");
+    source.push_str("Private Sub VbaTabChange(ByVal origin As Object,ByVal previous As Integer,ByVal requested As Integer)\nDim i As Long,peer As Object\nIf requested>VbaControls.Count-1 Then requested=VbaControls.Count-1\nFor i=0 To VbaControls.Count-1\nSet peer=VbaControls.Item(i)\nIf Not (peer Is origin) Then\nIf requested<previous Then\nIf peer.VbaTabIndex>=requested And peer.VbaTabIndex<previous Then peer.VbaTabIndex=peer.VbaTabIndex+1\nElse\nIf peer.VbaTabIndex>previous And peer.VbaTabIndex<=requested Then peer.VbaTabIndex=peer.VbaTabIndex-1\nEnd If\nEnd If\nNext i\norigin.VbaTabIndex=requested\nEnd Sub\n");
+    source.push_str("Private Sub VbaRoleChange(ByVal origin As Object,ByVal role As Integer)\nDim i As Long,peer As Object\nFor i=0 To VbaControls.Count-1\nSet peer=VbaControls.Item(i)\nIf Not (peer Is origin) Then\nIf peer.VbaKind=3 Then\nIf role=0 Then\npeer.VbaDefault=False\nElse\npeer.VbaCancel=False\nEnd If\nEnd If\nEnd If\nNext i\nEnd Sub\n");
+    source.push_str("Private Sub VbaOptionSelected(ByVal origin As Object)\nDim i As Long,peer As Object\nFor i=0 To VbaControls.Count-1\nSet peer=VbaControls.Item(i)\nIf Not (peer Is origin) Then\nIf peer.VbaKind=5 Then\nIf peer.GroupName=origin.GroupName Then peer.Value=False\nEnd If\nEnd If\nNext i\nEnd Sub\n");
+    for c in &form.controls {
+        for event in ["Click", "Change"] {
+            let handler = format!("{}_{}", c.name, event);
+            if handlers.contains(&handler.to_ascii_lowercase()) {
+                source.push_str(&format!(
+                    "Private Sub Vba{}_{}()\n{handler}\nEnd Sub\n",
+                    c.name, event
+                ));
+            }
         }
-        if d.dimensions.is_some() {
-            source.push_str(&format!("Erase {}\n", d.name.spelling));
-        } else {
-            let ty =
-                d.ty.as_ref()
-                    .map(|ty| ty.spelling.to_ascii_lowercase())
-                    .unwrap_or_else(|| "variant".into());
-            let value = match ty.as_str() {
-                "string" => "\"\"",
-                "variant" => "Empty",
-                "boolean" => "False",
-                "byte" | "integer" | "long" | "single" | "double" | "currency" | "date" => "0",
-                _ => "Nothing",
-            };
+        source.push_str(&format!("Private Sub Vba{0}_VbaTabChanged(ByVal previous As Integer,ByVal requested As Integer)\nVbaTabChange Vba{0},previous,requested\nEnd Sub\n",c.name));
+        if c.kind == ControlKind::OptionButton {
             source.push_str(&format!(
-                "{}{}={value}\n",
-                if value == "Nothing" { "Set " } else { "" },
-                d.name.spelling
+                "Private Sub Vba{0}_VbaSelected()\nVbaOptionSelected Vba{0}\nEnd Sub\n",
+                c.name
             ));
         }
+        if c.kind == ControlKind::CommandButton {
+            for (role, property) in ["Default", "Cancel"].iter().enumerate() {
+                source.push_str(&format!("Private Sub Vba{0}_Vba{property}Changed(ByVal value As Boolean)\nVbaRoleChange Vba{0},{role}\nEnd Sub\n",c.name));
+            }
+        }
     }
-    source.push_str("End If\nEnd Sub\n");
     if handlers.contains("userform_terminate") {
-        source.push_str("Private Sub Class_Terminate()\nIf VbaLoaded Then\nUserForm_Terminate\nEnd If\nEnd Sub\n");
+        source.push_str("Private Sub Class_Terminate()\nUserForm_Terminate\nEnd Sub\n");
     }
     Ok(source)
 }
@@ -770,10 +960,19 @@ impl Ide {
                 .iter()
                 .find(|c| c.id == control)
                 .ok_or_else(|| error("unknown control"))?;
-            if !event.eq_ignore_ascii_case(c.kind.default_event()) {
+            let canonical = if event.eq_ignore_ascii_case(c.kind.default_event()) {
+                c.kind.default_event()
+            } else if event.eq_ignore_ascii_case("Change")
+                && matches!(
+                    c.kind,
+                    ControlKind::CheckBox | ControlKind::OptionButton | ControlKind::ToggleButton
+                )
+            {
+                "Change"
+            } else {
                 return Err(error("unsupported control event"));
-            }
-            (format!("{}_{}", c.name, c.kind.default_event()), "")
+            };
+            (format!("{}_{}", c.name, canonical), "")
         } else {
             let canonical = [
                 "Initialize",
@@ -834,7 +1033,11 @@ impl Ide {
         for m in &self.modules {
             if let Some(designer) = self.forms.get(&m.id) {
                 modules.push(parse(
-                    &SourceFile::new(m.id, m.name.clone(), compiled_form(designer.form(), m)?)?,
+                    &SourceFile::new(
+                        m.id,
+                        m.name.clone(),
+                        compiled_form(designer.form(), m, self.native_forms.get(&m.id))?,
+                    )?,
                     ModuleKind::Class,
                 )?);
             } else {
@@ -849,21 +1052,46 @@ impl Ide {
                 ControlKind::Label,
                 ControlKind::TextBox,
                 ControlKind::CommandButton,
+                ControlKind::CheckBox,
+                ControlKind::OptionButton,
+                ControlKind::ToggleButton,
             ]
             .into_iter()
             .enumerate()
             {
                 modules.push(parse(
                     &SourceFile::new(
-                        SourceId(u64::MAX - i as u64),
+                        SourceId(u64::MAX - 16 - i as u64),
                         format!("{}.cls", class_name(kind)),
-                        control_class(kind),
+                        crate::form_controls::control_class(kind),
                     )?,
                     ModuleKind::Class,
                 )?);
             }
+            modules.push(parse(
+                &SourceFile::new(
+                    SourceId(u64::MAX - 5),
+                    "VbaFormControls.cls".into(),
+                    crate::form_controls::collection_class(),
+                )?,
+                ModuleKind::Class,
+            )?);
+            let components: Vec<_> = self
+                .forms
+                .values()
+                .map(|designer| designer.form().name.clone())
+                .collect();
+            modules.push(parse(
+                &SourceFile::new(
+                    SourceId(u64::MAX - 6),
+                    "VbaFormUserForms.cls".into(),
+                    crate::form_controls::userforms_class(&components),
+                )?,
+                ModuleKind::Class,
+            )?);
             let mut support =
                 String::from("Public Const vbModal As Long=1\nPublic Const vbModeless As Long=0\n");
+            support.push_str("Public Function UserForms(Optional ByVal index As Variant) As Object\nIf IsMissing(index) Then\nSet UserForms=VbaFormUserForms\nElse\nSet UserForms=VbaFormUserForms.Item(index)\nEnd If\nEnd Function\n");
             for (id, designer) in &self.forms {
                 for (name, modal) in [("Modal", 1), ("Modeless", 0)] {
                     support.push_str(&format!(
@@ -888,6 +1116,18 @@ impl Ide {
         let mut imports = self.imports.clone();
         if !self.forms.is_empty() {
             imports.push(Import {
+                name: "VbaFormQuery".into(),
+                kind: vba_foreign::InvokeKind::Call,
+                root: "VbaFormsGate".into(),
+                member: Some("Query".into()),
+            });
+            imports.push(Import {
+                name: "VbaFormRelease".into(),
+                kind: vba_foreign::InvokeKind::Call,
+                root: "VbaFormsGate".into(),
+                member: Some("Release".into()),
+            });
+            imports.push(Import {
                 name: "VbaFormWait".into(),
                 kind: vba_foreign::InvokeKind::Call,
                 root: "VbaFormsGate".into(),
@@ -896,8 +1136,12 @@ impl Ide {
         }
         imports
     }
-    pub(crate) fn update_form_waits(&mut self) {
-        if let Some(session) = &self.session {
+    pub(crate) fn update_form_waits(&mut self) -> Result<()> {
+        if let Some(session) = &mut self.session {
+            for (token, (component, object)) in &self.form_gate.releases {
+                session.release_project_object(component, *object)?;
+                self.form_gate.ready.insert(*token);
+            }
             for (token, object) in &self.form_gate.waits {
                 if session
                     .read_instance_field(*object, "VbaVisible")
@@ -907,6 +1151,7 @@ impl Ide {
                 }
             }
         }
+        Ok(())
     }
     pub fn run_form(&mut self, id: SourceId, modal: bool, host: &mut impl Host) -> Result<()> {
         if self.session.is_some() {
@@ -948,21 +1193,31 @@ impl Ide {
                 .iter()
                 .find(|c| c.id == control)
                 .ok_or_else(|| error("unknown form control"))?;
-            let Value::Object(child) = session.read_instance_field(object, &control.name)? else {
+            let Value::Object(child) =
+                session.read_instance_field(object, &format!("Vba{}", control.name))?
+            else {
                 return Err(error("control is unloaded"));
             };
             object = child;
         }
-        let field = if control.is_some() {
-            match field {
-                "Left" => "VbaLeft",
-                "Top" => "VbaTop",
-                "Width" => "VbaWidth",
-                "Height" => "VbaHeight",
-                name => name,
-            }
-        } else {
-            field
+        if control.is_none() && field.eq_ignore_ascii_case("Name") {
+            return Ok(Value::String(VbaString::from_utf8(&designer.form().name)?));
+        }
+        let key = field.to_ascii_lowercase();
+        let field = match key.as_str() {
+            "caption" if control.is_none() => "VbaCaption",
+            "visible" if control.is_none() => "VbaVisible",
+            "left" => "VbaLeft",
+            "top" => "VbaTop",
+            "width" => "VbaWidth",
+            "height" => "VbaHeight",
+            "tabindex" => "VbaTabIndex",
+            "default" => "VbaDefault",
+            "cancel" => "VbaCancel",
+            "maxlength" => "VbaMaxLength",
+            "value" => "VbaValue",
+            "name" if control.is_some() => "VbaName",
+            _ => field,
         };
         session.read_instance_field(object, field)
     }
@@ -1044,7 +1299,9 @@ impl Ide {
                 .iter()
                 .find(|c| c.id == id)
                 .ok_or_else(|| error("unknown control"))?;
-            let Value::Object(child) = session.read_instance_field(object, &c.name)? else {
+            let Value::Object(child) =
+                session.read_instance_field(object, &format!("Vba{}", c.name))?
+            else {
                 return Err(error("control unloaded"));
             };
             object = child;
@@ -1075,6 +1332,11 @@ impl Ide {
             ("VbaClose", vec![Value::Integer(0)])
         };
         session.schedule_instance_callback(object, handler, arguments)?;
+        self.form_gate.components = self
+            .forms
+            .values()
+            .map(|designer| designer.form().name.clone())
+            .collect();
         let mut gate = std::mem::take(&mut self.form_gate);
         let mut wrapped = FormHost {
             host,

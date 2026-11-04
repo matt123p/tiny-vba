@@ -46,6 +46,22 @@ pub enum Command {
     Definition(String),
     IsolatedImmediate(String),
 }
+impl Command {
+    /// Embeddings use this classification to enforce their existing execution policy
+    /// before dispatch, including instance-addressed native form input.
+    pub fn executes_code(&self) -> bool {
+        matches!(
+            self,
+            Self::Action(Action::Run | Action::StepInto | Action::StepOver | Action::StepOut)
+                | Self::RunToCursor
+                | Self::Immediate(_)
+                | Self::IsolatedImmediate(_)
+                | Self::Form(
+                    FormCommand::Run(..) | FormCommand::Event(..) | FormCommand::InstanceEvent(..)
+                )
+        )
+    }
+}
 /// Execute a rendered command through the same headless IDE action route.
 pub fn apply(
     ide: &mut Ide,

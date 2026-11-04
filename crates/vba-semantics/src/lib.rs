@@ -3406,13 +3406,6 @@ impl Binder<'_> {
                 }
             }
             ast::StatementKind::FormLifecycle { target, unload } => {
-                let bound = self.expr(target)?;
-                if self.expression_nominal(&bound).is_none() {
-                    return Err(err(
-                        "Load/Unload requires a statically bound project form",
-                        site.span,
-                    ));
-                }
                 let member = ast::Name {
                     spelling: if *unload { "VbaClose" } else { "VbaLoad" }.into(),
                     span: site.span,

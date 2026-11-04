@@ -3,6 +3,7 @@
 mod classes;
 mod host_calls;
 mod host_events;
+mod project_view;
 use classes::{ClassReturn, Instance};
 pub use host_calls::NestedCallResult;
 pub use host_events::{HostEventHandler, HostEventParameter};
@@ -1260,6 +1261,37 @@ impl Session {
         };
         self.instance_object(*object)?;
         Ok(*object)
+    }
+    /// Release this class's predeclared root if it still names the expected object.
+    /// Aliases and method frames retain ordinary references; no cleanup code runs here.
+    /// Document code-name roots are host-owned and cannot be released by this API.
+    pub fn release_project_object(
+        &mut self,
+        name: &str,
+        object: vba_values::ObjectRef,
+    ) -> Result<bool> {
+        if name.len() > 128 {
+            return Err(command("project class name budget"));
+        }
+        let instance = self.instance_object(object)?;
+        let class = self
+            .program
+            .program()
+            .classes
+            .iter()
+            .find(|class| {
+                class.source == instance.source
+                    && class.name.eq_ignore_ascii_case(name)
+                    && !class.document
+            })
+            .ok_or_else(|| command("project class/default owner mismatch"))?;
+        let source = class.source;
+        if self.default_instances.get(&source) == Some(&object) {
+            self.default_instances.remove(&source);
+            Ok(true)
+        } else {
+            Ok(false)
+        }
     }
     /// Inert, bounded inspection of live instances of a project class. This never
     /// constructs a default instance or executes a property/lifecycle procedure.
@@ -3833,9 +3865,16 @@ impl Session {
             *used = next;
             Ok(())
         };
+        let view_limit = self
+            .limits
+            .instructions
+            .saturating_sub(self.counters.instance_work);
+        let view_work = Cell::new(0u64);
+        let view_payload = Cell::new(0usize);
+        let classes = &self.program.program().classes;
         let outcome = self
             .foreign
-            .invoke_checked(
+            .invoke_checked_using(
                 host,
                 foreign::Invocation {
                     kind,
@@ -3845,6 +3884,20 @@ impl Session {
                 },
                 &mut self.store,
                 &mut validate,
+                &mut |host, call, store| {
+                    host.invoke_with_project(
+                        call,
+                        &project_view::View {
+                            instances: native.0,
+                            classes,
+                            store,
+                            work: &view_work,
+                            payload: &view_payload,
+                            work_limit: view_limit,
+                            payload_limit: 65536,
+                        },
+                    )
+                },
             )
             .map_err(|e| {
                 if e.code == "VBA0031" || e.code.starts_with("VBA_RUNTIME_") {
@@ -3860,6 +3913,14 @@ impl Session {
             ir::ForeignKind::ValueGet | ir::ForeignKind::ArgumentGet
         ) {
             self.advance()?;
+        }
+        self.counters.instance_work = self
+            .counters
+            .instance_work
+            .checked_add(view_work.get())
+            .ok_or_else(resource)?;
+        if self.counters.instance_work > self.limits.instructions {
+            return Err(resource());
         }
         self.accept_host(outcome)
     }

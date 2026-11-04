@@ -60,8 +60,11 @@ handler source; runtime input is disabled until the invocation is idle again.
 Show defaults to modal (1); modeless is 0. `Load FormName` initializes without
 showing, Hide retains loaded state, and `Unload FormName` invokes QueryClose with
 CloseMode 1. The UI close action supplies CloseMode 0. Nonzero Cancel prevents
-closing. Normal unload clears controls and authored fields; subsequent load
-initializes again. Repeated Hide/Unload do not repeat deactivation/termination.
+closing. M7A.4 supersedes the original unload field-clearing rule under
+[ADR 0044](decisions/0044-userform-window-and-code-lifetime.md): unload releases
+displayed controls/default ownership, referenced code fields survive, control
+access reloads initial control values, and actual last-reference cleanup delivers
+Terminate. Repeated Hide/Unload do not repeat cleanup for one code instance.
 The UI Reset Form Execution command cancels pending modal continuations and
 releases run state without running user cleanup handlers or changing design data.
 

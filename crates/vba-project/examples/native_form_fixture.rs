@@ -8,9 +8,25 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             .ok_or("supply a fixture output directory")?,
     );
     std::fs::create_dir_all(&dir)?;
-    let text = String::from_utf8(fixture::export())?
-        .replace("Debug.Print Entry.Text", "Stop\r\nDebug.Print Entry.Text");
+    let boolean = match std::env::args().nth(2).as_deref() {
+        None => false,
+        Some("--boolean-controls") => true,
+        Some(_) => return Err("unknown fixture option".into()),
+    };
+    let body = if boolean {
+        "Stop\r\nDebug.Print Check1.Value\r\nDebug.Print ChoiceA.Value\r\nDebug.Print ChoiceB.Value\r\nDebug.Print Toggle1.Value"
+    } else {
+        "Stop\r\nDebug.Print Entry.Text"
+    };
+    let text = String::from_utf8(fixture::export())?.replace("Debug.Print Entry.Text", body);
     std::fs::write(dir.join("NativeForm.frm"), text)?;
-    std::fs::write(dir.join("NativeForm.frx"), fixture::companion())?;
+    std::fs::write(
+        dir.join("NativeForm.frx"),
+        if boolean {
+            fixture::boolean_companion()
+        } else {
+            fixture::companion()
+        },
+    )?;
     Ok(())
 }

@@ -5,7 +5,8 @@ Updated 2026-11-04. **IN PROGRESS**. FC0 contracts and FC3.1–FC3.4 are complet
 and [ADR 0040](decisions/0040-native-userform-import-and-attachment.md). The first FC1.1 metadata slice remains partial under
 [ADR 0038](decisions/0038-native-office-forms-and-compatibility-only.md) and
 [ADR 0039](decisions/0039-m7a-native-control-metadata.md). It is not M7A sign-off.
-Native import now supports flat Label/TextBox/CommandButton forms. Native edited
+Native import now supports flat Label/TextBox/CommandButton and selected
+CheckBox/OptionButton/ToggleButton forms; see [the current runtime record](m7a4-native-runtime.md). Native edited
 persistence and `.tvform` removal remain unimplemented.
 
 ## Audited implementation paths — FC0.1
@@ -37,9 +38,9 @@ in M7A.4; a declared unsupported packet is not implementation evidence.
 | CommandButton | Caption/geometry, Enabled/Visible, default/cancel/focus, Click | Selected native decode + shared runtime; edited native save UNSUPPORTED |
 | Label | Caption/geometry, formatting, visibility, Click | Selected native decode + shared runtime; edited native save UNSUPPORTED |
 | TextBox | Text/Value, geometry, selection, validation, Change/focus/key events | Selected native decode + shared Text/Change runtime; edited native save UNSUPPORTED |
-| CheckBox | Value/three-state/group/binding, Change/Click | UNSUPPORTED |
-| OptionButton | Value/group/binding, Change/Click | UNSUPPORTED |
-| ToggleButton | Value/binding, Change/Click | UNSUPPORTED |
+| CheckBox | Value/three-state/group/binding, Change/Click | Native flat decode/runtime/input; binding and native edited save unsupported |
+| OptionButton | Value/group/binding, Change/Click | Native flat decode/runtime/input and root groups; binding/native edited save unsupported |
+| ToggleButton | Value/binding, Change/Click | Native flat decode/runtime/input; binding/native edited save unsupported |
 | ComboBox | Items/selection/columns/binding/style, Change/Click/drop/update events | UNSUPPORTED |
 | ListBox | Items/selection/columns/multiselect/binding, Change/Click | UNSUPPORTED |
 | Frame | Caption/container/child Controls/grouping/tab behavior | UNSUPPORTED |
@@ -134,7 +135,7 @@ build/OS/locale comparisons remain NOT_RUN under M8.5.
 | FC1.2–FC1.4 geometry/render/input/launch | DONE for worksheet-form-controls-v1 | Native widgets, placement, pointer/keyboard, consent, owner scope and debugger continuation |
 | FC1.5 native worksheet save | DONE for worksheet-form-controls-v1 | Untouched bytes plus edited caption/anchor/assignment/state/create/delete/reopen |
 | FC2 worksheet Form Controls | DONE for worksheet-form-controls-v1 | Nine native families, bounded bindings/list state, selected Shape/ControlFormat APIs; [contract/evidence](m7a-worksheet-controls.md) |
-| FC4 broader UserForm controls | NOT_STARTED | Native MSForms packets remain M7A.4 |
+| FC4 broader UserForm controls | IN_PROGRESS | [Native boolean controls](m7a4-native-runtime.md) implemented; list/container/scroll/image/binding/platform packets remain |
 | FC3.1–FC3.4 native UserForm codecs/attachment | DONE for native-userform-import-v1 | Export + embedded parity, shared designer/runtime/debugger, standalone IO, XLSM/DOCM trust and byte retention |
 | FC3.5 native lifecycle parity | IN_PROGRESS | [Shared explicit instance packet](m7a4-userform-instances.md) implemented; default/collection/lifecycle/focus/event and fork gates remain |
 | FC5 edited native persistence | NOT_STARTED | Required encoder, native resource and signature/cache contract |

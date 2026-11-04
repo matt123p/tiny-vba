@@ -18,6 +18,9 @@ pub enum Kind {
     Label,
     TextBox,
     CommandButton,
+    CheckBox,
+    OptionButton,
+    ToggleButton,
 }
 /// Coordinates are original signed HIMETRIC units, not pixels or points.
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -35,6 +38,11 @@ pub struct Control {
     pub visible: bool,
     pub tab_stop: bool,
     pub tab_index: i16,
+    pub default: bool,
+    pub cancel: bool,
+    pub max_length: i32,
+    pub group_name: String,
+    pub locked: bool,
 }
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Design {

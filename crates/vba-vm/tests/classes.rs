@@ -429,6 +429,8 @@ fn predeclared_document_state_is_lazy_shared_and_restored_without_import_executi
         Outcome::Completed(ReturnValue::Function(Value::Long(1)))
     );
     let old = first.project_object("Counter")?;
+    assert!(first.release_project_object("Counter", old).is_err());
+    assert_eq!(first.project_object("Counter")?, old);
     let saved = first.project_state()?;
     let mut second = Session::new(p, 2, vec![], None, Limits::default())?;
     second.restore_project(saved)?;
@@ -762,5 +764,172 @@ fn active_method_receiver_remains_a_root_after_its_last_variable_is_cleared() ->
         .collect::<Vec<_>>();
     assert_eq!(output, vec!["7", "8"]);
     assert!(s.class_instances("Counter")?.is_empty());
+    Ok(())
+}
+
+#[test]
+fn host_project_view_is_read_only_bounded_and_cannot_execute_private_fields_or_getters() -> R {
+    use std::collections::BTreeMap;
+    use vba_foreign::{Completion, Host, HostCall, Import, InvokeKind, ProjectObjectView, Reply};
+    use vba_values::ObjectRef;
+    struct Inspector {
+        calls: usize,
+    }
+    impl Host for Inspector {
+        fn identity(&self) -> u64 {
+            77
+        }
+        fn invoke(&mut self, _: HostCall) -> Reply {
+            Reply::Error(vba_foreign::ForeignError {
+                number: 438,
+                description: "context required".into(),
+            })
+        }
+        fn invoke_with_project(
+            &mut self,
+            call: HostCall,
+            objects: &dyn ProjectObjectView,
+        ) -> Reply {
+            self.calls += 1;
+            let object = match call.arguments.first().map(|a| &a.value) {
+                Some(Value::Object(object)) => *object,
+                _ => return self.invoke(call),
+            };
+            assert_eq!(objects.instances("Counter").ok(), Some(vec![object]));
+            assert_eq!(
+                objects.public_field(object, "n").ok(),
+                Some(Value::Long(33))
+            );
+            assert_eq!(
+                objects
+                    .public_field(object, "secret")
+                    .err()
+                    .map(|e| e.number),
+                Some(438)
+            );
+            assert_eq!(
+                objects
+                    .public_field(object, "Dangerous")
+                    .err()
+                    .map(|e| e.number),
+                Some(438)
+            );
+            assert_eq!(
+                objects
+                    .public_field(ObjectRef { host: 99, ..object }, "n")
+                    .err()
+                    .map(|e| e.number),
+                Some(91)
+            );
+            assert!(objects.instances(&"a".repeat(129)).is_err());
+            assert_eq!(
+                objects
+                    .public_field(object, "payload")
+                    .err()
+                    .map(|error| error.number),
+                Some(7)
+            );
+            Reply::Complete(Completion {
+                value: Value::Long(33),
+                writes: vec![],
+            })
+        }
+        fn resume(&mut self, _: u64) -> Reply {
+            self.invoke(HostCall {
+                kind: InvokeKind::Get,
+                target: ObjectRef {
+                    host: 77,
+                    object: 1,
+                    generation: 1,
+                },
+                member: "unused".into(),
+                arguments: vec![],
+            })
+        }
+        fn cancel(&mut self, _: u64) {}
+    }
+    let modules=[parse(&SourceFile::new(SourceId(1),"Main.bas".into(),"Sub Main()\nDim c As Counter\nSet c=New Counter\nc.n=33\nc.payload=String(32768,120)\nDebug.Print Probe(c)\nEnd Sub".into())?,ModuleKind::Standard)?,parse(&SourceFile::new(SourceId(2),"Counter.cls".into(),"Public n As Long\nPublic payload As String\nPrivate secret As Long\nPublic Property Get Dangerous() As Long\nErr.Raise 5\nEnd Property".into())?,ModuleKind::Class)?];
+    let program = compile_modules(
+        &modules,
+        &CompileOptions {
+            entry: "Main".into(),
+            capabilities: vba_vm::capabilities(),
+            imports: vec![Import {
+                name: "Probe".into(),
+                kind: InvokeKind::Call,
+                root: "Inspector".into(),
+                member: Some("Probe".into()),
+            }],
+            ..Default::default()
+        },
+    )?;
+    let binding = vba_vm::HostBinding::for_program(
+        &program,
+        77,
+        BTreeMap::from([(
+            "Inspector".into(),
+            ObjectRef {
+                host: 77,
+                object: 1,
+                generation: 1,
+            },
+        )]),
+    )?;
+    let mut session = Session::new(program, 1, vec![], Some(binding), Limits::default())?;
+    let mut host = Inspector { calls: 0 };
+    for _ in 0..100 {
+        if session.run_slice(&mut host, 64, &mut |_| Ok(false))? != Outcome::Yielded {
+            break;
+        }
+    }
+    assert_eq!(session.outcome(), &Outcome::Completed(ReturnValue::Sub));
+    assert_eq!(session.output(), &[vba_values::VbaString::from_utf8("33")?]);
+    assert_eq!(host.calls, 1);
+    Ok(())
+}
+
+#[test]
+fn releasing_a_default_root_keeps_aliases_and_recreates_an_independent_default() -> R {
+    let main = "Public kept As Counter\nSub Main()\nSet kept=Counter\nkept.n=37\nEnd Sub\nPublic Sub Again()\nDebug.Print Counter.n\nDebug.Print kept.n\nDebug.Print Counter Is kept\nEnd Sub";
+    let class = "Attribute VB_PredeclaredId = True\nPublic n As Long";
+    // Explicitly compile the Sub entry.
+    let modules = [
+        parse(
+            &SourceFile::new(SourceId(1), "Main.bas".into(), main.into())?,
+            ModuleKind::Standard,
+        )?,
+        parse(
+            &SourceFile::new(SourceId(2), "Counter.cls".into(), class.into())?,
+            ModuleKind::Class,
+        )?,
+    ];
+    let p = compile_modules(
+        &modules,
+        &CompileOptions {
+            entry: "Main".into(),
+            capabilities: vba_vm::capabilities(),
+            ..Default::default()
+        },
+    )?;
+    let mut s = Session::new(p, 1, vec![], None, Limits::default())?;
+    assert_eq!(drive(&mut s)?, Outcome::Completed(ReturnValue::Sub));
+    let old = s.project_object("Counter")?;
+    assert!(s.release_project_object("WrongOwner", old).is_err());
+    assert!(s.release_project_object("Counter", old)?);
+    assert!(!s.release_project_object("Counter", old)?);
+    assert!(s.project_object("Counter").is_err());
+    assert_eq!(s.read_instance_field(old, "n")?, Value::Long(37));
+    s.schedule_callback("Again", vec![])?;
+    s.start_next_callback(&mut NoHost)?;
+    assert_eq!(drive(&mut s)?, Outcome::Completed(ReturnValue::Sub));
+    assert_ne!(s.project_object("Counter")?, old);
+    assert_eq!(
+        s.output(),
+        &[
+            vba_values::VbaString::from_utf8("0")?,
+            vba_values::VbaString::from_utf8("37")?,
+            vba_values::VbaString::from_utf8("False")?
+        ]
+    );
     Ok(())
 }

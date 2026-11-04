@@ -1,5 +1,47 @@
 # Implementation progress
 
+## M7A.4 continued — native control properties and collections (2026-11-04)
+
+Implemented [ADR 0043](decisions/0043-native-controls-and-project-inspection.md)
+and the [current runtime scope](m7a4-native-runtime.md): native CheckBox,
+OptionButton and ToggleButton decode/display/input/run, canonical Boolean/Null
+state and ordinary Change/Click delivery, root option groups and Locked; Integer
+TabIndex with reordering/clamping; Default/Cancel exclusivity and Enter/Escape;
+TextBox MaxLength; Controls Count/index/name lookup; loaded UserForms Count/Item/
+Add without constructing defaults; Object-valued Load/Unload; explicit construction
+of non-predeclared forms; contextual property names. The form wrapper now preserves
+embedding intrinsic providers/waits. Generic bounded read-only project views avoid
+a second mutable object registry and do not execute getters or private fields.
+New native families deliberately have no legacy .tvform encoding.
+
+[ADR 0044](decisions/0044-userform-window-and-code-lifetime.md) separates window
+and referenced code lifetimes: named control properties reload initial controls,
+unload releases the matching default root while aliases retain code fields, and
+Terminate follows actual last-reference cleanup. Bounded internal continuations
+keep this release outside VM slices and protect document roots; cancelled close
+and paused Reset retain their normal ownership semantics.
+
+M7A.4 remains IN PROGRESS. Additional default/control alias edge cases, typed focus and
+validation/events, collection enumeration/type binding, the remaining native
+control/resource/binding/presentation families and platform packets remain open.
+M7A.5 edited native saving and M7A.6 removal are unchanged. No fresh Office run or
+full milestone sign-off is claimed. The runtime record keeps the completion gaps
+explicit rather than reducing the milestone to the completed subset.
+
+Validation: shared `cargo xtask ci`, `wasm`, `wasm-run`, `ui`, `ui-native` and
+`web` PASS. Nineteen native instance/property/lifecycle tests, the existing fifteen
+form execution tests, three actual multi-window/keyboard/boolean widget tests,
+new native decode/parser tests and both generic VM view/root-release regressions
+PASS, including actual WASI execution. Existing browser smoke/form/native harnesses
+PASS. A new six-family Chromium harness imports original native resources, clicks
+CheckBox/OptionButton/ToggleButton widgets, verifies group exclusion through the
+real VBA handler, pauses/resumes without replay, and preserves exact source.
+Light/dark/narrow/scaled/host renders were inspected; boolean glyph contrast was
+corrected using injected tokens. The original M7 fixture checker retains all twelve
+hashes. No Office-produced artifact or downloaded macro is included/executed.
+Consumer fork pins remain unchanged until their integration gates are run; no new
+native support is advertised in builds pinned to the earlier shared revision.
+
 ## M7A.4 started — explicit native UserForm instances (2026-11-04)
 
 The repositories were clean and synced before work began; M7A.3 was already

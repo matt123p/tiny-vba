@@ -89,13 +89,6 @@ impl Ide {
         {
             return Err(error("native form attachment metadata budget exceeded"));
         }
-        if native.attributes.iter().any(|a| {
-            a.name.eq_ignore_ascii_case("VB_PredeclaredId") && !a.value.eq_ignore_ascii_case("True")
-        }) {
-            return Err(error(
-                "native form without a predeclared instance is outside the initial import profile",
-            ));
-        }
         let bytes = native.resources.iter().try_fold(0usize, |n, r| {
             n.checked_add(r.bytes.len())
                 .ok_or_else(|| error("native form resource budget"))
@@ -122,6 +115,9 @@ impl Ide {
                     Kind::Label => ControlKind::Label,
                     Kind::TextBox => ControlKind::TextBox,
                     Kind::CommandButton => ControlKind::CommandButton,
+                    Kind::CheckBox => ControlKind::CheckBox,
+                    Kind::OptionButton => ControlKind::OptionButton,
+                    Kind::ToggleButton => ControlKind::ToggleButton,
                 },
                 bounds: Bounds {
                     left: point(c.left),

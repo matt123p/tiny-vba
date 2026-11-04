@@ -124,3 +124,15 @@ fn missing_truncated_external_ambiguous_and_oversized_resources_refuse() {
         );
     }
 }
+
+#[test]
+fn native_boolean_controls_decode_persisted_states_and_group_names() {
+    let form = decode(&fixture::boolean_companion()).unwrap();
+    assert_eq!(form.design.controls.len(), 7);
+    assert_eq!(form.design.controls[3].kind, Kind::CheckBox);
+    assert_eq!(form.design.controls[4].kind, Kind::OptionButton);
+    assert_eq!(form.design.controls[5].group_name, "choices");
+    assert_eq!(form.design.controls[6].kind, Kind::ToggleButton);
+    assert_eq!(form.design.controls[3].text, "0");
+    assert_eq!(form.source, fixture::SOURCE);
+}

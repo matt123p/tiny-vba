@@ -1,4 +1,4 @@
-//! Independent MS-OFORMS decoding for cached Label/TextBox/CommandButton leaf sites.
+//! Independent MS-OFORMS decoding for selected cached flat control families.
 use super::{Control, Design, Format, Kind, MAX_CONTROLS, NativeForm, Resource, frame};
 use crate::{Reader, Result, budget, corrupt, text, unsupported};
 use std::collections::BTreeSet;
@@ -262,7 +262,13 @@ pub(super) fn decode(
             return Err(corrupt("duplicate native control identity"));
         }
         let data = objects.take(site.bytes)?;
-        controls.push(control(data, site)?);
+        let control = control(data, site)?;
+        if controls.iter().any(|other: &Control| {
+            other.default && control.default || other.cancel && control.cancel
+        }) {
+            return Err(corrupt("duplicate native default/cancel buttons"));
+        }
+        controls.push(control);
     }
     sites.end()?;
     objects.end()?;
@@ -299,7 +305,7 @@ fn site(r: &mut Reader<'_>) -> Result<Site> {
     }
     field(&mut b, m, 3, 4, 0)?;
     let flags = field(&mut b, m, 4, 4, 0x33)?;
-    if flags & !0x33 != 0 || flags & 0x10 == 0 {
+    if flags & !0x3f != 0 || flags & 0x10 == 0 {
         return Err(unsupported("native site flags/container/default/cancel"));
     }
     let bytes = field(&mut b, m, 5, 4, 0)? as usize;
@@ -309,8 +315,14 @@ fn site(r: &mut Reader<'_>) -> Result<Site> {
         17 => Kind::CommandButton,
         21 => Kind::Label,
         23 => Kind::TextBox,
+        26 => Kind::CheckBox,
+        27 => Kind::OptionButton,
+        28 => Kind::ToggleButton,
         _ => return Err(unsupported(&format!("native control class index {class}"))),
     };
+    if kind != Kind::CommandButton && flags & 0xc != 0 {
+        return Err(unsupported("default/cancel flags require a CommandButton"));
+    }
     if field(&mut b, m, 9, 2, 0)? != 0 {
         return Err(unsupported("native control group"));
     }
@@ -340,35 +352,64 @@ fn site(r: &mut Reader<'_>) -> Result<Site> {
 fn control(bytes: &[u8], site: Site) -> Result<Control> {
     let mut r = Reader::new(bytes);
     let mut b = block(&mut r, 0x0200)?;
-    let (caption, text, width, height, enabled) = if site.kind == Kind::TextBox {
-        let lo = mask(&mut b, 0x8640_01ff, 0x8000_0100)?;
-        if b.u32()? != 0 {
+    let mut max_length = 0;
+    let mut group_name = String::new();
+    let mut locked = false;
+    let (caption, text, width, height, enabled) = if matches!(
+        site.kind,
+        Kind::TextBox | Kind::CheckBox | Kind::OptionButton | Kind::ToggleButton
+    ) {
+        let lo = mask(&mut b, 0x86c0_01ff, 0x8000_0100)?;
+        let high = b.u32()?;
+        if high & !1 != 0 {
             return Err(unsupported("extended MorphData properties"));
+        }
+        if (site.kind != Kind::OptionButton && high & 1 != 0)
+            || (site.kind == Kind::TextBox && lo & (1 << 23) != 0)
+            || (site.kind != Kind::TextBox && lo & (1 << 3) != 0)
+        {
+            return Err(unsupported(
+                "MorphData property not applicable to native control class",
+            ));
         }
         let m = u64::from(lo);
         let flags = field(&mut b, m, 0, 4, 0x2c80_081b)?;
-        if flags & !2 != 0x2c80_0819 {
+        locked = flags & 4 != 0;
+        if flags & !6 != 0x2c80_0819 {
             return Err(unsupported("TextBox behavior flags"));
         }
         field(&mut b, m, 1, 4, 0)?;
         field(&mut b, m, 2, 4, 0)?;
-        if field(&mut b, m, 3, 4, 0)? != 0 {
-            return Err(unsupported("TextBox MaxLength"));
-        }
+        max_length = i32::try_from(field(&mut b, m, 3, 4, 0)?)
+            .map_err(|_| unsupported("TextBox MaxLength exceeds Long"))?;
         field(&mut b, m, 4, 1, 0)?;
         if field(&mut b, m, 5, 1, 0)? != 0
-            || field(&mut b, m, 6, 1, 1)? != 1
+            || field(&mut b, m, 6, 1, 1)?
+                != match site.kind {
+                    Kind::TextBox => 1,
+                    Kind::CheckBox => 4,
+                    Kind::OptionButton => 5,
+                    Kind::ToggleButton => 6,
+                    _ => 1,
+                }
             || field(&mut b, m, 7, 1, 0)? != 0
         {
             return Err(unsupported("TextBox display/scroll/mouse profile"));
         }
         let value = field(&mut b, m, 22, 4, 0)?;
+        let caption = field(&mut b, m, 23, 4, 0)?;
         field(&mut b, m, 25, 4, 0)?;
         field(&mut b, m, 26, 4, 0)?;
+        let group = if high & 1 != 0 { b.u32()? } else { 0 };
         align(&mut b, 4)?;
         let (w, h) = size(&mut b)?;
         let value = string(&mut b, value)?;
-        (String::new(), value, w, h, flags & 2 != 0)
+        let caption = string(&mut b, caption)?;
+        group_name = string(&mut b, group)?;
+        if site.kind == Kind::TextBox && (!caption.is_empty() || !group_name.is_empty()) {
+            return Err(unsupported("TextBox caption/group"));
+        }
+        (caption, value, w, h, flags & 2 != 0)
     } else {
         let allowed = if site.kind == Kind::Label {
             0x3ff
@@ -419,5 +460,10 @@ fn control(bytes: &[u8], site: Site) -> Result<Control> {
         visible: site.flags & 2 != 0,
         tab_stop: site.flags & 1 != 0,
         tab_index: site.tab,
+        default: site.flags & 4 != 0,
+        cancel: site.flags & 8 != 0,
+        max_length,
+        group_name,
+        locked,
     })
 }

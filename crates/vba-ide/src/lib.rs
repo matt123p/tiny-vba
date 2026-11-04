@@ -10,6 +10,7 @@ mod native_forms;
 pub use vba_project::Limits as ProjectImportLimits;
 pub use vba_project::forms::companion_name as native_form_companion_name;
 pub use vba_project::forms::{NativeForm, Resource as NativeFormResource};
+mod form_controls;
 mod form_project;
 pub use form_project::FormInstance;
 pub mod forms;
@@ -447,6 +448,15 @@ impl Ide {
             None => Mode::Design,
             Some(Outcome::Yielded) => Mode::Running,
             Some(Outcome::Paused(_)) => Mode::Break,
+            Some(Outcome::Waiting)
+                if self
+                    .session
+                    .as_ref()
+                    .and_then(Session::pending_host_token)
+                    .is_some_and(|token| self.form_gate.releases.contains_key(&token)) =>
+            {
+                Mode::Running
+            }
             Some(Outcome::Waiting) => Mode::Waiting,
             Some(Outcome::Completed(_)) => Mode::Completed,
             Some(Outcome::Failed(_)) => Mode::Failed,
@@ -1015,6 +1025,11 @@ impl Ide {
         if self.forms.is_empty() {
             return self.dispatch_unwrapped(action, host);
         }
+        self.form_gate.components = self
+            .forms
+            .values()
+            .map(|designer| designer.form().name.clone())
+            .collect();
         let mut gate = std::mem::take(&mut self.form_gate);
         let result = self.dispatch_unwrapped(
             action,
@@ -1141,6 +1156,11 @@ impl Ide {
         if self.forms.is_empty() {
             return self.close_unwrapped(host, discard_modified);
         }
+        self.form_gate.components = self
+            .forms
+            .values()
+            .map(|designer| designer.form().name.clone())
+            .collect();
         let mut gate = std::mem::take(&mut self.form_gate);
         let result = self.close_unwrapped(
             &mut form_project::FormHost {
@@ -1348,7 +1368,7 @@ impl Ide {
             self.tick_core(host)?;
             return self.tick_document_event(host);
         }
-        self.update_form_waits();
+        self.update_form_waits()?;
         if let Some(token) = self
             .session
             .as_ref()
@@ -1359,6 +1379,11 @@ impl Ide {
         {
             return Ok(());
         }
+        self.form_gate.components = self
+            .forms
+            .values()
+            .map(|designer| designer.form().name.clone())
+            .collect();
         let mut gate = std::mem::take(&mut self.form_gate);
         let result = self.tick_core(&mut form_project::FormHost {
             host,

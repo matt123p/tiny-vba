@@ -9,6 +9,9 @@ pub enum ControlKind {
     Label,
     TextBox,
     CommandButton,
+    CheckBox,
+    OptionButton,
+    ToggleButton,
 }
 impl ControlKind {
     pub fn name(self) -> &'static str {
@@ -16,12 +19,19 @@ impl ControlKind {
             Self::Label => "Label",
             Self::TextBox => "TextBox",
             Self::CommandButton => "CommandButton",
+            Self::CheckBox => "CheckBox",
+            Self::OptionButton => "OptionButton",
+            Self::ToggleButton => "ToggleButton",
         }
     }
     pub fn default_event(self) -> &'static str {
         match self {
             Self::TextBox => "Change",
-            Self::Label | Self::CommandButton => "Click",
+            Self::Label
+            | Self::CommandButton
+            | Self::CheckBox
+            | Self::OptionButton
+            | Self::ToggleButton => "Click",
         }
     }
 }

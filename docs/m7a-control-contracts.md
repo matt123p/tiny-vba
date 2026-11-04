@@ -32,17 +32,16 @@ are file-format defaults from MS-OFORMS, not undocumented VBE toolbox defaults.
 | Font / ForeColor / BackColor / border / effect | Known native property fields, StdFont/TextProps and original resources; no font file acquisition | P; renderer parity M7A.4 |
 | Tag / HelpContextID / ControlTipText | Known frame/site strings/scalars retained in resources | P; no runtime property claim |
 | Window placement / StartUpPosition / ShowModal | VBFrame metadata retained; enabled/default-modal form required; explicit show modes use existing runtime | P for placement; disabled/default-modeless metadata U; parity M7A.4 |
-| Default / Cancel / Accelerator / TakeFocusOnClick changes | Native site/control flags or fields | U; runtime/input packet M7A.4 |
-| Locked / multiline / password / MaxLength / scrolling changes | MorphData behavior fields or nondefault flags | U; TextBox semantics packet M7A.4 |
+| Default / Cancel / Accelerator / TakeFocusOnClick changes | Native site/control flags or fields | Default/Cancel decoded and executed; other fields U |
+| Locked / multiline / password / MaxLength / scrolling changes | MorphData behavior fields or nondefault flags | Locked/MaxLength decoded and executed; other fields U |
 | ControlSource / RowSource / list metadata | Native binding/site fields | U; host binding packet M7A.4 |
 | Pictures / MouseIcon / custom pointers / non-cached class table | Native binary resource or reference-specific class | U; no resource execution/loading |
 | Container children | Native depth/sites and separate parent-control storage | U in v1; refuse instead of flattening |
 
 Selected textual properties are strings, control dimensions are exposed as Single
 points, and Enabled/Visible/TabStop are Boolean in the existing shared runtime.
-Native TabIndex is retained as signed 16-bit metadata; the existing runtime
-currently exposes a Long rank in the shared tab order. Exact native Integer/rank
-semantics remain M7A.4. Form client geometry reaches the designer; additional
+Native TabIndex is retained as signed 16-bit metadata; the runtime now exposes
+an Integer rank with neighbor reordering and range validation. Form client geometry reaches the designer; additional
 root Width/Height members and executable MSForms reference/type bindings are not
 claimed by import support. Import parses persisted fields, not VBA coercion.
 VBA calls retain the
@@ -61,9 +60,9 @@ unlisted property remains outside the selected import/runtime claim.
 | Label | Common caption/geometry/state; AutoSize, font, accelerator | Click; mouse/key/focus applicability audit | D/P | shared | Click() | U |
 | TextBox | Common geometry/state/Text/Value; selection, validation, text limits, multiline/password/binding | Change, Before/AfterUpdate, Enter/Exit, key/mouse | D/P | shared | Change() | U |
 | CommandButton | Common caption/geometry/state; Default, Cancel, accelerator/focus | Click; key/mouse/focus | D/P | shared | Click() | U |
-| CheckBox | Value/TripleState, caption, group/binding | Change/Click, input/focus | U | U | U | U |
-| OptionButton | Value/GroupName, caption/binding | Change/Click, input/focus | U | U | U | U |
-| ToggleButton | Value, caption/binding | Change/Click, input/focus | U | U | U | U |
+| CheckBox | Value/TripleState, caption; binding remains U | Change/Click, user cycling/Locked; focus packet remains U | D/P | shared | selected Value/Change/Click | U |
+| OptionButton | Value/GroupName, caption; binding remains U | Change/Click/root grouping; focus packet remains U | D/P | shared | selected Value/Change/Click | U |
+| ToggleButton | Value/TripleState, caption; binding remains U | Change/Click/user cycling/Locked; focus packet remains U | D/P | shared | selected Value/Change/Click | U |
 | ComboBox | List/RowSource, Value/Text, ListIndex, columns/style/matching/binding | Change/Click/DropButtonClick, update/focus/input | U | U | U | U |
 | ListBox | List/RowSource, ListIndex/Selected/MultiSelect, columns/binding | Change/Click/DblClick, update/focus/input | U | U | U | U |
 | Frame | Caption, Controls/container/group/tab behavior | Click, applicable focus/input | U | U | U | U |
@@ -117,7 +116,7 @@ ActiveX event signatures are not inferred from Form Control assignments.
 
 | Input / workflow | Native representation and identity | Owner / platform | Acceptance boundary |
 |---|---|---|---|
-| Export `.frm` + optional `.frx` | VERSION 5.00 Office designer CLSID; exact authored source; caller-named companion/offset; checked CFB f/o | Shared decoder; portable native/WASM/WASI | Three-control flat subset; distinct export tests |
+| Export `.frm` + optional `.frx` | VERSION 5.00 Office designer CLSID; exact authored source; caller-named companion/offset; checked CFB f/o | Shared decoder; portable native/WASM/WASI | Selected six-family flat subset; distinct export tests and the M7A.4 runtime record |
 | Embedded form | BaseClass + MODULESTREAMNAME designer storage + VBFrame + MS-OFORMS f/o | Shared decoder, fork package/trust | Independent embedded and XLSM/DOCM tests |
 | Designer/code/Properties/debugger | Caller SourceId -> shared validated design + authored class/event code | Shared IDE/UI, standalone and both forks | Existing UI and runtime; inert attachment and exact handler tests |
 | Native export/edited embedded save | Native source/resource encoder, cache/signature policy, revision checks, atomic commit | Shared encoder plus caller IO/package policy | U until M7A.5; no custom-format fallback |
@@ -164,3 +163,8 @@ M7A.4 first packet (shared): [explicit UserForm instances](m7a4-userform-instanc
 now have independent ordinary class state, windows and event keys. This supersedes
 the M2 predeclared-only restriction. It does not expand the native control decoder,
 claim full lifecycle parity or change existing fork dependency pins.
+
+Current M7A.4 additions and exact remaining scope are recorded in
+[the native runtime record](m7a4-native-runtime.md) under ADR 0043. Older
+three-control/Long-tab-index/predeclared-only descriptions above are historical
+for the import checkpoint; the runtime record supersedes those restrictions.

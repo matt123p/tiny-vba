@@ -36,7 +36,8 @@ pub struct Invocation {
     pub member: String,
     pub arguments: Vec<Argument>,
 }
-/// Host receives snapshots; it never retains a VM/document borrow or a writable location.
+/// Host receives snapshots and may use a transient read-only project view during
+/// dispatch. It never retains a VM/document borrow or a writable location.
 #[derive(Clone, Debug, PartialEq)]
 pub struct HostArgument {
     pub name: Option<String>,
@@ -74,6 +75,13 @@ pub enum Reply {
     Error(ForeignError),
     Wait(u64),
 }
+/// Transient, read-only inspection of canonical project objects during one host call.
+/// Queries never construct objects, execute getters or retain locations. Implementations
+/// enforce their work/payload limits and reject stale/foreign handles and private fields.
+pub trait ProjectObjectView {
+    fn instances(&self, class: &str) -> Result<Vec<ObjectRef>, ForeignError>;
+    fn public_field(&self, object: ObjectRef, field: &str) -> Result<Value, ForeignError>;
+}
 pub trait Host {
     fn protocol(&self) -> ProtocolVersion {
         PROTOCOL_VERSION
@@ -81,6 +89,9 @@ pub trait Host {
     /// Stable identity, unique per host instance during the embedding session.
     fn identity(&self) -> u64;
     fn invoke(&mut self, call: HostCall) -> Reply;
+    fn invoke_with_project(&mut self, call: HostCall, _objects: &dyn ProjectObjectView) -> Reply {
+        self.invoke(call)
+    }
     /// Host policy and capability boundary for environment, prompt, file, settings,
     /// and late-bound intrinsic operations. The default refuses the operation.
     /// Providers must allowlist each operation, bound result sizes, and validate
@@ -189,6 +200,19 @@ impl Session {
         store: &mut Locations,
         validate: &mut impl FnMut(Option<Location>, &Value) -> Result<(), Diagnostic>,
     ) -> Result<Outcome, Diagnostic> {
+        self.invoke_checked_using(host, invocation, store, validate, &mut |host, call, _| {
+            host.invoke(call)
+        })
+    }
+    /// Uses the same validation/writeback path with a transient host dispatcher.
+    pub fn invoke_checked_using<H: Host>(
+        &mut self,
+        host: &mut H,
+        invocation: Invocation,
+        store: &mut Locations,
+        validate: &mut impl FnMut(Option<Location>, &Value) -> Result<(), Diagnostic>,
+        dispatch: &mut impl FnMut(&mut H, HostCall, &Locations) -> Reply,
+    ) -> Result<Outcome, Diagnostic> {
         check_protocol(host.protocol())?;
         if self.pending.is_some() {
             return Err(protocol("call already suspended"));
@@ -237,12 +261,16 @@ impl Session {
             });
             locations.push(location);
         }
-        let reply = host.invoke(HostCall {
-            kind: invocation.kind,
-            target: invocation.target,
-            member: invocation.member,
-            arguments,
-        });
+        let reply = dispatch(
+            host,
+            HostCall {
+                kind: invocation.kind,
+                target: invocation.target,
+                member: invocation.member,
+                arguments,
+            },
+            store,
+        );
         self.accept(reply, locations, store, host.identity(), 0, validate)
     }
     pub fn resume(

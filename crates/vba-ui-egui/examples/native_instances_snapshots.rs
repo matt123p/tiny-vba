@@ -28,7 +28,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             1252,
             &[NativeFormResource {
                 name: "NativeForm.frx".into(),
-                bytes: fixture::companion(),
+                bytes: fixture::boolean_companion(),
             }],
         )?;
         ide.add_module("Main.bas","Sub Main()\nDim a As NativeForm,b As NativeForm\nSet a=New NativeForm\nSet b=New NativeForm\na.Caption=\"First window\"\nb.Caption=\"Second window\"\na.Entry.Text=\"Value one\"\nb.Entry.Text=\"Value two\"\na.Show 0\nb.Show 0\nEnd Sub")?;
