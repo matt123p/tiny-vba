@@ -1,8 +1,8 @@
 # Documentation index
 
 M1–M6, M6A and M7 are complete for their declared profiles; the
-remaining plan starts at M8. Fresh Excel/Word comparison is
-deferred to M8.5. The plan retains M1–M8 numbering with inserted M6A. Earlier implementation reports,
+remaining plan starts at M7A, then M8. Fresh Excel/Word comparison is
+deferred to M8.5. The plan retains M1–M8 numbering with inserted M6A and M7A. Earlier implementation reports,
 specifications and ADRs retain historical IDs; see the
 [mapping](implementation-progress.md#plan-renumbering--2026-10-28).
 
@@ -24,10 +24,11 @@ code extension points and packet design used to implement the milestone.
 [ADR 0034](decisions/0034-intrinsic-implementation-framework.md) records the design;
 the [M6A work ledger](m6a-work-ledger.md) records completed packet results.
 
-[Deferred Office forms and controls implementation plan](office-forms-controls-implementation-plan.md)
-records worksheet Form Controls (including the missing Food.xlsm button), native
-UserForm import, broader shared controls and persistence. It is outside the current
-M7–M8 delivery profile and has not started.
+[M7A native Office forms/control breakdown](office-forms-controls-implementation-plan.md)
+activates native UserForms, worksheet controls and native persistence before M8,
+and requires removal of `.tvform`. [ADR 0038](decisions/0038-native-office-forms-and-compatibility-only.md)
+records the owner-directed compatibility-only policy. Implementation has not started;
+existing `.tvform` support is legacy code scheduled for removal.
 
 [VBA attributes and Excel code-view investigation](vba-attributes-and-editor-projection.md)
 documents hidden module/member metadata, recorded-macro attributes, the blank

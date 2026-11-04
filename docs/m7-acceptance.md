@@ -1,5 +1,10 @@
 # M7 — Unchanged-document and package acceptance
 
+Planning update, 2026-11-04: this record retains its historical implemented profile.
+[M7A](implementation-plan.md) and [ADR 0038](decisions/0038-native-office-forms-and-compatibility-only.md)
+now schedule native Office forms/persistence and removal of `.tvform` before M8.
+That work is not yet implemented; historical results do not establish native support.
+
 Updated 2026-11-04. Profile: `m7-unchanged-v1`, authored-contract evidence.
 M7.1–M7.4 are complete for this declared profile; verification results are below.
 This profile accepts original source in generated `.xlsm` and `.docm` packages;

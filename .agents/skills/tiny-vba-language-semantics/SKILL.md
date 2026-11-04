@@ -162,3 +162,16 @@ and trailing ParamArray metadata for explicit host calls. Validate its version/f
 ByVal Variant-array position and literal defaults. Earlier targets retain expanded static
 calls and required standard parameters. Qualified external type members may use contextual
 keyword spellings; bare reserved identifiers remain invalid.
+
+## Standing Office compatibility policy — M7A
+
+[ADR 0038](../../../docs/decisions/0038-native-office-forms-and-compatibility-only.md)
+supersedes the custom format direction and native-forms deferral. Mirror applicable
+Excel/Word VBA behavior, formats and workflows; do not add custom user-facing
+language features, formats or control semantics. Unknown behavior remains an
+explicit gap pending evidence. M7A is planned, not implemented: native `.frm`/`.frx`
+and embedded form workflows, required native edited persistence, and removal of
+`.tvform` precede M8 release acceptance. Existing codec references describe legacy
+implementation, not permission to extend or retain that product format. Reuse
+compatible internal layers and native-equivalent regressions. Original-byte
+preservation alone does not satisfy saving native edits.

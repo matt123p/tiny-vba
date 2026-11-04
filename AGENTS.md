@@ -20,6 +20,9 @@ Routine implementation choices within the agreed scope do not require another ap
 
 ## Scope and layering
 
+- Mirror applicable Excel/Word VBA behavior, native formats and workflows. Do not
+  add custom user-facing language features, file formats or control semantics.
+  Investigate uncertain behavior; report unsupported gaps instead of inventing it.
 - Implement a fresh Rust VBA engine. Never reuse `craft-vba` or copy another interpreter's implementation.
 - Gridcraft/Wordcraft forks own Office compatibility objects, member catalogues, document state,
   host adapters, workbook/document UI, undo/recalc and OOXML packaging.
@@ -97,4 +100,13 @@ package/writeback work. Source decoding stays inert/read-only; package/trust pol
 stays in forks. `cargo xtask m7` is optional and requires sibling forks; core CI
 stays independent. Preserve original bytes separately from source exports; edited
 binary writeback and cryptographic signature verification remain unsupported.
-M8 is next; fresh Office comparisons remain NOT_RUN under M8.5.
+M7A is next; native Office forms and removal of `.tvform` precede M8.
+See [ADR 0038](docs/decisions/0038-native-office-forms-and-compatibility-only.md). Fresh Office comparisons remain NOT_RUN under M8.5.
+
+M7A is planned, not implemented. It activates native UserForms (`.frm`/`.frx` and
+embedded resources), Office controls, native editing/persistence and removal of
+the legacy `.tvform` codec/routes/examples. Reuse compatible internals without
+keeping a parallel custom product format. Native edited package persistence needs
+the reviewed encoder/writeback/signature path; original-byte retention alone
+cannot satisfy M7A. Do not treat the historical M2 format choice as authorization
+to extend `.tvform`. The main plan and ADR 0038 supersede that choice.

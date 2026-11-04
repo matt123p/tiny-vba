@@ -1,5 +1,35 @@
 # Implementation progress
 
+## M7A added — native Office forms and removal of .tvform (2026-11-04)
+
+Owner direction inserts **M7A before M8** and supersedes the native-forms deferral
+and custom `.tvform` format direction. [ADR 0038](decisions/0038-native-office-forms-and-compatibility-only.md)
+records the standing policy: mirror Excel/Word behavior, formats and workflows;
+no new user-facing dialect, exchange format or invented control semantics.
+The [main plan](implementation-plan.md) defines stable M7A.1–M7A.7 tasks; the
+[activated forms breakdown](office-forms-controls-implementation-plan.md) retains
+FC0–FC5 IDs and adds FC6 for `.tvform` removal.
+
+Scope includes native `.frm`/`.frx` and embedded UserForm resources, worksheet
+forms/controls, Office instance/property/event behavior, native editing/export/
+package persistence, and removal of the custom codec/APIs/routes/filters/examples.
+The necessary reviewed encoder/writeback/signature work is an M7A prerequisite;
+original-byte preservation and a custom export cannot stand in for saving edits.
+Reuse compatible shared designer/runtime/debugger internals and replace useful
+regressions with native fixtures. Historical M2/M7 evidence remains unchanged;
+M7A has **not started implementation**, and `.tvform` is still present today.
+
+Next: **M7A.1 / FC0.1** inventory and native compatibility contracts, followed by
+the worksheet Button slice and the reviewed native UserForm codec work. M8 task
+IDs remain stable; its release acceptance now depends on M7A. Fresh Office
+comparisons remain NOT_RUN under M8.5. This is a planning/documentation change;
+no native support or format removal is claimed from it.
+
+Validation: `cargo xtask ci`, `cargo xtask wasm` and `cargo xtask wasm-run` PASS.
+New scope/plan links and unique M7A.1–M7A.7/M8.1–M8.5 definitions verified;
+`python3 -O tools/check_m7.py` and `git diff --check` PASS. No product code,
+dependency or existing fixture/evidence hash changed.
+
 ## M7 — authored unchanged-document/package acceptance (2026-11-04)
 
 Completed M7.1–M7.4 for `m7-unchanged-v1`; see the
@@ -33,8 +63,8 @@ checks PASS (GridCraft 9 filtered integration tests; WordCraft 12 rendered/model
 tests); final Word optional-feature strict Clippy and browser-shell compilation
 PASS. Exact commands, scope and exclusions are recorded in acceptance.
 
-Next smallest task: M8.2's host-call payload reservation/accounting review,
-with M8.1 curation alongside it. The M8.5 fresh Office comparison remains an
+At M7 sign-off, the next code task was M8.2's payload accounting review.
+The subsequent owner-directed M7A addition takes precedence. The M8.5 fresh Office comparison remains an
 explicit release gate. No external corpus candidate was newly executed.
 
 ## README and license alignment (2026-11-03)
@@ -64,7 +94,7 @@ Current status, 2026-11-04: the classic-editor/debugger profile is implemented;
 its historical milestone is M10. Runtime host profile remains m5-host-v1 with
 verified IR 1–8 and the accepted intrinsic extension. **M1–M6, M6A and M7 are
 complete for their declared profiles.** The [remaining plan](implementation-plan.md)
-contains M8. Fresh Excel/Word comparisons remain NOT_RUN and are a release gate
+contains M7A followed by M8. Fresh Excel/Word comparisons remain NOT_RUN and are a release gate
 under M8.5. Office objects, document events, trust and packaging remain fork-owned.
 The [M7 acceptance record](m7-acceptance.md) defines original-project preservation,
 source exports and unsupported edited binary writeback separately.

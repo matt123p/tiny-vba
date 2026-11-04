@@ -1,11 +1,11 @@
-# Deferred implementation plan — Office forms and controls
+# M7A implementation breakdown — native Office forms and controls
 
-Created 2026-11-02. Status: **DEFERRED / NOT STARTED** by owner direction.
-This is a future implementation backlog, outside the current M7–M8 delivery
-profile. It has no milestone number or scheduled start and does not block M7.
-Activate selected stages explicitly before implementing them; activation must
-assign owners, capability versions, prerequisites and acceptance gates in the
-[main plan](implementation-plan.md). The FC task IDs below remain stable.
+Created 2026-11-02; activated 2026-11-04. Status: **PLANNED / IMPLEMENTATION NOT STARTED**.
+Owner direction inserts [M7A before M8](implementation-plan.md) and requires native
+Office forms plus removal of `.tvform`. [ADR 0038](decisions/0038-native-office-forms-and-compatibility-only.md)
+supersedes this document's former deferral. FC0–FC5 IDs remain stable; FC6 covers
+removal. This is a work breakdown, not a claim that native forms are implemented.
+Only Office-compatible behavior/formats belong in product scope.
 
 ## Problem and current support
 
@@ -14,7 +14,7 @@ Three distinct capabilities need separate treatment:
 | Surface | Current support | Future work |
 |---|---|---|
 | Excel worksheet Form Controls | GridCraft preserves unsupported control package content for saving; does not display or operate it | Import, render, interact and retain macro/link metadata |
-| tiny-vba `.tvform` forms | Shared Label/TextBox/CommandButton designer/runtime and exchange; GridCraft can import a separate `.tvform` | Extend controls and integrate native Office imports |
+| Legacy tiny-vba `.tvform` forms | Shared Label/TextBox/CommandButton designer/runtime and custom exchange still exist | Reuse suitable internals behind native Office forms; remove the custom format and its shipping workflows under FC6 |
 | Native VBA UserForms | `vba-project` explicitly refuses UserForms/designers; no `.frm`/`.frx` or binary designer import | Inert source/resource decoding, shared design mapping and runtime integration |
 
 The local `examples/Food.xlsm` illustrates the first gap: sheet1 contains
@@ -24,11 +24,11 @@ DrawingML shape has an empty `macro` attribute, so reading only DrawingML macro
 associations cannot recover its assignment. This is package inspection evidence;
 the workbook was not executed and is not a distributable test fixture.
 
-Current contracts remain [M2 acceptance](m2-acceptance.md),
+Historical implemented contracts are [M2 acceptance](m2-acceptance.md),
 [ADR 0024](decisions/0024-standard-form-execution-and-exchange.md) and
 [read-only project import](project-import.md). Unsupported content remains
 explicitly unsupported; preserving bytes does not establish rendering, execution
-or edited writeback support.
+or edited writeback support. ADR 0038 governs the new native-only format direction.
 
 ## Ownership and implementation constraints
 
@@ -121,7 +121,7 @@ evidence plus negative cases and explicit unsupported property diagnostics.
 ## FC3 — Native VBA UserForm import
 
 Owners: tiny-vba read-only decoder/shared IDE; forks attach package components.
-Depends on FC0; can proceed independently of FC2 after activation.
+Depends on FC0; can proceed independently of FC2 after its contracts are ready.
 
 - **FC3.1:** Design a bounded component/resource result for native designer
   modules instead of coercing them into ordinary classes. Preserve module IDs,
@@ -154,15 +154,16 @@ designer metadata remains visible in diagnostics rather than being discarded.
 
 - **FC4.1:** Extend the shared form model/runtime in small packets for CheckBox,
   OptionButton, ComboBox, ListBox, Frame, MultiPage/TabStrip, ScrollBar, SpinButton,
-  ToggleButton and Image, subject to FC0's reviewed inventory. Version exchange
-  data as needed and preserve explicit refusal by older readers.
+  ToggleButton and Image, subject to FC0's reviewed inventory. Extend native
+  resource codecs and validated internal descriptors; do not create an exchange
+  format or custom control behavior. Unsupported native variants refuse explicitly.
 - **FC4.2:** Specify focus/tab order, default/cancel buttons, accelerators,
   validation/change/click events, grouping, item/value semantics and property
   defaults per packet. Extend native and browser presentation together.
-- **FC4.3:** Evaluate Office-supplied worksheet ActiveX controls as a separate
-  compatibility profile using independent Rust implementations and inert binary
-  decoding. Activation requires a separate design review; no COM/OCX loading or
-  native code execution follows from this backlog.
+- **FC4.3:** Specify the applicable Office-supplied worksheet ActiveX control
+  profile in FC0 and implement its reviewed native compatibility using independent
+  Rust code and inert resource decoding. Record host/platform differences. No
+  COM/OCX loading or arbitrary native code execution is authorized.
 
 Third-party ActiveX/OLE controls, arbitrary COM libraries, proprietary control
 loading, CommandBars and custom Ribbon support are outside this plan. Unknown
@@ -171,9 +172,11 @@ controls remain preserved/inert where safe and explicitly unsupported at runtime
 ## FC5 — Persistence and acceptance
 
 - **FC5.1:** Specify original-byte preservation, edited worksheet-control
-  serialization, `.tvform` export and edited native UserForm writeback as separate
-  capabilities. Native form edits affecting `vbaProject.bin` require the adopted
-  M7 writeback/signature contract; separate export remains available until then.
+  serialization, native `.frm`/`.frx` export and edited embedded UserForm writeback
+  as separate capabilities. Implement the necessary source/resource encoder and
+  package commits under ADR 0037 before claiming edited native persistence. This
+  prerequisite is part of M7A; retaining original bytes or exporting `.tvform`
+  cannot satisfy it.
 - **FC5.2:** Verify relationship/content-type integrity, source and resource
   identity, unknown-part retention and save/reopen behavior. Never report edited
   forms saved when only the original package was retained. Use revision-checked
@@ -188,11 +191,32 @@ controls remain preserved/inert where safe and explicitly unsupported at runtime
   separately. Fresh comparisons require named build/OS/locale and raw results;
   unavailable comparisons remain NOT_RUN.
 
-On activation, create a ledger per task/control with owner, capability version,
-fixture rights/provenance, dependencies, implemented subset, checks and unresolved
-gaps. Report load/compile/display/input/run/save independently using PASS,
-MISMATCH, UNSUPPORTED and NOT_RUN. Promotion to the main plan requires an explicit
-scope decision; this document alone authorizes no implementation.
+## FC6 — Remove .tvform and retain native equivalents
 
-First task when resumed: **FC0.1**, followed by the reviewed FC1 worksheet Button
-slice. No code, capability, compatibility or acceptance result changes with this plan.
+Owner: tiny-vba shared IDE/native/browser shell; both fork integration owners.
+Depends on native replacement workflows in FC3–FC5 before final sign-off.
+
+- **FC6.1:** Inventory `.tvform` codec/types, public APIs, CLI/open/import/export/
+  save routes, file filters/associations, examples, tests and current documentation
+  across the three repositories. Record native replacements and dependencies.
+- **FC6.2:** Remove shipping `.tvform` support, including any legacy-reader or
+  parallel-format path. Replace examples and useful regression coverage with
+  native `.frm`/`.frx` and embedded form fixtures. Do not add a converter or another
+  user-facing format. Preserve the shared internal form model/runtime where it
+  implements actual Office semantics.
+- **FC6.3:** Update product help, README, examples and capability matrices so only
+  implemented native workflows are advertised. Historical M2/M7 evidence may keep
+  format names with clear superseded-status notes; it must not imply current support.
+- **FC6.4:** Verify file pickers, browser transfers, source/design acknowledgments,
+  host persistence and negative unknown-format behavior after removal. A repository
+  reference audit must distinguish historical records from shipping format support.
+
+Maintain a ledger per task/control with owner, capability version, fixture
+rights/provenance, dependencies, implemented subset, checks and unresolved gaps.
+Report load/compile/display/input/run/edit/save independently using PASS,
+MISMATCH, UNSUPPORTED and NOT_RUN. Office reference behavior is the target;
+unverified behavior remains a gap, never an invented replacement feature.
+
+Next task: **M7A.1 / FC0.1**, followed by the FC1 worksheet Button slice. Native
+UserForm codec work follows the reviewed FC0 contracts. No runtime, format or
+compatibility result changes with this planning revision.

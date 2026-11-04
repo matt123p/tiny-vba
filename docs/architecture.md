@@ -29,6 +29,13 @@ read-only in vba-project and package/trust/signature policy in the forks. An opt
 xtask gate consumes sibling workflow tests; ordinary core CI has no sibling dependency.
 No shared crate, dependency edge, IR version or ambient authority was added.
 
+[M7A](implementation-plan.md) now precedes M8 under [ADR 0038](decisions/0038-native-office-forms-and-compatibility-only.md).
+The target is native Office forms and compatible behavior, with `.tvform` removed
+from shipping workflows. Reuse internal design/runtime layers; reusable bounded
+form codecs stay shared, while forks own document/package commits and host objects.
+Native edited persistence requires the reviewed encoder/signature contract. This
+planning change adds no crate, dependency, IR capability or implemented support.
+
 VBA source flows through syntax → semantics → verified IR → explicit-state VM.
 The dependency graph is separate from this data flow: IR does not need a dependency on the binder.
 The adopted [IR 1 specification](bytecode-vm-specification.md) defines instruction/stack contracts,
@@ -213,9 +220,12 @@ design data, selection and atomic layout/history commands. It contains no Office
 application objects, runtime control activation or persistence IO. Its document
 is independent of VM Reset. The shared egui designer/runtime and source/design exchange now use this same model under ADR 0024.
 
-## M2 standard forms (ADR 0024)
+## M2 implemented form profile (ADR 0024; format direction superseded by M7A)
 
-`vba-ide` owns shared form design/source, the bounded `.tvform` codec, generated
+The existing `.tvform` codec is legacy code scheduled for removal under ADR 0038.
+This section describes current implementation, not the M7A native target.
+
+`vba-ide` owns shared form design/source, the bounded legacy `.tvform` codec, generated
 project-class support and form event orchestration. `vba-ui-egui` renders the
 designer and runtime; the shell owns explicit native/browser IO. The VM supplies
 generic parked host continuations and explicitly opted-in suspended callbacks,

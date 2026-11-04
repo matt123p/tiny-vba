@@ -1,5 +1,10 @@
 # M2 class and standard-form acceptance
 
+Planning update, 2026-11-04: this record retains its historical implemented profile.
+[M7A](implementation-plan.md) and [ADR 0038](decisions/0038-native-office-forms-and-compatibility-only.md)
+now schedule native Office forms/persistence and removal of `.tvform` before M8.
+That work is not yet implemented; historical results do not establish native support.
+
 Updated 2026-10-29. **M2.1–M2.4 are complete for the declared profile below.**
 All required final gates pass; executable evidence is mapped below.
 [ADR 0024](decisions/0024-standard-form-execution-and-exchange.md) owns execution,

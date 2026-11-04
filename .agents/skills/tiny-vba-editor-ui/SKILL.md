@@ -105,3 +105,16 @@ Keep raw source canonical; use CodeProjection for visible edits/coordinates and
 preserve hidden metadata/newline bytes through history and export. Attribute
 records never create executable checkpoints. Document rename requires host
 validation and revision-checked acknowledgement; unsupported hosts refuse.
+
+## Standing Office compatibility policy — M7A
+
+[ADR 0038](../../../docs/decisions/0038-native-office-forms-and-compatibility-only.md)
+supersedes the custom format direction and native-forms deferral. Mirror applicable
+Excel/Word VBA behavior, formats and workflows; do not add custom user-facing
+language features, formats or control semantics. Unknown behavior remains an
+explicit gap pending evidence. M7A is planned, not implemented: native `.frm`/`.frx`
+and embedded form workflows, required native edited persistence, and removal of
+`.tvform` precede M8 release acceptance. Existing codec references describe legacy
+implementation, not permission to extend or retain that product format. Reuse
+compatible internal layers and native-equivalent regressions. Original-byte
+preservation alone does not satisfy saving native edits.

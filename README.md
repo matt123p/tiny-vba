@@ -95,9 +95,10 @@ The reusable editor offers:
 The form designer adds a Toolbox, Properties, drag/resize, alignment, tab order and
 event-handler navigation for the implemented **Label, TextBox and CommandButton**
 profile. Forms run through the real VM and can be debugged during modal or modeless
-interaction. Source and design travel together in the project's `.tvform` format.
-This does not yet include importing native Office binary UserForms or worksheet
-Form Controls. See the [form workflow and supported scope](docs/m2-acceptance.md).
+interaction. Its current `.tvform` format is legacy code scheduled for removal.
+[M7A](docs/implementation-plan.md) will replace it with native Office UserForms,
+`.frm`/`.frx` exchange, controls and native persistence before M8. Native support
+is not implemented yet. See the [current form scope](docs/m2-acceptance.md).
 
 ## Debugger
 
@@ -231,14 +232,18 @@ ReflexGrid cases passing**. The latter match inherited, upstream-reported Excel 
 expectations; they are not fresh local Office comparisons or a measure of all VBA.
 The [oracle report](docs/m4-oracle-report.md) records their provenance.
 
-Next are expanded conformance, hardening and release validation (M8). Fresh
+Next is M7A: native Office forms and removal of `.tvform`, followed by expanded
+conformance, hardening and release validation (M8). Fresh
 Excel/Word comparisons remain **NOT_RUN**, scheduled for M8.5. The
 [reviewed writeback/signature contract](docs/decisions/0037-m7-package-preservation-and-writeback.md)
-keeps edited binary project writeback and cryptographic verification unsupported.
+describes the current unsupported edited-writeback/verifier boundary. M7A includes
+the native form/source encoder needed for edited persistence under that contract.
 M7 preserves original project bytes and supported related payloads separately
 from plain-source exports. Arbitrary COM/DLL execution, P-code execution and
 third-party ActiveX/OLE controls are outside the current scope. Broader Office
-forms/controls have a [separate deferred plan](docs/office-forms-controls-implementation-plan.md).
+forms/controls are scheduled in the [M7A work breakdown](docs/office-forms-controls-implementation-plan.md).
+The standing [compatibility-only policy](docs/decisions/0038-native-office-forms-and-compatibility-only.md) targets Excel/Word
+behavior and native formats; it does not authorize custom user-facing extensions.
 
 ## Develop and test tiny-vba
 
@@ -249,6 +254,7 @@ repository checks and Node 18+ runs the WASI smoke gate.
 
 ```sh
 cargo run -p vba-ide-app
+# Current legacy form example; M7A replaces this format with native Office forms.
 cargo run -p vba-ide-app -- --open examples/forms/CustomerForm.tvform
 cargo run -p vba-cli -- run examples/pure-vba/Arithmetic.bas --entry Answer
 cargo run -p vba-cli -- debug examples/pure-vba/Arithmetic.bas --entry Answer

@@ -188,5 +188,18 @@ and after actual fork tests. Ordinary core CI remains sibling-independent.
 Keep load/compile/run/save, canonical source/original project bytes and
 authored/inherited/fresh evidence separate. Original binary preservation and
 plain-source exports do not implement edited CFB writeback. Opaque signature
-transport does not verify validity or grant trust. Broader binary forms/controls
-remain deferred and fresh Office observations remain M8.5.
+transport does not verify validity or grant trust. Native forms/controls and removal of `.tvform` are now scheduled in M7A;
+fresh Office observations remain M8.5.
+
+## Standing Office compatibility policy — M7A
+
+[ADR 0038](../../../docs/decisions/0038-native-office-forms-and-compatibility-only.md)
+supersedes the custom format direction and native-forms deferral. Mirror applicable
+Excel/Word VBA behavior, formats and workflows; do not add custom user-facing
+language features, formats or control semantics. Unknown behavior remains an
+explicit gap pending evidence. M7A is planned, not implemented: native `.frm`/`.frx`
+and embedded form workflows, required native edited persistence, and removal of
+`.tvform` precede M8 release acceptance. Existing codec references describe legacy
+implementation, not permission to extend or retain that product format. Reuse
+compatible internal layers and native-equivalent regressions. Original-byte
+preservation alone does not satisfy saving native edits.
