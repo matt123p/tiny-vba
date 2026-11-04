@@ -58,6 +58,9 @@ Source contracts: [ActiveControl](https://learn.microsoft.com/en-us/office/vba/l
 [BeforeUpdate](https://learn.microsoft.com/en-us/office/vba/language/reference/user-interface-help/beforeupdate-event),
 [AfterUpdate](https://learn.microsoft.com/en-us/office/vba/language/reference/user-interface-help/afterupdate-event)
 and [ByVal return objects](https://learn.microsoft.com/en-us/office/vba/language/concepts/forms/byval-references-in-microsoft-forms).
+A [firsthand published Word UserForm report](https://learn.microsoft.com/en-us/answers/questions/4772989/cant-move-focus-to-the-control)
+also identifies error 2110 for invisible/disabled/non-focusable targets. That is
+reported evidence, not a fresh observation or an adopted macro/fixture.
 These public contracts are not fresh measured event traces. Recursive redirection,
 container/activation boundaries, boolean-family update timing, full update/binding/coercion and keyboard/mouse
 ordering, selection/multiline/password, further native families/resources and

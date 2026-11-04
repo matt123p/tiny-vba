@@ -42,8 +42,8 @@ Selected textual properties are strings, control dimensions are exposed as Singl
 points, and Enabled/Visible/TabStop are Boolean in the existing shared runtime.
 Native TabIndex is retained as signed 16-bit metadata; the runtime now exposes
 an Integer rank with neighbor reordering and range validation. Form client geometry reaches the designer; additional
-root Width/Height members and executable MSForms reference/type bindings are not
-claimed by import support. Import parses persisted fields, not VBA coercion.
+root Width/Height and executable MSForms reference/type bindings are runtime
+capabilities under ADR 0043/0047, independently of inert import support. Import parses persisted fields, not VBA coercion.
 VBA calls retain the
 central coercion/error path. Geometry and state not representable by this profile
 refuse before attachment; future property error-number comparisons remain M7A.4/M8.5.
@@ -58,11 +58,11 @@ unlisted property remains outside the selected import/runtime claim.
 | Native UserForm control | Property packet to complete | Events to complete | Decode | Display / edit | Execute | Native edited save |
 |---|---|---|---|---|---|---|
 | Label | Common caption/geometry/state; AutoSize, font, accelerator | Click; mouse/key/focus applicability audit | D/P | shared | Click() | U |
-| TextBox | Common geometry/state/Text/Value; selection, validation, text limits, multiline/password/binding | Change, Before/AfterUpdate, Enter/Exit, key/mouse | D/P | shared | Change() | U |
+| TextBox | Common geometry/state/Text/Value; selection, validation, text limits, multiline/password/binding | Change, Before/AfterUpdate, Enter/Exit, key/mouse | D/P | shared | Change, selected typed Enter/Exit/BeforeUpdate/AfterUpdate | U |
 | CommandButton | Common caption/geometry/state; Default, Cancel, accelerator/focus | Click; key/mouse/focus | D/P | shared | Click() | U |
-| CheckBox | Value/TripleState, caption; binding remains U | Change/Click, user cycling/Locked; focus packet remains U | D/P | shared | selected Value/Change/Click | U |
-| OptionButton | Value/GroupName, caption; binding remains U | Change/Click/root grouping; focus packet remains U | D/P | shared | selected Value/Change/Click | U |
-| ToggleButton | Value/TripleState, caption; binding remains U | Change/Click/user cycling/Locked; focus packet remains U | D/P | shared | selected Value/Change/Click | U |
+| CheckBox | Value/TripleState, caption; binding remains U | Change/Click, user cycling/Locked; selected Enter/Exit; key/mouse/binding remain U | D/P | shared | selected Value/Change/Click | U |
+| OptionButton | Value/GroupName, caption; binding remains U | Change/Click/root grouping; selected Enter/Exit; key/mouse/binding remain U | D/P | shared | selected Value/Change/Click | U |
+| ToggleButton | Value/TripleState, caption; binding remains U | Change/Click/user cycling/Locked; selected Enter/Exit; key/mouse/binding remain U | D/P | shared | selected Value/Change/Click | U |
 | ComboBox | List/RowSource, Value/Text, ListIndex, columns/style/matching/binding | Change/Click/DropButtonClick, update/focus/input | U | U | U | U |
 | ListBox | List/RowSource, ListIndex/Selected/MultiSelect, columns/binding | Change/Click/DblClick, update/focus/input | U | U | U | U |
 | Frame | Caption, Controls/container/group/tab behavior | Click, applicable focus/input | U | U | U | U |
@@ -86,7 +86,9 @@ into permission to load a library.
 | TextBox Change | Private Sub `<Name>_Change()` | Existing runtime path; native Value initializes without import-time event | Comprehensive native typing/programmatic Change packet M7A.4 |
 | UserForm Initialize / Activate / Deactivate / Terminate | Private Sub `UserForm_<Event>()` | Initialize inert during import; explicit Show then once; Reset cancels through existing runtime | Shared explicit instance routing implemented by [the M7A.4 packet](m7a4-userform-instances.md); exact Office order/default-instance parity remains open |
 | UserForm QueryClose | Private Sub `UserForm_QueryClose(Cancel As Integer, CloseMode As Integer)`; ByRef | Existing shared cancellation contract reused | Native source/resource lifecycle comparisons M7A.4/M8.5 |
-| Validation / key / mouse / additional events | Microsoft Forms signatures, including ReturnBoolean/ReturnInteger where applicable | U; never approximate event argument objects | Exact typed packet and independent reference evidence required |
+| Native non-label Enter/Exit | Private Sub `control_Enter()` / `control_Exit(ByVal Cancel As MSForms.ReturnBoolean)` | Selected canonical focus and typed cancellation under ADR 0048 | Additional activation/container/redirection observations remain open |
+| Native TextBox validation | Private Sub `control_BeforeUpdate(ByVal Cancel As MSForms.ReturnBoolean)` / `control_AfterUpdate()` | User-input update/cancellation on focus transition; ordinary frames and mutable ByVal identity | Broader binding/coercion/update cases remain open |
+| Key / mouse / additional events | Microsoft Forms signatures, including ReturnBoolean/ReturnInteger where applicable | U; never approximate event argument objects | Exact typed packet and independent reference evidence required |
 
 Unknown handlers, wrong supported signatures and generated-support/member name
 collisions refuse attachment. Native export attributes are retained; generated
@@ -127,7 +129,8 @@ ActiveX event signatures are not inferred from Form Control assignments.
 
 Capability versions are internal API/acceptance labels, never new exchange formats:
 `native-userform-import-v1` (shared) and `worksheet-form-controls-v1` (GridCraft; includes the earlier read-only metadata API).
-Existing IR 8/ordinary class/event/debugger protocols are reused. Dependencies:
+IR 9–11 metadata extends ordinary class/event/debugger protocols for enumeration,
+scalar As New and nominal native interfaces; older IR capability refusal remains. Dependencies:
 reviewed cfb/encoding_rs, shared source/design limits, caller IO and fork trust/
 package retention. Only a downward IDE -> project edge is added; no host-shaped
 objects or resource decoder enter the VM. Future packets must extend native
@@ -166,5 +169,8 @@ claim full lifecycle parity or change existing fork dependency pins.
 
 Current M7A.4 additions and exact remaining scope are recorded in
 [the native runtime record](m7a4-native-runtime.md) under ADR 0043. Older
-three-control/Long-tab-index/predeclared-only descriptions above are historical
-for the import checkpoint; the runtime record supersedes those restrictions.
+three-control/Long-tab-index/predeclared-only descriptions are historical for the
+import checkpoint; the runtime record supersedes those restrictions. ADR 0045–0048
+also add bounded Controls/UserForms iteration, scalar As New, MSForms interfaces,
+VBA.UserForms access and selected native focus/TextBox typed validation. Full native
+family/property/binding/platform scope remains required under M7A.4.

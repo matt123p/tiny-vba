@@ -15,8 +15,17 @@ input gates PASS, including subsequent typing after cancellation and event order
 through Stop/resume. Native/legacy forms and general browser smoke regressions
 also PASS; rendered cancellation output was inspected. Default/Cancel keyboard
 activation preserves the current control focus. Original M7 fixture hashes remain
-intact. Fork immutable-pin integration follows. Full M7A.4 remains
+intact. Both forks pin accepted shared revision 69d433c2: GridCraft fdeee9aa and
+WordCraft a7c188dc PASS full CI, native/actual Node 22 WASM package/trust/input
+checks, strict optional VBA/UI Clippy and optional VBA web builds. The package
+case additionally asserts initial TextBox and subsequent canonical checkbox focus,
+with trust refusal and exact VBA bytes preserved. Unrelated GridCraft ribbon edits
+remain outside these integration commits. Full M7A.4 remains
 IN PROGRESS for its unchanged [remaining scope](m7a4-native-runtime.md).
+Next smallest runtime packet: TextBox selection/keyboard/property behavior and
+native multiline/password flags, preserving typed cancellation and UI focus.
+Further native control/container/list/resource families and worksheet ActiveX
+remain required; the implemented flat profile is not a milestone scope reduction.
 
 ## M7A.4 continued — Forms type bindings and library access (2026-11-04)
 
@@ -32,10 +41,11 @@ project shadows and existing references. Six generic interface, four alias and
 smoke, legacy forms and native forms PASS. The boolean-input harness additionally
 checks an authored MSForms.CheckBox WithEvents handler, typed control enumeration
 and qualified VBA.UserForms access during Initialize. Input, Stop/resume, exact
-source and page-error checks PASS; the rendered result was inspected. Both forks accepted immutable revision d94a7a33: GridCraft f7ac1279 and
+source and page-error checks PASS; the rendered result was inspected. Both forks
+accepted immutable revision d94a7a33: GridCraft f7ac1279 and
 WordCraft ee3d8a90 PASS full CI, native/actual Node 22 WASM package/trust/input
 tests, optional VBA/UI Clippy and optional VBA web builds.
-Focus/typed event delivery and broader native control/property/platform scope
+Broader native focus/control/property/platform scope
 remain open in [the runtime record](m7a4-native-runtime.md); M7A.4 is not complete.
 
 Both forks accepted the preceding enumeration/As New revision b95a38a2:
