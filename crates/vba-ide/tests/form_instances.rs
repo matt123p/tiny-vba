@@ -1537,3 +1537,203 @@ fn native_combo_ambiguous_completion_and_deletion_do_not_replay_a_definite_click
     );
     Ok(())
 }
+
+#[test]
+fn native_list_bulk_loading_normalizes_bounds_and_copies_typed_arrays() -> R {
+    let ide = list_setup(
+        r#"Sub Main()
+Dim f As New NativeForm,l As MSForms.ListBox
+Dim source(-2 To -1,4 To 5) As Long
+Set l=f.List1
+source(-2,4)=11
+source(-2,5)=12
+source(-1,4)=21
+source(-1,5)=22
+l.List=source
+source(-2,4)=99
+Debug.Print l.ListCount,l.ColumnCount,l.List(0,0),l.List(1,1),VarType(l.List(0,0))
+Debug.Print IsNull(l.Column(1)),l.Column(0,1)
+l.ListIndex=1
+Debug.Print l.Column(0),l.Column(1),l.Text,l.Value
+l.Column(1)="changed"
+Debug.Print l.Value,source(-1,5)
+l.Column(0,0)="first"
+Debug.Print l.List(0)
+l.Column=source
+Debug.Print l.ListCount,l.ListIndex,IsNull(l.Value),l.List(0,0),l.List(0,1),l.List(1,0),l.List(1,1)
+l.AddItem "tail"
+l.RemoveItem 1
+Debug.Print l.ListCount,l.List(1)
+End Sub"#,
+        "",
+    )?;
+    assert_eq!(ide.mode(), Mode::Completed, "{:?}", ide.diagnostics);
+    assert_eq!(
+        ide.output(),
+        vec![
+            "initialized",
+            "2\t2\t11\t22\t8",
+            "True\t21",
+            "21\t22\t21\t22",
+            "changed\t22",
+            "first",
+            "2\t-1\tTrue\t99\t21\t12\t22",
+            "2\ttail"
+        ]
+    );
+    Ok(())
+}
+
+#[test]
+fn native_list_failed_bulk_loads_preserve_all_rows_selection_and_value() -> R {
+    let ide = list_setup(
+        r#"Sub Main()
+Dim l As MSForms.ListBox
+Dim bad(0 To 1,0 To 1) As Variant
+Dim wide(0 To 0,0 To 10) As String
+Dim tall(0 To 1024,0 To 0) As String
+Dim cube(0 To 0,0 To 0,0 To 0) As String
+Set l=NativeForm.List1
+l.AddItem "keep"
+l.List(0,1)="value"
+l.ListIndex=0
+bad(0,0)="partial"
+bad(1,1)=Null
+On Error Resume Next
+l.List=bad
+Debug.Print Err.Number
+Err.Clear
+bad(1,1)=String(16385,"x")
+l.List=bad
+Debug.Print Err.Number
+Err.Clear
+l.List=wide
+Debug.Print Err.Number
+Err.Clear
+l.List=tall
+Debug.Print Err.Number
+Err.Clear
+l.List=cube
+Debug.Print Err.Number
+Err.Clear
+l.List=Array(1,2)
+Debug.Print Err.Number
+Err.Clear
+l.List=42
+Debug.Print Err.Number
+Err.Clear
+l.List(,1)=bad
+Debug.Print Err.Number
+Err.Clear
+Debug.Print l.Column(10,0)
+Debug.Print Err.Number
+Err.Clear
+Debug.Print l.Column(0,-1)
+Debug.Print Err.Number
+Debug.Print l.ListCount,l.ListIndex,l.List(0),l.Value,l.Text
+End Sub"#,
+        "",
+    )?;
+    assert_eq!(ide.mode(), Mode::Completed, "{:?}", ide.diagnostics);
+    assert_eq!(
+        ide.output(),
+        vec![
+            "initialized",
+            "94",
+            "7",
+            "7",
+            "7",
+            "9",
+            "9",
+            "13",
+            "381",
+            "381",
+            "381",
+            "1\t0\tkeep\tvalue\tkeep"
+        ]
+    );
+    Ok(())
+}
+
+#[test]
+fn native_combo_bulk_column_loading_uses_transposed_axes_and_existing_matching() -> R {
+    let ide = combo_setup(
+        r#"Sub Main()
+Dim c As MSForms.ComboBox
+Dim source(3 To 4,-4 To -2) As String
+Set c=NativeForm.Combo1
+source(3,-4)="Alpha"
+source(4,-4)="A"
+source(3,-3)="Beta"
+source(4,-3)="B"
+source(3,-2)="Gamma"
+source(4,-2)="C"
+c.Column()=source
+Debug.Print c.ListCount,c.ListIndex,IsNull(c.Column(0)),c.List(2,1)
+c.Value="B"
+Debug.Print c.Text,c.Column(0),c.Column(1),c.MatchFound
+c.Column(0)="Beta changed"
+Debug.Print c.Text,c.Value,c.MatchFound
+Debug.Print source(3,-3)
+c.List=source
+Debug.Print c.ListCount,c.ListIndex,IsNull(c.Value),c.List(0,2),c.List(1,2)
+End Sub"#,
+        "",
+        3,
+        1,
+    )?;
+    assert_eq!(ide.mode(), Mode::Completed, "{:?}", ide.diagnostics);
+    assert_eq!(
+        ide.output(),
+        vec![
+            "initialized",
+            "3\t-1\tTrue\tC",
+            "Beta\tBeta\tB\tTrue",
+            "Beta changed\tB\tTrue",
+            "Beta",
+            "2\t-1\tTrue\tGamma\tC"
+        ]
+    );
+    Ok(())
+}
+
+#[test]
+fn native_bulk_load_commits_before_change_stop_without_replaying_or_mutating_resources() -> R {
+    let mut ide = list_setup(
+        r#"Sub Main()
+Dim source(1 To 2,1 To 2) As String
+NativeForm.List1.AddItem "old"
+NativeForm.List1.ListIndex=0
+source(1,1)="new first"
+source(2,2)="new last"
+NativeForm.List1.List=source
+Debug.Print "loaded"
+End Sub"#,
+        "\r\nPrivate Sub List1_Change()\r\nIf List1.ListCount=2 Then\r\nDebug.Print List1.ListCount,List1.ListIndex,IsNull(List1.Value),List1.List(1,1)\r\nStop\r\nEnd If\r\nEnd Sub\r\nPrivate Sub List1_Click()\r\nDebug.Print \"click\"\r\nEnd Sub\r\n",
+    )?;
+    assert_eq!(ide.mode(), Mode::Break, "{:?}", ide.diagnostics);
+    assert_eq!(
+        ide.output(),
+        vec!["initialized", "click", "2\t-1\tTrue\tnew last"]
+    );
+    let f = *ide.form_instances()?.first().ok_or("instance")?;
+    let original = ide.native_form(f.source).ok_or("native")?.clone();
+    assert_eq!(
+        ide.form_instance_field(f, Some(14), "ListCount")?,
+        Value::Long(2)
+    );
+    assert_eq!(
+        ide.form_instance_field(f, Some(14), "ListIndex")?,
+        Value::Long(-1)
+    );
+    assert_eq!(ide.form_instance_field(f, Some(14), "Value")?, Value::Null);
+    ide.dispatch(Action::Run, &mut NoHost)?;
+    settle(&mut ide)?;
+    assert_eq!(ide.mode(), Mode::Completed, "{:?}", ide.diagnostics);
+    assert_eq!(
+        ide.output(),
+        vec!["initialized", "click", "2\t-1\tTrue\tnew last", "loaded"]
+    );
+    assert_eq!(ide.native_form(f.source), Some(&original));
+    Ok(())
+}

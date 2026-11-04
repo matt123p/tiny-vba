@@ -215,3 +215,5 @@ SpinButton/ScrollBar decoding, Long properties, nominal interfaces and ordinary
 Change/spin/drag-only Scroll delivery. Shared arrows/track/thumb/keyboard input
 uses authorized callbacks and canonical state, including reversed ranges and
 pause/resume. Full [M7A.4](m7a4-native-runtime.md) remains in progress.
+
+[Native list array loading (ADR 0053)](decisions/0053-native-list-array-loading.md) records the selected bulk-loading/Column packet and remaining array gaps.

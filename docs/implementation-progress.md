@@ -1,5 +1,25 @@
 # Implementation progress
 
+## M7A.4 continued — native list array loading (2026-11-04)
+
+Implemented [ADR 0053](decisions/0053-native-list-array-loading.md): shared native
+ListBox/ComboBox two-dimensional List loading, transposed Column loading and
+indexed/current-row Column access. Source arrays retain their bounds/types and
+remain independent. All cell conversion and limit checks precede canonical row/
+selection replacement; existing ordinary Change continuations retain Stop/resume.
+Four new authored regressions cover typed/nonzero-bound arrays, transpose/copy,
+current-row selection, failed-load atomicity and pause/resource preservation.
+Shared CI, WASM, actual WASI (56 form-instance cases), UI (12 actual widget
+cases), native capture and web gates PASS. Chromium array-loaded ListBox and
+transposed ComboBox input/modal Stop/resume PASS; editor smoke and legacy form
+regressions also PASS. Array-loaded row/text renders were inspected. Original M7
+fixture/hash checks and changed Markdown targets PASS. Fork pin/test updates are
+in progress.
+M7A.4 remains IN PROGRESS. Next: whole-array readback/empty-list shape and remaining
+loading/list semantics, followed by containers/resources/bindings. Native edited
+persistence and .tvform removal remain M7A.5/M7A.6. Fresh Office comparison is
+NOT_RUN under M8.5; the selected errors/selection rules are authored expectations.
+
 ## M7A.4 continued — native ComboBox (2026-11-04)
 
 Implemented [ADR 0052](decisions/0052-native-combobox.md): editable/drop-list

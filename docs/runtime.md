@@ -423,3 +423,10 @@ drop-list ComboBox packet, shared ordinary list rows, text/selection/matching an
 VM-owned drop state. Authorized input preserves focus/validation and debugger
 continuations; contextual F4 leaves the editor shortcut intact elsewhere. Locale
 limits, further properties/bindings/resources and broader M7A.4 remain open.
+
+[ADR 0053](decisions/0053-native-list-array-loading.md) adds shared native ListBox/
+ComboBox two-dimensional List loading, transposed Column loading and indexed/
+current-row Column access through ordinary class procedures. Source bounds/types
+remain independent; complete validation precedes canonical row/selection changes
+and ordinary callbacks. Whole-array reads, additional list/binding semantics and
+the broader M7A.4 scope remain open.

@@ -106,18 +106,90 @@ VbaTextColumn=column
 VbaRefresh
 End Property
 "#;
-pub(crate) const CELLS: &str = r#"Public Property Get List(ByVal row As Long,Optional ByVal column As Long=0) As Variant
-If row<0 Or row>=VbaCount Or column<0 Or column>9 Then Err.Raise 381
-List=VbaItems(row*10+column)
+pub(crate) const CELLS: &str = r#"Public Property Get List(Optional ByVal row As Variant,Optional ByVal column As Variant) As Variant
+If VBA.IsMissing(row) Then Err.Raise 381
+Dim index As Long,col As Long
+index=VBA.CLng(row)
+If Not VBA.IsMissing(column) Then col=VBA.CLng(column)
+If index<0 Or index>=VbaCount Or col<0 Or col>9 Then Err.Raise 381
+List=VbaItems(index*10+col)
 End Property
-Public Property Let List(ByVal row As Long,Optional ByVal column As Long=0,ByVal value As Variant)
-If row<0 Or row>=VbaCount Or column<0 Or column>9 Then Err.Raise 381
-Dim text As String
+Public Property Let List(Optional ByVal row As Variant,Optional ByVal column As Variant,ByVal value As Variant)
+If VBA.IsMissing(row) Then
+If Not VBA.IsMissing(column) Then Err.Raise 381
+VbaLoad value,False
+Exit Property
+End If
+Dim index As Long,col As Long,text As String
+index=VBA.CLng(row)
+If Not VBA.IsMissing(column) Then col=VBA.CLng(column)
+If index<0 Or index>=VbaCount Or col<0 Or col>9 Then Err.Raise 381
 text=VBA.CStr(value)
 If VBA.Len(text)>16384 Then Err.Raise 7
-VbaItems(row*10+column)=text
-If row=VbaListIndex Then VbaRefresh
+VbaItems(index*10+col)=text
+If index=VbaListIndex Then VbaRefresh
 End Property
+Public Property Get Column(Optional ByVal col As Variant,Optional ByVal row As Variant) As Variant
+If VBA.IsMissing(col) Then Err.Raise 381
+Dim x As Long,y As Long
+x=VBA.CLng(col)
+If x<0 Or x>9 Then Err.Raise 381
+If VBA.IsMissing(row) Then
+If VbaListIndex<0 Then
+Column=Null
+Exit Property
+End If
+y=VbaListIndex
+Else
+y=VBA.CLng(row)
+End If
+Column=Me.List(y,x)
+End Property
+Public Property Let Column(Optional ByVal col As Variant,Optional ByVal row As Variant,ByVal value As Variant)
+If VBA.IsMissing(col) Then
+If Not VBA.IsMissing(row) Then Err.Raise 381
+VbaLoad value,True
+Exit Property
+End If
+Dim x As Long,y As Long
+x=VBA.CLng(col)
+y=VbaListIndex
+If Not VBA.IsMissing(row) Then y=VBA.CLng(row)
+Me.List(y,x)=value
+End Property
+Private Sub VbaLoad(ByVal value As Variant,ByVal transpose As Boolean)
+Dim first As Long,second As Long,rows As Double,columns As Double
+Dim row As Long,column As Long,text As String,data() As Variant
+first=VBA.LBound(value,1)
+second=VBA.LBound(value,2)
+rows=VBA.CDbl(VBA.UBound(value,1))-first+1
+columns=VBA.CDbl(VBA.UBound(value,2))-second+1
+If transpose Then
+rows=VBA.CDbl(VBA.UBound(value,2))-second+1
+columns=VBA.CDbl(VBA.UBound(value,1))-first+1
+End If
+If rows<1 Or columns<1 Then Err.Raise 381
+If rows>1024 Or columns>10 Then Err.Raise 7
+ReDim data(0 To VBA.CLng(rows)*10-1)
+For row=0 To VBA.CLng(rows)-1
+For column=0 To 9
+text=""
+If column<columns Then
+If transpose Then
+text=VBA.CStr(value(first+column,second+row))
+Else
+text=VBA.CStr(value(first+row,second+column))
+End If
+If VBA.Len(text)>16384 Then Err.Raise 7
+End If
+data(row*10+column)=text
+Next column
+Next row
+VbaItems=data
+VbaCount=VBA.CLng(rows)
+VbaListIndex=-1
+VbaRefresh
+End Sub
 "#;
 pub(crate) const SELECTED: &str = r#"Public Property Get Selected(ByVal row As Long) As Boolean
 If row<0 Or row>=VbaCount Then Err.Raise 381

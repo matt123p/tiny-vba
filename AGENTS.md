@@ -192,3 +192,8 @@ Reuse ordinary list rows, canonical UTF-16 text/selection/drop state and existin
 locale services/refusals. Preserve authorized input, typed validation, source/
 resource identity and nonreplayed Change/Click/drop continuations. No new codec,
 COM or second mutable store; broader M7A.4 work stays explicit.
+
+Native ListBox/ComboBox bulk loading follows [ADR 0053](docs/decisions/0053-native-list-array-loading.md).
+Keep source arrays independent, validate all cells before canonical replacement,
+and use ordinary control refresh/event continuations. No error-handler rank probes,
+new intrinsic or mutable host store; array reads and broader M7A.4 remain open.
