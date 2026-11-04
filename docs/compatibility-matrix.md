@@ -109,3 +109,10 @@ IR 9 validates public zero-argument Object-returning class enumerators and rejec
 legacy targets. Retained native enumerators own their collections. Qualified
 access, implicit OLE/MSForms type bindings, direct cursor interfaces and structural-
 mutation parity remain gaps; no full M7A.4 claim.
+
+[ADR 0046](decisions/0046-lazy-project-class-variables.md) adds scalar project-class
+and native-form As New under IR 10 `auto-instancing-v10`, including module/static/
+instance storage, canonical ByRef preparation and constructor Stop/failure/retry.
+Reads construct only when Nothing; declaration/Set targets and inspection remain
+inert. Arrays and external activation refuse explicitly. Native designer launch
+constructs non-predeclared forms explicitly. Broader M7A.4 requirements remain open.

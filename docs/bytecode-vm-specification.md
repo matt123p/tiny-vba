@@ -1,6 +1,6 @@
 # Bytecode and explicit-state VM specification
 
-Version: IR 1 base with versioned extensions through IR 9. Date: 2026-10-26. Status: adopted implementation contract under
+Version: IR 1 base with versioned extensions through IR 10. Date: 2026-10-26. Status: adopted implementation contract under
 [ADR 0004](decisions/0004-bytecode-vm-contract.md). M2 structural IR/verifier/lowering and M3 execution subset implemented. See [compiler](compiler.md) and [runtime](runtime.md).
 
 This document defines the M2/M3 instruction representation, verifier, calling convention and execution
@@ -654,3 +654,15 @@ original verified enumeration site. No opcode or array-valued VBA getter is adde
 Native receiver chains are capped at 64 and remain roots through snapshot creation
 and host waits. Installed snapshots retain their native objects in active/parked
 frames. See [ADR 0045](decisions/0045-class-and-native-collection-enumerators.md).
+
+## IR 10 scalar class auto-instancing
+
+`auto-instancing-v10` adds optional Local.auto_new and ClassField.auto_new class
+source IDs. Verification requires IR 10/capability, a constructible project class,
+matching scalar Object nominal type, legal role, matching instance-field aliases
+and consistent persistent slots. Class lookup consumes verification work. No
+opcode is added: a declared-variable read constructs only when Nothing and enters
+ordinary Class_Initialize frames. The pending read/public field disposition
+survives Stop and initializer failure clears only the matching variable. Argument
+preparation preserves source order; inspection stays inert. See
+[ADR 0046](decisions/0046-lazy-project-class-variables.md).

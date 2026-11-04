@@ -32,6 +32,7 @@ fn base() -> TestResult<Program> {
         kind: ProcedureKind::Sub,
         parameters: vec![],
         locals: vec![Local {
+            auto_new: None,
             array: None,
             name: "x".into(),
             kind: ScalarKind::Long,
@@ -536,6 +537,7 @@ fn direct() -> TestResult<Program> {
             required: true,
         }],
         locals: vec![Local {
+            auto_new: None,
             array: None,
             name: "n".into(),
             kind: ScalarKind::Long,
@@ -946,6 +948,7 @@ fn reference_capture_program() -> TestResult<Program> {
     p.required_features.insert("argument-captures-v3".into());
     let proc = proc_mut(&mut p)?;
     proc.locals.push(Local {
+        auto_new: None,
         array: None,
         name: "capture".into(),
         kind: ScalarKind::Long,
@@ -1027,6 +1030,7 @@ fn host_root_slots_require_ir4_object_layout_and_read_only_use() -> TestResult {
     p.profile = "ir3-structural".into();
     p.required_features.insert("host-roots-v4".into());
     proc_mut(&mut p)?.locals.push(Local {
+        auto_new: None,
         array: None,
         name: "root".into(),
         kind: ScalarKind::Object,
@@ -1048,6 +1052,7 @@ fn host_root_slots_require_ir4_object_layout_and_read_only_use() -> TestResult {
     hidden.required_features.insert("host-roots-v4".into());
     let mut visible = hidden.clone();
     proc_mut(&mut visible)?.locals.push(Local {
+        auto_new: None,
         array: None,
         name: "root".into(),
         kind: ScalarKind::Object,
@@ -1058,6 +1063,7 @@ fn host_root_slots_require_ir4_object_layout_and_read_only_use() -> TestResult {
     assert!(check(visible).is_err());
     let mut typed = hidden.clone();
     proc_mut(&mut typed)?.locals.push(Local {
+        auto_new: None,
         array: None,
         name: "root".into(),
         kind: ScalarKind::Long,
@@ -1068,6 +1074,7 @@ fn host_root_slots_require_ir4_object_layout_and_read_only_use() -> TestResult {
     assert!(check(typed).is_err());
     let mut arrayed = hidden.clone();
     proc_mut(&mut arrayed)?.locals.push(Local {
+        auto_new: None,
         array: Some(ScalarKind::Object),
         name: "root".into(),
         kind: ScalarKind::Object,
@@ -1079,6 +1086,7 @@ fn host_root_slots_require_ir4_object_layout_and_read_only_use() -> TestResult {
     // The matching layout verifies cleanly.
     let mut ok = hidden;
     proc_mut(&mut ok)?.locals.push(Local {
+        auto_new: None,
         array: None,
         name: "root".into(),
         kind: ScalarKind::Object,
@@ -1099,6 +1107,7 @@ fn host_root_references_cannot_be_captured_or_written() -> TestResult {
         let proc = proc_mut(&mut p)?;
         proc.max_stack = 4;
         proc.locals.push(Local {
+            auto_new: None,
             array: None,
             name: "root".into(),
             kind: ScalarKind::Object,

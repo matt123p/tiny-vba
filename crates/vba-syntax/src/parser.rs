@@ -252,11 +252,15 @@ impl Parser<'_> {
         Ok(Expr { span, kind, depth })
     }
     fn ty(&mut self) -> PResult<Option<Name>> {
+        self.type_clause(false).map(|(ty, _)| ty)
+    }
+    fn type_clause(&mut self, allow_new: bool) -> PResult<(Option<Name>, bool)> {
         if !self.eat("As") {
-            return Ok(None);
+            return Ok((None, false));
         }
-        if self.at("New") {
-            return Err(self.unsupported("As New"));
+        let auto_new = self.eat("New");
+        if auto_new && !allow_new {
+            return Err(self.unsupported("As New outside a variable declaration"));
         }
         let mut name = self.name()?;
         if self.eat(".") {
@@ -268,7 +272,7 @@ impl Parser<'_> {
         if self.at(".") || self.at("*") || self.at("(") {
             return Err(self.unsupported("deeply qualified, fixed-length or array type"));
         }
-        Ok(Some(name))
+        Ok((Some(name), auto_new))
     }
     fn visibility(&mut self) -> Visibility {
         if self.eat("Public") {
@@ -490,7 +494,10 @@ impl Parser<'_> {
             } else {
                 None
             };
-            let ty = self.ty()?;
+            let (ty, auto_new) = self.type_clause(true)?;
+            if auto_new && (constant || with_events) {
+                return Err(self.error("As New cannot be combined with Const or WithEvents"));
+            }
             let value = if constant {
                 self.require("=")?;
                 Some(self.expr(0)?)
@@ -498,6 +505,7 @@ impl Parser<'_> {
                 None
             };
             result.push(Declaration {
+                auto_new,
                 with_events,
                 dimensions,
                 persistent: false,

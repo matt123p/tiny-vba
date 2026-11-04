@@ -1,5 +1,22 @@
 # Implementation progress
 
+## M7A.4 continued — lazy class/form variables (2026-11-04)
+
+Implemented [ADR 0046](decisions/0046-lazy-project-class-variables.md): scalar
+As New for constructible project classes and native forms, including canonical
+module/static/instance variables, ByRef preparation, Nothing re-creation and
+constructor Stop/failure/retry. IR 10 validates exact nominal storage and refuses
+older consumers. Debugger inspection stays inert; there is no location/object
+registry or external activation. Designer launch now explicitly constructs native
+forms whose predeclared attribute is False. A modal callback regression also
+proves enumeration-snapshot lifetimes in parked frames. Ten generic and 25 native
+instance cases PASS natively and in WASI. Shared `cargo xtask ci`, `wasm`,
+`wasm-run`, `ui`, `ui-native` and `web` PASS. Chromium smoke, legacy forms and
+native forms PASS; the native boolean-input harness additionally runs an authored
+As New probe after the handler Stop, constructs/releases it without replay and
+preserves exact source and expected values. The milestone remains
+IN PROGRESS for the unchanged [remaining scope](m7a4-native-runtime.md).
+
 ## M7A.4 continued — class and native collection enumeration (2026-11-04)
 
 Implemented [ADR 0045](decisions/0045-class-and-native-collection-enumerators.md):
@@ -15,7 +32,8 @@ No .tvform extension or second mutable object store is added.
 Authored regressions: five generic enumeration tests and 22 native form instance
 tests, including three new collection ownership/iteration cases. The full M7A.4
 remaining scope is preserved in [the runtime record](m7a4-native-runtime.md);
-focus/typed events, qualified and nominal bindings, implicit/As New, further
+focus/typed events, qualified and nominal bindings, additional implicit/alias cases,
+As New arrays, further
 control families and platform packets remain required. Fresh Office evidence
 remains NOT_RUN under M8.5. Shared `cargo xtask ci`, `wasm`, `wasm-run`,
 `ui`, `ui-native` and `web` PASS. All five generic and 22 native-instance

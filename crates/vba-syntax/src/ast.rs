@@ -95,6 +95,7 @@ pub struct Parameter {
 }
 #[derive(Clone, Debug)]
 pub struct Declaration {
+    pub auto_new: bool,
     pub with_events: bool,
     pub dimensions: Option<Vec<(Expr, Expr)>>,
     pub persistent: bool,

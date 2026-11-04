@@ -106,6 +106,9 @@ fn render(out: &mut Output, p: &Program) -> fmt::Result {
             )?;
         }
         for (i, local) in proc.locals.iter().enumerate() {
+            if let Some(source) = local.auto_new {
+                writeln!(out, "  slot-auto-new {i} class-source={}", source.0)?;
+            }
             if let Some(element) = local.array {
                 writeln!(out, "  slot-array {i} element={element:?}")?;
             }

@@ -136,3 +136,9 @@ UserForm display/default ownership from referenced code lifetime. Named control
 getters reload; inert inspection does not. Generic root release validates class/
 object and protects document code names. Internal release waits remain bounded,
 report Running and preserve slice quotas; Terminate runs only at normal finalization.
+
+IR 10 scalar As New is defined by
+[ADR 0046](../../../docs/decisions/0046-lazy-project-class-variables.md). Preserve
+exact nominal local/field/persistent metadata, inert declaration/inspection/Set
+targets, source-order ByRef preparation, ordinary constructor frames and failed
+initialization retry. No external activation or mutable registry is added.

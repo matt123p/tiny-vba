@@ -34,7 +34,9 @@ pub const IR6_VERSION: u32 = 6;
 pub const IR7_VERSION: u32 = 7;
 pub const IR8_VERSION: u32 = 8;
 pub const IR9_VERSION: u32 = 9;
-pub const FEATURES: [&str; 25] = [
+pub const IR10_VERSION: u32 = 10;
+pub const FEATURES: [&str; 26] = [
+    "auto-instancing-v10",
     "class-enumerators-v9",
     "host-procedure-defaults-v1",
     "host-events-v1",
@@ -337,6 +339,7 @@ pub enum SlotRole {
 }
 #[derive(Clone, Debug)]
 pub struct Local {
+    pub auto_new: Option<SourceIndex>,
     pub array: Option<ScalarKind>,
     pub name: String,
     pub kind: ScalarKind,
@@ -447,6 +450,7 @@ pub struct LaunchSignature {
 }
 #[derive(Clone, Debug)]
 pub struct ClassField {
+    pub auto_new: Option<SourceIndex>,
     pub with_events: bool,
     pub name: String,
     pub kind: ScalarKind,
@@ -600,12 +604,20 @@ impl Capabilities {
                 .collect(),
             declarations: ScalarKind::ALL.into_iter().collect(),
         };
+        caps.features.remove("auto-instancing-v10");
         caps.features.remove("class-enumerators-v9");
         caps.features.remove("host-procedure-defaults-v1");
         caps.features.remove("intrinsics-m6a-v1");
         caps.features.remove("string-comparison-context-v1");
         caps.instructions.remove(&Opcode::IntrinsicCall);
         caps.instructions.remove(&Opcode::BinaryCompare);
+        caps
+    }
+    pub fn ir10_structural() -> Self {
+        let mut caps = Self::ir9_structural();
+        caps.profile = "ir10-structural".into();
+        caps.ir_versions.insert(IR10_VERSION);
+        caps.features.insert("auto-instancing-v10".into());
         caps
     }
     pub fn ir9_structural() -> Self {

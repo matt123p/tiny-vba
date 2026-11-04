@@ -18,6 +18,11 @@ pub(super) struct Instance {
 }
 #[derive(Clone, Copy)]
 pub(super) enum ClassReturn {
+    AutoInitialize {
+        object: vba_values::ObjectRef,
+        location: Location,
+        field: Option<(ir::ForeignKind, Option<Location>)>,
+    },
     Event,
     Initialize(vba_values::ObjectRef),
     Terminate(vba_values::ObjectRef),
@@ -678,12 +683,39 @@ impl Session {
             .find(|(_, f)| f.name.eq_ignore_ascii_case(member) && (f.public || inside))
         {
             let location = *fields.get(index).ok_or_else(|| invariant("field index"))?;
+            if site.kind == ir::ForeignKind::ArgumentGet {
+                let scratch = site
+                    .result_reference
+                    .ok_or_else(|| invariant("field reference scratch"))?;
+                let expected = self.location(scratch)?;
+                if self.kinds.get(&expected).is_some_and(|kind| {
+                    *kind != ScalarKind::Variant && Some(kind) != self.kinds.get(&location)
+                }) {
+                    return Err(runtime_diagnostic(runtime::Error::Vba {
+                        number: 13,
+                        message: "ByRef field type mismatch".into(),
+                    }));
+                }
+            }
             let value = if matches!(kind, ir::ForeignKind::Call | ir::ForeignKind::Get) {
                 if !args.is_empty() {
                     return Err(runtime_diagnostic(runtime::Error::Vba {
                         number: 450,
                         message: "field takes no index arguments".into(),
                     }));
+                }
+                let reference = site
+                    .result_reference
+                    .map(|slot| self.location(slot))
+                    .transpose()?;
+                if self.ensure_auto_instance(location, field.auto_new)? {
+                    let Some(ClassReturn::AutoInitialize { field, .. }) =
+                        &mut self.top_mut()?.class_return
+                    else {
+                        return Err(invariant("auto-instancing initializer frame"));
+                    };
+                    *field = Some((site.kind, reference));
+                    return Ok(());
                 }
                 self.read_value(location)?
             } else if matches!(kind, ir::ForeignKind::Let | ir::ForeignKind::Set) && args.len() == 1
@@ -701,18 +733,6 @@ impl Session {
                 }));
             };
             if site.kind == ir::ForeignKind::ArgumentGet {
-                let scratch = site
-                    .result_reference
-                    .ok_or_else(|| invariant("field reference scratch"))?;
-                let expected = self.location(scratch)?;
-                if self.kinds.get(&expected).is_some_and(|kind| {
-                    *kind != ScalarKind::Variant && Some(kind) != self.kinds.get(&location)
-                }) {
-                    return Err(runtime_diagnostic(runtime::Error::Vba {
-                        number: 13,
-                        message: "ByRef field type mismatch".into(),
-                    }));
-                }
                 self.push(Operand::Reference(location))?;
                 self.advance()?;
                 return Ok(());

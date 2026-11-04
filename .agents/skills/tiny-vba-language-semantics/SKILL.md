@@ -216,3 +216,9 @@ validates public zero-argument Object-returning class enumerators. Keep older IR
 refusal, ordinary getter checkpoints, bounded forwarding roots, wait/cancel and
 active/parked snapshot lifetimes. Native Controls/UserForms snapshot canonical
 objects through the transient view; no second mutable registry or .tvform change.
+
+IR 10 scalar As New is defined by
+[ADR 0046](../../../docs/decisions/0046-lazy-project-class-variables.md). Preserve
+exact nominal local/field/persistent metadata, inert declaration/inspection/Set
+targets, source-order ByRef preparation, ordinary constructor frames and failed
+initialization retry. No external activation or mutable registry is added.

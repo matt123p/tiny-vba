@@ -131,6 +131,7 @@ fn validate(
             | IR7_VERSION
             | IR8_VERSION
             | IR9_VERSION
+            | IR10_VERSION
     ) || p.profile != caps.profile
         || !caps.ir_versions.contains(&p.ir_version)
     {
@@ -197,6 +198,20 @@ fn validate(
         let mut fields = BTreeSet::new();
         let mut methods = BTreeSet::new();
         for field in &class.fields {
+            if let Some(source) = field.auto_new {
+                budget.table(p.classes.len())?;
+                verify_auto_new(
+                    p,
+                    caps,
+                    source,
+                    field.kind,
+                    field.array,
+                    field.nominal.as_ref(),
+                )?;
+                if field.with_events {
+                    return Err(invalid("auto-instancing WithEvents field"));
+                }
+            }
             if field.public && field.array.is_some() {
                 return Err(invalid("object module Public array"));
             }
@@ -481,6 +496,7 @@ fn validate(
     let mut statement_ids = BTreeSet::new();
     let mut instruction_count = 0usize;
     let mut depths = reserve(p.procedures.len())?;
+    let mut persistent_auto = BTreeMap::new();
     let mut persistent_kinds = BTreeMap::new();
     for (procedure_index, proc) in p.procedures.iter().enumerate() {
         name(&proc.name)?;
@@ -650,6 +666,23 @@ fn validate(
             _ => (),
         }
         for (i, local) in proc.locals.iter().enumerate() {
+            if let Some(source) = local.auto_new {
+                budget.table(p.classes.len())?;
+                verify_auto_new(
+                    p,
+                    caps,
+                    source,
+                    local.kind,
+                    local.array,
+                    nominal_slots.get(&(procedure_index, i)).copied(),
+                )?;
+                if !matches!(
+                    local.role,
+                    SlotRole::User | SlotRole::Persistent(_) | SlotRole::InstanceField(_)
+                ) {
+                    return Err(invalid("auto-instancing local role"));
+                }
+            }
             let role_valid = match local.role {
                 SlotRole::Receiver => {
                     feature(p, caps, "project-classes-v7")?;
@@ -671,6 +704,7 @@ fn validate(
                     p.ir_version >= IR7_VERSION
                         && local.kind == field.kind
                         && local.array == field.array
+                        && local.auto_new == field.auto_new
                         && nominal_slots.get(&(procedure_index, i)).copied()
                             == field.nominal.as_ref()
                         && i >= proc.parameters.len()
@@ -696,6 +730,12 @@ fn validate(
                         return Err(invalid("persistent slot identifier/version"));
                     }
                     feature(p, caps, "persistent-v2")?;
+                    if persistent_auto
+                        .insert(id, local.auto_new)
+                        .is_some_and(|old| old != local.auto_new)
+                    {
+                        return Err(invalid("inconsistent persistent auto-instancing"));
+                    }
                     if persistent_kinds
                         .insert(id, (local.kind, local.array))
                         .is_some_and(|kind| kind != (local.kind, local.array))
@@ -1621,6 +1661,36 @@ fn target_checkpoint(proc: &Procedure, pc: Pc) -> Result<()> {
         Some(Instruction::Checkpoint(_))
     ) {
         return Err(invalid("branch target is not checkpoint"));
+    }
+    Ok(())
+}
+
+fn verify_auto_new(
+    p: &Program,
+    caps: &Capabilities,
+    source: SourceIndex,
+    kind: ScalarKind,
+    array: Option<ScalarKind>,
+    nominal: Option<&vba_values::NominalType>,
+) -> Result<()> {
+    if p.ir_version < IR10_VERSION {
+        return Err(incompatible("auto-instancing requires IR 10"));
+    }
+    feature(p, caps, "auto-instancing-v10")?;
+    let class = p
+        .classes
+        .iter()
+        .find(|class| class.source == source && !class.document)
+        .ok_or_else(|| invalid("auto-instancing class"))?;
+    if kind != ScalarKind::Object
+        || array.is_some()
+        || nominal.is_none_or(|ty| {
+            ty.library() != "vbaproject"
+                || ty.version() != "1"
+                || !ty.name().eq_ignore_ascii_case(&class.name)
+        })
+    {
+        return Err(invalid("auto-instancing storage/type"));
     }
     Ok(())
 }

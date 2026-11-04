@@ -9,6 +9,7 @@ const MAX_PROCEDURES: usize = 4096;
 const MAX_SLOTS: usize = 4096;
 #[derive(Clone, Debug)]
 pub struct ClassField {
+    pub auto_new: Option<String>,
     pub with_events: bool,
     pub name: String,
     pub kind: ScalarKind,
@@ -46,6 +47,7 @@ pub struct BoundParameter {
 }
 #[derive(Clone, Debug)]
 pub struct BoundLocal {
+    pub auto_new: Option<String>,
     pub field: Option<u32>,
     pub receiver: bool,
     pub nominal: Option<vba_values::NominalType>,
@@ -788,6 +790,7 @@ pub fn bind_with_references(
                     }
                 }
                 fields.push(ClassField {
+                    auto_new: auto_new_type(d, references)?,
                     with_events: d.with_events,
                     name: d.name.spelling.clone(),
                     kind: if d.dimensions.is_some() {
@@ -1238,6 +1241,7 @@ pub fn bind_with_references(
                 local.persistent =
                     Some(format!("{}:module:{}", sig.module, declaration.name.key()));
             }
+            local.auto_new = auto_new_type(declaration, references)?;
             local.array = declaration.dimensions.as_ref().map(|_| element);
             local.nominal = nominal(declaration.ty.as_ref(), references)?;
         }
@@ -1344,6 +1348,7 @@ impl Binder<'_> {
         push(
             &mut self.locals,
             BoundLocal {
+                auto_new: None,
                 field: None,
                 receiver: false,
                 nominal: None,
@@ -1406,6 +1411,7 @@ impl Binder<'_> {
                                 .locals
                                 .last_mut()
                                 .ok_or_else(|| err("declaration local", d.span))?;
+                            local.auto_new = auto_new_type(d, self.references)?;
                             local.array = d.dimensions.as_ref().map(|_| element);
                             local.nominal = nominal(d.ty.as_ref(), self.references)?;
                             if d.persistent {
@@ -1447,6 +1453,7 @@ impl Binder<'_> {
         push(
             &mut self.locals,
             BoundLocal {
+                auto_new: None,
                 field: None,
                 receiver: false,
                 nominal: None,
@@ -1573,6 +1580,7 @@ impl Binder<'_> {
         push(
             &mut self.locals,
             BoundLocal {
+                auto_new: None,
                 field: None,
                 receiver: false,
                 nominal: None,
@@ -2339,6 +2347,7 @@ impl Binder<'_> {
             push(
                 &mut self.locals,
                 BoundLocal {
+                    auto_new: None,
                     field: None,
                     receiver: false,
                     nominal: None,
@@ -3933,4 +3942,22 @@ fn literal(
         ast::ExprKind::Nothing => Value::Nothing,
         _ => return Err(unsupported("constant expression evaluation", expr.span)),
     })
+}
+
+fn auto_new_type(
+    d: &ast::Declaration,
+    references: &vba_foreign::ReferenceSet,
+) -> Result<Option<String>> {
+    if !d.auto_new {
+        return Ok(None);
+    }
+    if d.dimensions.is_some() {
+        return Err(unsupported("As New arrays", d.span));
+    }
+    let ty = nominal(d.ty.as_ref(), references)?
+        .ok_or_else(|| err("As New requires a named project class", d.span))?;
+    if !ty.library().eq_ignore_ascii_case("VBAProject") {
+        return Err(unsupported("external As New activation", d.span));
+    }
+    Ok(Some(ty.name().to_owned()))
 }

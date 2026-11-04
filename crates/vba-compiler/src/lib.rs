@@ -162,6 +162,9 @@ pub fn compile_modules(
             code_count: 0,
         };
         for (i, local) in procedure.locals.iter().enumerate() {
+            if local.auto_new.is_some() {
+                builder.feature("auto-instancing-v10");
+            }
             if local.array.is_some() {
                 builder.feature("arrays-v2");
                 builder.feature("array-layout-v3");
@@ -196,6 +199,7 @@ pub fn compile_modules(
             push(
                 &mut builder.locals,
                 ir::Local {
+                    auto_new: auto_new_source(local.auto_new.as_deref(), &program.classes)?,
                     array: local.array,
                     name: local.name.clone(),
                     kind: local.kind,
@@ -265,6 +269,9 @@ pub fn compile_modules(
     }
     let mut classes = Vec::new();
     for class in &program.classes {
+        if class.fields.iter().any(|field| field.auto_new.is_some()) {
+            features.insert("auto-instancing-v10".into());
+        }
         features.insert("project-classes-v7".into());
         if class.fields.iter().any(|field| {
             field.with_events
@@ -317,16 +324,19 @@ pub fn compile_modules(
             fields: class
                 .fields
                 .iter()
-                .map(|f| ir::ClassField {
-                    with_events: f.with_events,
-                    name: f.name.clone(),
-                    kind: f.kind,
-                    nominal: f.nominal.clone(),
-                    array: f.array,
-                    bounds: f.bounds.clone(),
-                    public: f.public,
+                .map(|f| {
+                    Ok(ir::ClassField {
+                        auto_new: auto_new_source(f.auto_new.as_deref(), &program.classes)?,
+                        with_events: f.with_events,
+                        name: f.name.clone(),
+                        kind: f.kind,
+                        nominal: f.nominal.clone(),
+                        array: f.array,
+                        bounds: f.bounds.clone(),
+                        public: f.public,
+                    })
                 })
-                .collect(),
+                .collect::<Result<Vec<_>>>()?,
             methods: program
                 .procedures
                 .iter()
@@ -351,7 +361,9 @@ pub fn compile_modules(
     let mut ir = ir::Program {
         classes,
         nominal_locals,
-        ir_version: if features.contains("class-enumerators-v9") {
+        ir_version: if features.contains("auto-instancing-v10") {
+            ir::IR10_VERSION
+        } else if features.contains("class-enumerators-v9") {
             ir::IR9_VERSION
         } else if features.contains("host-procedure-defaults-v1")
             || features.contains("intrinsics-m6a-v1")
@@ -587,6 +599,7 @@ impl Builder<'_> {
         push(
             &mut self.locals,
             ir::Local {
+                auto_new: None,
                 array: None,
                 name: format!("$scratch{id}"),
                 kind,
@@ -636,6 +649,17 @@ impl Builder<'_> {
         self.constant(block, &Value::Integer(0))?;
         self.binary(block, "+", value.span)?;
         self.emit(block, ir::Instruction::WriteRef(ir::AssignmentKind::Value))
+    }
+    fn touch_auto_instance(&mut self, block: usize, slot: usize) -> Result<()> {
+        if self
+            .locals
+            .get(slot)
+            .is_some_and(|local| local.auto_new.is_some())
+        {
+            self.emit(block, ir::Instruction::ReadLocal(ir::LocalSlot(idx(slot)?)))?;
+            self.emit(block, ir::Instruction::DropValue)?;
+        }
+        Ok(())
     }
     fn capture_argument(&mut self, block: usize, slot: usize, value: &bound::Expr) -> Result<()> {
         self.feature("argument-defaults-v2");
@@ -774,6 +798,10 @@ impl Builder<'_> {
                         kind: bound::ExprKind::Local(slot),
                     })
                 }
+                bound::Argument::Reference(slot) => {
+                    self.touch_auto_instance(block, *slot)?;
+                    arg.clone()
+                }
                 arg => arg.clone(),
             };
             push(&mut prepared, (index, arg))?;
@@ -885,6 +913,7 @@ impl Builder<'_> {
                         !matches!(l.role, ir::SlotRole::HostRoot | ir::SlotRole::Receiver)
                     })
                 {
+                    self.touch_auto_instance(block, slot)?;
                     self.emit(block, ir::Instruction::RefLocal(ir::LocalSlot(idx(slot)?)))?;
                     ir::ArgumentMode::Reference
                 } else if arg.reference
@@ -1837,4 +1866,18 @@ impl Builder<'_> {
             foreign,
         })
     }
+}
+
+fn auto_new_source(
+    name: Option<&str>,
+    classes: &[bound::Class],
+) -> Result<Option<ir::SourceIndex>> {
+    let Some(name) = name else {
+        return Ok(None);
+    };
+    let class = classes
+        .iter()
+        .find(|class| class.name.eq_ignore_ascii_case(name) && !class.document)
+        .ok_or_else(|| error("As New requires a constructible project class"))?;
+    Ok(Some(ir::SourceIndex(idx(class.module)?)))
 }

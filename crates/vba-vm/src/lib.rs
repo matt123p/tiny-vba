@@ -1,5 +1,6 @@
 //! M3 explicit-frame execution, single-use continuations and generation-checked inspection.
 #![forbid(unsafe_code)]
+mod auto_instances;
 mod classes;
 mod host_calls;
 mod host_events;
@@ -20,7 +21,7 @@ use vba_values::{Location, Locations, ScalarKind, Value};
 type Result<T> = std::result::Result<T, Diagnostic>;
 pub const PROFILE: &str = runtime::PROFILE;
 pub fn capabilities() -> ir::Capabilities {
-    let mut c = ir::Capabilities::ir9_structural();
+    let mut c = ir::Capabilities::ir10_structural();
     c.profile = PROFILE.into();
 
     c
@@ -2652,6 +2653,19 @@ impl Session {
             self.array_types.remove(&location);
             self.nominal_types.remove(&location);
         }
+        if let Some(ClassReturn::AutoInitialize {
+            object, location, ..
+        }) = frame.class_return
+        {
+            if self
+                .store
+                .read(location)
+                .is_ok_and(|value| *value == Value::Object(object))
+            {
+                self.store.write(location, Value::Nothing)?;
+            }
+            self.retire_instance(object)?;
+        }
         if let Some(ClassReturn::Initialize(object) | ClassReturn::Terminate(object)) =
             frame.class_return
         {
@@ -3120,7 +3134,17 @@ impl Session {
                 self.advance()?;
             }
             I::ReadLocal(slot) => {
-                let v = self.read_value(self.location(slot)?)?;
+                let location = self.location(slot)?;
+                let source = self
+                    .proc()?
+                    .locals
+                    .get(slot.0 as usize)
+                    .ok_or_else(|| invariant("auto-instancing local"))?
+                    .auto_new;
+                if self.ensure_auto_instance(location, source)? {
+                    return Ok(());
+                }
+                let v = self.read_value(location)?;
                 self.push(Operand::Value(v))?;
                 self.advance()?;
             }
@@ -3502,6 +3526,19 @@ impl Session {
                 }
                 if let Some(disposition) = frame.class_return {
                     match disposition {
+                        ClassReturn::AutoInitialize {
+                            location, field, ..
+                        } => {
+                            if let Some((kind, reference)) = field {
+                                if kind == ir::ForeignKind::ArgumentGet {
+                                    self.push(Operand::Reference(location))?;
+                                    self.advance()?;
+                                } else {
+                                    let value = self.read_value(location)?;
+                                    self.finish_class_call(kind, reference, value)?;
+                                }
+                            }
+                        }
                         ClassReturn::Event => {}
                         ClassReturn::Initialize(_) => {}
                         ClassReturn::Terminate(object) => self.retire_instance(object)?,

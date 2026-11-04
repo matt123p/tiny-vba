@@ -608,3 +608,73 @@ fn retained_native_enumerator_owns_its_collection_after_unload() -> R {
     assert_eq!(ide.output(), vec!["Heading", "Entry", "Apply"]);
     Ok(())
 }
+
+#[test]
+fn native_as_new_forms_load_only_on_reference_and_recreate_after_nothing() -> R {
+    let ide = setup(
+        "Sub Main()\nDim f As New NativeForm,a As NativeForm\nDebug.Print UserForms.Count\nf.Show 0\nf.Entry.Text=\"first\"\nSet a=f\nSet f=Nothing\nf.Show 0\nf.Entry.Text=\"second\"\nIf f Is a Then Err.Raise 5\nDebug.Print a.Entry.Text\nDebug.Print f.Entry.Text\nDebug.Print UserForms.Count\nEnd Sub",
+        None,
+    )?;
+    assert_eq!(ide.mode(), Mode::Completed, "{:?}", ide.diagnostics);
+    assert_eq!(
+        ide.output(),
+        vec!["0", "initialized", "initialized", "first", "second", "2"]
+    );
+    assert_eq!(ide.form_instances()?.len(), 2);
+    Ok(())
+}
+
+#[test]
+fn enumerated_controls_remain_rooted_in_a_parked_modal_caller() -> R {
+    let source =
+        fixture::SOURCE.replace("Debug.Print Entry.Text", "Stop\r\nDebug.Print Entry.Text");
+    let mut ide = setup(
+        "Sub Main()\nDim a As NativeForm,b As NativeForm,c As Object\nSet a=New NativeForm\nSet b=New NativeForm\na.Show 0\nFor Each c In a.Controls\nIf c.Name=\"Heading\" Then\nUnload a\nb.Show\nEnd If\nDebug.Print c.Name\nNext c\nEnd Sub",
+        Some(&source),
+    )?;
+    assert_eq!(ide.mode(), Mode::Waiting, "{:?}", ide.diagnostics);
+    let b = *ide.form_instances()?.first().ok_or("modal instance")?;
+    ide.form_instance_event(b, Some(13), None, &mut NoHost)?;
+    settle(&mut ide)?;
+    assert_eq!(ide.mode(), Mode::Break, "{:?}", ide.diagnostics);
+    ide.dispatch(Action::Run, &mut NoHost)?;
+    settle(&mut ide)?;
+    ide.tick(&mut NoHost)?;
+    settle(&mut ide)?;
+    assert_eq!(ide.mode(), Mode::Completed, "{:?}", ide.diagnostics);
+    assert_eq!(
+        ide.output(),
+        vec![
+            "initialized",
+            "initialized",
+            "initial",
+            "Heading",
+            "Entry",
+            "Apply"
+        ]
+    );
+    Ok(())
+}
+
+#[test]
+fn designer_run_constructs_non_predeclared_native_forms_without_a_default_reference() -> R {
+    let mut ide = Ide::new();
+    let export = String::from_utf8(fixture::export())?
+        .replace("VB_PredeclaredId = True", "VB_PredeclaredId = False");
+    let id = ide.import_native_form_export(
+        "NativeForm.frm",
+        export.as_bytes(),
+        1252,
+        &[NativeFormResource {
+            name: "NativeForm.frx".into(),
+            bytes: fixture::companion(),
+        }],
+    )?;
+    ide.run_form(id, false, &mut NoHost)?;
+    settle(&mut ide)?;
+    assert_eq!(ide.mode(), Mode::Completed, "{:?}", ide.diagnostics);
+    assert_eq!(ide.form_instances()?.len(), 1);
+    assert!(ide.form_runtime_field(id, None, "VbaLoaded").is_err());
+    assert_eq!(ide.output(), vec!["initialized"]);
+    Ok(())
+}

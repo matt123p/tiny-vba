@@ -144,7 +144,7 @@ behavior contracts, not fresh Office oracle observations:
   [Click](https://learn.microsoft.com/office/vba/language/reference/user-interface-help/click-event): selected lifecycle/control events.
 
 The declared M2 gate does not claim universal VBA class/UserForm compatibility.
-Friend, As New, Implements, arbitrary control events/control types, binary form
+Friend, Implements, arbitrary control events/control types, binary form
 resources, COM/DLL activation and Office package writeback remain unsupported.
 Document bindings/events, Office objects, storage/trust and package persistence
 remain fork-owned M5–M7 work. No GridCraft or WordCraft files changed.
@@ -167,3 +167,7 @@ images were inspected, including narrow layout, injected themes, modal contrast
 and actual paused handler source/locals. Reports are generated under ignored
 `reports/ui/`; both Rust render harnesses and Chromium scripts reproduce them.
 No fresh Windows/macOS or Microsoft Office oracle run is claimed.
+
+As New's historical exclusion is superseded for scalar project classes/native
+forms by [ADR 0046](decisions/0046-lazy-project-class-variables.md) and IR 10.
+Arrays/external activation remain unsupported.

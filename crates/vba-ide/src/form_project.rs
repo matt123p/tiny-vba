@@ -1215,12 +1215,28 @@ impl Ide {
                 String::from("Public Const vbModal As Long=1\nPublic Const vbModeless As Long=0\n");
             support.push_str("Public Function UserForms(Optional ByVal index As Variant) As Object\nIf IsMissing(index) Then\nSet UserForms=VbaFormUserForms\nElse\nSet UserForms=VbaFormUserForms.Item(index)\nEnd If\nEnd Function\n");
             for (id, designer) in &self.forms {
+                let module = self
+                    .modules
+                    .iter()
+                    .find(|module| module.id == *id)
+                    .ok_or_else(|| error("missing form source"))?;
+                let parsed = parse(&module.source()?, ModuleKind::Class)?;
+                let predeclared =
+                    !parsed.module.attributes.iter().any(|attribute| {
+                        attribute.path.first().is_some_and(|name| {
+                            name.spelling.eq_ignore_ascii_case("VB_PredeclaredId")
+                        }) && matches!(attribute.value.kind, vba_syntax::ExprKind::Boolean(false))
+                    });
                 for (name, modal) in [("Modal", 1), ("Modeless", 0)] {
-                    support.push_str(&format!(
-                        "Sub VbaRun{name}{}()\n{}.Show {modal}\nEnd Sub\n",
-                        id.0,
-                        designer.form().name
-                    ));
+                    let instance = if predeclared {
+                        format!("{}.Show {modal}\n", designer.form().name)
+                    } else {
+                        format!(
+                            "Dim instance As {0}\nSet instance=New {0}\ninstance.Show {modal}\n",
+                            designer.form().name
+                        )
+                    };
+                    support.push_str(&format!("Sub VbaRun{name}{}()\n{instance}End Sub\n", id.0));
                 }
             }
             modules.push(parse(

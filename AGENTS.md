@@ -150,3 +150,8 @@ class enumerator metadata and native Controls/UserForms For Each. Preserve IR 1â
 refusal, ordinary getter frames, nonreplayed waits, bounded receiver roots and
 active/parked snapshot object ownership. Native collection interfaces inspect
 canonical fields without another mutable store. M7A.4 remains in progress.
+
+[ADR 0046](docs/decisions/0046-lazy-project-class-variables.md) adds IR 10 scalar
+project-class/native-form As New. Preserve exact nominal storage/field aliases,
+lazy reads, inert inspection, source-order ByRef evaluation and initializer
+Stop/failure/retry. No external activation or per-location registry is added.

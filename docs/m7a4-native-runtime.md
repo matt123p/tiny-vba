@@ -6,6 +6,11 @@ Updated 2026-11-04. **IN PROGRESS. M7A.4 is not complete.** This record extends
 
 Implemented in shared tiny-vba:
 
+- [Lazy As New](decisions/0046-lazy-project-class-variables.md) for scalar project
+  classes/native forms, module/static and per-instance variables, canonical ByRef,
+  Nothing re-creation, constructor Stop/failure/retry and inert debugger inspection
+  under IR 10. Non-predeclared forms can also launch from the designer.
+
 - [Window/code lifetime separation](decisions/0044-userform-window-and-code-lifetime.md):
   unloading drops display/default ownership while aliases retain authored code
   fields; named control getters reload initial controls. Fresh default references
@@ -74,7 +79,8 @@ Remaining M7A.4 requirements, without reducing the milestone's scope:
   full Activate/Deactivate ordering and modeless focus ownership. The selected
   replacement/code-lifetime cases are implemented under ADR 0044.
 - Qualified collection access, generic UserForm/
-  MSForms type bindings, and complete implicit/As New behavior. Direct enumerator
+  MSForms type bindings, additional implicit/alias behavior and As New arrays.
+  External class activation remains outside the supported project-only path. Direct enumerator
   cursor interfaces and collection structural-mutation parity also remain open;
   For Each uses the existing bounded snapshot profile.
 - ActiveControl/SetFocus, Enter/Exit and Before/AfterUpdate with the native typed

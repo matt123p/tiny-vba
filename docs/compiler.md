@@ -271,3 +271,10 @@ metadata for explicit host calls. Earlier targets retain static call-site expans
 required standard parameters. Verification requires IR 8 and the declared feature; this
 adds no opcode. [ADR 0036](decisions/0036-suspended-host-project-calls.md) defines ownership.
 Qualified type members accept contextual keyword spelling, including `External.Name`.
+
+[ADR 0046](decisions/0046-lazy-project-class-variables.md) adds scalar project-class
+and native-form As New under IR 10 `auto-instancing-v10`, including module/static/
+instance storage, canonical ByRef preparation and constructor Stop/failure/retry.
+Reads construct only when Nothing; declaration/Set targets and inspection remain
+inert. Arrays and external activation refuse explicitly. Native designer launch
+constructs non-predeclared forms explicitly. Broader M7A.4 requirements remain open.

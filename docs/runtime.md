@@ -1,6 +1,6 @@
 # M3/M4 runtime and debugger
 
-Implemented 2026-10-26, extended by new M1.1. The current consumer is `m5-host-v1`, using verified IR 1/2/3/4/5/6/7/8.
+Implemented 2026-10-26, extended by new M1.1. The current consumer is `m5-host-v1`, using verified IR 1/2/3/4/5/6/7/8/9/10.
 The [M4 language contract](m4-language.md) and [ADR 0011](decisions/0011-m4-language-extension.md)
 define scalar coercions, arrays, arguments, persistent state, builtins and VBA handlers.
 [ADR 0013](decisions/0013-m5-host-contract.md) adds the versioned native host protocol and hidden
@@ -378,3 +378,10 @@ verified DISPID_NEWENUM metadata invokes ordinary Object-returning getters befor
 the existing bounded foreign enumeration path. Native forwarding receivers and
 active/parked enumeration snapshots remain lifetime roots. No Office class names,
 object registry, dependency edge or new opcode enter the VM.
+
+[ADR 0046](decisions/0046-lazy-project-class-variables.md) adds scalar project-class
+and native-form As New under IR 10 `auto-instancing-v10`, including module/static/
+instance storage, canonical ByRef preparation and constructor Stop/failure/retry.
+Reads construct only when Nothing; declaration/Set targets and inspection remain
+inert. Arrays and external activation refuse explicitly. Native designer launch
+constructs non-predeclared forms explicitly. Broader M7A.4 requirements remain open.
