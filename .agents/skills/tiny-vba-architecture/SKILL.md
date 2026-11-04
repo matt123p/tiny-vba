@@ -176,9 +176,15 @@ fresh Office observations remain M8.5.
 supersedes the custom format direction and native-forms deferral. Mirror applicable
 Excel/Word VBA behavior, formats and workflows; do not add custom user-facing
 language features, formats or control semantics. Unknown behavior remains an
-explicit gap pending evidence. M7A is planned, not implemented: native `.frm`/`.frx`
+explicit gap pending evidence. M7A is in progress (see [inventory/ledger](../../../docs/m7a-inventory.md)); native `.frm`/`.frx`
 and embedded form workflows, required native edited persistence, and removal of
 `.tvform` precede M8 release acceptance. Existing codec references describe legacy
 implementation, not permission to extend or retain that product format. Reuse
 compatible internal layers and native-equivalent regressions. Original-byte
 preservation alone does not satisfy saving native edits.
+
+Initial FC1.1 native worksheet metadata lives in GridCraft XLSX, with no VM or
+UI dependency and no second writable model. [ADR 0039](../../../docs/decisions/0039-m7a-native-control-metadata.md)
+requires source DrawingML identity/assignment reconciliation before later native
+rendering or activation. Decode tests are not execution evidence. Shared native
+UserForm codecs, native edited persistence and custom-format removal remain open.

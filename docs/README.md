@@ -27,8 +27,10 @@ the [M6A work ledger](m6a-work-ledger.md) records completed packet results.
 [M7A native Office forms/control breakdown](office-forms-controls-implementation-plan.md)
 activates native UserForms, worksheet controls and native persistence before M8,
 and requires removal of `.tvform`. [ADR 0038](decisions/0038-native-office-forms-and-compatibility-only.md)
-records the owner-directed compatibility-only policy. Implementation has not started;
-existing `.tvform` support is legacy code scheduled for removal.
+records the owner-directed compatibility-only policy. M7A is in progress: the [inventory/ledger](m7a-inventory.md) and
+[ADR 0039](decisions/0039-m7a-native-control-metadata.md) record the audited paths
+and partial native worksheet Button metadata reader. Native UserForm codecs and
+`.tvform` removal are still open; current custom-format code remains legacy.
 
 [VBA attributes and Excel code-view investigation](vba-attributes-and-editor-projection.md)
 documents hidden module/member metadata, recorded-macro attributes, the blank

@@ -255,3 +255,12 @@ suspension and toolkit-independent IDE orchestration. The IDE validates public p
 visibility, exact pending token, source and host identity; the VM owns frames, typed values,
 ByRef outputs and cumulative limits. No dependency edge or foreign protocol variant changes.
 Application forks own macro resolution policy, lifecycle events, prompts and native commits.
+
+## M7A native control metadata (2026-11-04)
+
+[ADR 0039](decisions/0039-m7a-native-control-metadata.md) and the
+[inventory](m7a-inventory.md) record the first GridCraft-owned native worksheet
+Button metadata decoder. It reads the fork's preserved graph into a bounded
+read-only snapshot, with no new shared crate/edge or VM authority. Full DrawingML
+identity reconciliation, UI/runtime activation, native UserForm codecs/edited
+persistence and removal of `.tvform` remain open.

@@ -1,10 +1,12 @@
 # M7A implementation breakdown — native Office forms and controls
 
-Created 2026-11-02; activated 2026-11-04. Status: **PLANNED / IMPLEMENTATION NOT STARTED**.
+Created 2026-11-02; activated 2026-11-04. Status: **IN PROGRESS**, started 2026-11-04.
 Owner direction inserts [M7A before M8](implementation-plan.md) and requires native
 Office forms plus removal of `.tvform`. [ADR 0038](decisions/0038-native-office-forms-and-compatibility-only.md)
 supersedes this document's former deferral. FC0–FC5 IDs remain stable; FC6 covers
-removal. This is a work breakdown, not a claim that native forms are implemented.
+removal. The [inventory/ledger](m7a-inventory.md) and [ADR 0039](decisions/0039-m7a-native-control-metadata.md)
+record the first native worksheet metadata implementation. Native UserForms,
+interactive controls and removal remain open; this is not a native-forms sign-off.
 Only Office-compatible behavior/formats belong in product scope.
 
 ## Problem and current support
@@ -217,6 +219,8 @@ Report load/compile/display/input/run/edit/save independently using PASS,
 MISMATCH, UNSUPPORTED and NOT_RUN. Office reference behavior is the target;
 unverified behavior remains a gap, never an invented replacement feature.
 
-Next task: **M7A.1 / FC0.1**, followed by the FC1 worksheet Button slice. Native
-UserForm codec work follows the reviewed FC0 contracts. No runtime, format or
-compatibility result changes with this planning revision.
+FC0.1 initial path inventory is complete; FC0.2/FC0.3 are in progress. FC1.1 now
+has a bounded read-only native Button metadata decoder and save/reopen evidence.
+Next: preserve/reconcile source DrawingML identity and assignments before geometry,
+rendering and activation. Shared native UserForm codec/resource contracts remain
+next in their own layer. See the ledger for exact evidence and open capabilities.

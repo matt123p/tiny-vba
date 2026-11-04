@@ -1,5 +1,44 @@
 # Implementation progress
 
+## M7A started — inventory and first native Button metadata slice (2026-11-04)
+
+Completed the initial FC0.1 code-path audit and published the
+[control/property/event seed matrix and work ledger](m7a-inventory.md).
+[ADR 0039](decisions/0039-m7a-native-control-metadata.md) records the first native
+reader contract and owner boundaries. M7A.1 remains in progress: detailed control
+signatures and native UserForm resource/encoding contracts are still needed.
+
+GridCraft XLSX now exposes `read_worksheet_controls` over the existing preserved
+worksheet/VML/ctrlProp graph. It joins native shape IDs/Office spid, names, caption
+text and macro sources without creating a second model or granting execution.
+A strict namespace-aware reader bounds input, stored text, nodes, depth, graph
+metadata and control counts; DTDs, spoofed namespaces, ambiguous identities,
+conflicting assignments and malformed graphs refuse without mutation. Caption
+mixed text/entities preserve order. Known x14 markup-choice/fallback selection
+produces one record. Preserved fragments now retain their inherited default XML
+namespace as well as prefixes, fixing a blocker for proper native namespace checks.
+
+Eight original native package regressions and the same eight actual Node 22
+JavaScript/WASM tests PASS. They cover save/reopen/rename, exact metadata, explicit
+unsupported controls, negative graph/namespace cases and resource limits. This is
+partial FC1.1 decode evidence, not display/input/run or edited native save support.
+Validation: GridCraft `CRAFT_FONTS_DIR=/tmp/gridcraft-acceptance-fonts cargo xtask ci`
+PASS (all 10 steps, including full tests, strict Clippy and WASM). The focused
+`cargo test -p gridcraft-xlsx --locked form_controls` and actual
+`wasm32-unknown-unknown` tests via `wasm-bindgen-test-runner` PASS (8 each;
+Node 22.23.4). Shared `cargo xtask ci`, `cargo xtask wasm` and
+`cargo xtask wasm-run` PASS. `python3 -O tools/check_m7.py` verifies all 12
+historical artifact hashes unchanged; it does not execute the M7 fixtures.
+Both repositories pass `git diff --check`. WordCraft code is unchanged.
+
+The audit also found DrawingML source IDs are replaced by model IDs. Preserve and
+reconcile those IDs/assignments before enabling native Button rendering/activation.
+Native UserForms (`.frm`/`.frx` and embedded resources), full control semantics,
+required native encoding/writeback and `.tvform` removal are still open. No legacy
+format extension, new user-facing format, VM/IR capability or fresh Office result
+was introduced. Next: complete native worksheet representation reconciliation;
+shared native UserForm resource contracts can proceed in their owning layer.
+
 ## M7A added — native Office forms and removal of .tvform (2026-11-04)
 
 Owner direction inserts **M7A before M8** and supersedes the native-forms deferral

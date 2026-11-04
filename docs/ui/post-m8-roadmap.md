@@ -26,7 +26,9 @@ profile. [M7A](../implementation-plan.md) now activates native UserForms, worksh
 controls and native editing/persistence, and removes `.tvform`. The
 [forms breakdown](../office-forms-controls-implementation-plan.md) retains FC task
 IDs; [ADR 0038](../decisions/0038-native-office-forms-and-compatibility-only.md)
-sets the compatibility-only direction. Implementation has not started.
+sets the compatibility-only direction. M7A has started with audited paths and a
+partial native worksheet metadata decoder; [the ledger](../m7a-inventory.md)
+records the remaining native UI/runtime/form work.
 Fresh Office comparisons remain [M8.5](../implementation-plan.md#m8--expanded-conformance-hardening-and-release).
 Generic-host doubles and standalone UI images cannot establish real Office compatibility.
 

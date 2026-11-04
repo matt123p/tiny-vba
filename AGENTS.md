@@ -100,10 +100,13 @@ package/writeback work. Source decoding stays inert/read-only; package/trust pol
 stays in forks. `cargo xtask m7` is optional and requires sibling forks; core CI
 stays independent. Preserve original bytes separately from source exports; edited
 binary writeback and cryptographic signature verification remain unsupported.
-M7A is next; native Office forms and removal of `.tvform` precede M8.
+M7A is in progress; native Office forms and removal of `.tvform` precede M8.
 See [ADR 0038](docs/decisions/0038-native-office-forms-and-compatibility-only.md). Fresh Office comparisons remain NOT_RUN under M8.5.
 
-M7A is planned, not implemented. It activates native UserForms (`.frm`/`.frx` and
+M7A is in progress; see [inventory/ledger](docs/m7a-inventory.md) and
+[ADR 0039](docs/decisions/0039-m7a-native-control-metadata.md). The initial native
+worksheet metadata reader is partial FC1.1; it does not render or execute controls.
+Native UserForm codecs and `.tvform` removal are still unimplemented. M7A covers native UserForms (`.frm`/`.frx` and
 embedded resources), Office controls, native editing/persistence and removal of
 the legacy `.tvform` codec/routes/examples. Reuse compatible internals without
 keeping a parallel custom product format. Native edited package persistence needs

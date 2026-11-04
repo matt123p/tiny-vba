@@ -32,25 +32,30 @@ continue alongside M7A, but release acceptance depends on M7A completion.
 
 ## M7A — Native Office forms and removal of .tvform
 
-Status: **PLANNED / IMPLEMENTATION NOT STARTED**, added 2026-11-04 on owner direction.
+Status: **IN PROGRESS**, started 2026-11-04 on owner direction.
+The [inventory and work ledger](m7a-inventory.md) records FC0.1's audited paths,
+the seed control matrix and the partial native worksheet Button metadata slice.
+Native UserForm import, interactive worksheet controls and `.tvform` removal
+remain unimplemented; no M7A acceptance is claimed.
 Owner: tiny-vba reusable form codecs/model/runtime/editor; GridCraft worksheet
 controls/Excel bindings; both forks' document, trust, event and package integration.
 The [activated work breakdown](office-forms-controls-implementation-plan.md)
 retains FC0–FC5 IDs and adds FC6 for removal. M7A IDs below stay stable.
 
-- **M7A.1 — Inventory and contracts (FC0):** audit actual import/designer/runtime/
+- **M7A.1 — Inventory and contracts (FC0; in progress):** audit actual import/designer/runtime/
   persistence paths and Office reference behavior. Publish a per-control/property/
   event/format/host matrix, native fixture rights and provenance, supported platform
   behavior, capability versions, dependencies and acceptance ledger. Cover UserForms,
   worksheet Form Controls and applicable Office-supplied worksheet ActiveX controls
-  separately. First implementation task: FC0.1 inventory, then the native worksheet
-  Button slice; native UserForm codec work can proceed after its contracts are ready.
+  separately. FC0.1 initial inventory is done; continue FC0.2/FC0.3 contracts and
+  the partial worksheet Button slice. Native UserForm codec work can proceed
+  after its resource contracts are ready.
 - **M7A.2 — Native UserForm codecs and attachment (FC3.1–FC3.4):** bounded, inert
   `.frm`/`.frx` and embedded designer-resource import; preserve authored source,
   component/code names, resources and control hierarchy. Attach native forms to
   shared View Object/View Code, Properties and debugger workflows in standalone,
   GridCraft and WordCraft. Native export and embedded import have separate evidence.
-- **M7A.3 — Worksheet forms and controls (FC1–FC2):** implement the worksheet Button
+- **M7A.3 — Worksheet forms and controls (FC1–FC2; first metadata slice implemented):** implement the worksheet Button
   and remaining standard Form Controls with actual Excel geometry, properties,
   macro assignments, linked cells/list ranges, input, trust, event ordering and
   save/reopen behavior. Use real fork commands and undo/recalculation paths.

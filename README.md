@@ -96,9 +96,11 @@ The form designer adds a Toolbox, Properties, drag/resize, alignment, tab order 
 event-handler navigation for the implemented **Label, TextBox and CommandButton**
 profile. Forms run through the real VM and can be debugged during modal or modeless
 interaction. Its current `.tvform` format is legacy code scheduled for removal.
-[M7A](docs/implementation-plan.md) will replace it with native Office UserForms,
-`.frm`/`.frx` exchange, controls and native persistence before M8. Native support
-is not implemented yet. See the [current form scope](docs/m2-acceptance.md).
+[M7A](docs/implementation-plan.md) is in progress to replace it with native Office UserForms,
+`.frm`/`.frx` exchange, controls and native persistence before M8. Native UserForm import
+is not implemented yet. The [M7A ledger](docs/m7a-inventory.md) records the first
+native worksheet Button metadata decoder and remaining form work. See the
+[current shared form scope](docs/m2-acceptance.md).
 
 ## Debugger
 
