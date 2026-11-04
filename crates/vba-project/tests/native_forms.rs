@@ -154,3 +154,49 @@ fn native_text_behavior_packet_decodes_exact_flags_password_and_preserves_origin
     assert_eq!(form.resources[1].bytes, bytes);
     assert!(decode(&fixture::text_companion(flags | (1 << 24), 42)).is_err());
 }
+
+#[test]
+fn native_spin_and_scroll_packets_keep_ranges_identity_and_no_font_tail() {
+    let bytes = fixture::numeric_companion();
+    let f = decode(&bytes).unwrap();
+    assert_eq!(f.design.controls[3].kind, Kind::SpinButton);
+    let spin = f.design.controls[3].numeric.as_ref().unwrap();
+    assert_eq!(
+        (spin.minimum, spin.maximum, spin.value, spin.small_change),
+        (0, 10, 4, 2)
+    );
+    let scroll = f.design.controls[4].numeric.as_ref().unwrap();
+    assert_eq!(
+        (
+            scroll.minimum,
+            scroll.maximum,
+            scroll.value,
+            scroll.large_change
+        ),
+        (10, -10, 0, 5)
+    );
+    assert_eq!(f.resources[1].bytes, bytes);
+}
+
+#[test]
+fn native_numeric_position_outside_range_refuses_the_whole_resource() {
+    use std::io::{Cursor, Read, Write};
+    let original = fixture::numeric_companion();
+    let mut file = cfb::CompoundFile::open(Cursor::new(original[4..].to_vec())).unwrap();
+    let mut objects = Vec::new();
+    file.open_stream("/o")
+        .unwrap()
+        .read_to_end(&mut objects)
+        .unwrap();
+    let spin = fixture::controls().concat().len();
+    objects[spin + 16..spin + 20].copy_from_slice(&11u32.to_le_bytes());
+    file.create_stream("/o")
+        .unwrap()
+        .write_all(&objects)
+        .unwrap();
+    let bytes = file.into_inner().into_inner();
+    let mut resource = (bytes.len() as u32).to_le_bytes().to_vec();
+    resource.extend(bytes);
+    assert!(decode(&resource).is_err());
+    assert!(decode(&original).is_ok());
+}

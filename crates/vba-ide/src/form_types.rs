@@ -12,6 +12,8 @@ const TYPES: &[&str] = &[
     "CheckBox",
     "OptionButton",
     "ToggleButton",
+    "ScrollBar",
+    "SpinButton",
     "ReturnBoolean",
     "ReturnInteger",
 ];
@@ -71,43 +73,58 @@ impl Ide {
                 });
             }
         }
-        if let Some(ty) = library
-            .types
-            .iter()
-            .find(|ty| ty.name.eq_ignore_ascii_case("fmEnterFieldBehavior"))
-        {
-            if ty.kind != ReferenceTypeKind::Enum {
-                return Err(error("Forms enum conflicts with the native provider"));
-            }
-        } else {
-            library.types.push(ReferenceType {
-                name: "fmEnterFieldBehavior".into(),
-                kind: ReferenceTypeKind::Enum,
-            });
-        }
-        for (name, value) in [
-            ("fmEnterFieldBehaviorSelectAll", 0),
-            ("fmEnterFieldBehaviorRecallSelection", 1),
+        for (enum_name, constants) in [
+            (
+                "fmEnterFieldBehavior",
+                &[
+                    ("fmEnterFieldBehaviorSelectAll", 0),
+                    ("fmEnterFieldBehaviorRecallSelection", 1),
+                ][..],
+            ),
+            (
+                "fmOrientation",
+                &[
+                    ("fmOrientationAuto", -1),
+                    ("fmOrientationVertical", 0),
+                    ("fmOrientationHorizontal", 1),
+                ][..],
+            ),
         ] {
-            if let Some(existing) = library
-                .constants
+            if let Some(ty) = library
+                .types
                 .iter()
-                .find(|c| c.name.eq_ignore_ascii_case(name))
+                .find(|ty| ty.name.eq_ignore_ascii_case(enum_name))
             {
-                if existing.value != Value::Long(value)
-                    || existing
-                        .module
-                        .as_deref()
-                        .is_none_or(|m| !m.eq_ignore_ascii_case("fmEnterFieldBehavior"))
-                {
-                    return Err(error("Forms constant conflicts with the native provider"));
+                if ty.kind != ReferenceTypeKind::Enum {
+                    return Err(error("Forms enum conflicts with the native provider"));
                 }
             } else {
-                library.constants.push(vba_foreign::ReferenceConstant {
-                    name: name.into(),
-                    module: Some("fmEnterFieldBehavior".into()),
-                    value: Value::Long(value),
+                library.types.push(ReferenceType {
+                    name: enum_name.into(),
+                    kind: ReferenceTypeKind::Enum,
                 });
+            }
+            for &(name, value) in constants {
+                if let Some(existing) = library
+                    .constants
+                    .iter()
+                    .find(|c| c.name.eq_ignore_ascii_case(name))
+                {
+                    if existing.value != Value::Long(value)
+                        || existing
+                            .module
+                            .as_deref()
+                            .is_none_or(|m| !m.eq_ignore_ascii_case(enum_name))
+                    {
+                        return Err(error("Forms constant conflicts with the native provider"));
+                    }
+                } else {
+                    library.constants.push(vba_foreign::ReferenceConstant {
+                        name: name.into(),
+                        module: Some(enum_name.into()),
+                        value: Value::Long(value),
+                    });
+                }
             }
         }
         ReferenceSet::new(libraries)
@@ -136,9 +153,15 @@ impl Ide {
             (ControlKind::CheckBox, "CheckBox"),
             (ControlKind::OptionButton, "OptionButton"),
             (ControlKind::ToggleButton, "ToggleButton"),
+            (ControlKind::ScrollBar, "ScrollBar"),
+            (ControlKind::SpinButton, "SpinButton"),
         ] {
             let mut specific = claim(name, true)?;
             specific.event_names = Some(match kind {
+                ControlKind::ScrollBar => vec!["Change".into(), "Scroll".into()],
+                ControlKind::SpinButton => {
+                    vec!["Change".into(), "SpinUp".into(), "SpinDown".into()]
+                }
                 ControlKind::TextBox => vec!["Change".into()],
                 ControlKind::CheckBox | ControlKind::OptionButton | ControlKind::ToggleButton => {
                     vec!["Change".into(), "Click".into()]

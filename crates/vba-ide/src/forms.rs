@@ -12,6 +12,8 @@ pub enum ControlKind {
     CheckBox,
     OptionButton,
     ToggleButton,
+    ScrollBar,
+    SpinButton,
 }
 impl ControlKind {
     pub fn name(self) -> &'static str {
@@ -22,11 +24,13 @@ impl ControlKind {
             Self::CheckBox => "CheckBox",
             Self::OptionButton => "OptionButton",
             Self::ToggleButton => "ToggleButton",
+            Self::ScrollBar => "ScrollBar",
+            Self::SpinButton => "SpinButton",
         }
     }
     pub fn default_event(self) -> &'static str {
         match self {
-            Self::TextBox => "Change",
+            Self::TextBox | Self::ScrollBar | Self::SpinButton => "Change",
             Self::Label
             | Self::CommandButton
             | Self::CheckBox

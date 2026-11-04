@@ -107,6 +107,18 @@ Else
 control.VbaSetSelection start,length
 End If
 End Sub
+Public Sub VbaNumericInput(ByVal index As Long,ByVal mode As Long,ByVal value As Long,ByVal up As Boolean,ByVal large As Boolean)
+Dim control As Object
+Set control=VbaControls.Item(index)
+VbaMoveFocus control
+If Not (VbaActiveControl Is control) Then Exit Sub
+If Not VbaVisible Or Not VbaLoaded Or Not control.Enabled Or Not control.Visible Then Exit Sub
+If mode=0 Then
+control.VbaStep up,large
+Else
+control.VbaDrag value
+End If
+End Sub
 Public Sub VbaInput(ByVal index As Long,ByVal text As String)
 Dim control As Object
 Set control=VbaControls.Item(index)

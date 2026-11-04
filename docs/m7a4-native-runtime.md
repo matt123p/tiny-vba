@@ -6,6 +6,12 @@ Updated 2026-11-04. **IN PROGRESS. M7A.4 is not complete.** This record extends
 
 Implemented in shared tiny-vba:
 
+- [Native SpinButton/ScrollBar](decisions/0050-native-spinbutton-and-scrollbar.md):
+  distinct native resource packets, Long bounds/value/increments, orientation and
+  delay, canonical Change/SpinUp/SpinDown/drag-only Scroll, reversed ranges and
+  ordinary focus/debugger continuations. Arrows/track/thumb/keyboard input use
+  authorized callbacks and the shared renderer; resources stay unchanged.
+
 - [Native TextBox selection/input](decisions/0049-native-textbox-selection-and-input.md):
   UTF-16 SelStart/SelLength/SelText and atomic input/cursor commits, native multiline,
   word-wrap, Enter/Tab behavior, SelectAll/RecallSelection and custom password
@@ -21,7 +27,7 @@ Implemented in shared tiny-vba:
   Leaf WithEvents interfaces keep their distinct event exposure.
 
 - [MSForms nominal types and qualified library access](decisions/0047-native-forms-nominal-types-and-library-access.md):
-  generic IR 11 class interfaces bind native UserForm/Control/Controls and six leaf
+  generic IR 11 class interfaces bind native UserForm/Control/Controls and eight leaf
   types without a host object registry or COM. Specific leaf WithEvents preserves
   canonical objects while event allowlists hide bridge events; non-source Control
   connections refuse with error 459. Mutable ReturnBoolean/ReturnInteger holders
@@ -109,9 +115,10 @@ Remaining M7A.4 requirements, without reducing the milestone's scope:
   and remaining property/default/error/coercion contracts,
   including native dynamic TypeName. ADR 0048 implements the selected flat native
   focus/typed cancellation path, without claiming the full event/property matrix.
-- Native ComboBox, ListBox, Frame, MultiPage, TabStrip, ScrollBar, SpinButton,
+- Native ComboBox, ListBox, Frame, MultiPage, TabStrip,
   Image and Excel RefEdit packets, including real container/resource identity,
-  list/page collections, pictures, bindings and presentation. These remain refused.
+  list/page collections, pictures, bindings and presentation. These remain refused. The selected numeric packet does not close all
+  ScrollBar/SpinButton property/resource/presentation cases.
 - Applicable Office-supplied worksheet ActiveX/platform packets; third-party
   controls and COM/OCX loading remain outside scope.
 - Fresh Office build/OS/locale observations remain NOT_RUN under M8.5. The two

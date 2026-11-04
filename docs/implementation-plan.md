@@ -63,7 +63,8 @@ and native save/reopen. See [ADR 0041](decisions/0041-worksheet-form-controls.md
   continuation. The [runtime increment](m7a4-native-runtime.md) adds boolean controls,
   collections, For Each enumeration, scalar As New, MSForms nominal interfaces,
   qualified VBA.UserForms access, selected native focus/typed validation and
-  native TextBox selection/input properties.
+  native TextBox selection/input properties. Selected SpinButton/ScrollBar native
+  records, properties and input/event paths are implemented under ADR 0050.
   Remaining requirements and integration are recorded there. Reuse the shared runtime
   behind native forms and close Office compatibility gaps for the inventoried
   standard controls. Match instance/default-instance behavior, lifecycle, modal/

@@ -10,6 +10,13 @@ enum FormInput {
     Focus,
     Activate,
     Text { start: i32, length: i32 },
+    Numeric(FormNumericInput),
+}
+/// Native numeric widget actions; values still pass through ordinary VBA properties.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum FormNumericInput {
+    Step { up: bool, large: bool },
+    Drag(i32),
 }
 const GATE_OBJECT: u64 = u64::MAX;
 // Reserved form-interface range, disjoint from the gate itself. No object store.
@@ -394,6 +401,8 @@ pub(crate) fn class_name(kind: ControlKind) -> &'static str {
         ControlKind::CheckBox => "VbaFormCheckBox",
         ControlKind::OptionButton => "VbaFormOptionButton",
         ControlKind::ToggleButton => "VbaFormToggleButton",
+        ControlKind::ScrollBar => "VbaFormScrollBar",
+        ControlKind::SpinButton => "VbaFormSpinButton",
     }
 }
 pub(crate) fn checked_handlers(
@@ -490,7 +499,17 @@ pub(crate) fn checked_handlers(
             ));
         }
         let control = form.controls.iter().find(|c| {
-            format!("{}_{}", c.name, c.kind.default_event()).eq_ignore_ascii_case(&p.name.spelling)
+            (native
+                && p.name
+                    .spelling
+                    .get(c.name.len() + 1..)
+                    .is_some_and(|e| crate::form_numeric::event(c.kind, e).is_some())
+                && p.name
+                    .spelling
+                    .get(..c.name.len() + 1)
+                    .is_some_and(|prefix| prefix.eq_ignore_ascii_case(&format!("{}_", c.name))))
+                || format!("{}_{}", c.name, c.kind.default_event())
+                    .eq_ignore_ascii_case(&p.name.spelling)
                 || matches!(
                     c.kind,
                     ControlKind::CheckBox | ControlKind::OptionButton | ControlKind::ToggleButton
@@ -613,7 +632,10 @@ fn compiled_form(form: &Form, module: &Module, native: Option<&NativeForm>) -> R
     for c in &form.controls {
         let temp = format!("VbaInit{}", c.id);
         source.push_str(&format!("Dim {temp} As {}\nSet {temp}=New {}\n{temp}.Enabled={}\n{temp}.Visible={}\n{temp}.TabStop={}\n{temp}.VbaTabIndex={}\n{temp}.Left={}\n{temp}.Top={}\n{temp}.Width={}\n{temp}.Height={}\n",class_name(c.kind),class_name(c.kind),boolean(c.enabled),boolean(c.visible),boolean(c.tab_stop),form.tab_order.iter().position(|id|*id==c.id).unwrap_or(0),c.bounds.left,c.bounds.top,c.bounds.width,c.bounds.height));
-        if c.kind != ControlKind::TextBox {
+        if !matches!(
+            c.kind,
+            ControlKind::TextBox | ControlKind::ScrollBar | ControlKind::SpinButton
+        ) {
             source.push_str(&format!("{temp}.Caption={}\n", vba_string(&c.caption)));
         }
         if c.kind == ControlKind::TextBox {
@@ -652,6 +674,19 @@ fn compiled_form(form: &Form, module: &Module, native: Option<&NativeForm>) -> R
                     "{temp}.GroupName={}\n",
                     vba_string(&control.group_name)
                 ));
+            }
+            if let Some(n) = &control.numeric {
+                let number = |n: i32| {
+                    if n == i32::MIN {
+                        "(-2147483647-1)".to_owned()
+                    } else {
+                        n.to_string()
+                    }
+                };
+                source.push_str(&format!("{temp}.VbaMin={}\n{temp}.VbaMax={}\n{temp}.VbaValue={}\n{temp}.SmallChange={}\n{temp}.Orientation={}\n{temp}.Delay={}\n",number(n.minimum),number(n.maximum),number(n.value),n.small_change,n.orientation,n.delay));
+                if c.kind == ControlKind::ScrollBar {
+                    source.push_str(&format!("{temp}.LargeChange={}\n", n.large_change));
+                }
             }
             if c.kind == ControlKind::TextBox {
                 source.push_str(&format!("{temp}.MaxLength={}\n{temp}.MultiLine={}\n{temp}.WordWrap={}\n{temp}.EnterKeyBehavior={}\n{temp}.TabKeyBehavior={}\n{temp}.EnterFieldBehavior={}\n", control.max_length,boolean(control.text_behavior.multi_line),boolean(control.text_behavior.word_wrap),boolean(control.text_behavior.enter_key),boolean(control.text_behavior.tab_key),u8::from(control.text_behavior.recall_selection)));
@@ -699,7 +734,7 @@ fn compiled_form(form: &Form, module: &Module, native: Option<&NativeForm>) -> R
     source.push_str("Private Sub VbaRoleChange(ByVal origin As Object,ByVal role As Integer)\nDim i As Long,peer As Object\nFor i=0 To VbaControls.Count-1\nSet peer=VbaControls.Item(i)\nIf Not (peer Is origin) Then\nIf peer.VbaKind=3 Then\nIf role=0 Then\npeer.VbaDefault=False\nElse\npeer.VbaCancel=False\nEnd If\nEnd If\nEnd If\nNext i\nEnd Sub\n");
     source.push_str("Private Sub VbaOptionSelected(ByVal origin As Object)\nDim i As Long,peer As Object\nFor i=0 To VbaControls.Count-1\nSet peer=VbaControls.Item(i)\nIf Not (peer Is origin) Then\nIf peer.VbaKind=5 Then\nIf peer.GroupName=origin.GroupName Then peer.Value=False\nEnd If\nEnd If\nNext i\nEnd Sub\n");
     for c in &form.controls {
-        for event in ["Click", "Change"] {
+        for event in ["Click", "Change", "Scroll", "SpinUp", "SpinDown"] {
             let handler = format!("{}_{}", c.name, event);
             if handlers.contains(&handler.to_ascii_lowercase()) {
                 source.push_str(&format!(
@@ -1129,7 +1164,9 @@ impl Ide {
                 .is_some()
                 .then(|| crate::form_focus::event(c.kind, event))
                 .flatten();
-            let canonical = if let Some((name, _)) = focus {
+            let canonical = if let Some(name) = crate::form_numeric::event(c.kind, event) {
+                name
+            } else if let Some((name, _)) = focus {
                 name
             } else if event.eq_ignore_ascii_case(c.kind.default_event()) {
                 c.kind.default_event()
@@ -1233,6 +1270,8 @@ impl Ide {
                 ControlKind::CheckBox,
                 ControlKind::OptionButton,
                 ControlKind::ToggleButton,
+                ControlKind::ScrollBar,
+                ControlKind::SpinButton,
             ]
             .into_iter()
             .enumerate()
@@ -1435,6 +1474,12 @@ impl Ide {
             "tabindex" => "VbaTabIndex",
             "default" => "VbaDefault",
             "cancel" => "VbaCancel",
+            "smallchange" => "VbaSmallChange",
+            "largechange" => "VbaLargeChange",
+            "orientation" => "VbaOrientation",
+            "delay" => "VbaDelay",
+            "min" => "VbaMin",
+            "max" => "VbaMax",
             "maxlength" => "VbaMaxLength",
             "passwordchar" => "VbaPasswordChar",
             "selstart" => "VbaSelStart",
@@ -1553,6 +1598,24 @@ impl Ide {
             host,
         )
     }
+    pub fn form_instance_numeric(
+        &mut self,
+        instance: FormInstance,
+        control: u32,
+        input: FormNumericInput,
+        host: &mut impl Host,
+    ) -> Result<()> {
+        if self.native_form(instance.source).is_none() {
+            return Err(error("numeric input requires a native form"));
+        }
+        self.deliver_form_input(
+            instance,
+            Some(control),
+            None,
+            FormInput::Numeric(input),
+            host,
+        )
+    }
     fn deliver_form_input(
         &mut self,
         instance: FormInstance,
@@ -1604,13 +1667,46 @@ impl Ide {
             {
                 return Err(error("control is disabled or hidden"));
             }
+            if let FormInput::Numeric(action) = input
+                && (!matches!(c.kind, ControlKind::SpinButton | ControlKind::ScrollBar)
+                    || c.kind == ControlKind::SpinButton
+                        && matches!(
+                            action,
+                            FormNumericInput::Drag(_) | FormNumericInput::Step { large: true, .. }
+                        ))
+            {
+                return Err(error("invalid numeric control input"));
+            }
             if matches!(input, FormInput::Text { .. }) && c.kind != ControlKind::TextBox {
                 return Err(error("text input requires a TextBox"));
             }
             if input == FormInput::Activate && c.kind != ControlKind::CommandButton {
                 return Err(error("keyboard activation requires a CommandButton"));
             }
-            if focus {
+            if let FormInput::Numeric(action) = input {
+                let index = designer
+                    .form()
+                    .controls
+                    .iter()
+                    .position(|c| c.id == id)
+                    .and_then(|n| i32::try_from(n).ok())
+                    .ok_or_else(|| error("numeric control index"))?;
+                object = instance.object;
+                let (mode, value, up, large) = match action {
+                    FormNumericInput::Step { up, large } => (0, 0, up, large),
+                    FormNumericInput::Drag(value) => (1, value, false, false),
+                };
+                (
+                    "VbaNumericInput",
+                    vec![
+                        Value::Long(index),
+                        Value::Long(mode),
+                        Value::Long(value),
+                        Value::Boolean(up),
+                        Value::Boolean(large),
+                    ],
+                )
+            } else if focus {
                 if c.kind == ControlKind::Label {
                     return Err(error("labels cannot receive focus"));
                 }

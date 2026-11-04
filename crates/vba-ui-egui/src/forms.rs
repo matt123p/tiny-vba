@@ -1,5 +1,6 @@
 //! Reusable form designer and real runtime controls. All edits/events are explicit IDE commands.
 use super::*;
+mod numeric;
 mod text;
 use vba_ide::forms::{Align, Bounds, ControlKind, DesignEdit, SameSize};
 #[derive(Clone, Debug)]
@@ -18,6 +19,7 @@ pub enum FormCommand {
     InstanceEvent(vba_ide::FormInstance, Option<u32>, Option<String>),
     InstanceFocus(vba_ide::FormInstance, u32),
     InstanceActivate(vba_ide::FormInstance, u32),
+    InstanceNumeric(vba_ide::FormInstance, u32, vba_ide::FormNumericInput),
     InstanceText(vba_ide::FormInstance, u32, vba_ide::VbaString, (u32, u32)),
 }
 pub(super) fn apply_form(
@@ -64,6 +66,9 @@ pub(super) fn apply_form(
         FormCommand::Event(id, c, text) => ide.form_event(id, c, text, host),
         FormCommand::InstanceText(instance, control, text, selection) => {
             ide.form_instance_text(instance, control, text, selection, host)
+        }
+        FormCommand::InstanceNumeric(instance, control, input) => {
+            ide.form_instance_numeric(instance, control, input, host)
         }
         FormCommand::InstanceActivate(instance, control) => {
             ide.form_instance_activate(instance, control, host)
@@ -646,7 +651,10 @@ impl EditorUi {
         theme: Theme,
     ) {
         if matches!(ide.mode(), Mode::Break | Mode::Stale) {
-            self.form_runtime_focus.clear();
+            // Paused controls do not execute, but their stable IDs restore focus before input.
+            if ide.mode() == Mode::Stale {
+                self.form_runtime_focus.clear();
+            }
             self.form_last_focus = None;
             self.form_active_control.clear();
             return;
@@ -936,6 +944,12 @@ impl EditorUi {
                             ) * scale,
                         );
                         let widget_id = ui.scope_id().with(("runtime.control", c.id));
+                        if native && idle && keyboard_owner==Some(instance)
+                            && !previous_focus.iter().any(|(owner,_,_)|*owner==instance)
+                            && matches!(c.kind,ControlKind::TextBox|ControlKind::SpinButton|ControlKind::ScrollBar)
+                            && ide.form_instance_field(instance,None,&format!("Vba{}",c.name)).ok()==ide.form_instance_field(instance,None,"VbaActiveControl").ok() {
+                            ui.ctx().memory_mut(|m|m.request_focus(widget_id));
+                        }
                         let tab_stop = ide
                             .form_instance_field(instance, Some(c.id), "TabStop")
                             .ok()
@@ -950,6 +964,7 @@ impl EditorUi {
                         }
                         ui.push_id(("runtime", c.id), |ui| {
                             ui.add_enabled_ui(enabled, |ui| match c.kind {
+                                ControlKind::SpinButton|ControlKind::ScrollBar=> {numeric::Numeric{ide,instance,control:c,bounds,widget:widget_id,theme}.show(ui,commands);}
                                 ControlKind::TextBox if native => { text::TextBox {ide,instance,control:c,bounds,widget:widget_id,enabled,theme}.show(ui,commands); }
                                 ControlKind::TextBox => {
                                     let mut text = ide
@@ -1085,7 +1100,7 @@ impl EditorUi {
                         let active = ide.form_instance_field(instance, None, "VbaActiveControl").ok();
                         let active_id = focus.iter().find(|(_, control, _)| form.controls.iter().find(|c| c.id == *control).is_some_and(|c| ide.form_instance_field(instance, None, &format!("Vba{}",c.name)).ok() == active));
                         let requested = focus.iter().find(|(_, _, target)| Some(*target) == focused);
-                        let pending = commands.iter().any(|command| matches!(command, Command::Form(FormCommand::InstanceFocus(owner, _) | FormCommand::InstanceActivate(owner, _) | FormCommand::InstanceText(owner, _, _, _) | FormCommand::InstanceEvent(owner, _, _)) if *owner == instance));
+                        let pending = commands.iter().any(|command| matches!(command, Command::Form(FormCommand::InstanceFocus(owner, _) | FormCommand::InstanceActivate(owner, _) | FormCommand::InstanceText(owner, _, _, _) | FormCommand::InstanceNumeric(owner, _, _) | FormCommand::InstanceEvent(owner, _, _)) if *owner == instance));
                         if let Some((_, control, _)) = requested && requested != active_id && !pending {
                             commands.push(Command::Form(FormCommand::InstanceFocus(instance, *control)));
                         }

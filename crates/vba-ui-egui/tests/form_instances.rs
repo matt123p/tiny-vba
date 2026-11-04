@@ -327,7 +327,9 @@ fn native_multiline_text_and_selection_follow_actual_keyboard_input_in_utf16() -
         }
     }
     let f = *ide.form_instances()?.first().ok_or("instance")?;
+    // This context intentionally has no emoji/fallback font; retain canonical data.
     let mut h = Harness::builder()
+        .allow_missing_glyphs()
         .with_size(egui::vec2(1400., 1000.))
         .build_ui_state(
             |ui, s: &mut State| {
@@ -501,7 +503,9 @@ fn native_text_caret_and_insertion_preserve_unpaired_utf16_units() -> R {
         }
     }
     let f = *ide.form_instances()?.first().ok_or("instance")?;
+    // This context intentionally has no emoji/fallback font; retain canonical data.
     let mut h = Harness::builder()
+        .allow_missing_glyphs()
         .with_size(egui::vec2(1400., 1000.))
         .build_ui_state(
             |ui, s: &mut State| {
@@ -534,6 +538,162 @@ fn native_text_caret_and_insertion_preserve_unpaired_utf16_units() -> R {
     assert_eq!(
         h.state().ide.form_instance_field(f, Some(12), "VbaText")?,
         vba_ide::Value::String(vba_ide::VbaString::from_units(vec![120, 55357, 122])?)
+    );
+    assert!(h.state().errors.is_empty(), "{:?}", h.state().errors);
+    Ok(())
+}
+
+#[test]
+fn native_numeric_arrows_and_keyboard_change_canonical_values() -> R {
+    let mut ide = Ide::new();
+    ide.import_native_form_export(
+        "NativeForm.frm",
+        &fixture::export(),
+        1252,
+        &[NativeFormResource {
+            name: "NativeForm.frx".into(),
+            bytes: fixture::numeric_companion(),
+        }],
+    )?;
+    ide.add_module("Main.bas", "Sub Main()\nNativeForm.Show 0\nEnd Sub")?;
+    ide.dispatch(Action::Run, &mut NoHost)?;
+    for _ in 0..100 {
+        ide.tick(&mut NoHost)?;
+        if ide.mode() == Mode::Completed {
+            break;
+        }
+    }
+    let f = *ide.form_instances()?.first().ok_or("instance")?;
+    let mut h = Harness::builder()
+        .with_size(egui::vec2(1400., 1000.))
+        .build_ui_state(
+            |ui, s: &mut State| {
+                for c in s.view.show(ui, &s.ide, Theme::light()) {
+                    if let Err(e) = apply(&mut s.ide, c, &mut NoHost) {
+                        s.errors.push(e.to_string());
+                    }
+                }
+                if let Err(e) = s.ide.tick(&mut NoHost) {
+                    s.errors.push(e.to_string());
+                }
+            },
+            State {
+                ide,
+                view: EditorUi::default(),
+                errors: vec![],
+            },
+        );
+    h.run_steps(5);
+    h.get_by_label("Spin1 Increase").click();
+    h.run_steps(8);
+    assert_eq!(
+        h.state().ide.form_instance_field(f, Some(14), "Value")?,
+        vba_ide::Value::Long(6)
+    );
+    h.key_press(egui::Key::ArrowDown);
+    h.run_steps(8);
+    assert_eq!(
+        h.state().ide.form_instance_field(f, Some(14), "Value")?,
+        vba_ide::Value::Long(4)
+    );
+    h.get_by_label("Scroll1 Scroll right").click();
+    h.run_steps(8);
+    assert_eq!(
+        h.state().ide.form_instance_field(f, Some(15), "Value")?,
+        vba_ide::Value::Long(-2)
+    );
+    assert!(h.state().errors.is_empty(), "{:?}", h.state().errors);
+    assert!(
+        vba_ui_egui::Command::Form(vba_ui_egui::FormCommand::InstanceNumeric(
+            f,
+            14,
+            vba_ide::FormNumericInput::Step {
+                up: true,
+                large: false
+            }
+        ))
+        .executes_code()
+    );
+    Ok(())
+}
+
+#[test]
+fn native_scroll_drag_does_not_replay_stationary_input_after_a_handler_resets_value() -> R {
+    let mut ide = Ide::new();
+    let source = fixture::SOURCE.to_owned()
+        + "\r\nPrivate Sub Scroll1_Scroll()\r\nDebug.Print \"scroll\"\r\nScroll1.Value=0\r\nEnd Sub\r\n";
+    let export = String::from_utf8(fixture::export())?.replace(fixture::SOURCE, &source);
+    ide.import_native_form_export(
+        "NativeForm.frm",
+        export.as_bytes(),
+        1252,
+        &[NativeFormResource {
+            name: "NativeForm.frx".into(),
+            bytes: fixture::numeric_companion(),
+        }],
+    )?;
+    ide.add_module("Main.bas","Sub Main()\nNativeForm.Scroll1.Width=150\nNativeForm.Scroll1.Left=100\nNativeForm.Show 0\nEnd Sub")?;
+    ide.dispatch(Action::Run, &mut NoHost)?;
+    for _ in 0..100 {
+        ide.tick(&mut NoHost)?;
+        if ide.mode() == Mode::Completed {
+            break;
+        }
+    }
+    let f = *ide.form_instances()?.first().ok_or("instance")?;
+    let mut h = Harness::builder()
+        .with_size(egui::vec2(1400., 1000.))
+        .build_ui_state(
+            |ui, s: &mut State| {
+                for c in s.view.show(ui, &s.ide, Theme::light()) {
+                    if let Err(e) = apply(&mut s.ide, c, &mut NoHost) {
+                        s.errors.push(e.to_string());
+                    }
+                }
+                if let Err(e) = s.ide.tick(&mut NoHost) {
+                    s.errors.push(e.to_string());
+                }
+            },
+            State {
+                ide,
+                view: EditorUi::default(),
+                errors: vec![],
+            },
+        );
+    h.run_steps(5);
+    let center = h
+        .get(
+            egui_kittest::kittest::By::new()
+                .label("Scroll1")
+                .role(egui::accesskit::Role::ScrollBar),
+        )
+        .rect()
+        .center();
+    h.event(egui::Event::PointerMoved(center));
+    h.run_steps(1);
+    h.event(egui::Event::PointerButton {
+        pos: center,
+        button: egui::PointerButton::Primary,
+        pressed: true,
+        modifiers: egui::Modifiers::NONE,
+    });
+    h.run_steps(1);
+    h.event(egui::Event::PointerMoved(center + egui::vec2(20., 0.)));
+    h.run_steps(2);
+    h.event(egui::Event::PointerMoved(center + egui::vec2(40., 0.)));
+    h.run_steps(5);
+    assert_eq!(
+        h.state().ide.output(),
+        vec!["initialized", "scroll", "scroll"]
+    );
+    h.run_steps(10);
+    assert_eq!(
+        h.state().ide.output(),
+        vec!["initialized", "scroll", "scroll"]
+    );
+    assert_eq!(
+        h.state().ide.form_instance_field(f, Some(15), "Value")?,
+        vba_ide::Value::Long(0)
     );
     assert!(h.state().errors.is_empty(), "{:?}", h.state().errors);
     Ok(())

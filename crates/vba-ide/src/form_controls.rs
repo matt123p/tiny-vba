@@ -73,11 +73,16 @@ pub(crate) fn control_class(kind: ControlKind) -> String {
         ControlKind::CheckBox => 4,
         ControlKind::OptionButton => 5,
         ControlKind::ToggleButton => 6,
+        ControlKind::ScrollBar => 7,
+        ControlKind::SpinButton => 8,
     };
     s.push_str(&format!(
         "Public Property Get VbaKind() As Integer\nVbaKind={kind_code}\nEnd Property\n"
     ));
-    if kind != ControlKind::TextBox {
+    if !matches!(
+        kind,
+        ControlKind::TextBox | ControlKind::ScrollBar | ControlKind::SpinButton
+    ) {
         s.push_str("Public Caption As String\n");
     }
     for (name, minimum) in [
@@ -114,6 +119,8 @@ pub(crate) fn control_class(kind: ControlKind) -> String {
             s.push_str("If IsNull(VbaValue) Then\nMe.Value=False\nElseIf VbaValue Then\nIf TripleState Then\nMe.Value=Null\nElse\nMe.Value=False\nEnd If\nElse\nMe.Value=True\nEnd If\n");
         }
         s.push_str("End Sub\n");
+    } else if matches!(kind, ControlKind::ScrollBar | ControlKind::SpinButton) {
+        s.push_str(&crate::form_numeric::members(kind));
     } else if kind == ControlKind::TextBox {
         s.push_str(crate::form_text::members());
     } else {

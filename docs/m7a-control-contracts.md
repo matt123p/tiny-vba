@@ -68,8 +68,8 @@ unlisted property remains outside the selected import/runtime claim.
 | Frame | Caption, Controls/container/group/tab behavior | Click, applicable focus/input | U | U | U | U |
 | MultiPage | Pages/Controls/Value, child identities/layout | Change, applicable focus/input | U | U | U | U |
 | TabStrip | Tabs/Value, layout/selection | Change, applicable focus/input | U | U | U | U |
-| ScrollBar | Value/Min/Max/SmallChange/LargeChange/Orientation | Change/Scroll, input/focus | U | U | U | U |
-| SpinButton | Value/Min/Max/SmallChange/Orientation | Change/SpinUp/SpinDown, input/focus | U | U | U | U |
+| ScrollBar | Selected Long Value/bounds/increments/orientation/delay; further resources/properties remain U | Change/drag-only Scroll, selected input/focus | D/P | shared | selected packet | U |
+| SpinButton | Selected Long Value/bounds/increment/orientation/delay; further resources/properties remain U | Change/SpinUp/SpinDown, selected input/focus | D/P | shared | selected packet | U |
 | Image | Picture resource, PictureSizeMode/Alignment/Tiling, geometry | Applicable mouse/input events | U | U | U | U |
 | Excel RefEdit | Range-selection text/reference, Excel owner/binding/resource class | Change, host range-selection/input | U | U | U | U |
 

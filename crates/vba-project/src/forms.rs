@@ -21,6 +21,8 @@ pub enum Kind {
     CheckBox,
     OptionButton,
     ToggleButton,
+    ScrollBar,
+    SpinButton,
 }
 /// Coordinates are original signed HIMETRIC units, not pixels or points.
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -44,6 +46,18 @@ pub struct Control {
     pub group_name: String,
     pub locked: bool,
     pub text_behavior: TextBehavior,
+    pub numeric: Option<NumericBehavior>,
+}
+/// Native SpinButton/ScrollBar state, without executing control resources.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct NumericBehavior {
+    pub minimum: i32,
+    pub maximum: i32,
+    pub value: i32,
+    pub small_change: i32,
+    pub large_change: i32,
+    pub orientation: i32,
+    pub delay: i32,
 }
 /// Selected native MorphData behavior; original resources remain separate.
 #[derive(Clone, Debug, PartialEq, Eq)]

@@ -312,6 +312,8 @@ fn site(r: &mut Reader<'_>) -> Result<Site> {
     let tab = field(&mut b, m, 6, 2, 0xffff)? as u16 as i16;
     let class = field(&mut b, m, 7, 2, 0x7fff)?;
     let kind = match class {
+        16 => Kind::SpinButton,
+        47 => Kind::ScrollBar,
         17 => Kind::CommandButton,
         21 => Kind::Label,
         23 => Kind::TextBox,
@@ -352,6 +354,9 @@ fn site(r: &mut Reader<'_>) -> Result<Site> {
 fn control(bytes: &[u8], site: Site) -> Result<Control> {
     let mut r = Reader::new(bytes);
     let mut b = block(&mut r, 0x0200)?;
+    if matches!(site.kind, Kind::SpinButton | Kind::ScrollBar) {
+        return numeric_control(r, b, site);
+    }
     let mut max_length = 0;
     let mut group_name = String::new();
     let mut locked = false;
@@ -481,5 +486,85 @@ fn control(bytes: &[u8], site: Site) -> Result<Control> {
         group_name,
         locked,
         text_behavior,
+        numeric: None,
+    })
+}
+
+fn numeric_control(r: Reader<'_>, mut b: Reader<'_>, site: Site) -> Result<Control> {
+    let spin = site.kind == Kind::SpinButton;
+    let m = u64::from(mask(&mut b, if spin { 0x5fef } else { 0xbeff }, 1 << 3)?);
+    field(&mut b, m, 0, 4, 0)?;
+    field(&mut b, m, 1, 4, 0)?;
+    let flags = field(&mut b, m, 2, 4, 0x1b)?;
+    if flags & !2 != 0x19 {
+        return Err(unsupported("numeric control behavior flags"));
+    }
+    if !spin && field(&mut b, m, 4, 1, 0)? != 0 {
+        return Err(unsupported("numeric mouse pointer"));
+    }
+    let minimum = field(&mut b, m, 5, 4, 0)? as i32;
+    let maximum = field(&mut b, m, 6, 4, if spin { 100 } else { 32767 })? as i32;
+    let value = field(&mut b, m, 7, 4, 0)? as i32;
+    let prev = if spin { 8 } else { 9 };
+    let next = prev + 1;
+    let disabled = flags & 2 == 0;
+    if (m & (1 << prev) != 0) != disabled || (m & (1 << next) != 0) != disabled {
+        return Err(unsupported("numeric enabled cache"));
+    }
+    field(&mut b, m, prev, 4, 0)?;
+    field(&mut b, m, next, 4, 0)?;
+    let small = field(&mut b, m, if spin { 10 } else { 11 }, 4, 1)? as i32;
+    let large = if spin {
+        1
+    } else {
+        field(&mut b, m, 12, 4, 1)? as i32
+    };
+    let orientation = field(&mut b, m, if spin { 11 } else { 13 }, 4, u32::MAX)? as i32;
+    let delay = i32::try_from(field(&mut b, m, if spin { 12 } else { 15 }, 4, 50)?)
+        .map_err(|_| unsupported("numeric delay"))?;
+    if spin && field(&mut b, m, 14, 1, 0)? != 0 {
+        return Err(unsupported("numeric mouse pointer"));
+    }
+    if small < 0
+        || large < 0
+        || !(-1..=1).contains(&orientation)
+        || value < minimum.min(maximum)
+        || value > minimum.max(maximum)
+    {
+        return Err(unsupported("numeric control range"));
+    }
+    align(&mut b, 4)?;
+    let (width, height) = size(&mut b)?;
+    b.end()?;
+    r.end()?;
+    Ok(Control {
+        id: site.id,
+        name: site.name,
+        kind: site.kind,
+        left: site.left,
+        top: site.top,
+        width,
+        height,
+        caption: String::new(),
+        text: String::new(),
+        enabled: !disabled,
+        visible: site.flags & 2 != 0,
+        tab_stop: site.flags & 1 != 0,
+        tab_index: site.tab,
+        default: false,
+        cancel: false,
+        max_length: 0,
+        group_name: String::new(),
+        locked: false,
+        text_behavior: super::TextBehavior::default(),
+        numeric: Some(super::NumericBehavior {
+            minimum,
+            maximum,
+            value,
+            small_change: small,
+            large_change: large,
+            orientation,
+            delay,
+        }),
     })
 }

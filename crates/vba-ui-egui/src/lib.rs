@@ -63,6 +63,7 @@ impl Command {
                         | FormCommand::InstanceFocus(..)
                         | FormCommand::InstanceActivate(..)
                         | FormCommand::InstanceText(..)
+                        | FormCommand::InstanceNumeric(..)
                 )
         )
     }

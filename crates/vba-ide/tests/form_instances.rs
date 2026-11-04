@@ -1127,3 +1127,87 @@ fn native_caret_only_input_does_not_overwrite_a_value_changed_by_enter() -> R {
     );
     Ok(())
 }
+
+fn numeric_setup(main: &str, source: &str) -> R<Ide> {
+    let mut ide = Ide::new();
+    let export = String::from_utf8(fixture::export())?.replace(fixture::SOURCE, source);
+    ide.import_native_form_export(
+        "NativeForm.frm",
+        export.as_bytes(),
+        1252,
+        &[NativeFormResource {
+            name: "NativeForm.frx".into(),
+            bytes: fixture::numeric_companion(),
+        }],
+    )?;
+    ide.add_module("Main.bas", main)?;
+    ide.dispatch(Action::Run, &mut NoHost)?;
+    settle(&mut ide)?;
+    Ok(ide)
+}
+#[test]
+fn native_numeric_properties_use_long_default_values_and_exact_errors() -> R {
+    let ide = numeric_setup(
+        "Sub Main()\nDim f As New NativeForm,s As MSForms.SpinButton,b As MSForms.ScrollBar\nSet s=f.Spin1\nSet b=f.Scroll1\nDebug.Print CLng(s)\nDebug.Print b.Min\nDebug.Print b.Max\ns.Value=8\ns.Max=5\nDebug.Print s.Value\nOn Error Resume Next\ns.Value=20\nDebug.Print Err.Number\nDebug.Print s.Value\nErr.Clear\ns.SmallChange=-1\nDebug.Print Err.Number\nDebug.Print s.SmallChange\nEnd Sub",
+        fixture::SOURCE,
+    )?;
+    assert_eq!(ide.mode(), Mode::Completed, "{:?}", ide.diagnostics);
+    assert_eq!(
+        ide.output(),
+        vec!["initialized", "4", "10", "-10", "5", "380", "5", "380", "2"]
+    );
+    Ok(())
+}
+#[test]
+fn native_spin_change_pause_commits_before_spin_event_without_replay() -> R {
+    let source = fixture::SOURCE.to_owned()
+        + "\r\nPrivate Sub Spin1_Change()\r\nDebug.Print Spin1.Value\r\nStop\r\nEnd Sub\r\nPrivate Sub Spin1_SpinUp()\r\nDebug.Print \"up\"\r\nEnd Sub\r\n";
+    let mut ide = numeric_setup("Sub Main()\nNativeForm.Show\nEnd Sub", &source)?;
+    let f = *ide.form_instances()?.first().ok_or("instance")?;
+    ide.form_instance_numeric(
+        f,
+        14,
+        vba_ide::FormNumericInput::Step {
+            up: true,
+            large: false,
+        },
+        &mut NoHost,
+    )?;
+    settle(&mut ide)?;
+    assert_eq!(ide.mode(), Mode::Break, "{:?}", ide.diagnostics);
+    assert_eq!(ide.output(), vec!["initialized", "6"]);
+    assert_eq!(
+        ide.form_instance_field(f, Some(14), "Value")?,
+        Value::Long(6)
+    );
+    ide.dispatch(Action::Run, &mut NoHost)?;
+    settle(&mut ide)?;
+    assert_eq!(ide.mode(), Mode::Waiting);
+    assert_eq!(ide.output(), vec!["initialized", "6", "up"]);
+    Ok(())
+}
+#[test]
+fn native_scroll_user_steps_reverse_with_range_but_only_drag_raises_scroll() -> R {
+    let source = fixture::SOURCE.to_owned()
+        + "\r\nPrivate Sub Scroll1_Change()\r\nDebug.Print Scroll1.Value\r\nEnd Sub\r\nPrivate Sub Scroll1_Scroll()\r\nDebug.Print \"scroll\"\r\nEnd Sub\r\n";
+    let mut ide = numeric_setup("Sub Main()\nNativeForm.Show 0\nEnd Sub", &source)?;
+    let f = *ide.form_instances()?.first().ok_or("instance")?;
+    ide.form_instance_numeric(
+        f,
+        15,
+        vba_ide::FormNumericInput::Step {
+            up: true,
+            large: false,
+        },
+        &mut NoHost,
+    )?;
+    settle(&mut ide)?;
+    ide.form_instance_numeric(f, 15, vba_ide::FormNumericInput::Drag(-5), &mut NoHost)?;
+    settle(&mut ide)?;
+    assert_eq!(ide.output(), vec!["initialized", "-2", "-5", "scroll"]);
+    assert!(
+        ide.form_instance_numeric(f, 14, vba_ide::FormNumericInput::Drag(2), &mut NoHost)
+            .is_err()
+    );
+    Ok(())
+}

@@ -1,19 +1,42 @@
 # Implementation progress
 
+## M7A.4 continued — native numeric controls (2026-11-04)
+
+Implemented [ADR 0050](decisions/0050-native-spinbutton-and-scrollbar.md): native
+SpinButton/ScrollBar resource packets, Long properties, orientation/constants,
+normal/reversed ranges and canonical Change/spin/drag-only Scroll events. UI
+arrows/track/thumb/keyboard/repeat submit authorized ordinary callbacks; a paused
+Change commits before the spin continuation without replay. Three native runtime,
+two decode and two actual widget input cases cover the new paths. Native CI,
+WASM/WASI and UI/native/web gates PASS; all 43 instance and seven decode cases
+PASS in native/WASI execution, with nine actual instance/input widget cases.
+Chromium numeric, Unicode text, boolean and focus/cancel/Stop/resume gates PASS.
+A focus regression found by immediate typing after resume is fixed by preserving
+stable paused control IDs and restoring focus before input. Stationary dragging
+also remains inert after a Scroll handler resets Value. Host glyph policy remains
+unchanged; tests explicitly opt into placeholders when fonts lack their Unicode.
+Consumer immutable-pin integration and final artifact checks follow. Full M7A.4 remains
+IN PROGRESS for the unchanged [remaining scope](m7a4-native-runtime.md).
+
 ## M7A.4 continued — native TextBox text and selection (2026-11-04)
 
 Implemented [ADR 0049](decisions/0049-native-textbox-selection-and-input.md):
 UTF-16 selection/replacement, multiline/wrap, Enter/Tab behavior, field-selection
 constants and native/custom password masking. Input commits text and selection
 atomically before ordinary Change callbacks and preserves typed validation/focus.
-A real Unicode widget regression also fixes missing-glyph panic without changing
-host fonts/global policy. Four new native instance and one decode case pass; actual multiline/selection,
+A real Unicode widget regression validates caller-selected glyph fallback without
+changing host fonts/global policy. Four new native instance and one decode case pass; actual multiline/selection,
 persisted password and isolated-surrogate widget cases cover the UI. Shared
 `cargo xtask ci`, `wasm`, `wasm-run`, `ui`, `ui-native` and `web` PASS, including
 40 native instance tests in native/WASI execution and seven actual widget cases.
 Chromium native text/password/focus/boolean input and editor/legacy form gates
 PASS; rendered text and password output was inspected. Original M7 hashes and
-changed Markdown links PASS. Consumer immutable-pin integration follows.
+changed Markdown links PASS. Both forks pin accepted revision 1411bd16: GridCraft 76c135ba and WordCraft
+49841a60 PASS full CI, three native/actual Node 22 WASM package/trust/input
+cases, strict optional VBA/UI Clippy and optional VBA web builds. The new
+XLSM/DOCM case covers native text flags/mask, typed selection/replacement,
+trusted input and exact original VBA bytes on reopen. Unrelated GridCraft
+ribbon edits remain outside the integration commits.
 Full M7A.4 remains IN PROGRESS with its unchanged remaining control/property/
 binding/platform requirements in [the runtime record](m7a4-native-runtime.md).
 

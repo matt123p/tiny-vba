@@ -40,8 +40,9 @@ uses the native properties; Ctrl+Enter and Ctrl+Tab create a new line for multil
 controls and have no effect for single-line controls, following the published
 Forms contract. Otherwise Tab/Enter use focus/default-button routing. WordWrap
 only affects multiline display. Rendering never changes installed host fonts or
-global font policy. A missing display glyph receives a one-character fallback,
-keeping editing positions and canonical Unicode data intact rather than panicking. Edits preserve unchanged raw
+global font policy. Glyph shaping/fallback remains under the caller's font policy; Unicode tests with
+no matching font explicitly allow placeholders rather than changing the renderer
+or installing fonts. Editing positions and canonical data remain intact. Edits preserve unchanged raw
 UTF-16 units around the changed span; caret-only input transports the original
 VbaString rather than a lossy rendering copy.
 

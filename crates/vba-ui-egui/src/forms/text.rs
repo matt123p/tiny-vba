@@ -155,17 +155,6 @@ impl TextBox<'_> {
                 })
                 .collect::<String>();
             ui.fonts_mut(|fonts| {
-                // Keep one displayed character per editing character without changing host fonts.
-                let display = display
-                    .chars()
-                    .map(|c| {
-                        if c.is_control() || fonts.has_glyph(&font, c) {
-                            c
-                        } else {
-                            '?'
-                        }
-                    })
-                    .collect::<String>();
                 fonts.layout(
                     display,
                     font.clone(),

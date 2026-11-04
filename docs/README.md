@@ -209,3 +209,9 @@ TextBox UTF-16 selection, multiline/wrap, Enter/Tab/field behavior and custom
 password masking through ordinary classes and authorized atomic input. Native
 metadata decoding remains inert; original resources and canonical text are
 preserved. The broader [M7A.4 scope](m7a4-native-runtime.md) remains in progress.
+
+[ADR 0050](decisions/0050-native-spinbutton-and-scrollbar.md) adds selected native
+SpinButton/ScrollBar decoding, Long properties, nominal interfaces and ordinary
+Change/spin/drag-only Scroll delivery. Shared arrows/track/thumb/keyboard input
+uses authorized callbacks and canonical state, including reversed ranges and
+pause/resume. Full [M7A.4](m7a4-native-runtime.md) remains in progress.

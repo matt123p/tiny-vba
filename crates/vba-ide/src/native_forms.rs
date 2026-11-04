@@ -118,6 +118,8 @@ impl Ide {
                     Kind::CheckBox => ControlKind::CheckBox,
                     Kind::OptionButton => ControlKind::OptionButton,
                     Kind::ToggleButton => ControlKind::ToggleButton,
+                    Kind::ScrollBar => ControlKind::ScrollBar,
+                    Kind::SpinButton => ControlKind::SpinButton,
                 },
                 bounds: Bounds {
                     left: point(c.left),

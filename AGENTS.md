@@ -175,3 +175,9 @@ atomic and executable input authorized. Preserve CRLF and scalar cursor mapping,
 native flags/resource identity, password masking and ordinary callback/debugger
 boundaries. Rendering must not replace host fonts/global policy or alter data on
 missing glyphs. No .tvform expansion or full M7A.4 acceptance is implied.
+
+Native numeric controls follow [ADR 0050](docs/decisions/0050-native-spinbutton-and-scrollbar.md).
+Keep Long state/events in ordinary classes, distinct binary records bounded and
+resource retention inert. Numeric input executes VBA and needs the same policy
+as other form commands. Preserve reversed bounds, error/coercion semantics and
+Change/spin/Scroll continuations. No .tvform expansion or full milestone sign-off.
