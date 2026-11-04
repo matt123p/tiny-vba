@@ -178,3 +178,15 @@ can use `prepare_host_events` without executing code. Office signatures/policy r
 Use exact-token `abort_host_wait` when an embedding needs a fatal nested error policy;
 normal typed result/error transport remains available. It cancels modal waits through
 the form gate as well as foreign host waits. Do not implement Office policy in the VM.
+
+## M7 package evidence
+
+Read [M7 acceptance](../../../docs/m7-acceptance.md) and
+[ADR 0037](../../../docs/decisions/0037-m7-package-preservation-and-writeback.md).
+The optional `cargo xtask m7` verifies reviewed sibling artifact hashes before
+and after actual fork tests. Ordinary core CI remains sibling-independent.
+Keep load/compile/run/save, canonical source/original project bytes and
+authored/inherited/fresh evidence separate. Original binary preservation and
+plain-source exports do not implement edited CFB writeback. Opaque signature
+transport does not verify validity or grant trust. Broader binary forms/controls
+remain deferred and fresh Office observations remain M8.5.

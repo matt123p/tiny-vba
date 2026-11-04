@@ -1,0 +1,183 @@
+{
+  "schema": 1,
+  "profile": "m7-unchanged-v1",
+  "evidence_basis": "authored-contract",
+  "office_observations": "NOT_RUN",
+  "specimens": [
+    {
+      "id": "m7-xlsm-context-v1",
+      "repository": "gridcraft",
+      "format": ".xlsm",
+      "profile": "m7-unchanged-v1",
+      "license": "MIT OR Apache-2.0",
+      "provenance": "Original source and deterministic test-only Rust MS-OVBA/OOXML builders in this change; no Office-produced binary or external macro.",
+      "execution_review": "original-authored-bounded-host-workflow",
+      "initial_execution_status": "NOT_RUN",
+      "requirements": [
+        "M1 host types/defaults",
+        "M2 classes",
+        "M3 ranges",
+        "M4 typed values",
+        "M5 explicit events",
+        "M6 metadata and context",
+        "M6A VarType/CCur",
+        "M6 live Application WithEvents"
+      ],
+      "references": "Only explicit fork-declared Excel/Word reference snapshots; no library activation.",
+      "standard_controls": "none; native binary forms/worksheet controls excluded; .tvform acceptance remains separate",
+      "expected_basis": "Authored host contract and independently specified literal expected results; no Office observation.",
+      "expected": {
+        "B.A1": {
+          "type": "Double",
+          "value": 11
+        },
+        "B.A3": {
+          "type": "Double",
+          "value": 33
+        },
+        "A.Data.A2": {
+          "type": "Double",
+          "value": 22
+        },
+        "A.Data.A5": {
+          "type": "Double",
+          "value": 6
+        },
+        "A.Data.A6": {
+          "type": "Double",
+          "value": 11
+        },
+        "A.Data.A9": {
+          "type": "Double",
+          "value": 301
+        },
+        "A.Data.A10": {
+          "type": "Double",
+          "value": 1004
+        },
+        "event_effects": {
+          "owner.B1": 101,
+          "owner.B2": 102,
+          "owner.B3": 103,
+          "owner.B5": 105,
+          "other.B4": 104,
+          "active.A7": 77,
+          "active.C1": 201,
+          "owner.C2": 202,
+          "owner.B6": 6,
+          "owner.B7": 3,
+          "owner.E1": 501
+        },
+        "source": "exact authored bytes after extraction/reopen",
+        "binary_project": "byte-identical",
+        "before_save_Cancel": {
+          "type": "Boolean",
+          "value": true
+        },
+        "activation_effects": {
+          "B.D1": 401,
+          "A.D2": 402,
+          "A.D1": "Empty",
+          "B.D2": "Empty"
+        }
+      },
+      "artifacts": [
+        {
+          "path": "tests/fixtures/m7/AppSink.cls",
+          "sha256": "10bbf3e51b94280ddb6388de4711a7438192255d0590fc0e63516e7eb5987a19"
+        },
+        {
+          "path": "tests/fixtures/m7/BookCode.cls",
+          "sha256": "2e6223408375f248e079016b752498f75b7d0e61783c83e03b6c47c6ec71b4d6"
+        },
+        {
+          "path": "tests/fixtures/m7/Counter.cls",
+          "sha256": "65976d1b16c02d12fcd9dbd6955bd649eea3775b231658a5b9d97d1445c46da6"
+        },
+        {
+          "path": "tests/fixtures/m7/Package.bas",
+          "sha256": "2001d3ba714c4b7c54f5676d47f0caf7b52b75a056369d92c8e2ac32d5934bb3"
+        },
+        {
+          "path": "tests/fixtures/m7/SheetCode.cls",
+          "sha256": "4a2f450348eba0854b3e8b68a392835c47f59ffcb25962adfac628902c646376"
+        },
+        {
+          "path": "crates/vba/tests/support/mod.rs",
+          "sha256": "a6a0b70949fd6b0fa3e431ff70cf4aa0f983adf60d8b89a1b6e1720d6172beab"
+        },
+        {
+          "path": "crates/vba/tests/package_acceptance.rs",
+          "sha256": "94aaeb0b811ee4cbfdbe0137d955c0983d4df9f9bee9c17b988137769bf25066"
+        }
+      ]
+    },
+    {
+      "id": "m7-docm-context-v1",
+      "repository": "wordcraft",
+      "format": ".docm",
+      "profile": "m7-unchanged-v1",
+      "license": "MIT OR Apache-2.0",
+      "provenance": "Original source and deterministic test-only Rust MS-OVBA/OOXML builders in this change; no Office-produced binary or external macro.",
+      "execution_review": "original-authored-bounded-host-workflow",
+      "initial_execution_status": "NOT_RUN",
+      "requirements": [
+        "M1 Word nominal references",
+        "M2 class/WithEvents",
+        "M6 Word main-story and document events",
+        "M6 metadata",
+        "M6A CStr"
+      ],
+      "references": "Only explicit fork-declared Excel/Word reference snapshots; no library activation.",
+      "standard_controls": "none; native binary forms/worksheet controls excluded; .tvform acceptance remains separate",
+      "expected_basis": "Authored host contract and independently specified literal expected results; no Office observation.",
+      "expected": {
+        "body_after_Main": {
+          "type": "String",
+          "value": "package11"
+        },
+        "body_after_Document_Open": {
+          "type": "String",
+          "value": "owner-bound"
+        },
+        "before_save_Cancel": {
+          "type": "Boolean",
+          "value": true
+        },
+        "body_after_before_save": {
+          "type": "String",
+          "value": "before-save"
+        },
+        "runtime_division_error": {
+          "type": "Long",
+          "value": 11
+        },
+        "source": "exact authored bytes after extraction/reopen",
+        "binary_project": "byte-identical",
+        "signature_data": "opaque byte-identical; validity NOT_RUN"
+      },
+      "artifacts": [
+        {
+          "path": "tests/fixtures/m7/AppSink.cls",
+          "sha256": "ae5af45d6f3b2b3884f69108efefc0a244cfde41639a581e0ca5a14999315808"
+        },
+        {
+          "path": "tests/fixtures/m7/Package.bas",
+          "sha256": "8bf2e22ad6d92746ad38caef78455cc334cffd96e4bc9bb3ab2838f124e00131"
+        },
+        {
+          "path": "tests/fixtures/m7/ThisDocument.cls",
+          "sha256": "b9cadbf9bc027b296c999704c755b251ee91194f4f2d23940a62c40acc4c0b74"
+        },
+        {
+          "path": "crates/vba/tests/support/mod.rs",
+          "sha256": "a6a0b70949fd6b0fa3e431ff70cf4aa0f983adf60d8b89a1b6e1720d6172beab"
+        },
+        {
+          "path": "crates/vba/tests/package_acceptance.rs",
+          "sha256": "3fbbc1c8a42e73042794fac630180f6d2ea22fb6d3634482e969f510692fb24a"
+        }
+      ]
+    }
+  ]
+}

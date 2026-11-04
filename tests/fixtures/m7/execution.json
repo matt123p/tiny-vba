@@ -1,0 +1,153 @@
+{
+  "schema": 1,
+  "profile": "m7-unchanged-v1",
+  "date": "2026-11-04",
+  "evidence_basis": "authored-contract",
+  "environment": {
+    "os": "Linux 7.0.0-38-generic x86_64",
+    "rustc": "1.99.1 (58cf8f9c3 2026-10-13)",
+    "cargo": "1.99.1 (5f94df478 2026-08-27)",
+    "node": "22.23.4",
+    "comparison_context": "invariant/Gregorian/UTF-16",
+    "office_build": null,
+    "fresh_office_observations": "NOT_RUN"
+  },
+  "selection_sha256": "de6637251d8d59e78224945442736bfb18f8092836e40f856e30b26f92f4c4ff",
+  "repositories": {
+    "tiny-vba": {
+      "base_head": "549d08f570ced69c4b4f4a4eea6b8a9eb56a7cb6",
+      "changes": "M7 changes accompanying this record"
+    },
+    "gridcraft": {
+      "base_head": "a6b2845fe82ad7f96c2240ed757135450adb84ad",
+      "changes": "M7 changes accompanying this record",
+      "implementation_commit": "536d3aaf1461763b072e1a1e08b2f63ab5a0c016"
+    },
+    "wordcraft": {
+      "base_head": "46b1dad4e56fd5ef6a3d1200d9bf2e9b62f94661",
+      "changes": "M7 changes accompanying this record",
+      "implementation_commit": "95cfa647ea700cc21a34769a371ed41c4eb500cc"
+    }
+  },
+  "shared_pins": {
+    "gridcraft": "8f4bebc3650cd51054fa6786f83a1ac73e07aeaf",
+    "wordcraft": "0b41fd7bf7c78a62323133b290f2f9646667f9d3"
+  },
+  "specimens": [
+    {
+      "id": "m7-xlsm-context-v1",
+      "profile": "m7-unchanged-v1",
+      "stages": {
+        "load": "PASS",
+        "compile": "PASS",
+        "run": "PASS",
+        "save_reopen": "PASS",
+        "raw_source_identity": "PASS",
+        "original_project_bytes": "PASS",
+        "hidden_metadata_export": "PASS",
+        "trust_lifecycle": "PASS"
+      },
+      "native_cases": 5,
+      "javascript_wasm_cases": 5,
+      "binary_edited_writeback": "UNSUPPORTED",
+      "cryptographic_signature_validity": "NOT_RUN",
+      "whole_package_byte_identity_claimed": false
+    },
+    {
+      "id": "m7-docm-context-v1",
+      "profile": "m7-unchanged-v1",
+      "stages": {
+        "load": "PASS",
+        "compile": "PASS",
+        "run": "PASS",
+        "save_reopen": "PASS",
+        "raw_source_identity": "PASS",
+        "original_project_bytes": "PASS",
+        "hidden_metadata_export": "PASS",
+        "trust_lifecycle": "PASS"
+      },
+      "native_cases": 6,
+      "javascript_wasm_cases": 6,
+      "binary_edited_writeback": "UNSUPPORTED",
+      "cryptographic_signature_validity": "NOT_RUN",
+      "whole_package_byte_identity_claimed": false
+    }
+  ],
+  "package_graph_regressions": {
+    "cases": 2,
+    "result": "PASS"
+  },
+  "required_and_affected_checks": {
+    "m7": "PASS",
+    "shared_ci": "PASS",
+    "shared_wasm": "PASS",
+    "shared_wasi": "PASS",
+    "gridcraft_ci": "PASS",
+    "wordcraft_ci": "PASS",
+    "gridcraft_ui": "PASS",
+    "wordcraft_ui": "PASS",
+    "wordcraft_clippy": "PASS",
+    "wordcraft_browser_compile": "PASS",
+    "gridcraft_js": "PASS",
+    "wordcraft_js": "PASS"
+  },
+  "raw_run_logs": {
+    "m7": {
+      "local_path": "/tmp/tiny-vba-m7-final-acceptance.log",
+      "sha256": "9475c4993a64b3683cd27aec271b5dc548cfefaf3d938a38c978d5bc8fc0e94b"
+    },
+    "shared_ci": {
+      "local_path": "/tmp/tiny-vba-m7-ci-final.log",
+      "sha256": "112842c4c0862dfb79390f5daa0990dafb1d8d66b30aab3ad2610734f01b4acf"
+    },
+    "shared_wasm": {
+      "local_path": "/tmp/tiny-vba-m7-wasm.log",
+      "sha256": "6e1cb39913ca316bedba5e193f4385eb7858f7b3c4cf455a0c44669f2f3a2fd8"
+    },
+    "shared_wasi": {
+      "local_path": "/tmp/tiny-vba-m7-wasi.log",
+      "sha256": "c445eb66ab67abbf6e539fe038594594055802ae3109078102598678888816ca"
+    },
+    "gridcraft_ci": {
+      "local_path": "/tmp/gridcraft-m7-ci-fonts.log",
+      "sha256": "e2eec59f718f6dcd06080cd827069ea8d5d34a426ba99c3ad82e726a5edc1242"
+    },
+    "wordcraft_ci": {
+      "local_path": "/tmp/wordcraft-m7-ci.log",
+      "sha256": "d1f09edf66ad9973d3caeef1f41d96de39c7827428885e3c57ba50785c3d32e5"
+    },
+    "gridcraft_ui": {
+      "local_path": "/tmp/gridcraft-m7-ui.log",
+      "sha256": "b538a20f6f2e976b2e4aac13677491562ba09199623c808bdc96db04b2370126"
+    },
+    "wordcraft_ui": {
+      "local_path": "/tmp/wordcraft-m7-ui-final.log",
+      "sha256": "e6114bf169dd95f5d868dec86d2bb1650286ef07ee8548151908e69ad39e8e91"
+    },
+    "wordcraft_clippy": {
+      "local_path": "/tmp/wordcraft-m7-final-clippy.log",
+      "sha256": "89d8248919598fba9f52fe3b9e4b58b1b8f51cdd60662d2ed4f5f3f2ae646df8"
+    },
+    "wordcraft_browser_compile": {
+      "local_path": "/tmp/wordcraft-m7-ui-wasm.log",
+      "sha256": "e86f1c0ade6e1e7dc26dc0c4fefd48aad25d8e3e320f34827eb18554aee56e21"
+    },
+    "gridcraft_js": {
+      "local_path": "/tmp/gridcraft-m7-final-js.log",
+      "sha256": "74a50292460b5ee1f40694fa4a3214a851c4dc95dcf559e7d662407d1dd4f3dd"
+    },
+    "wordcraft_js": {
+      "local_path": "/tmp/wordcraft-m7-final-js.log",
+      "sha256": "17116cc4f6fc98c6c5a1ecf551178a9808a554b22bc0b452c3c3cfbb8cc86781"
+    }
+  },
+  "reproduce": "cargo xtask m7 (with the reviewed sibling forks); full commands and setup are in docs/m7-acceptance.md",
+  "limits": [
+    "No fresh Office comparison; M8.5 remains a release gate.",
+    "Unsigned authored packages only; opaque signature sentinels do not establish validity.",
+    "Binary UserForm/worksheet Form Control execution remains deferred; .tvform acceptance stays separate.",
+    "No edited-source binary project encoder or P-code execution.",
+    "Full package ZIP/XML byte identity is not claimed.",
+    "Initial host Node 18 runtime abort and default-font GridCraft UI failures were superseded by Node 22 and the existing optional licensed font input."
+  ]
+}

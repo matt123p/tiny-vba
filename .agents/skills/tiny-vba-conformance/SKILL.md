@@ -90,3 +90,15 @@ and explicit IR 3/4 capabilities, retaining IR 1/2 refusal rules. Unselected ext
 signs off M6 for its tested integration profile by owner direction. Fresh
 Excel/Word comparisons are deferred to M8.5 and remain NOT_RUN until observed;
 they no longer block M7. Keep authored, inherited and fresh evidence distinct.
+
+## M7 package evidence
+
+Read [M7 acceptance](../../../docs/m7-acceptance.md) and
+[ADR 0037](../../../docs/decisions/0037-m7-package-preservation-and-writeback.md).
+The optional `cargo xtask m7` verifies reviewed sibling artifact hashes before
+and after actual fork tests. Ordinary core CI remains sibling-independent.
+Keep load/compile/run/save, canonical source/original project bytes and
+authored/inherited/fresh evidence separate. Original binary preservation and
+plain-source exports do not implement edited CFB writeback. Opaque signature
+transport does not verify validity or grant trust. Broader binary forms/controls
+remain deferred and fresh Office observations remain M8.5.

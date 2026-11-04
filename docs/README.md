@@ -1,10 +1,15 @@
 # Documentation index
 
-M1–M6 are signed off for their declared profiles and M6A is accepted; the
-remaining plan starts at M7. Fresh Excel/Word comparison is
+M1–M6, M6A and M7 are complete for their declared profiles; the
+remaining plan starts at M8. Fresh Excel/Word comparison is
 deferred to M8.5. The plan retains M1–M8 numbering with inserted M6A. Earlier implementation reports,
 specifications and ADRs retain historical IDs; see the
 [mapping](implementation-progress.md#plan-renumbering--2026-10-28).
+
+[M7 authored package acceptance](m7-acceptance.md) records separate load/compile/run/save,
+source identity and module-context evidence. [ADR 0037](decisions/0037-m7-package-preservation-and-writeback.md)
+separates original-project preservation from future edited-source writeback and signatures.
+The optional `cargo xtask m7` gate verifies reviewed hashes and runs real fork workflows.
 
 Read [architecture](architecture.md), [implementation plan](implementation-plan.md),
 [scope decision](decisions/0001-repository-scope.md) and [progress](implementation-progress.md) first.
@@ -128,12 +133,12 @@ independently authored GridCraft scenarios accepted for the declared profile.
   staged identifier resolution, host globals versus `Me`/`With`, active versus
   code context and compatibility tests.
 
-The [remaining plan](implementation-plan.md) assigns M6.5 to check current
-evidence against both, M6.6/M6.7 to close the gaps under the existing ownership
-split (shared binding in tiny-vba; Excel host globals and active state in the
-forks), M6.8 to bring host-object member completion to the shared IDE, and M7.4
-to run their matrices as unchanged-document acceptance. That work is implemented;
-see the [M6.5 check](m6-context-resolution-check.md).
+The completed M6.5–M6.8 work checked these specifications, implemented shared
+binding/fork context behavior and added shared host-object member completion;
+see the [M6.5 check](m6-context-resolution-check.md). The completed M7.4
+[unchanged-document matrix](m7-acceptance.md#both-supplied-matrices--m74) records
+per-case authored results and explicit unsupported profiles. Fresh Office
+comparison remains M8.5 in the [remaining plan](implementation-plan.md).
 
 [M6 host-event subscriptions](decisions/0029-host-event-subscriptions.md) defines
 bounded host-neutral delivery to nominal WithEvents fields. Word Application event

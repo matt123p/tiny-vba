@@ -90,3 +90,11 @@ read [its acceptance/format contract](docs/m2-acceptance.md). Keep generated for
 support out of saved authored source, design state independent of VM Reset,
 modal callbacks explicit and bounded, and save acknowledgments revision-checked.
 Binary Office form resources/package writeback remain outside this profile.
+
+M7 is complete for [the authored unchanged-document/package profile](docs/m7-acceptance.md).
+Read [ADR 0037](docs/decisions/0037-m7-package-preservation-and-writeback.md) before
+package/writeback work. Source decoding stays inert/read-only; package/trust policy
+stays in forks. `cargo xtask m7` is optional and requires sibling forks; core CI
+stays independent. Preserve original bytes separately from source exports; edited
+binary writeback and cryptographic signature verification remain unsupported.
+M8 is next; fresh Office comparisons remain NOT_RUN under M8.5.

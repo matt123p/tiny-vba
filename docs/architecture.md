@@ -23,6 +23,12 @@ The legacy instruction remains supported; environmental calls use explicit
 context/host services. See [M6A acceptance](m6a-acceptance.md) for evidence and
 profile limits.
 
+M7 package acceptance is implemented for the [authored profile](m7-acceptance.md).
+[ADR 0037](decisions/0037-m7-package-preservation-and-writeback.md) keeps source decoding
+read-only in vba-project and package/trust/signature policy in the forks. An optional
+xtask gate consumes sibling workflow tests; ordinary core CI has no sibling dependency.
+No shared crate, dependency edge, IR version or ambient authority was added.
+
 VBA source flows through syntax → semantics → verified IR → explicit-state VM.
 The dependency graph is separate from this data flow: IR does not need a dependency on the binder.
 The adopted [IR 1 specification](bytecode-vm-specification.md) defines instruction/stack contracts,

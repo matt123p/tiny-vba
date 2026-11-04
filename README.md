@@ -221,7 +221,8 @@ tiny-vba checkout. Each app's pinned revision determines its available features.
 
 The shared engine, editor/debugger, read-only project importer, selected
 class/form profile and declared intrinsic-function profile are implemented.
-M1–M6 are signed off for their declared profiles; M6A intrinsic coverage is accepted.
+M1–M6, M6A and the [M7 authored package profile](docs/m7-acceptance.md) are complete
+for their declared profiles.
 See the [compatibility matrix](docs/compatibility-matrix.md) and
 [intrinsic inventory](docs/vba-intrinsic-functions.md) for actual support.
 
@@ -230,10 +231,12 @@ ReflexGrid cases passing**. The latter match inherited, upstream-reported Excel 
 expectations; they are not fresh local Office comparisons or a measure of all VBA.
 The [oracle report](docs/m4-oracle-report.md) records their provenance.
 
-Next are unchanged-document/package acceptance (M7), then expanded conformance,
-hardening and release validation (M8). Fresh Excel/Word comparisons remain
-**NOT_RUN**, scheduled for M8.5. Binary project writeback/signature handling still
-needs its reviewed contract. Arbitrary COM/DLL execution, P-code execution and
+Next are expanded conformance, hardening and release validation (M8). Fresh
+Excel/Word comparisons remain **NOT_RUN**, scheduled for M8.5. The
+[reviewed writeback/signature contract](docs/decisions/0037-m7-package-preservation-and-writeback.md)
+keeps edited binary project writeback and cryptographic verification unsupported.
+M7 preserves original project bytes and supported related payloads separately
+from plain-source exports. Arbitrary COM/DLL execution, P-code execution and
 third-party ActiveX/OLE controls are outside the current scope. Broader Office
 forms/controls have a [separate deferred plan](docs/office-forms-controls-implementation-plan.md).
 
@@ -259,6 +262,8 @@ See the [embedding and browser guide](docs/ui/embedding.md) for web setup and Ru
 
 ```sh
 cargo xtask ci
+# Optional real package workflows with GridCraft/WordCraft sibling checkouts:
+cargo xtask m7
 rustup target add wasm32-unknown-unknown wasm32-wasip1
 cargo xtask wasm
 cargo xtask wasm-run

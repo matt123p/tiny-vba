@@ -39,6 +39,42 @@ fn run() -> Result<(), Box<dyn Error>> {
     std::env::set_current_dir(&root)?;
     eprintln!("xtask workspace: {}", root.display());
     match std::env::args().nth(1).as_deref() {
+        Some("m7") => {
+            // Optional real-fork integration gate. Ordinary core CI remains sibling-independent.
+            command(python(), &["tools/check_m7.py"])?;
+            let parent = root
+                .parent()
+                .ok_or_else(|| io::Error::other("M7 requires sibling fork checkouts"))?;
+            for (repository, package, filter) in [
+                ("gridcraft", "gridcraft-vba", "package_acceptance"),
+                ("wordcraft", "wordcraft-vba", "package_acceptance"),
+            ] {
+                let status = Command::new("cargo")
+                    .current_dir(parent.join(repository))
+                    .args(["test", "--locked", "-p", package, "--test", filter])
+                    .status()?;
+                if !status.success() {
+                    return Err(io::Error::other(format!(
+                        "M7 {repository} acceptance failed: {status}"
+                    ))
+                    .into());
+                }
+            }
+            let status = Command::new("cargo")
+                .current_dir(parent.join("gridcraft"))
+                .args(["test", "--locked", "-p", "gridcraft-xlsx", "m7_vba"])
+                .status()?;
+            if !status.success() {
+                return Err(io::Error::other(format!(
+                    "M7 package graph acceptance failed: {status}"
+                ))
+                .into());
+            }
+            command(python(), &["tools/check_m7.py"])?;
+            println!(
+                "M7 authored fork acceptance PASS; Office observations and real signature verification NOT_RUN"
+            );
+        }
         Some("ci") => {
             command("cargo", &["fmt", "--all", "--check"])?;
             command(
@@ -356,7 +392,7 @@ fn run() -> Result<(), Box<dyn Error>> {
         )?,
         _ => {
             return Err(io::Error::other(
-                "usage: cargo xtask <ci|layers|corpora|wasm|wasm-run|ui|ui-native|web>",
+                "usage: cargo xtask <ci|layers|corpora|m7|wasm|wasm-run|ui|ui-native|web>",
             )
             .into());
         }

@@ -1,5 +1,42 @@
 # Implementation progress
 
+## M7 — authored unchanged-document/package acceptance (2026-11-04)
+
+Completed M7.1–M7.4 for `m7-unchanged-v1`; see the
+[self-contained acceptance record](m7-acceptance.md),
+[reviewed specimen selection](../tests/fixtures/m7/selection.json) and
+[ADR 0037](decisions/0037-m7-package-preservation-and-writeback.md).
+Two original, licensed generated packages carry fixed source hashes, explicit
+capabilities/references and independent typed expectations. Both real forks verify
+load, compile, authorized execution and save/reopen separately, preserving raw
+source/hidden metadata and original binary project identity. Both supplied
+context matrices have per-row PASS/UNSUPPORTED dispositions with authored bases;
+fresh Office comparisons remain NOT_RUN under M8.5.
+
+GridCraft now captures the bounded VBA-related payload/relationship graph and
+refuses to reuse it with a replaced captured project. WordCraft attaches decoded
+standard/class/ThisDocument source inertly and refuses invalid/unsupported owners
+transactionally. Its adapter and editor enforce execution trust before VBA entry
+while permitting untrusted source editing/compile/export and resetting live work
+on trust revocation. WordCraft explicitly drops/logs package-wide OPC signature
+roots on rewrite; VBA signatures remain opaque transport data. No cryptographic
+verification, edited-source CFB encoder, binary form import or new runtime/IR
+capability is claimed. M7.3's deliverable is the reviewed writeback design.
+
+Validation: `cargo xtask m7` PASS (5 GridCraft package cases, 6 WordCraft package
+cases, 2 package graph regressions; 12 reviewed artifact hashes). Both full fork
+CI gates and their WASM stages PASS; GridCraft requires the existing optional
+`CRAFT_FONTS_DIR=/tmp/gridcraft-acceptance-fonts` input for its two glyph-dependent
+UI tests. Shared CI/WASM/WASI PASS. Actual Node 22 JavaScript/WASM package tests
+PASS (5 Excel, 6 Word); host Node 18 aborts in the test runtime. Optional VBA UI
+checks PASS (GridCraft 9 filtered integration tests; WordCraft 12 rendered/model
+tests); final Word optional-feature strict Clippy and browser-shell compilation
+PASS. Exact commands, scope and exclusions are recorded in acceptance.
+
+Next smallest task: M8.2's host-call payload reservation/accounting review,
+with M8.1 curation alongside it. The M8.5 fresh Office comparison remains an
+explicit release gate. No external corpus candidate was newly executed.
+
 ## README and license alignment (2026-11-03)
 
 Rewrote the public README around ArtCraft's clean-room VBA purpose, the Excel
@@ -23,19 +60,14 @@ Windows checks used a workspace-local TEMP/TMP and the installed Python 3.13
 directory on PATH after the default WindowsApps Python alias failed. No fresh
 GridCraft/WordCraft GUI walkthrough or Microsoft Office comparison was run.
 
-Updated 2026-11-03. The classic-editor/debugger profile is implemented; its
-historical milestone is M10. Runtime host profile remains m5-host-v1; verified IR
-1/2/3/4/5/6/7 and the accepted IR 8 `intrinsics-m6a-v1` extension are implemented.
-The [remaining plan](implementation-plan.md) now contains **M7–M8**.
-**M1–M6 are signed off for their declared profiles; M6A is accepted.** The owner approved moving
-fresh Excel/Word comparisons from M6.4 to M8.5 on 2026-11-01; those comparisons
-remain NOT_RUN and no longer block M7. [M6 acceptance](m6-acceptance.md) records
-the tested scope and [ADR 0032](decisions/0032-m6-sign-off-and-reference-comparison-deferral.md)
-records the revised gate. [M6A acceptance](m6a-acceptance.md) records the
-completed intrinsic inventory and shared/fork validation. **Next: M7.1**, curate
-and classify licensed specimens for unchanged-document/package acceptance.
-M7 implementation has not started.
-Office objects, document events, trust and packaging remain fork-owned.
+Current status, 2026-11-04: the classic-editor/debugger profile is implemented;
+its historical milestone is M10. Runtime host profile remains m5-host-v1 with
+verified IR 1–8 and the accepted intrinsic extension. **M1–M6, M6A and M7 are
+complete for their declared profiles.** The [remaining plan](implementation-plan.md)
+contains M8. Fresh Excel/Word comparisons remain NOT_RUN and are a release gate
+under M8.5. Office objects, document events, trust and packaging remain fork-owned.
+The [M7 acceptance record](m7-acceptance.md) defines original-project preservation,
+source exports and unsupported edited binary writeback separately.
 
 ## Suspended generic host calls (2026-11-03)
 
@@ -1298,3 +1330,55 @@ signatures are the next milestone's separate gate.
 Validation for ADR 0036: `cargo xtask ci`, `cargo xtask wasm` and `cargo xtask wasm-run` passed. All seven suspended-call tests, 15 compiler tests and the qualified-type regression also passed under Node WASI. These are authored generic contract tests, not fresh Office oracle evidence.
 
 ADR 0036 fatal-policy refinement: exact-token `abort_host_wait` stops all parked/modal invocations with a runtime diagnostic when the embedding requires it. Generic error-return behavior remains available; Office error policy stays in GridCraft.
+
+## Completed M7 plan scope
+
+Moved from the remaining plan on 2026-11-04 after authored-profile acceptance.
+The following definitions preserve task IDs and the original requested scope;
+[M7 acceptance](m7-acceptance.md) records actual results and profile limits.
+
+### M7 — Unchanged-document and package acceptance
+
+Owner: fork acceptance/package layers, coordinated with tiny-vba source-import
+and evidence contracts. Starts after M6A acceptance and depends on each
+specimen's M1–M6 and intrinsic capabilities; form
+specimens require M2 and the corresponding host event/persistence integration.
+Native Excel worksheet Form Controls, binary UserForm import and expanded control
+support are deferred outside this delivery profile; see the
+[Office forms and controls plan](office-forms-controls-implementation-plan.md).
+Classify specimens needing those capabilities as UNSUPPORTED/NOT_RUN rather than
+expanding M7 into their implementation. Existing `.tvform` acceptance stays scoped
+to its supported shared/host workflow.
+
+- **M7.1:** Curate licensed, reviewed Excel workbooks and Word documents with
+  declared language/object/reference/standard-control requirements and independently
+  established expected results. Keep candidate/unrun material separate.
+- **M7.2:** Report load, compile, run and save separately for unchanged source.
+  Verify source identity, typed values/errors, effects/events, code names,
+  package relationships/payloads, trust and lifecycle for .xlsm/.docm workflows.
+  Include M6.9–M6.12 attribute retention and code-view/raw-source mapping:
+  unchanged headers/member metadata survive load and plain-source export,
+  and code edits preserve attached hidden records. Report these separately
+  from original-package preservation and edited binary writeback.
+- **M7.3:** Design binary VBA project writeback and signature preservation/
+  invalidation as a separate reviewed contract before implementation. Distinguish
+  original-byte preservation from edited-source writeback. No protection/P-code
+  bypass or unrestricted binary add-ins.
+- **M7.4:** Execute the two specifications' module-context and name-resolution
+  matrices ([module types](vba_module_types_and_execution_contexts.md),
+  [object resolution](vba_excel_context_and_object_resolution.md)) as
+  unchanged-document evidence: per-module-kind binding with a different workbook
+  active, `With` versus bare identifiers, shadowing, code names after tab rename,
+  late binding, and chart-sheet/add-in cases where licensed specimens permit.
+  Exercise the adopted implementation contracts and record
+  PASS/MISMATCH/UNSUPPORTED/NOT_RUN per case, with each expectation’s basis
+  (authored contract, public specification or inherited observation). Fresh
+  comparisons against Excel/Word reference builds belong to M8.5; do not label
+  these M7 checks as fresh Office observations or change precedence from an
+  unverified assumption.
+
+Acceptance: per-document profile/version/evidence records distinguish PASS,
+MISMATCH, UNSUPPORTED and NOT_RUN. Verify declared supported forms/controls, source
+attachment, no untrusted auto-run and signature validity/loss decisions.
+Run both repositories' required CI/WASM gates and real fork workflows.
+Publish incompatibilities; subset success does not imply universal compatibility.

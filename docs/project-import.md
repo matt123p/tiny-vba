@@ -81,3 +81,14 @@ it does not strip importer output. Attribute-only document modules remain visibl
 components with a blank code pane. Raw metadata is available through the shared
 read-only inspector. No binary writeback or Macro Options policy is implied.
 See [ADR 0030](decisions/0030-attribute-metadata-and-code-projection.md).
+
+## Authored package acceptance (2026-11-04)
+
+[M7](m7-acceptance.md) exercises this decoder through actual `.xlsm`/`.docm`
+package workflows in both forks. WordCraft now attaches decoded source inertly
+when constructing its editor project; GridCraft retains its owner/code-name checks
+and adds related graph preservation. Original bytes and canonical source have
+separate assertions. Cache/source consistency remains `NotChecked`; a decoded
+project is not proof of valid P-code or a verified signature. The
+[writeback/signature contract](decisions/0037-m7-package-preservation-and-writeback.md)
+adds no encoder to this crate.

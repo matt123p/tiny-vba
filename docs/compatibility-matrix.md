@@ -1,6 +1,6 @@
 # Compatibility matrix
 
-Updated 2026-11-02. Stage: M5 document/event/UDF profile accepted against GridCraft; M6 signed off for its tested integration profile (see the [M6.5 check](m6-context-resolution-check.md)); M6A VBA intrinsic coverage accepted for the [declared profile](m6a-acceptance.md), with GridCraft and WordCraft pinned to the published shared revision; **M7 unchanged-document/package acceptance is next**; M8 release gates remain. **The documented m5-host-v1 consumer, including M3 control, M4 scalar widths and IR 4 host roots, has execution evidence; the 44 authored and 153 reviewed fixtures remain asserted PASS.**
+Updated 2026-11-04. Stage: M5 document/event/UDF profile accepted against GridCraft; M6 signed off for its tested integration profile (see the [M6.5 check](m6-context-resolution-check.md)); M6A VBA intrinsic coverage accepted for the [declared profile](m6a-acceptance.md), with GridCraft and WordCraft pinned to the published shared revision; **M7 authored unchanged-document/package acceptance is complete for [m7-unchanged-v1](m7-acceptance.md)**; M8 release gates remain. **The documented m5-host-v1 consumer, including M3 control, M4 scalar widths and IR 4 host roots, has execution evidence; the 44 authored and 153 reviewed fixtures remain asserted PASS.**
 
 | Dimension | Status | Evidence / next gate |
 | Imported object member dispatch | Implemented binder correction, including getter aliases | ADR 0017/0025; vba-vm/tests/embedding.rs preserves actual Get/Call/Let/Set, named arguments and returned object targets |
@@ -49,7 +49,8 @@ Updated 2026-11-02. Stage: M5 document/event/UDF profile accepted against GridCr
 | Explicit host references, enum/nominal types and constants | New M1.1 complete for registered types | Qualified types, ordered constants, IR 5 nominal storage/lifetime/ByRef checks and native/WASI tests plus fork-owned native/JavaScript-WASM typed-source proof; [profile](m1-host-references.md). Office definitions stay in forks |
 | Third-party ActiveX/OLE controls not supplied with Office | Out of scope for now | No loading, execution, designer or acceptance work scheduled |
 | Arbitrary COM/DLL execution, P-code and binary add-ins | Outside current scope | Standard Office control support does not imply unrestricted binary compatibility |
-| Binary VBA source writing/signature handling | Planned reviewed contract in new M7 | Original-byte preservation is not edited-source writeback |
+| Binary VBA source writing/signature handling | M7 reviewed contract; encoder/verifier unsupported | [ADR 0037](decisions/0037-m7-package-preservation-and-writeback.md); original binary and supported opaque VBA signature payloads preserved separately from source exports; package-wide signatures invalidated; real signature verification NOT_RUN |
+| Unchanged XLSM/DOCM source and package workflows | M7 authored profile complete | Two reviewed generated specimens; native and actual JS/WASM load/compile/trust/run/save/reopen; hidden attributes/code names/context/events; [acceptance](m7-acceptance.md). No universal Office, binary-form or edited-writeback claim |
 
 M3 execution evidence is restricted to its explicit tests/examples and runtime matrix. It does not establish
 workbook/Office compatibility, physical-device fidelity or unselected external corpus pass rates; self-authored

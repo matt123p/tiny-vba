@@ -12,7 +12,8 @@ M6A — VBA intrinsic-function coverage — was accepted on 2026-11-02. See the
 [intrinsic scope](../../../docs/vba-intrinsic-functions.md),
 [acceptance record](../../../docs/m6a-acceptance.md), and
 [ADR 0033](../../../docs/decisions/0033-intrinsics-before-package-acceptance.md).
-The next milestone is M7; fresh Office comparisons remain M8.5.
+M7 is complete for [m7-unchanged-v1](../../../docs/m7-acceptance.md).
+The next milestone is M8; fresh Office comparisons remain M8.5.
 
 The [M6A framework](../../../docs/m6a-implementation-framework.md) and
 [ledger](../../../docs/m6a-work-ledger.md) retain design and evidence for follow-up
@@ -128,3 +129,15 @@ third-party controls, binary Office form/resource compatibility or package write
 Office document bindings/events, storage, trust and package persistence stay in forks.
 Run CI/WASM/WASI plus UI/native/web and both Chromium smoke/form acceptance gates
 when changing these surfaces. M3 range/worksheet work is GridCraft-owned.
+
+## M7 package evidence
+
+Read [M7 acceptance](../../../docs/m7-acceptance.md) and
+[ADR 0037](../../../docs/decisions/0037-m7-package-preservation-and-writeback.md).
+The optional `cargo xtask m7` verifies reviewed sibling artifact hashes before
+and after actual fork tests. Ordinary core CI remains sibling-independent.
+Keep load/compile/run/save, canonical source/original project bytes and
+authored/inherited/fresh evidence separate. Original binary preservation and
+plain-source exports do not implement edited CFB writeback. Opaque signature
+transport does not verify validity or grant trust. Broader binary forms/controls
+remain deferred and fresh Office observations remain M8.5.

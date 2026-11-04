@@ -12,7 +12,7 @@ descriptors in values, one semantic argument binder, verified IR 8 extended call
 central runtime coercion and VM-owned context/effects. The design adds no crate
 or ambient IO authority; implementation/versioned documentation must land
 together. See the [acceptance record](../../../docs/m6a-acceptance.md) before
-extending the supported profile. M7 is the next milestone.
+extending the supported profile. M7 authored-profile acceptance is complete; M8 is next.
 
 The remaining plan now uses new M1–M8 numbers under ADR 0019. Implemented contract
 IDs in this skill and earlier ADRs are historical; use the progress mapping when
@@ -157,3 +157,15 @@ third-party controls, binary Office form/resource compatibility or package write
 Office document bindings/events, storage, trust and package persistence stay in forks.
 Run CI/WASM/WASI plus UI/native/web and both Chromium smoke/form acceptance gates
 when changing these surfaces. M3 range/worksheet work is GridCraft-owned.
+
+## M7 package evidence
+
+Read [M7 acceptance](../../../docs/m7-acceptance.md) and
+[ADR 0037](../../../docs/decisions/0037-m7-package-preservation-and-writeback.md).
+The optional `cargo xtask m7` verifies reviewed sibling artifact hashes before
+and after actual fork tests. Ordinary core CI remains sibling-independent.
+Keep load/compile/run/save, canonical source/original project bytes and
+authored/inherited/fresh evidence separate. Original binary preservation and
+plain-source exports do not implement edited CFB writeback. Opaque signature
+transport does not verify validity or grant trust. Broader binary forms/controls
+remain deferred and fresh Office observations remain M8.5.
