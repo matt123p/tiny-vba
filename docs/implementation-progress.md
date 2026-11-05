@@ -14,8 +14,20 @@ widget cases), native capture and web gates PASS. Ten expanded/collapsed renders
 were inspected across light/dark/narrow/scaled/injected-host themes; caption and
 restore marks use injected tokens and original vector drawing. Actual Chromium
 RefEdit text input, modal handler Stop/resume and exact authored source retention
-PASS with no page errors. Original M7 artifact hashes PASS. Application integration
-validation is in progress. M7A.4 remains IN PROGRESS for dynamic
+PASS with no page errors. Original M7 artifact hashes PASS. Both applications pin
+shared product revision `21898dce`: GridCraft `3d9af79a` (implementation `4b46c982`)
+and WordCraft `5aed1365`. Full CI (10/8 steps), twelve native and twelve actual
+Node/WASM package cases per application, strict optional VBA/UI Clippy and
+optional VBA web checks PASS. GridCraft's three embedded-form UI/consent cases
+cover real range-picker/worksheet pointer input, multi-area references, authored
+workbook changes, refusal of cell editing while picking, hidden VBE and trust
+revocation; its host capture was inspected. WordCraft's thirteen existing VBA UI
+cases and native-form widget test PASS; the latter covers hidden VBE, real button
+input and Stop/F5 continuation without replay. Form windows/advancement are now
+independent of VBE visibility in both hosts. Exact original XLSM/DOCM project bytes
+survive save/reopen; source/resources remain separate. All repositories are
+committed and pushed. This accepts the selected RefEdit and hidden-editor work;
+M7A.4 remains IN PROGRESS for dynamic
 collections, bindings, remaining control/platform/property/event/lifecycle
 contracts and broader RefEdit semantics. Native edited saving/removal remain
 M7A.5/.6. Fresh Office traces remain NOT_RUN under M8.5. Next: dynamic native

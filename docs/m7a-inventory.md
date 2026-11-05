@@ -48,7 +48,7 @@ in M7A.4; a declared unsupported packet is not implementation evidence.
 | ScrollBar | Value/range/increments/orientation, Change/Scroll | Selected native records, Long properties, reversed ranges and input/drag-only Scroll; further resources/properties/save remain unsupported |
 | SpinButton | Value/range/increments/orientation, Change/spin events | Selected native records, Long properties and input/Change/spin; further resources/properties/save remain unsupported |
 | Image | Native picture resource/geometry/display properties and applicable input events | Selected bounded native raster, picture identity/assignment, layout and Click (ADR 0059); further formats/platform/metadata/events/presentation remain open |
-| Excel RefEdit | Native class-table identity, text/reference, drop and host selection | Selected inert decode and ordinary text/drop runtime (ADR 0060); GridCraft picker integration validation in progress; broader host/platform/property/event semantics remain open |
+| Excel RefEdit | Native class-table identity, text/reference, drop and host selection | Selected inert decode and ordinary text/drop runtime (ADR 0060); GridCraft picker/authored integration PASS; broader host/platform/property/event semantics remain open |
 
 Inventory basis: Microsoft's [Forms object list](https://learn.microsoft.com/en-us/office/vba/language/reference/user-interface-help/objects-microsoft-forms),
 [properties index](https://learn.microsoft.com/en-us/office/vba/language/reference/user-interface-help/properties-microsoft-forms)

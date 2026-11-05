@@ -71,7 +71,7 @@ unlisted property remains outside the selected import/runtime claim.
 | ScrollBar | Selected Long Value/bounds/increments/orientation/delay; further resources/properties remain U | Change/drag-only Scroll, selected input/focus | D/P | shared | selected packet | U |
 | SpinButton | Selected Long Value/bounds/increment/orientation/delay; further resources/properties remain U | Change/SpinUp/SpinDown, selected input/focus | D/P | shared | selected packet | U |
 | Image | Picture identity/assignment, raster resource, PictureSizeMode/Alignment/Tiling, AutoSize and geometry | Nonfocusable Click | D/P | shared | selected packet (ADR 0059) | U |
-| Excel RefEdit | Canonical text/selection/drop state; non-cached native class identity | Change/DropButtonClick, selected focus/input; host range selection | D/P | shared; picker supplied by Excel host | selected packet (ADR 0060); integration validation in progress | U |
+| Excel RefEdit | Canonical text/selection/drop state; non-cached native class identity | Change/DropButtonClick, selected focus/input; host range selection | D/P | shared; picker supplied by Excel host | selected packet (ADR 0060); GridCraft picker integration PASS | U |
 
 The last row is an Office-supplied Excel extension, not a generic MSForms control
 or third-party control. Other Office references/extensions need an explicit

@@ -1,6 +1,6 @@
 # ADR 0060 — Native RefEdit and host range selection
 
-Status: adopted for the selected native RefEdit contract; integration validation in progress. Full M7A.4 remains open.
+Status: adopted for the selected native RefEdit contract; shared/application gates PASS. Full M7A.4 remains open.
 
 The user requires Office-native forms and Office behavior. RefEdit belongs to
 Excel's host integration; it is not an arbitrary external control or a new widget.
@@ -41,3 +41,14 @@ Primary contracts:
 - [ClassInfoPropMask](https://learn.microsoft.com/en-us/openspecs/office_file_formats/ms-oforms/23e7d1b6-a8c3-40c8-984b-cba659aea614)
 - [ClsidCacheIndex](https://learn.microsoft.com/en-us/openspecs/office_file_formats/ms-oforms/60fcfe48-aece-4114-b719-c7563195837f)
 - [Microsoft MS-OFORMS specification, example 3.4](https://officeprotocoldoc.z19.web.core.windows.net/files/MS-OFORMS/%5BMS-OFORMS%5D.pdf)
+
+Validation: shared CI/WASM/WASI/UI/native/web and Chromium text input pass.
+Both forks pin `21898dce`; all twelve native and twelve actual Node/WASM package
+cases per fork, full CI (10/8), optional strict Clippy and web checks pass.
+GridCraft's three form UI cases include real worksheet pointer selection,
+reduce/restore with VBE hidden, mutation refusal while picking and trust loss.
+WordCraft's native-form widget case verifies callbacks with VBE hidden and
+Stop/F5 continuation; thirteen other VBA UI cases pass. Both hosts now render
+and advance form execution independently of VBE visibility under ADR 0042's
+existing ownership rules. No fresh Office observation or full milestone sign-off
+is implied.
