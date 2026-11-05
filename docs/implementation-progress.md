@@ -14,9 +14,17 @@ Shared CI, WASM, actual WASI (77 runtime/19 decoder cases), UI (18 actual
 widget cases), native capture and web gates PASS. Five light/dark/narrow/scaled/
 injected-host image renders were inspected. Actual Chromium Image clicks, picture
 assignment/alignment, modal Stop/resume and exact source retention PASS. Zero-size
-zoom/tiling and one-pixel repeat regressions keep painting bounded. Application
-integration validation is in progress. The reviewed headless project -> image codec edge and
-explicit feature/license/budget policy are recorded in the ADR and architecture.
+zoom/tiling and one-pixel repeat regressions keep painting bounded. Both applications
+pin shared product revision `4455df40`: GridCraft `7d23b368` and WordCraft
+`e3a77b94`. Full CI (10/8 steps), eleven native and eleven actual Node/WASM
+package cases per application, strict optional VBA/UI Clippy and optional VBA
+web checks PASS. Both GridCraft embedded-form UI/consent regressions PASS.
+The new package cases verify inert import, nominal Image/stdole picture access,
+shared immutable resource identity, nonfocusable authorized clicks and exact
+original XLSM/DOCM project bytes after save/reopen; WordCraft also verifies trust
+revocation. All three repositories are committed and pushed. The reviewed
+headless project -> image codec edge and explicit feature/license/budget policy
+are recorded in the ADR and architecture.
 M7A.4 remains IN PROGRESS for further picture format/metadata/platform/event/
 presentation cases, RefEdit, dynamic collections, bindings, platform controls and
 remaining lifecycle/property/default/error contracts in the unchanged ledger.
