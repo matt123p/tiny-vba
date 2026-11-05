@@ -8,6 +8,8 @@ leaf control owning tabs, not a parent for nearby controls. Its native record
 has ordered character-counted ArrayStrings, mandatory TextProps and optional
 per-tab flags. Preserve names, UTF-16 captions, tags, tips, accelerators,
 selection, orientation/style, row/tooltip flags and fixed tab dimensions.
+Check uncompressed character counts before combining them with the compression
+flag; oversized counts cannot alias that flag and masquerade as empty strings.
 Validate parallel array lengths, unique persisted identifiers, selection and
 flag bounds; refuse pictures/custom pointers, unknown masks and missing tab
 names rather than inventing client-generated names. Source and resources remain

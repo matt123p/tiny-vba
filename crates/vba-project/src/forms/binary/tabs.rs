@@ -16,6 +16,9 @@ fn strings(r: &mut Reader<'_>, bytes: u32) -> Result<Vec<String>> {
         } else {
             chars
         };
+        if bytes > 16384 {
+            return Err(budget());
+        }
         values.push(string(&mut array, (count & 0x8000_0000) | bytes)?);
     }
     array.end()?;
@@ -137,4 +140,15 @@ pub(super) fn control(bytes: &[u8], site: Site) -> Result<Control> {
             tooltips: m & (1 << 13) == 0,
         }),
     })
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    #[test]
+    fn uncompressed_character_count_cannot_be_misread_as_a_compression_flag() {
+        for count in [0x40000000u32, 0x40000001, 0x7fffffff] {
+            assert!(strings(&mut Reader::new(&count.to_le_bytes()), 4).is_err());
+        }
+    }
 }

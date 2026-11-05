@@ -13,7 +13,9 @@ light/dark/narrow/scaled/injected-host captures were inspected, including visibl
 keyboard focus and preserved missing-glyph text. Chromium TabStrip arrow input,
 modal Stop/resume and exact source retention PASS, alongside Frame, focus, list,
 ComboBox, metadata/control-tip, editor and legacy form regressions. Application
-integration is being validated; M7A.4 is not complete. MultiPage/Page, Image/RefEdit, tab structural
+integration is being validated. A malformed uncompressed character-count guard
+and native/WASI regression prevent counts from aliasing the compression flag.
+M7A.4 is not complete. MultiPage/Page, Image/RefEdit, tab structural
 mutation and writable Index/Name, further property/event/binding/platform and
 lifecycle semantics remain required. Native saving/removal remain M7A.5/.6.
 Fresh Office traces remain NOT_RUN under M8.5.
