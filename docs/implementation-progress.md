@@ -1,3 +1,5 @@
+# Implementation progress
+
 ## M7A.4 continued — native Tabs/Pages mutation (2026-11-05)
 
 Implemented ordinary native Tabs/Pages Add/Remove/Clear, writable Integer Index
@@ -14,18 +16,26 @@ including restored instances and canonical ByRef types; budgets are unchanged.
 Shared validation PASS: CI, WASM, actual WASI, UI, native capture, web and Chromium
 text input. All 84 form-instance cases, 31 generic class cases and 20 form widget
 cases pass; ten dynamic tab/page renders were inspected across light/dark, narrow,
-scaled and host themes. Fork integration is pending. New authored cases cover mutation/order,
+scaled and host themes. New authored cases cover mutation/order,
 lookup/rename failures, aliases, first/last/empty selection, reentrant replacement,
 committed Add results across Stop/resume, removed child input, actual pointer
 selection, source/resources and restored object/Variant-array lifetime.
+
+Fork integration PASS: both forks pin shared product
+`422c5c2338a05276e353b27018a531bf23231af4`. All thirteen native and thirteen
+actual Node/WASM package cases pass in each fork, including both Tabs and Pages
+mutation with aliases, authorization and exact original XLSM/DOCM VBA bytes.
+Full CI passes (GridCraft 10 steps; WordCraft 8), as do strict optional VBA/UI
+Clippy and web checks. GridCraft's three form widget cases and WordCraft's
+thirteen VBA UI cases plus its hidden-VBE native-form case pass. Integration
+commits: GridCraft `6f23a3dae3c01466f25bbd3e1d49825936efab67`, WordCraft
+`2bc6875fb87e5bf8ebc2072a496751db9da75269`; both are pushed.
 
 M7A.4 remains IN PROGRESS. Controls.Add/Remove, list multiple selection/bindings,
 further control/platform/property/event/focus/lifecycle/resource semantics and
 the [full remaining ledger](m7a4-native-runtime.md) remain required. Native edited
 saving/.tvform removal remain M7A.5/.6. Fresh Office traces remain NOT_RUN under M8.5.
 Next: dynamic Controls ownership/input/lifetime before further binding packets.
-
-# Implementation progress
 
 ## M7A.4 continued — native RefEdit (2026-11-05)
 

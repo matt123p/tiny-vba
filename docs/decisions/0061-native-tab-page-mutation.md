@@ -1,7 +1,6 @@
 # ADR 0061 — Native Tabs/Pages mutation and stable member identity
 
-Status: adopted; shared CI/WASM/WASI/UI/native/web and Chromium validation PASS;
-application validation pending. M7A.4 remains in progress.
+Status: adopted; shared and application validation PASS. M7A.4 remains in progress.
 
 `vba-ide` supplies ordinary VBA classes for native `Tabs.Add/Remove/Clear`,
 `Pages.Add/Remove/Clear`, writable Integer `Index`, and runtime-created member
@@ -70,8 +69,17 @@ Primary contracts:
 - [Index example](https://learn.microsoft.com/en-us/office/vba/language/reference/user-interface-help/index-property-example)
 - [Tab.Index](https://learn.microsoft.com/en-us/office/vba/api/outlook.tab.index)
 - [Page.Index](https://learn.microsoft.com/en-us/office/vba/api/outlook.page.index)
+- [Microsoft Forms Name](https://learn.microsoft.com/en-us/office/vba/language/reference/user-interface-help/name-propertye-microsoft-forms)
 - [Tab.Name](https://learn.microsoft.com/en-us/office/vba/api/outlook.tab.name)
 - [Word Name parameter example](https://learn.microsoft.com/en-us/office/vba/word/concepts/objects-properties-methods/bind-controls-to-a-specific-row-in-the-data-store-when-inserting-a-building-bloc)
 
 Fixtures and regressions are independently authored Rust under MIT OR Apache-2.0.
 No vendor binary, artwork, sample macro or interpreter implementation was adopted.
+
+Validation: shared CI/WASM/WASI/UI/native/web and Chromium text input pass,
+including 84 form-instance, 31 generic class and 20 form widget cases. Ten dynamic
+tab/page renders were inspected in light/dark, narrow, scaled and host themes.
+Both application forks pin shared product `422c5c23`; thirteen native and thirteen
+actual Node/WASM package cases per fork, full CI (10/8 steps), strict optional
+Clippy/web and existing form/VBA UI checks pass. This is authored integration
+acceptance for the increment; it does not close the broader M7A.4 ledger.
