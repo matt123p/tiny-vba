@@ -13,12 +13,21 @@ light/dark/narrow/scaled/injected-host captures were inspected, including visibl
 keyboard focus and preserved missing-glyph text. Chromium TabStrip arrow input,
 modal Stop/resume and exact source retention PASS, alongside Frame, focus, list,
 ComboBox, metadata/control-tip, editor and legacy form regressions. Application
-integration is being validated. A malformed uncompressed character-count guard
+integration pins shared revision `fe86257c`: GridCraft `4d044524` and WordCraft
+`225b4ca4`. Both full CI gates (10/8), nine native and nine actual Node/WASM
+package cases per application, strict optional VBA/UI Clippy and optional VBA
+web builds PASS. Both GridCraft embedded-form UI/consent cases PASS. The new
+package cases cover inert import, distinct tab identity/defaults, disabled input
+refusal, trusted selection and exact original XLSM/DOCM resource preservation;
+WordCraft also verifies trust revocation. M7 artifact/hash and changed Markdown
+checks PASS. A malformed uncompressed character-count guard
 and native/WASI regression prevent counts from aliasing the compression flag.
 M7A.4 is not complete. MultiPage/Page, Image/RefEdit, tab structural
 mutation and writable Index/Name, further property/event/binding/platform and
 lifecycle semantics remain required. Native saving/removal remain M7A.5/.6.
-Fresh Office traces remain NOT_RUN under M8.5.
+Fresh Office traces remain NOT_RUN under M8.5. Next: native MultiPage f/o/x
+reconciliation and Page identity/selection, followed by remaining control and
+semantic requirements in the unchanged milestone.
 
 ## M7A.4 continued — native Frame containers (2026-11-05)
 
