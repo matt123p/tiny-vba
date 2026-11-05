@@ -200,8 +200,9 @@ impl Ide {
             (ControlKind::MultiPage, "MultiPage"),
             (ControlKind::Page, "Page"),
         ] {
-            let mut specific = claim(name, true)?;
+            let mut specific = claim(name, kind != ControlKind::Page)?;
             specific.event_names = Some(match kind {
+                ControlKind::Page => vec![],
                 ControlKind::ScrollBar => vec!["Change".into(), "Scroll".into()],
                 ControlKind::SpinButton => {
                     vec!["Change".into(), "SpinUp".into(), "SpinDown".into()]
@@ -221,6 +222,9 @@ impl Ide {
                 }
                 _ => vec!["Click".into()],
             });
+            if kind == ControlKind::Page {
+                specific.event_names = None;
+            }
             bindings.insert(
                 crate::form_project::class_name(kind).into(),
                 if kind == ControlKind::Page {

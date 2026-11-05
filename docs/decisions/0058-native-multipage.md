@@ -18,7 +18,11 @@ remain separate and inert.
 The IDE generates ordinary MultiPage, Page and Pages classes. Public form
 Controls contains the MultiPage; Pages contains the actual Page objects; each
 Page.Controls contains its immediate children. The internal TabStrip does not
-escape into any public collection. Page/Pages have distinct nominal interfaces.
+escape into any public collection. Page/Pages have distinct nominal interfaces. Page uses a separate documented
+container surface, not inherited Frame control events, SetFocus or editable
+control geometry. Site layout remains internal backing state. Page Index reads
+as Integer; pages are exposed through their owning MultiPage rather than added
+UserForm member aliases. Unimplemented Page methods/events refuse explicitly.
 Parent references use the existing event bridge, without owning back-references.
 Pages enumeration uses the existing bounded canonical-object snapshot provider.
 Value is the MultiPage default property; SelectedItem and named page aliases
@@ -61,4 +65,5 @@ Sources: [MS-OFORMS MultiPage storage](https://learn.microsoft.com/en-us/openspe
 [PageProperties](https://learn.microsoft.com/en-us/openspecs/office_file_formats/ms-oforms/6588bbac-e5df-4c7a-9372-5246f2ea8e32),
 [MultiPage default property](https://learn.microsoft.com/en-us/office/vba/language/reference/user-interface-help/multipage-control),
 [Page access and selection](https://learn.microsoft.com/en-us/office/vba/language/reference/user-interface-help/page-object-pages-collection-multipage-control-selecteditem-property-example),
+[Page property surface](https://learn.microsoft.com/en-us/office/vba/api/outlook.page),
 [indexed Click and repeated selection](https://learn.microsoft.com/en-us/office/vba/language/reference/user-interface-help/click-event).

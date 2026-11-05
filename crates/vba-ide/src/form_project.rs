@@ -531,6 +531,9 @@ pub(crate) fn checked_handlers(
             ));
         }
         let control = form.controls.iter().find(|c| {
+            if c.kind == ControlKind::Page {
+                return false;
+            }
             (native
                 && p.name.spelling.get(c.name.len() + 1..).is_some_and(|e| {
                     crate::form_numeric::event(c.kind, e)
@@ -670,7 +673,7 @@ fn compiled_form(form: &Form, module: &Module, native: Option<&NativeForm>) -> R
             class_name(c.kind)
         ));
     }
-    for c in &form.controls {
+    for c in form.controls.iter().filter(|c| c.kind != ControlKind::Page) {
         source.push_str(&format!("Public Property Get {0}() As {1}\nIf Not VbaLoaded Then Class_Initialize\nSet {0}=Vba{0}\nEnd Property\n",c.name,class_name(c.kind)));
     }
     let containers = form.controls.iter().any(|c| {
@@ -700,7 +703,32 @@ fn compiled_form(form: &Form, module: &Module, native: Option<&NativeForm>) -> R
     }
     for c in &form.controls {
         let temp = format!("VbaInit{}", c.id);
-        source.push_str(&format!("Dim {temp} As {}\nSet {temp}=New {}\n{temp}.Enabled={}\n{temp}.Visible={}\n{temp}.TabStop={}\n{temp}.VbaTabIndex={}\n{temp}.Left={}\n{temp}.Top={}\n{temp}.Width={}\n{temp}.Height={}\n",class_name(c.kind),class_name(c.kind),boolean(c.enabled),boolean(c.visible),boolean(c.tab_stop),form.tab_order.iter().filter(|id| form.controls.iter().any(|peer|peer.id==**id && peer.parent==c.parent)).position(|id|*id==c.id).unwrap_or(0),c.bounds.left,c.bounds.top,c.bounds.width,c.bounds.height));
+        let mut setup = format!(
+            "Dim {temp} As {}\nSet {temp}=New {}\n{temp}.Enabled={}\n{temp}.Visible={}\n{temp}.TabStop={}\n{temp}.VbaTabIndex={}\n{temp}.Left={}\n{temp}.Top={}\n{temp}.Width={}\n{temp}.Height={}\n",
+            class_name(c.kind),
+            class_name(c.kind),
+            boolean(c.enabled),
+            boolean(c.visible),
+            boolean(c.tab_stop),
+            form.tab_order
+                .iter()
+                .filter(|id| form
+                    .controls
+                    .iter()
+                    .any(|peer| peer.id == **id && peer.parent == c.parent))
+                .position(|id| *id == c.id)
+                .unwrap_or(0),
+            c.bounds.left,
+            c.bounds.top,
+            c.bounds.width,
+            c.bounds.height
+        );
+        if c.kind == ControlKind::Page {
+            for name in ["Left", "Top", "Width", "Height", "TabStop"] {
+                setup = setup.replace(&format!("{temp}.{name}="), &format!("{temp}.Vba{name}="));
+            }
+        }
+        source.push_str(&setup);
         if !matches!(
             c.kind,
             ControlKind::TextBox
@@ -754,8 +782,13 @@ fn compiled_form(form: &Form, module: &Module, native: Option<&NativeForm>) -> R
         }
         if let Some(control) = native.and_then(|n| n.design.controls.iter().find(|n| n.id == c.id))
         {
+            let help = if c.kind == ControlKind::Page {
+                "VbaHelpContextID"
+            } else {
+                "HelpContextID"
+            };
             source.push_str(&format!(
-                "{temp}.Tag={}\n{temp}.ControlTipText={}\n{temp}.HelpContextID={}\n",
+                "{temp}.Tag={}\n{temp}.ControlTipText={}\n{temp}.{help}={}\n",
                 vba_string(&control.tag),
                 vba_string(&control.control_tip_text),
                 control.help_context_id
@@ -1321,6 +1354,9 @@ impl Ide {
                 .iter()
                 .find(|c| c.id == control)
                 .ok_or_else(|| error("unknown control"))?;
+            if c.kind == ControlKind::Page {
+                return Err(error("Page does not expose authored control events"));
+            }
             let focus = self
                 .native_form(id)
                 .is_some()
@@ -2032,6 +2068,11 @@ impl Ide {
                 .iter()
                 .find(|c| c.id == id)
                 .ok_or_else(|| error("unknown control"))?;
+            if c.kind == ControlKind::Page {
+                return Err(error(
+                    "Page is a container; input targets its controls or MultiPage tabs",
+                ));
+            }
             let mut parent = c.parent;
             for _ in 0..8 {
                 let Some(id) = parent else { break };

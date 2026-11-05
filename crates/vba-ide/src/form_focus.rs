@@ -3,7 +3,7 @@ use crate::forms::{ControlKind, Form};
 use std::collections::BTreeSet;
 
 pub(crate) fn event(kind: ControlKind, name: &str) -> Option<(&'static str, bool)> {
-    if kind == ControlKind::Label {
+    if matches!(kind, ControlKind::Label | ControlKind::Page) {
         return None;
     }
     for (event, cancel) in [("Enter", false), ("Exit", true)] {
@@ -228,7 +228,7 @@ End Sub
     for control in form
         .controls
         .iter()
-        .filter(|c| c.kind != ControlKind::Label)
+        .filter(|c| !matches!(c.kind, ControlKind::Label | ControlKind::Page))
     {
         source.push_str(&format!(
             "Private Sub Vba{0}_VbaFocusRequested(ByVal target As Object)\nVbaMoveFocus target\ntarget.VbaFocusConfirmed=True\nEnd Sub\n",

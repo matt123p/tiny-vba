@@ -10,16 +10,20 @@ selection waits for dirty-field validation/cancellation across Stop/resume.
 Internal navigation snapshots preserve object identity without raising VM limits.
 The published indexed Click signature and same-selection suppression also fix
 prior TabStrip behavior. Original source/resources remain independent and inert.
-Shared CI, WASM, actual WASI (73 instance/16 decoder cases), UI (16 actual
+Shared CI, WASM, actual WASI (74 instance/16 decoder cases), UI (16 actual
 widget cases), native capture and web gates PASS. Five light/dark/narrow/scaled/
 injected-host captures were inspected. Actual Chromium page arrow input, modal
 Stop/resume and exact authored source retention PASS, without page errors.
-Original M7 fixture hashes and changed Markdown links PASS. Application pin and
-XLSM/DOCM integration validation are in progress.
+Original M7 fixture hashes and changed Markdown links PASS. A subsequent Page
+API audit removes inherited Frame methods/events and UserForm page aliases, keeps
+site geometry internal, and verifies Integer Index and explicit method refusal.
+All repeat shared gates and actual Chromium page input/modal Stop/resume PASS.
+Application pin and XLSM/DOCM integration validation are in progress.
 M7A.4 remains IN PROGRESS for dynamic page/tab mutation, broader native page/
 Frame/resource/property/event/lifecycle semantics, Image/RefEdit, list/binding/
 platform controls and the unchanged detailed ledger. Native editing/removal
-remain M7A.5/.6; fresh Office observations remain NOT_RUN under M8.5.
+remain M7A.5/.6; fresh Office observations remain NOT_RUN under M8.5. Next:
+native Image resources/Picture layout, then Excel RefEdit and the remaining ledger.
 
 ## M7A.4 continued — native TabStrip (2026-11-05)
 

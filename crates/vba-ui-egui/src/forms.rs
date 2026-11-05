@@ -180,7 +180,7 @@ fn native_eligible(
             .all(|c| {
                 ["Visible", "Enabled"]
                     .into_iter()
-                    .chain(tabbing.then_some("TabStop"))
+                    .chain((tabbing && c.kind != ControlKind::Page).then_some("TabStop"))
                     .all(|name| {
                         ide.form_instance_field(instance, Some(c.id), name).ok()
                             == Some(vba_ide::Value::Boolean(true))
@@ -1219,7 +1219,7 @@ impl EditorUi {
                         ui.scope_builder(control_scope, |ui| {
                             ui.add_enabled_ui(enabled, |ui| match c.kind {
                                 ControlKind::Frame | ControlKind::Page=> {
-                                    let response=ui.interact(bounds,widget_id,egui::Sense::click());
+                                    let response=ui.interact(bounds,widget_id,if c.kind==ControlKind::Page {egui::Sense::hover()}else{egui::Sense::click()});
                                     ui.painter().rect_filled(bounds,2.,theme.chrome);
                                     ui.painter().rect_stroke(bounds.shrink(1.),2.,egui::Stroke::new(1.,theme.border),egui::StrokeKind::Inside);
                                     if c.kind==ControlKind::Frame {ui.painter().text(bounds.left_top()+egui::vec2(6.,3.),egui::Align2::LEFT_TOP,&caption,egui::TextStyle::Body.resolve(ui.style()),theme.text);}

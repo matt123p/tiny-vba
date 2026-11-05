@@ -64,6 +64,9 @@ End Function
 }
 
 pub(crate) fn control_class(kind: ControlKind) -> String {
+    if kind == ControlKind::Page {
+        return crate::form_container::page_class();
+    }
     let mut s = String::from(
         "Option Explicit\nPublic VbaName As String\nPublic VbaDirty As Boolean\nPublic Property Get Name() As String\nName=VbaName\nEnd Property\nPublic Enabled As Boolean\nPublic Visible As Boolean\nPublic TabStop As Boolean\nPublic VbaTabIndex As Integer\nPublic Event VbaTabChanged(ByVal previous As Integer,ByVal requested As Integer)\nPublic Property Get TabIndex() As Integer\nTabIndex=VbaTabIndex\nEnd Property\nPublic Property Let TabIndex(ByVal value As Integer)\nIf value<0 Then Err.Raise 380\nRaiseEvent VbaTabChanged(VbaTabIndex,value)\nEnd Property\n",
     );

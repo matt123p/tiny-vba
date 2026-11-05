@@ -2302,7 +2302,7 @@ Set m=NativeForm.Multi1
 Set pages=m.Pages
 Debug.Print NativeForm.Controls.Count,pages.Count
 Set p=pages("SecondTab")
-Debug.Print p Is NativeForm.SecondTab,p.Parent Is m,p.Controls(0) Is NativeForm.PageEntry2
+Debug.Print p Is m.SecondTab,p.Parent Is m,p.Controls(0) Is NativeForm.PageEntry2
 Debug.Print NativeForm.PageEntry2.Parent Is p,p.Caption,p.Index
 For Each p In pages
 Debug.Print p.Name,p.Controls.Count
@@ -2450,5 +2450,22 @@ fn native_page_and_tab_click_handlers_receive_long_indices_only_on_new_selection
             .is_err()
         );
     }
+    Ok(())
+}
+
+#[test]
+fn native_pages_do_not_inherit_frame_control_methods_or_authored_events() -> R {
+    for extra in [
+        "Private Sub FirstTab_Click()\nEnd Sub\n",
+        "Private Sub FirstTab_Enter()\nEnd Sub\n",
+    ] {
+        assert!(multipage_setup("Sub Main()\nEnd Sub", extra).is_err());
+    }
+    let ide = multipage_setup(
+        "Sub Main()\nDim p As MSForms.Page\nSet p=NativeForm.Multi1.Pages(0)\nDebug.Print VarType(p.Index)\nOn Error Resume Next\np.SetFocus\nDebug.Print Err.Number\nEnd Sub",
+        "",
+    )?;
+    assert_eq!(ide.mode(), Mode::Completed, "{:?}", ide.diagnostics);
+    assert_eq!(ide.output(), vec!["initialized", "2", "438"]);
     Ok(())
 }

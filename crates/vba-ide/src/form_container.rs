@@ -71,7 +71,11 @@ If current.VbaKind=14 Then
 If VbaLookup(current.VbaParentKey).Value<>current.Index Then Exit Function
 End If
 If current.VbaId=scope Then tabbing=False
-If tabbing And Not current.TabStop Then Exit Function
+If tabbing Then
+If current.VbaKind<>14 Then
+If Not current.TabStop Then Exit Function
+End If
+End If
 If current.VbaParentKey=0 Then
 VbaEligible=True
 Exit Function
@@ -199,3 +203,43 @@ End If
 Next scan
 End Sub
 "#;
+
+/// Page is a container object, not a Frame control with inherited events/methods.
+pub(crate) fn page_class() -> String {
+    let mut source = String::from(
+        r#"Option Explicit
+Public VbaName As String
+Public VbaIndex As Long
+Public VbaLeft As Single
+Public VbaTop As Single
+Public VbaWidth As Single
+Public VbaHeight As Single
+Public VbaTabStop As Boolean
+Public VbaTabIndex As Integer
+Public VbaHelpContextID As Long
+Public Enabled As Boolean
+Public Visible As Boolean
+Public Caption As String
+Public Tag As String
+Public ControlTipText As String
+Public Accelerator As String
+Public Event VbaTabChanged(ByVal previous As Integer,ByVal requested As Integer)
+Public Property Get VbaKind() As Integer
+VbaKind=14
+End Property
+Public Property Get Name() As String
+Name=VbaName
+End Property
+Public Property Get Index() As Integer
+Index=VbaIndex
+End Property
+"#,
+    );
+    source.push_str(COMMON);
+    source.push_str(
+        &FRAME
+            .replace("Public Event Click\n", "")
+            .replace("Public Sub VbaClick()\nRaiseEvent Click\nEnd Sub\n", ""),
+    );
+    source
+}
