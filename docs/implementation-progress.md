@@ -1,3 +1,30 @@
+## M7A.4 continued — native Tabs/Pages mutation (2026-11-05)
+
+Implemented ordinary native Tabs/Pages Add/Remove/Clear, writable Integer Index
+and runtime-created member Name under [ADR 0061](decisions/0061-native-tab-page-mutation.md).
+Position cells retain canonical aliases and selected identity without owning
+cycles. Removed Page descendants reject widget input; dynamic empty Pages and
+reordered native children render through the existing shared UI. Collection
+replacement precedes authored callbacks, including reentrant changes and Stop.
+Generated storage is shared, and page ordering follows canonical order directly.
+The parser accepts contextual Name identifiers from documented VBA signatures.
+The VM derives reference-bearing slot lists for instance/frame lifetime checks,
+including restored instances and canonical ByRef types; budgets are unchanged.
+
+Shared validation PASS: CI, WASM, actual WASI, UI, native capture, web and Chromium
+text input. All 84 form-instance cases, 31 generic class cases and 20 form widget
+cases pass; ten dynamic tab/page renders were inspected across light/dark, narrow,
+scaled and host themes. Fork integration is pending. New authored cases cover mutation/order,
+lookup/rename failures, aliases, first/last/empty selection, reentrant replacement,
+committed Add results across Stop/resume, removed child input, actual pointer
+selection, source/resources and restored object/Variant-array lifetime.
+
+M7A.4 remains IN PROGRESS. Controls.Add/Remove, list multiple selection/bindings,
+further control/platform/property/event/focus/lifecycle/resource semantics and
+the [full remaining ledger](m7a4-native-runtime.md) remain required. Native edited
+saving/.tvform removal remain M7A.5/.6. Fresh Office traces remain NOT_RUN under M8.5.
+Next: dynamic Controls ownership/input/lifetime before further binding packets.
+
 # Implementation progress
 
 ## M7A.4 continued — native RefEdit (2026-11-05)

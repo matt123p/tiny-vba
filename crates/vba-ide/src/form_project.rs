@@ -30,11 +30,10 @@ fn tab_object(session: &Session, control: ObjectRef, index: i32) -> Result<Objec
     let Value::Object(tabs) = collection else {
         return Err(error("missing tabs"));
     };
-    let Value::Array(entries) = session.read_instance_field(tabs, "VbaEntries")? else {
-        return Err(error("invalid tabs"));
-    };
+    let entries =
+        crate::form_tabs::ordered_members(tabs, |o, f| session.read_instance_field(o, f))?;
     let index = usize::try_from(index).map_err(|_| error("tab index"))?;
-    let Some(Value::Object(tab)) = entries.elements().get(index) else {
+    let Some(Value::Object(tab)) = entries.get(index) else {
         return Err(error("tab index"));
     };
     Ok(*tab)
@@ -87,10 +86,7 @@ impl<H: Host> FormHost<'_, H> {
                 return Err(error(91, "missing collection owner"));
             };
             let mut values = Vec::new();
-            if objects.instances("VbaFormControls")?.contains(&owner)
-                || objects.instances("VbaFormTabs")?.contains(&owner)
-                || objects.instances("VbaFormPages")?.contains(&owner)
-            {
+            if objects.instances("VbaFormControls")?.contains(&owner) {
                 let Value::Long(total) = objects.public_field(owner, "VbaTotal")? else {
                     return Err(error(13, "invalid collection count"));
                 };
@@ -107,6 +103,15 @@ impl<H: Host> FormHost<'_, H> {
                         .get(..total)
                         .ok_or_else(|| error(7, "collection budget"))?,
                 );
+            } else if objects.instances("VbaFormTabs")?.contains(&owner)
+                || objects.instances("VbaFormPages")?.contains(&owner)
+            {
+                values = crate::form_tabs::ordered_members(owner, |o, f| {
+                    objects
+                        .public_field(o, f)
+                        .map_err(|e| crate::error(&e.description))
+                })
+                .map_err(|e| error(5, &e.to_string()))?;
             } else if objects.instances("VbaFormUserForms")?.contains(&owner) {
                 for component in &self.gate.components {
                     for object in objects.instances(component)? {
@@ -859,7 +864,7 @@ fn compiled_form(form: &Form, module: &Module, native: Option<&NativeForm>) -> R
                     .filter(|_| c.kind == ControlKind::TabStrip)
                 {
                     let name = format!("VbaTab{}_{}", c.id, i);
-                    source.push_str(&format!("Dim {name} As VbaFormTab\nSet {name}=New VbaFormTab\n{name}.VbaName={}\n{name}.VbaCaption={}\n{name}.VbaIndex={i}\n{name}.Tag={}\n{name}.ControlTipText={}\n{name}.Accelerator={}\n{name}.Enabled={}\n{name}.Visible={}\n{temp}.VbaTabs.VbaAdd {name}\n",vba_string(&tab.name),vba_string(&tab.caption),vba_string(&tab.tag),vba_string(&tab.tooltip),vba_string(&tab.accelerator),boolean(tab.enabled),boolean(tab.visible)));
+                    source.push_str(&format!("Dim {name} As VbaFormTab\nSet {name}=New VbaFormTab\n{name}.VbaName={}\n{name}.VbaCaption={}\n{name}.Tag={}\n{name}.ControlTipText={}\n{name}.Accelerator={}\n{name}.Enabled={}\n{name}.Visible={}\n{temp}.VbaTabs.VbaAdd {name}\n",vba_string(&tab.name),vba_string(&tab.caption),vba_string(&tab.tag),vba_string(&tab.tooltip),vba_string(&tab.accelerator),boolean(tab.enabled),boolean(tab.visible)));
                 }
             }
             if let Some(n) = &control.numeric {
@@ -891,6 +896,17 @@ fn compiled_form(form: &Form, module: &Module, native: Option<&NativeForm>) -> R
                     boolean(control.cancel)
                 ));
             }
+        }
+    }
+    for c in &form.controls {
+        if let Some(tabs) = native
+            .and_then(|n| n.design.controls.iter().find(|n| n.id == c.id))
+            .and_then(|c| c.tabs.as_ref())
+        {
+            source.push_str(&format!(
+                "Vba{}.VbaInitializeSelection {}\n",
+                c.name, tabs.selected
+            ));
         }
     }
     if containers {
@@ -928,11 +944,22 @@ fn compiled_form(form: &Form, module: &Module, native: Option<&NativeForm>) -> R
             c.id, c.name
         ));
     }
+    for c in &form.controls {
+        if c.kind == ControlKind::MultiPage {
+            source.push_str(&format!("Dim page{0} As Object\nSet page{0}=Vba{1}.VbaFindPage(key)\nIf Not (page{0} Is Nothing) Then\nSet VbaLookup=page{0}\nExit Function\nEnd If\n", c.id, c.name));
+        }
+    }
     source.push_str("Err.Raise 91\nEnd Function\n");
     for control in &form.controls {
         source.push_str(&format!("Private Sub Vba{}_VbaParentRequested(ByVal child As Object,ByRef owner As Object)\nIf child.VbaParentKey=0 Then\nSet owner=Me\nElse\nSet owner=VbaLookup(child.VbaParentKey)\nEnd If\nEnd Sub\n",control.name));
     }
     for c in &form.controls {
+        if c.kind == ControlKind::MultiPage {
+            source.push_str(&format!(
+                "Private Sub Vba{}_VbaStructureChanged()\nVbaReorderTabs\nEnd Sub\n",
+                c.name
+            ));
+        }
         for event in [
             "Click",
             "Change",
@@ -1571,11 +1598,21 @@ impl Ide {
             }
             for (id, name, source) in [
                 (
-                    u64::MAX - 40,
-                    "VbaFormTab",
-                    crate::form_tabs::TAB.to_owned(),
+                    u64::MAX - 44,
+                    "VbaFormTabPosition",
+                    crate::form_tab_state::POSITION.to_owned(),
                 ),
-                (u64::MAX - 41, "VbaFormTabs", crate::form_tabs::collection()),
+                (
+                    u64::MAX - 45,
+                    "VbaFormTabState",
+                    crate::form_tab_state::STATE.to_owned(),
+                ),
+                (u64::MAX - 40, "VbaFormTab", crate::form_tabs::tab_class()),
+                (
+                    u64::MAX - 41,
+                    "VbaFormTabs",
+                    crate::form_tab_collection::source(false),
+                ),
                 (
                     u64::MAX - 43,
                     "VbaFormPicture",
@@ -1584,7 +1621,7 @@ impl Ide {
                 (
                     u64::MAX - 42,
                     "VbaFormPages",
-                    crate::form_tabs::collection(),
+                    crate::form_tab_collection::source(true),
                 ),
             ] {
                 modules.push(parse(
@@ -1636,6 +1673,7 @@ impl Ide {
             )?);
             let mut support =
                 String::from("Public Const vbModal As Long=1\nPublic Const vbModeless As Long=0\n");
+            support.push_str("Public Function VbaNextPageId() As Long\nStatic nextId As Long\nIf nextId= -2147483647 Then Err.Raise 7\nnextId=nextId-1\nVbaNextPageId=nextId\nEnd Function\n");
             support.push_str("Public Function VbaUserForms(Optional ByVal index As Variant) As Object\nIf IsMissing(index) Then\nSet VbaUserForms=VbaFormUserForms\nElse\nSet VbaUserForms=VbaFormUserForms.Item(index)\nEnd If\nEnd Function\n");
             for (id, designer) in &self.forms {
                 let module = self
@@ -1766,6 +1804,32 @@ impl Ide {
                 return Err(error("control is unloaded"));
             };
             object = child;
+            if control.kind == ControlKind::Page
+                && ["name", "vbaname", "index", "vbaindex"]
+                    .contains(&field.to_ascii_lowercase().as_str())
+            {
+                let Value::Object(cell) = session.read_instance_field(object, "VbaPosition")?
+                else {
+                    return Err(error("Page position"));
+                };
+                return session.read_instance_field(
+                    cell,
+                    if field.to_ascii_lowercase().contains("name") {
+                        "VbaName"
+                    } else {
+                        "VbaIndex"
+                    },
+                );
+            }
+            if matches!(control.kind, ControlKind::TabStrip | ControlKind::MultiPage)
+                && ["value", "vbavalue"].contains(&field.to_ascii_lowercase().as_str())
+            {
+                let Value::Object(state) = session.read_instance_field(object, "VbaTabState")?
+                else {
+                    return Err(error("tab state"));
+                };
+                return session.read_instance_field(state, "VbaValue");
+            }
         }
         if control.is_none() && field.eq_ignore_ascii_case("Name") {
             return Ok(Value::String(VbaString::from_utf8(&designer.form().name)?));
@@ -2012,7 +2076,10 @@ impl Ide {
             .session
             .as_ref()
             .ok_or_else(|| error("no form session"))?;
-        let Value::Long(count) = session.read_instance_field(tabs, "VbaTotal")? else {
+        let Value::Object(state) = session.read_instance_field(tabs, "VbaState")? else {
+            return Err(error("tab state"));
+        };
+        let Value::Long(count) = session.read_instance_field(state, "VbaTotal")? else {
             return Err(error("invalid tabs"));
         };
         if !(0..=128).contains(&count) {
@@ -2050,7 +2117,13 @@ impl Ide {
         else {
             return Err(error("unloaded control"));
         };
-        let tab = tab_object(session, control, tab)?;
+        let mut tab = tab_object(session, control, tab)?;
+        if ["name", "index"].contains(&field.to_ascii_lowercase().as_str()) {
+            let Value::Object(cell) = session.read_instance_field(tab, "VbaPosition")? else {
+                return Err(error("tab position"));
+            };
+            tab = cell;
+        }
         let field = match field.to_ascii_lowercase().as_str() {
             "name" => "VbaName",
             "caption" if descriptor.kind == ControlKind::TabStrip => "VbaCaption",
@@ -2125,7 +2198,21 @@ impl Ide {
                     return Err(error("Frame is disabled or hidden"));
                 }
                 if owner.kind == ControlKind::Page {
-                    let page_index = session.read_instance_field(owner_object, "VbaIndex")?;
+                    let Value::Object(position) =
+                        session.read_instance_field(owner_object, "VbaPosition")?
+                    else {
+                        return Err(error("Page position"));
+                    };
+                    if session.read_instance_field(position, "VbaAttached")? != Value::Boolean(true)
+                    {
+                        return Err(error("Page removed"));
+                    }
+                    let Value::Integer(page_index) =
+                        session.read_instance_field(position, "VbaIndex")?
+                    else {
+                        return Err(error("Page index"));
+                    };
+                    let page_index = Value::Long(i32::from(page_index));
                     let parent_id = owner.parent.ok_or_else(|| error("Page owner"))?;
                     let multi = designer
                         .form()

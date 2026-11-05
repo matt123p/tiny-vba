@@ -146,11 +146,11 @@ Remaining M7A.4 requirements, without reducing the milestone's scope:
 - ADR 0060 adds selected native RefEdit text/drop semantics and host picker integration; broader RefEdit/platform behavior remains open. ADR 0059 adds selected Image raster records,
   picture identity/assignment, layout and Click; further picture formats/metadata,
   loading/platform services and the complete event/presentation matrix stay open. ADR 0058 adds selected native MultiPage/Page;
-  dynamic Pages, further transitions/properties/resources, programmatic selection/
+  ADR 0061 adds selected dynamic Pages/Index/Name; further transitions/properties/resources, programmatic selection/
   focus and lifecycle edge cases remain open.
   ADR 0057 implements selected native TabStrip records and ordinary Tab/Tabs;
-  tab structural mutation, writable Index/Name and full event/presentation parity
-  remain open. ADR 0056 implements selected native Frame parents; additional storage variants,
+  ADR 0061 adds tab structural mutation and writable Index/runtime Name; further
+  mutation/error/locale and full event/presentation parity remain open. ADR 0056 implements selected native Frame parents; additional storage variants,
   properties, resource/presentation and full event parity remain open.
   ComboBox and ListBox now have selected unbound packets; further array-shape/loading cases, multiple selection, bindings and further presentation remain open. The selected numeric packet does not close all
   ScrollBar/SpinButton property/resource/presentation cases.
@@ -213,3 +213,17 @@ selection and authorization. Original source/resources stay separate. Broader
 RefEdit/platform/property/event/binding semantics and the unchanged M7A.4 ledger
 remain open. Native edited saving/removal stay M7A.5/.6; fresh Office traces stay
 NOT_RUN under M8.5.
+
+## Native Tabs/Pages mutation
+
+ADR 0061 implements Add/Remove/Clear, zero-based Integer Index and runtime Name,
+including named/omitted Add arguments, canonical enumeration, identity-preserving
+reordering, first/last/empty selection, detached aliases and ordinary event
+continuations. Inert queries validate scalar position cells against actual member
+slots. The existing bounded For Each snapshot profile is unchanged. Programmatic
+mutations do not change native source/design/resource bytes or synthesize Click.
+Reordered native Page descendants remain attached to the same Page and removed
+Page descendants cannot receive widget input. Added Pages are empty; dynamic
+Controls.Add and complete focus/lifecycle/detachment parity remain open alongside
+the unchanged broader ledger above. Detailed selection/error behavior is authored
+inference pending M8.5 Office traces, not fresh comparison evidence.

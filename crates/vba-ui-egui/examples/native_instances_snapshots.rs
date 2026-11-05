@@ -15,6 +15,9 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         .nth(1)
         .unwrap_or_else(|| "reports/ui".into());
     std::fs::create_dir_all(&folder)?;
+    let dynamic = std::env::args()
+        .nth(2)
+        .is_some_and(|o| o.starts_with("--dynamic-"));
     let refedit = std::env::args()
         .nth(2)
         .is_some_and(|o| o == "--refedit-controls");
@@ -23,10 +26,10 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         .is_some_and(|o| o == "--image-controls");
     let pages = std::env::args()
         .nth(2)
-        .is_some_and(|o| o == "--page-controls");
+        .is_some_and(|o| o == "--page-controls" || o == "--dynamic-page-controls");
     let tabs = std::env::args()
         .nth(2)
-        .is_some_and(|o| o == "--tab-controls");
+        .is_some_and(|o| o == "--tab-controls" || o == "--dynamic-tab-controls");
     let combos = std::env::args()
         .nth(2)
         .is_some_and(|option| option == "--combo-controls");
@@ -89,7 +92,16 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         } else {
             "Sub Main()\nDim a As NativeForm,b As NativeForm\nSet a=New NativeForm\nSet b=New NativeForm\na.Caption=\"First window\"\nb.Caption=\"Second window\"\na.Entry.Text=\"Value one\"\nb.Entry.Text=\"Value two\"\na.Show 0\nb.Show 0\nEnd Sub"
         };
-        let main = if combos {
+        let main = if dynamic {
+            let (control, collection) = if pages {
+                ("Multi1", "Pages")
+            } else {
+                ("Tabs1", "Tabs")
+            };
+            format!(
+                "Sub Main()\nDim s As Object\nSet s=NativeForm.{control}\ns.{collection}(0).Index=1\ns.{collection}.Add Name:=\"Runtime\",Caption:=\"Added at runtime\",Index:=0\ns.{collection}.Remove \"BlockedTab\"\ns.Value=2\nNativeForm.Show 0\ns.SetFocus\nEnd Sub"
+            )
+        } else if combos {
             main.replace("List1", "Combo1")
                 .replace("b.Show 0\nEnd Sub", "b.Show 0\na.Combo1.DropDown\nEnd Sub")
         } else {
@@ -97,7 +109,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         };
         ide.add_module("Main.bas", &main)?;
         ide.dispatch(Action::Run, &mut NoHost)?;
-        for _ in 0..100 {
+        for _ in 0..1000 {
             ide.tick(&mut NoHost)?;
             if ide.mode() == Mode::Completed {
                 break;
@@ -148,7 +160,11 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                 return Err("expected native tooltip".into());
             }
         }
-        let prefix = if refedit {
+        let prefix = if dynamic && pages {
+            "m7a4-dynamic-pages"
+        } else if dynamic {
+            "m7a4-dynamic-tabs"
+        } else if refedit {
             "m7a4-native-refedit"
         } else if images {
             "m7a4-native-images"

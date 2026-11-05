@@ -2743,3 +2743,245 @@ fn native_refedit_picker_refuses_modeless_and_respects_cancellable_focus() -> R 
     );
     Ok(())
 }
+
+#[test]
+fn native_tabs_mutate_order_without_replacing_members_or_resource_data() -> R {
+    let ide = tab_setup(
+        r#"Sub Main()
+Dim s As MSForms.TabStrip,t As MSForms.Tab,added As MSForms.Tab,alias As MSForms.Tab
+Set s=NativeForm.Tabs1
+Set alias=s.Tabs(1)
+s.Value=1
+Set added=s.Tabs.Add(Name:="Extra",Caption:="extra",Index:=0)
+Debug.Print s.SelectedItem Is alias,s.Value,VarType(alias.Index)
+alias.Index=0
+Debug.Print s.Tabs(0) Is alias,added.Index
+added.Name="Renamed"
+Debug.Print s.Tabs("RENAMED") Is added
+On Error Resume Next
+s.Tabs(0).Name="CannotRenameDesign"
+Debug.Print Err.Number,s.Tabs(0).Name
+Err.Clear
+s.Tabs.Remove "SecondTab"
+Debug.Print s.SelectedItem Is added,s.Value
+Debug.Print alias.Index
+Debug.Print Err.Number
+Err.Clear
+s.Tabs.Remove "BlockedTab"
+Set t=s.Tabs.Add()
+Debug.Print t.Name,t.Caption,t.Index
+For Each t In s.Tabs
+Debug.Print t.Name
+Next t
+s.Tabs.Clear
+Debug.Print s.Tabs.Count,s.Value,s.SelectedItem Is Nothing
+Set t=s.Tabs.Add()
+Debug.Print t.Name,t.Index,added.Name
+End Sub"#,
+        "Private Sub Tabs1_Change()\nDebug.Print \"change\",Tabs1.Value\nEnd Sub\nPrivate Sub Tabs1_Click(ByVal Index As Long)\nDebug.Print \"unexpected click\"\nEnd Sub\n",
+    )?;
+    assert_eq!(ide.mode(), Mode::Completed, "{:?}", ide.diagnostics);
+    assert_eq!(
+        ide.output(),
+        vec![
+            "initialized",
+            "change\t1",
+            "change\t2",
+            "True\t2\t2",
+            "change\t0",
+            "True\t1",
+            "True",
+            "382\tSecondTab",
+            "change\t0",
+            "True\t0",
+            "91",
+            "Tab1\tTab1\t2",
+            "Renamed",
+            "FirstTab",
+            "Tab1",
+            "change\t-1",
+            "0\t-1\tTrue",
+            "change\t0",
+            "Tab1\t0\tRenamed"
+        ]
+    );
+    let f = *ide.form_instances()?.first().ok_or("form")?;
+    assert_eq!(ide.form_instance_tab_count(f, 14)?, 1);
+    assert_eq!(
+        ide.form_instance_tab_field(f, 14, 0, "Name")?,
+        Value::String(VbaString::from_utf8("Tab1")?)
+    );
+    Ok(())
+}
+
+#[test]
+fn native_tabs_reentrant_remove_and_clear_commit_before_stopped_change() -> R {
+    let mut ide = tab_setup(
+        r#"Sub Main()
+NativeForm.Tabs1.Tabs.Remove 0
+Debug.Print NativeForm.Tabs1.Tabs.Count,NativeForm.Tabs1.Tabs(0).Name
+End Sub"#,
+        r#"
+Private entered As Boolean
+Private Sub Tabs1_Change()
+Debug.Print Tabs1.Tabs.Count
+If Not entered Then
+entered=True
+Tabs1.Tabs.Clear
+Tabs1.Tabs.Add "Replacement"
+Stop
+End If
+End Sub
+"#,
+    )?;
+    assert_eq!(ide.mode(), Mode::Break, "{:?}", ide.diagnostics);
+    let f = *ide.form_instances()?.first().ok_or("form")?;
+    assert_eq!(ide.form_instance_tab_count(f, 14)?, 1);
+    assert_eq!(
+        ide.form_instance_tab_field(f, 14, 0, "Name")?,
+        Value::String(VbaString::from_utf8("Replacement")?)
+    );
+    ide.dispatch(Action::Run, &mut NoHost)?;
+    settle(&mut ide)?;
+    assert_eq!(ide.mode(), Mode::Completed, "{:?}", ide.diagnostics);
+    assert_eq!(
+        ide.output(),
+        vec!["initialized", "2", "0", "1", "1\tReplacement"]
+    );
+    Ok(())
+}
+
+#[test]
+fn native_pages_reorder_and_remove_preserve_live_parent_and_block_removed_children() -> R {
+    let mut ide = multipage_setup(
+        r#"Sub Main()
+Dim m As MSForms.MultiPage,p As MSForms.Page,added As MSForms.Page
+Set m=NativeForm.Multi1
+Set p=m.Pages(0)
+p.Index=1
+Debug.Print m.Value,m.Pages(1) Is p,NativeForm.PageEntry1.Parent Is p
+Set added=m.Pages.Add("Extra","extra",0)
+Debug.Print added.Parent Is m,added.Controls.Count,added.Index,m.Value
+added.Name="Runtime"
+Debug.Print m.Pages("runtime") Is added
+m.Pages.Remove p.Name
+Debug.Print m.Pages.Count,m.Value
+NativeForm.Show 0
+End Sub"#,
+        "",
+    )?;
+    assert_eq!(ide.mode(), Mode::Completed, "{:?}", ide.diagnostics);
+    assert_eq!(
+        ide.output(),
+        vec![
+            "initialized",
+            "1\tTrue\tTrue",
+            "True\t0\t0\t2",
+            "True",
+            "3\t2"
+        ]
+    );
+    let f = *ide.form_instances()?.first().ok_or("form")?;
+    assert!(
+        ide.form_instance_text(f, 40, VbaString::from_utf8("removed")?, (0, 0), &mut NoHost)
+            .is_err()
+    );
+    ide.form_instance_tab(f, 20, 0, &mut NoHost)?;
+    settle(&mut ide)?;
+    assert_eq!(ide.mode(), Mode::Completed, "{:?}", ide.diagnostics);
+    assert_eq!(
+        ide.form_instance_field(f, Some(20), "Value")?,
+        Value::Long(0)
+    );
+    Ok(())
+}
+
+#[test]
+fn native_tab_failed_mutations_leave_selection_order_and_aliases_unchanged() -> R {
+    let ide = tab_setup(
+        r#"Sub Main()
+Dim s As MSForms.TabStrip,t As MSForms.Tab
+Set s=NativeForm.Tabs1
+Set t=s.Tabs.Add("Runtime")
+On Error Resume Next
+s.Tabs.Add "runtime"
+Debug.Print Err.Number
+Err.Clear
+s.Tabs.Add "BadIndex",,5.5
+Debug.Print Err.Number
+Err.Clear
+t.Name="FIRSTTAB"
+Debug.Print Err.Number
+Err.Clear
+t.Index=-1
+Debug.Print Err.Number
+Err.Clear
+s.Tabs.Remove "Missing"
+Debug.Print Err.Number
+Err.Clear
+s.Tabs.Add Null
+Debug.Print Err.Number
+Debug.Print s.Tabs.Count,s.Value,t.Name,t.Index,s.Tabs(3) Is t
+NativeForm.Show 0
+End Sub"#,
+        "Private Sub Tabs1_Change()\nDebug.Print \"unexpected selection change\"\nEnd Sub\n",
+    )?;
+    assert_eq!(ide.mode(), Mode::Completed, "{:?}", ide.diagnostics);
+    assert_eq!(
+        ide.output(),
+        vec![
+            "initialized",
+            "380",
+            "380",
+            "380",
+            "380",
+            "-2147024809",
+            "94",
+            "4\t0\tRuntime\t3\tTrue"
+        ]
+    );
+    let f = *ide.form_instances()?.first().ok_or("form")?;
+    let native = ide.native_form(f.source).ok_or("native")?;
+    assert!(
+        native
+            .resources
+            .iter()
+            .any(|r| r.bytes == fixture::tab_companion(0))
+    );
+    assert_eq!(
+        native.source,
+        fixture::SOURCE.to_owned()
+            + "Private Sub Tabs1_Change()\nDebug.Print \"unexpected selection change\"\nEnd Sub\n"
+    );
+    Ok(())
+}
+
+#[test]
+fn native_tab_add_returns_the_committed_member_after_change_resumes_once() -> R {
+    let mut ide = tab_setup(
+        r#"Sub Main()
+Dim t As MSForms.Tab
+Set t=NativeForm.Tabs1.Tabs.Add("Added",,0)
+Debug.Print t Is NativeForm.Tabs1.Tabs(0),t.Index
+End Sub"#,
+        "Private Sub Tabs1_Change()\nDebug.Print Tabs1.Tabs(0).Name,Tabs1.Value\nStop\nEnd Sub\n",
+    )?;
+    assert_eq!(ide.mode(), Mode::Break, "{:?}", ide.diagnostics);
+    let f = *ide.form_instances()?.first().ok_or("form")?;
+    let original = ide.native_form(f.source).ok_or("native")?.clone();
+    assert_eq!(ide.form_instance_tab_count(f, 14)?, 4);
+    assert_eq!(
+        ide.form_instance_tab_field(f, 14, 0, "Name")?,
+        Value::String(VbaString::from_utf8("Added")?)
+    );
+    assert_eq!(
+        ide.form_instance_field(f, Some(14), "Value")?,
+        Value::Long(1)
+    );
+    ide.dispatch(Action::Run, &mut NoHost)?;
+    settle(&mut ide)?;
+    assert_eq!(ide.mode(), Mode::Completed, "{:?}", ide.diagnostics);
+    assert_eq!(ide.output(), vec!["initialized", "Added\t1", "True\t0"]);
+    assert_eq!(ide.native_form(f.source), Some(&original));
+    Ok(())
+}

@@ -1486,3 +1486,86 @@ fn native_refedit_reduce_restore_uses_canonical_modal_state() -> R {
     assert!(h.query_by_label("Apply").is_some());
     Ok(())
 }
+
+#[test]
+fn native_dynamic_tabs_and_pages_render_and_route_pointer_input_after_reordering() -> R {
+    for pages in [false, true] {
+        let mut ide = Ide::new();
+        ide.import_native_form_export(
+            "NativeForm.frm",
+            &fixture::export(),
+            1252,
+            &[NativeFormResource {
+                name: "NativeForm.frx".into(),
+                bytes: if pages {
+                    fixture::multipage_companion(0)
+                } else {
+                    fixture::tab_companion(0)
+                },
+            }],
+        )?;
+        let (control, collection, id) = if pages {
+            ("Multi1", "Pages", 20)
+        } else {
+            ("Tabs1", "Tabs", 14)
+        };
+        ide.add_module("Main.bas",&format!("Sub Main()\nDim s As Object\nSet s=NativeForm.{control}\ns.{collection}(0).Index=1\ns.{collection}.Add Name:=\"Runtime\",Caption:=\"Added at runtime\",Index:=0\ns.{collection}.Remove \"BlockedTab\"\nNativeForm.Show 0\nEnd Sub"))?;
+        ide.dispatch(Action::Run, &mut NoHost)?;
+        for _ in 0..1000 {
+            ide.tick(&mut NoHost)?;
+            if ide.mode() == Mode::Completed {
+                break;
+            }
+        }
+        assert_eq!(ide.mode(), Mode::Completed, "{:?}", ide.diagnostics);
+        let f = *ide.form_instances()?.first().ok_or("form")?;
+        let original = ide.native_form(f.source).ok_or("native")?.clone();
+        let mut h = Harness::builder()
+            .allow_missing_glyphs()
+            .with_size(egui::vec2(1400., 1000.))
+            .build_ui_state(
+                |ui, s: &mut State| {
+                    for c in s.view.show(ui, &s.ide, Theme::light()) {
+                        if let Err(e) = apply(&mut s.ide, c, &mut NoHost) {
+                            s.errors.push(e.to_string());
+                        }
+                    }
+                    if let Err(e) = s.ide.tick(&mut NoHost) {
+                        s.errors.push(e.to_string());
+                    }
+                },
+                State {
+                    ide,
+                    view: EditorUi::default(),
+                    errors: vec![],
+                },
+            );
+        h.run_steps(8);
+        if pages {
+            assert!(h.query_by_label("PageEntry1").is_some());
+        }
+        assert!(h.query_by_label("Blocked").is_none());
+        h.get_by_label("Added at runtime").click();
+        h.run_steps(12);
+        assert_eq!(
+            h.state().ide.form_instance_field(f, Some(id), "Value")?,
+            vba_ide::Value::Long(0)
+        );
+        if pages {
+            assert!(h.query_by_label("PageEntry1").is_none());
+            assert!(h.query_by_label("PageEntry2").is_none());
+        }
+        h.get_by_label("First").click();
+        h.run_steps(12);
+        assert_eq!(
+            h.state().ide.form_instance_field(f, Some(id), "Value")?,
+            vba_ide::Value::Long(2)
+        );
+        if pages {
+            assert!(h.query_by_label("PageEntry1").is_some());
+        }
+        assert!(h.state().errors.is_empty(), "{:?}", h.state().errors);
+        assert_eq!(h.state().ide.native_form(f.source), Some(&original));
+    }
+    Ok(())
+}

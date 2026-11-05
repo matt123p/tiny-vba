@@ -185,3 +185,11 @@ selection and authorization. Original source/resources stay separate. Broader
 RefEdit/platform/property/event/binding semantics and the unchanged M7A.4 ledger
 remain open. Native edited saving/removal stay M7A.5/.6; fresh Office traces stay
 NOT_RUN under M8.5.
+
+[ADR 0061](../../../docs/decisions/0061-native-tab-page-mutation.md) adds native Tabs/Pages
+Add/Remove/Clear, writable Integer Index and runtime member Name. Scalar position
+cells preserve member/selection identity without owning cycles; inert queries and
+page input/rendering follow canonical ordering. Generic VM reference-scan metadata
+keeps primitive slots out of object lifetime scans under unchanged budgets.
+Dynamic Controls, bindings/multiple selection and the broader M7A.4 ledger remain
+open; native edited saving/removal remain M7A.5/.6. Fresh Office traces are NOT_RUN.

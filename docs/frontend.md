@@ -152,3 +152,8 @@ provider binds MSForms form/control/collection/return types and qualified
 VBA.UserForms through explicit source-function aliases; scope shadows and missing
 references remain authoritative. Ordinary canonical values/frames are retained.
 This is not full native lifecycle/event/control parity or edited persistence.
+
+`Name` is a contextual identifier in declarations, formal parameters and ordinary
+expressions/assignment (ADR 0061), matching Word's documented event signatures.
+This does not implement the file-renaming Name statement or permit other reserved
+keywords as bare identifiers.

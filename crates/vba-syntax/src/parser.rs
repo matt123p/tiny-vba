@@ -1397,7 +1397,6 @@ fn reserved(text: &str) -> bool {
             | "lock"
             | "unlock"
             | "kill"
-            | "name"
             | "randomize"
             | "load"
             | "unload"

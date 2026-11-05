@@ -158,11 +158,15 @@ fn native_page_visible(
             let Some(parent) = c.parent else {
                 return false;
             };
-            ide.form_instance_field(instance, Some(parent), "Value")
-                .ok()
-                == ide
-                    .form_instance_field(instance, Some(c.id), "VbaIndex")
-                    .ok()
+            match (
+                ide.form_instance_field(instance, Some(parent), "Value"),
+                ide.form_instance_field(instance, Some(c.id), "VbaIndex"),
+            ) {
+                (Ok(vba_ide::Value::Long(selected)), Ok(vba_ide::Value::Integer(index))) => {
+                    selected >= 0 && selected == i32::from(index)
+                }
+                _ => false,
+            }
         })
 }
 fn native_eligible(

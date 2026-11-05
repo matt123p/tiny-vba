@@ -266,3 +266,11 @@ enumeration/default selection and authorized widget input. Canonical state stays
 in ordinary classes; inert queries/rendering do not instantiate or execute VBA.
 MultiPage, dynamic tab mutation/index/name semantics and the remaining M7A.4
 ledger stay open. Native edited persistence and .tvform removal remain separate.
+
+[ADR 0061](../../../docs/decisions/0061-native-tab-page-mutation.md) adds native Tabs/Pages
+Add/Remove/Clear, writable Integer Index and runtime member Name. Scalar position
+cells preserve member/selection identity without owning cycles; inert queries and
+page input/rendering follow canonical ordering. Generic VM reference-scan metadata
+keeps primitive slots out of object lifetime scans under unchanged budgets.
+Dynamic Controls, bindings/multiple selection and the broader M7A.4 ledger remain
+open; native edited saving/removal remain M7A.5/.6. Fresh Office traces are NOT_RUN.

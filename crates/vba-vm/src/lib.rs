@@ -240,6 +240,7 @@ struct Frame {
     fault_pc: ir::Pc,
     checkpoint: Option<ir::SiteId>,
     slots: Vec<Location>,
+    reference_slots: Vec<Location>,
     owned: Vec<Location>,
     stack: Vec<Operand>,
 }
@@ -1952,9 +1953,11 @@ impl Session {
             values.push(v);
         }
         let mut slots = Vec::new();
+        let mut reference_slots = Vec::new();
         let mut owned = Vec::new();
         let mut stack = Vec::new();
         reserve(&mut slots, locals.len())?;
+        reserve(&mut reference_slots, locals.len())?;
         reserve(&mut owned, owned_count)?;
         reserve(&mut stack, stack_max)?;
         reserve(&mut self.frames, 1)?;
@@ -1988,6 +1991,16 @@ impl Session {
                 return Err(invariant("array alias metadata"));
             }
             slots.push(location);
+            // ByRef can point at a Variant caller slot; use its canonical type.
+            let kind = self
+                .array_types
+                .get(&location)
+                .copied()
+                .or_else(|| self.kinds.get(&location).copied())
+                .ok_or_else(|| invariant("frame slot type"))?;
+            if matches!(kind, ScalarKind::Object | ScalarKind::Variant) {
+                reference_slots.push(location);
+            }
         }
         self.allocated_locations = count;
         self.stack_capacity = stack_capacity;
@@ -2009,6 +2022,7 @@ impl Session {
             fault_pc: entry,
             checkpoint: None,
             slots,
+            reference_slots,
             owned,
             stack,
         });

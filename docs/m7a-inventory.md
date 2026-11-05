@@ -43,8 +43,8 @@ in M7A.4; a declared unsupported packet is not implementation evidence.
 | ComboBox | Items/selection/columns/binding/style, Change/Click/drop/update events | Selected native unbound editable/drop-list packet; further list/binding/resource/lifecycle cases and edited save remain unsupported |
 | ListBox | Items/selection/columns/multiselect/binding, Change/Click | Selected native unbound indexed rows/columns, single selection, Value/Text and input; 2D List/Column loading/readback and indexed/current-row Column implemented; further shape/loading cases/multiple selection/bindings/save remain unsupported |
 | Frame | Caption/container/child Controls/Parent/ActiveControl/scoped grouping and tab/focus | Selected native packet under ADR 0056; further resource/event/property variants remain open |
-| MultiPage | Pages/selected Value, child controls, Change | Selected native f/o/x joins, Page/Pages identity, lookup/enumeration, selection-gated child input/focus/rendering (ADR 0058); broader mutation/event/resource contracts open |
-| TabStrip | Tabs/selected Value, Change | Selected native decode, ordinary Tab/Tabs, lookup/enumeration/selection/input; structural mutation and further APIs/events/presentation remain open |
+| MultiPage | Pages/selected Value, child controls, Change | Selected native f/o/x joins, Page/Pages identity, lookup/enumeration, selection-gated child input/focus/rendering (ADR 0058); selected Add/Remove/Clear/Index/runtime Name (ADR 0061); broader event/resource contracts open |
+| TabStrip | Tabs/selected Value, Change | Selected native decode, ordinary Tab/Tabs, lookup/enumeration/selection/input; selected Add/Remove/Clear/Index/runtime Name (ADR 0061); further APIs/events/presentation remain open |
 | ScrollBar | Value/range/increments/orientation, Change/Scroll | Selected native records, Long properties, reversed ranges and input/drag-only Scroll; further resources/properties/save remain unsupported |
 | SpinButton | Value/range/increments/orientation, Change/spin events | Selected native records, Long properties and input/Change/spin; further resources/properties/save remain unsupported |
 | Image | Native picture resource/geometry/display properties and applicable input events | Selected bounded native raster, picture identity/assignment, layout and Click (ADR 0059); further formats/platform/metadata/events/presentation remain open |
@@ -197,3 +197,11 @@ selection and authorization. Original source/resources stay separate. Broader
 RefEdit/platform/property/event/binding semantics and the unchanged M7A.4 ledger
 remain open. Native edited saving/removal stay M7A.5/.6; fresh Office traces stay
 NOT_RUN under M8.5.
+
+[ADR 0061](decisions/0061-native-tab-page-mutation.md) adds native Tabs/Pages
+Add/Remove/Clear, writable Integer Index and runtime member Name. Scalar position
+cells preserve member/selection identity without owning cycles; inert queries and
+page input/rendering follow canonical ordering. Generic VM reference-scan metadata
+keeps primitive slots out of object lifetime scans under unchanged budgets.
+Dynamic Controls, bindings/multiple selection and the broader M7A.4 ledger remain
+open; native edited saving/removal remain M7A.5/.6. Fresh Office traces are NOT_RUN.

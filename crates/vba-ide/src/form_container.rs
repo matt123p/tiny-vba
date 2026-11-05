@@ -69,6 +69,7 @@ For i=0 To 8
 If Not current.Enabled Or Not current.Visible Then Exit Function
 kind=current.VbaKind
 If kind=14 Then
+If Not current.VbaPosition.VbaAttached Then Exit Function
 If VbaLookup(current.VbaParentKey).Value<>current.Index Then Exit Function
 End If
 If current.VbaId=scope Then tabbing=False
@@ -141,9 +142,20 @@ End Sub
 Private Sub VbaScopeOrder(ByVal parent As Long,ByRef position As Long)
 Dim scan As Long
 Dim i As Long,control As Object,children As Object,kind As Integer
+Dim pages As Boolean
+If parent<>0 Then pages=VbaLookup(parent).VbaKind=13
 Set children=VbaScopeControls(parent)
 Dim entries As Variant
 entries=children.VbaEntries
+If pages Then
+For i=0 To children.VbaTotal-1
+Set control=entries(i)
+control.VbaNavigationRank=position
+position=position+1
+VbaScopeOrder control.VbaId,position
+Next i
+Exit Sub
+End If
 For i=0 To children.VbaTotal-1
 For scan=0 To children.VbaTotal-1
 Set control=entries(scan)
@@ -215,8 +227,6 @@ End Sub
 pub(crate) fn page_class() -> String {
     let mut source = String::from(
         r#"Option Explicit
-Public VbaName As String
-Public VbaIndex As Long
 Public VbaLeft As Single
 Public VbaTop As Single
 Public VbaWidth As Single
@@ -234,19 +244,19 @@ Public Event VbaTabChanged(ByVal previous As Integer,ByVal requested As Integer)
 Public Property Get VbaKind() As Integer
 VbaKind=14
 End Property
-Public Property Get Name() As String
-Name=VbaName
-End Property
-Public Property Get Index() As Integer
-Index=VbaIndex
-End Property
 "#,
     );
+    source.push_str(crate::form_tab_state::MEMBER);
     source.push_str(COMMON);
+    source=source.replace("Dim owner As Object\nRaiseEvent VbaParentRequested(Me,owner)\nIf owner Is Nothing Then Err.Raise 91\nSet Parent=owner", "If Not VbaPosition.VbaAttached Then Err.Raise 91\nSet Parent=VbaState.VbaOwner()");
     source.push_str(
         &FRAME
             .replace("Public Event Click\n", "")
             .replace("Public Sub VbaClick()\nRaiseEvent Click\nEnd Sub\n", ""),
+    );
+    source = source.replace(
+        "Set VbaChildren=New VbaFormControls\n",
+        "Set VbaChildren=New VbaFormControls\nSet VbaPosition=New VbaFormTabPosition\n",
     );
     source
 }

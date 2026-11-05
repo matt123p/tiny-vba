@@ -16,6 +16,8 @@ pub(super) struct Instance {
     pub ty: vba_values::NominalType,
     pub interfaces: Vec<ir::ClassInterface>,
     pub fields: Vec<Location>,
+    // Derived from verified field types; scalar-only fields cannot retain objects.
+    pub reference_fields: Vec<Location>,
 }
 #[derive(Clone, Copy)]
 pub(super) enum ClassReturn {
@@ -337,6 +339,7 @@ impl Session {
                 ty: vba_values::NominalType::new("VBAProject", "1", &class.name)?,
                 interfaces: class.interfaces.clone(),
                 fields: vec![],
+                reference_fields: vec![],
             });
         }
         for (snapshot, instance) in saved.into_iter().zip(&instances) {
@@ -405,6 +408,7 @@ impl Session {
                 .fields
                 .clone();
             reserve(&mut instance.fields, fields.len())?;
+            reserve(&mut instance.reference_fields, fields.len())?;
             for ((field, value), connection) in fields.into_iter().zip(values).zip(connections) {
                 let location = self.store.allocate(value)?;
                 self.allocated_locations = self
@@ -419,6 +423,12 @@ impl Session {
                     self.nominal_types.insert(location, ty);
                 }
                 instance.fields.push(location);
+                if matches!(
+                    field.array.unwrap_or(field.kind),
+                    ScalarKind::Object | ScalarKind::Variant
+                ) {
+                    instance.reference_fields.push(location);
+                }
                 if field.with_events {
                     self.event_connections.insert(location, connection);
                     self.next_connection = self.next_connection.max(connection);
@@ -563,7 +573,9 @@ impl Session {
             values.push(value);
         }
         let mut fields = Vec::new();
+        let mut reference_fields = Vec::new();
         reserve(&mut fields, class.fields.len())?;
+        reserve(&mut reference_fields, class.fields.len())?;
         reserve(&mut self.instances, 1)?;
         for (field, value) in class.fields.iter().zip(values) {
             let location = self.store.allocate(value)?;
@@ -579,6 +591,12 @@ impl Session {
                 self.nominal_types.insert(location, ty.clone());
             }
             fields.push(location);
+            if matches!(
+                field.array.unwrap_or(field.kind),
+                ScalarKind::Object | ScalarKind::Variant
+            ) {
+                reference_fields.push(location);
+            }
             if field.with_events {
                 self.event_connections.insert(location, 0);
             }
@@ -597,6 +615,7 @@ impl Session {
             ty: vba_values::NominalType::new("VBAProject", "1", &class.name)?,
             interfaces: class.interfaces.clone(),
             fields,
+            reference_fields,
         });
         Ok(object)
     }
@@ -975,7 +994,7 @@ impl Session {
                         }
                     }
                 }
-                for location in &frame.slots {
+                for location in &frame.reference_slots {
                     visit(self.store.read(*location)?)?;
                 }
                 for operand in &frame.stack {
@@ -1000,7 +1019,7 @@ impl Session {
                 visit(self.store.read(*location)?)?;
             }
             for instance in self.instances.iter().filter(|i| i.alive) {
-                for location in &instance.fields {
+                for location in &instance.reference_fields {
                     visit(self.store.read(*location)?)?;
                 }
             }

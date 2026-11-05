@@ -933,3 +933,61 @@ fn releasing_a_default_root_keeps_aliases_and_recreates_an_independent_default()
     );
     Ok(())
 }
+
+#[test]
+fn reference_scan_metadata_survives_restore_and_tracks_object_and_variant_array_fields() -> R {
+    let class = r#"Public id As Long
+Public phase As Long
+Private scalar(0 To 4095) As Long
+Public child As Object
+Public payload As Variant
+Private children(0 To 0) As Object
+Public Sub Populate()
+Dim first As Counter,second As Counter,third As Counter
+Set first=New Counter
+first.id=1
+Set child=first
+Set second=New Counter
+second.id=2
+Dim values(0 To 0) As Variant
+Set values(0)=second
+payload=values
+Set third=New Counter
+third.id=3
+Set children(0)=third
+End Sub
+Public Sub ReadAndRelease()
+Debug.Print child.id,payload(0).id,children(0).id
+Set child=Nothing
+payload=Empty
+Set children(0)=Nothing
+End Sub
+Private Sub Class_Terminate()
+Debug.Print id
+End Sub"#;
+    let main = r#"Public item As Counter
+Function Answer() As Long
+If item Is Nothing Then
+Set item=New Counter
+item.Populate
+item.phase=1
+Else
+item.ReadAndRelease
+Set item=Nothing
+End If
+Answer=1
+End Function"#;
+    let mut first = session(main, class)?;
+    assert!(matches!(drive(&mut first)?, Outcome::Completed(_)));
+    assert!(first.output().is_empty());
+    let saved = first.project_state()?;
+    let mut second = session(main, class)?;
+    second.restore_project(saved)?;
+    assert!(matches!(drive(&mut second)?, Outcome::Completed(_)));
+    let expected = ["1\t2\t3", "1", "2", "3", "0"]
+        .into_iter()
+        .map(vba_values::VbaString::from_utf8)
+        .collect::<Result<Vec<_>, _>>()?;
+    assert_eq!(second.output(), expected);
+    Ok(())
+}
