@@ -18,7 +18,14 @@ Original M7 fixture hashes and changed Markdown links PASS. A subsequent Page
 API audit removes inherited Frame methods/events and UserForm page aliases, keeps
 site geometry internal, and verifies Integer Index and explicit method refusal.
 All repeat shared gates and actual Chromium page input/modal Stop/resume PASS.
-Application pin and XLSM/DOCM integration validation are in progress.
+Both applications pin shared product revision `18e412ca`: GridCraft
+`00207414` and WordCraft `a0d78dc4`. Full CI (10/8 steps), ten native and ten
+actual Node/WASM package cases per application, strict optional VBA/UI Clippy
+and optional VBA web builds PASS. Both GridCraft embedded-form UI/consent
+regressions PASS. New package cases exercise native page selection, selected-page
+child input/refusal and exact original XLSM/DOCM resources after save/reopen;
+WordCraft also verifies trust revocation. All three repositories are committed
+and pushed. This closes the selected MultiPage increment, not M7A.4.
 M7A.4 remains IN PROGRESS for dynamic page/tab mutation, broader native page/
 Frame/resource/property/event/lifecycle semantics, Image/RefEdit, list/binding/
 platform controls and the unchanged detailed ledger. Native editing/removal
