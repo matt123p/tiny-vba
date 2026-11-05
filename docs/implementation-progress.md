@@ -11,12 +11,21 @@ the array is held in Variant. Shared constructor helpers consolidate repeated se
 
 Validation PASS: full CI, WASM compilation, actual WASI execution, UI, native
 application capture, web and actual Chromium selection/Stop/resume regression.
-All 96 form-instance, 34 generic class and 22 widget cases pass. GridCraft's local
-integration passes all 18 native-form package cases plus actual typed text/list
+All 96 form-instance, 34 generic class and 22 widget cases pass. GridCraft's pinned
+integration passes all 19 native and 19 actual Node/WASM package cases plus typed text/list
 widget input, engine refresh and trust revocation; the render was inspected.
 These cover native bindings before Initialize, read-only rows inside Change,
 larger-list epoch reuse, protected value/selection/row/bounds failures and exact
-XLSM resource retention. Final pinned fork CI/Node-WASM integration is in progress.
+XLSM resource retention. A spilled-cell case proves refresh after recalculation
+without a content revision; weak immutable workbook snapshots detect replacement
+without owning document data. Formula-bearing workbooks use uncached source reads.
+
+Pinned fork validation PASS: GridCraft full CI (10 steps), strict optional VBA/UI
+Clippy, four form UI cases and optional web build; WordCraft full CI (8 steps),
+strict optional VBA/UI Clippy, 14 native/14 actual Node-WASM package cases, 13 VBA
+UI tests, the hidden-VBE native-form widget case and optional web build. Both pin
+shared product revision `91b0c7870b76c2c71dbcc5964563195f6f39498d`.
+GridCraft integration is committed as `0b2986c1`; WordCraft as `aca12a32`.
 The remaining M7A.4 ledger is still open.
 
 ## M7A.4 continued — multiple selection and TypeName (2026-11-05)

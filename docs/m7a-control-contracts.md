@@ -34,7 +34,7 @@ are file-format defaults from MS-OFORMS, not undocumented VBE toolbox defaults.
 | Window placement / StartUpPosition / ShowModal | VBFrame metadata retained; enabled/default-modal form required; explicit show modes use existing runtime | P for placement; disabled/default-modeless metadata U; parity M7A.4 |
 | Default / Cancel / Accelerator / TakeFocusOnClick changes | Native site/control flags or fields | Default/Cancel decoded and executed; other fields U |
 | Locked / multiline / password / MaxLength / scrolling changes | MorphData behavior fields or nondefault flags | Locked/MaxLength, multiline, password and selected Enter/Tab/field behavior decoded and executed; scrolling remains U |
-| ControlSource / RowSource / list metadata | Native binding/site fields | U; host binding packet M7A.4 |
+| ControlSource / RowSource / list metadata | Native binding/site fields retained without resolution | D for value/list families; selected runtime links through explicit host Range capability (ADR 0065) |
 | Pictures / MouseIcon / custom pointers / non-cached class table | Native binary resource or reference-specific class | U; no resource execution/loading |
 | Container children | Native immediate sites and separate Frame parent storage | D for selected bounded Frame packet (ADR 0056); other container variants U |
 
@@ -58,13 +58,13 @@ unlisted property remains outside the selected import/runtime claim.
 | Native UserForm control | Property packet to complete | Events to complete | Decode | Display / edit | Execute | Native edited save |
 |---|---|---|---|---|---|---|
 | Label | Common caption/geometry/state; AutoSize, font, accelerator | Click; mouse/key/focus applicability audit | D/P | shared | Click() | U |
-| TextBox | Common geometry/state/Text/Value; UTF-16 selection, typed validation, text limits, multiline/password; binding remains U | Change, Before/AfterUpdate, Enter/Exit, key/mouse | D/P | shared | Change, selected typed Enter/Exit/BeforeUpdate/AfterUpdate | U |
+| TextBox | Common geometry/state/Text/Value; UTF-16 selection, typed validation, text limits, multiline/password; selected cell binding (ADR 0065); further binding timing/types open | Change, Before/AfterUpdate, Enter/Exit, key/mouse | D/P | shared | Change, selected typed Enter/Exit/BeforeUpdate/AfterUpdate | U |
 | CommandButton | Common caption/geometry/state; Default, Cancel, accelerator/focus | Click; key/mouse/focus | D/P | shared | Click() | U |
-| CheckBox | Value/TripleState, caption; binding remains U | Change/Click, user cycling/Locked; selected Enter/Exit; key/mouse/binding remain U | D/P | shared | selected Value/Change/Click | U |
-| OptionButton | Value/GroupName, caption; binding remains U | Change/Click/parent-scoped grouping; selected Enter/Exit; key/mouse/binding remain U | D/P | shared | selected Value/Change/Click | U |
-| ToggleButton | Value/TripleState, caption; binding remains U | Change/Click/user cycling/Locked; selected Enter/Exit; key/mouse/binding remain U | D/P | shared | selected Value/Change/Click | U |
+| CheckBox | Value/TripleState, caption; selected cell binding (ADR 0065); further binding timing/types open | Change/Click, user cycling/Locked; selected Enter/Exit; key/mouse and further binding timing remain open | D/P | shared | selected Value/Change/Click | U |
+| OptionButton | Value/GroupName, caption; selected cell binding (ADR 0065); further binding timing/types open | Change/Click/parent-scoped grouping; selected Enter/Exit; key/mouse and further binding timing remain open | D/P | shared | selected Value/Change/Click | U |
+| ToggleButton | Value/TripleState, caption; selected cell binding (ADR 0065); further binding timing/types open | Change/Click/user cycling/Locked; selected Enter/Exit; key/mouse and further binding timing remain open | D/P | shared | selected Value/Change/Click | U |
 | ComboBox | Selected unbound rows/columns, 2D List/Column loading/readback, indexed/current-row Column, Value/Text/style/matching/selection; further list/binding APIs remain U | Selected Change/Click/DropButtonClick and input/focus/update | D/P | shared | selected packet | U |
-| ListBox | Selected unbound indexed rows, ListCount/ListIndex/Selected, Value/Text/columns, 2D List/Column loading/readback and indexed/current-row Column; further shape/loading cases, multiple selection and bindings remain U | Selected Change/Click, input/focus/update | D/P | shared | selected packet | U |
+| ListBox | Selected unbound indexed rows, ListCount/ListIndex/Selected, Value/Text/columns, 2D List/Column loading/readback and indexed/current-row Column; Multi/Extended selection (ADR 0063), selected cell/row binding (ADR 0065); further shape/loading/binding timing remain open | Selected Change/Click, input/focus/update | D/P | shared | selected packet | U |
 | Frame | Caption, child Controls/Parent, ActiveControl, scoped tab/groups | Click and selected authored focus handlers | D/P (bounded parent storages) | shared | Click and selected authored focus handlers | U |
 | MultiPage / Page | Pages/Controls/Value/SelectedItem, child identities/layout | Change/indexed Click, selected focus/input | D/P | shared | selected packet (ADR 0058) | U |
 | TabStrip | Tabs/Value/SelectedItem, metadata, layout/selection | Change/Click and selected focus/input | D/P | shared | selected packet (ADR 0057) | U |
@@ -129,8 +129,8 @@ ActiveX event signatures are not inferred from Form Control assignments.
 
 Capability versions are internal API/acceptance labels, never new exchange formats:
 `native-userform-import-v1` (shared) and `worksheet-form-controls-v1` (GridCraft; includes the earlier read-only metadata API).
-IR 9–11 metadata extends ordinary class/event/debugger protocols for enumeration,
-scalar As New and nominal native interfaces; older IR capability refusal remains. Dependencies:
+IR 9–12 metadata extends ordinary class/event/debugger protocols for enumeration,
+scalar As New, nominal native interfaces and inert runtime class names; older IR capability refusal remains. Dependencies:
 reviewed cfb/encoding_rs, shared source/design limits, caller IO and fork trust/
 package retention. Only a downward IDE -> project edge is added; no host-shaped
 objects or resource decoder enter the VM. Future packets must extend native

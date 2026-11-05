@@ -315,5 +315,6 @@ remain in force. Further binding timing/types and the broader M7A.4 ledger remai
 
 Optional `Host::object_revision` is a read-only validated data epoch, never an
 authorization shortcut. Return None unless all relevant value changes invalidate
-it; formula ranges in GridCraft deliberately use the uncached path. Binding
+it; formula-bearing workbooks/spills in GridCraft deliberately use the uncached path.
+Weak immutable workbook snapshots detect recalculation without retaining documents. Binding
 callbacks retain current trust, canonical VM state and bounded input ownership.

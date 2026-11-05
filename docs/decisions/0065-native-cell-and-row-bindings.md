@@ -1,6 +1,6 @@
 # ADR 0065 — Native cell and row bindings
 
-Status: shared implementation and validation passed; pinned fork integration in progress. M7A.4 remains open.
+Status: selected shared packet and pinned fork validation passed. M7A.4 remains open.
 
 The Forms provider decodes ControlSource and RowSource from bounded native
 OleSiteConcreteControl fields without resolving or executing them during import.
@@ -22,8 +22,9 @@ range within the existing 1,024-row/ten-column packet; singleton cells become a
 one-cell 2D array. The list model continues its established string normalization.
 Bound rows reject AddItem/RemoveItem/Clear/indexed/bulk replacement outside the
 binding refresh path. Clearing RowSource disconnects and clears rows. Clearing
-ControlSource disconnects while retaining the current control value. Failed
-attachment leaves the previous source/value/rows intact. Value, row-removal/clear and physical-text write failures are preflighted before
+ControlSource disconnects while retaining the current control value. Failed source resolution or control/list validation leaves the previous
+source/value/rows intact. Once canonical mutation commits, an authored callback
+error or Stop retains that mutation through the existing continuation rules. Value, row-removal/clear and physical-text write failures are preflighted before
 canonical mutation; bound callbacks cannot bypass the row write guard. Broader
 property/event timing still requires further validation.
 
@@ -35,8 +36,8 @@ mean no selection. Programmatic control writes use the existing range setter,
 with canonical value mutation after its successful result. Runtime source edits
 are not native designer edits or an M7A.5 persistence implementation.
 
-GridCraft queues refresh callbacks after document revisions or input-owner/form
-availability change, behind its existing document-event delivery. Handles are
+GridCraft queues refresh callbacks after document revisions, immutable workbook
+replacement or input-owner/form availability change, behind its existing document-event delivery. Handles are
 only bounded scheduling state, not another control/value store. Refresh requires
 current trust and ordinary VM callback/input ownership; source changes, Stop,
 Reset, close and stale handles retain existing continuation/lifetime rules. The
@@ -46,8 +47,10 @@ return a data epoch only when it covers every relevant value change. Bindings
 remember that epoch before reading source data and invalidate it on failed apply
 or write; absent epochs always read again. This avoids rebuilding unchanged large
 lists without making the cache authoritative. GridCraft returns document revisions
-only for bounded plain-cell ranges; formulas use the uncached path because
-recalculated values need not change the content revision. Generic For Each
+only for bounded ranges in formula-free workbooks; formula-bearing workbooks
+and spilled results use the uncached path because recalculated values need not
+change the content revision. Weak workbook snapshots detect recalculation
+without retaining a document or inventing a second data model. Generic For Each
 now accepts object arrays held in Variant through the existing EnumerateObjects
 path, preserving project identity without a host dispatch.
 
