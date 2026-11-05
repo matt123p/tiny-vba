@@ -2,6 +2,7 @@
 use super::{Control, Design, Format, Kind, MAX_CONTROLS, NativeForm, Resource, frame};
 use crate::{Reader, Result, budget, corrupt, text, unsupported};
 use std::collections::BTreeSet;
+mod classes;
 mod images;
 mod pages;
 mod tabs;
@@ -253,9 +254,11 @@ fn container(
     if has_font != 0 {
         font(&mut r)?;
     }
-    if flags & 0x8000 == 0 && r.u16()? != 0 {
-        return Err(unsupported("non-cached control class table"));
-    }
+    let classes = if flags & 0x8000 == 0 {
+        classes::read(&mut r)?
+    } else {
+        Vec::new()
+    };
     let n = r.u32()? as usize;
     if n > MAX_CONTROLS {
         return Err(budget());
@@ -293,7 +296,7 @@ fn container(
     let mut ids = BTreeSet::new();
     let mut names = BTreeSet::new();
     for _ in 0..n {
-        let site = site(&mut sites)?;
+        let site = site(&mut sites, &classes)?;
         if !ids.insert(site.id)
             || !names.insert(site.name.to_lowercase())
             || site.name.eq_ignore_ascii_case(&header.name)
@@ -430,7 +433,7 @@ struct Site {
     left: i32,
     top: i32,
 }
-fn site(r: &mut Reader<'_>) -> Result<Site> {
+fn site(r: &mut Reader<'_>, classes: &[[u8; 16]]) -> Result<Site> {
     let mut b = block(r, 0)?;
     let m = mask(&mut b, 0x0bff, 0x00a5)? as u64;
     let name = field(&mut b, m, 0, 4, 0)?;
@@ -447,6 +450,7 @@ fn site(r: &mut Reader<'_>) -> Result<Site> {
     let tab = field(&mut b, m, 6, 2, 0xffff)? as u16 as i16;
     let class = field(&mut b, m, 7, 2, 0x7fff)?;
     let kind = match class {
+        0x8000..=0xffff => classes::kind(classes, class)?,
         12 => Kind::Image,
         7 => Kind::Page,
         57 => Kind::MultiPage,
@@ -516,6 +520,8 @@ fn control(bytes: &[u8], site: Site) -> Result<Control> {
     if matches!(site.kind, Kind::SpinButton | Kind::ScrollBar) {
         return numeric_control(r, b, site);
     }
+    let textbox = matches!(site.kind, Kind::TextBox | Kind::RefEdit);
+    let refedit = site.kind == Kind::RefEdit;
     let listbox = site.kind == Kind::ListBox;
     let combobox = site.kind == Kind::ComboBox;
     let list_control = listbox || combobox;
@@ -528,6 +534,7 @@ fn control(bytes: &[u8], site: Site) -> Result<Control> {
     let (caption, text, width, height, enabled) = if matches!(
         site.kind,
         Kind::TextBox
+            | Kind::RefEdit
             | Kind::CheckBox
             | Kind::OptionButton
             | Kind::ToggleButton
@@ -537,6 +544,8 @@ fn control(bytes: &[u8], site: Site) -> Result<Control> {
         let allowed = 0x86c0_03ff
             | if listbox {
                 0x0022_3800
+            } else if refedit {
+                (1 << 18) | (1 << 20)
             } else if combobox {
                 0x0003_7800
             } else {
@@ -548,10 +557,13 @@ fn control(bytes: &[u8], site: Site) -> Result<Control> {
             return Err(unsupported("extended MorphData properties"));
         }
         if (site.kind != Kind::OptionButton && high & 1 != 0)
-            || (matches!(site.kind, Kind::TextBox | Kind::ListBox | Kind::ComboBox)
-                && lo & (1 << 23) != 0)
-            || (!matches!(site.kind, Kind::TextBox | Kind::ComboBox) && lo & (1 << 3) != 0)
-            || (site.kind != Kind::TextBox && lo & (1 << 9) != 0)
+            || (matches!(
+                site.kind,
+                Kind::TextBox | Kind::RefEdit | Kind::ListBox | Kind::ComboBox
+            ) && lo & (1 << 23) != 0)
+            || (!matches!(site.kind, Kind::TextBox | Kind::RefEdit | Kind::ComboBox)
+                && lo & (1 << 3) != 0)
+            || (!textbox && lo & (1 << 9) != 0)
         {
             return Err(unsupported(
                 "MorphData property not applicable to native control class",
@@ -560,7 +572,7 @@ fn control(bytes: &[u8], site: Site) -> Result<Control> {
         let m = u64::from(lo);
         let flags = field(&mut b, m, 0, 4, 0x2c80_081b)?;
         locked = flags & 4 != 0;
-        let text_flags = if site.kind == Kind::TextBox {
+        let text_flags = if textbox {
             0x80f0_4000
         } else if combobox {
             0x0020_5000
@@ -570,7 +582,7 @@ fn control(bytes: &[u8], site: Site) -> Result<Control> {
         if flags & !(6 | text_flags) != 0x2c80_0819 & !text_flags {
             return Err(unsupported("TextBox behavior flags"));
         }
-        if site.kind == Kind::TextBox {
+        if textbox {
             text_behavior.multi_line = flags & (1 << 31) != 0;
             text_behavior.word_wrap = flags & (1 << 23) != 0;
             text_behavior.enter_key = flags & (1 << 20) != 0;
@@ -585,7 +597,7 @@ fn control(bytes: &[u8], site: Site) -> Result<Control> {
         let scroll = field(&mut b, m, 5, 1, 0)?;
         let display = field(&mut b, m, 6, 1, 1)?;
         let expected = match site.kind {
-            Kind::TextBox => 1,
+            Kind::TextBox | Kind::RefEdit => 1,
             Kind::ListBox => 2,
             Kind::ComboBox => display,
             Kind::CheckBox => 4,
@@ -646,6 +658,9 @@ fn control(bytes: &[u8], site: Site) -> Result<Control> {
                 text_column,
             });
         }
+        if refedit && (field(&mut b, m, 18, 1, 0)? != 2 || field(&mut b, m, 20, 1, 1)? != 3) {
+            return Err(unsupported("RefEdit requires Always/Reduce drop button"));
+        }
         let value = field(&mut b, m, 22, 4, 0)?;
         let caption = field(&mut b, m, 23, 4, 0)?;
         field(&mut b, m, 25, 4, 0)?;
@@ -656,7 +671,7 @@ fn control(bytes: &[u8], site: Site) -> Result<Control> {
         let value = string(&mut b, value)?;
         let caption = string(&mut b, caption)?;
         group_name = string(&mut b, group)?;
-        if site.kind == Kind::TextBox && (!caption.is_empty() || !group_name.is_empty()) {
+        if textbox && (!caption.is_empty() || !group_name.is_empty()) {
             return Err(unsupported("TextBox caption/group"));
         }
         if (listbox || combobox && display == 7) && !value.is_empty() {

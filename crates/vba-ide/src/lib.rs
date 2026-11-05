@@ -18,6 +18,7 @@ mod form_image;
 mod form_list;
 mod form_numeric;
 mod form_project;
+mod form_refedit;
 mod form_tabs;
 mod form_text;
 mod form_types;

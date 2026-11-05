@@ -74,6 +74,7 @@ and native save/reopen. See [ADR 0041](decisions/0041-worksheet-form-controls.md
   ADR 0058 adds selected MultiPage/Page f/o/x joins, collections and rendering,
   and corrects indexed Click and repeated-selection behavior for both tab controls.
   ADR 0059 adds selected native Image/picture records, assignments and rendering.
+  ADR 0060 adds selected native RefEdit class/text/drop behavior and host selection.
   Remaining requirements and integration are recorded there. Reuse the shared runtime
   behind native forms and close Office compatibility gaps for the inventoried
   standard controls. Match instance/default-instance behavior, lifecycle, modal/

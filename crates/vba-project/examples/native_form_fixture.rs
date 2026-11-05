@@ -9,6 +9,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     );
     std::fs::create_dir_all(&dir)?;
     let option = std::env::args().nth(2);
+    let refedit = option.as_deref() == Some("--refedit-controls");
     let images = option.as_deref() == Some("--image-controls");
     let pages = option.as_deref() == Some("--page-controls");
     let tabs = option.as_deref() == Some("--tab-controls");
@@ -26,7 +27,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         Some(
             "--focus-events" | "--text-controls" | "--password-text" | "--numeric-controls"
             | "--list-controls" | "--combo-controls" | "--metadata" | "--frame-controls"
-            | "--tab-controls" | "--page-controls" | "--image-controls",
+            | "--tab-controls" | "--page-controls" | "--image-controls" | "--refedit-controls",
         ) => false,
         Some(_) => return Err("unknown fixture option".into()),
     };
@@ -89,7 +90,9 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     std::fs::write(dir.join("NativeForm.frm"), text)?;
     std::fs::write(
         dir.join("NativeForm.frx"),
-        if images {
+        if refedit {
+            fixture::refedit_companion()
+        } else if images {
             fixture::image_companion()
         } else if pages {
             fixture::multipage_companion(0)

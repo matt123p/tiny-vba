@@ -4,6 +4,7 @@ mod combo;
 mod images;
 mod list;
 mod numeric;
+mod refedit;
 mod tabs;
 mod text;
 use vba_ide::forms::{Align, Bounds, ControlKind, DesignEdit, SameSize};
@@ -914,6 +915,70 @@ impl EditorUi {
             let form = designer.form();
             let idle = ide.form_instance_can_deliver(instance);
             let native = ide.native_form(id).is_some();
+            if let Some((owner, control)) = ide
+                .form_range_selection()
+                .ok()
+                .flatten()
+                .filter(|(owner, _)| *owner == instance)
+            {
+                if let Some(c) = form.controls.iter().find(|c| c.id == control) {
+                    egui::Window::new(
+                        ide.form_instance_field(instance, None, "Caption")
+                            .map(control_text)
+                            .unwrap_or_else(|_| form.caption.clone()),
+                    )
+                    .id(self.scope.unwrap_or(self.instance).with((
+                        "refedit",
+                        owner.object.object,
+                        owner.object.generation,
+                    )))
+                    .collapsible(false)
+                    .resizable(false)
+                    .title_bar(false)
+                    .frame(
+                        egui::Frame::new()
+                            .fill(theme.chrome)
+                            .stroke(egui::Stroke::new(1., theme.border))
+                            .corner_radius(5)
+                            .inner_margin(8),
+                    )
+                    .show(ctx, |ui| {
+                        window_theme(ui, theme);
+                        ui.heading(
+                            ide.form_instance_field(instance, None, "Caption")
+                                .map(control_text)
+                                .unwrap_or_else(|_| form.caption.clone()),
+                        );
+                        ui.add_enabled_ui(idle && self.range_selection_enabled, |ui| {
+                            let (bounds, _) =
+                                ui.allocate_exact_size(egui::vec2(320., 26.), egui::Sense::hover());
+                            refedit::RefEdit {
+                                text: text::TextBox {
+                                    ide,
+                                    instance,
+                                    control: c,
+                                    bounds,
+                                    widget: ui.scope_id().with(c.id),
+                                    enabled: true,
+                                    theme,
+                                },
+                                picker: true,
+                            }
+                            .show(ui, commands);
+                            if ui.input_mut(|i| {
+                                i.consume_key(egui::Modifiers::NONE, egui::Key::Escape)
+                                    || i.consume_key(egui::Modifiers::NONE, egui::Key::Enter)
+                            }) {
+                                commands.push(Command::Form(FormCommand::InstanceDrop(
+                                    instance, c.id, false,
+                                )));
+                            }
+                        });
+                    });
+                }
+                continue;
+            }
+
             if native {
                 let active = match ide.form_instance_field(instance, None, "VbaActiveControl") {
                     Ok(vba_ide::Value::Object(object)) => Some(object),
@@ -1229,6 +1294,7 @@ impl EditorUi {
                                 }
                                 ControlKind::TabStrip | ControlKind::MultiPage=> {tabs::Tabs{ide,instance,control:c,bounds,widget:widget_id,theme}.show(ui,commands);}
 
+                                ControlKind::RefEdit => {refedit::RefEdit{text:text::TextBox{ide,instance,control:c,bounds,widget:widget_id,enabled,theme},picker:self.range_selection_enabled && ide.form_instance_is_modal(instance)}.show(ui,commands);}
                                 ControlKind::Image=> {images::Image{ide,instance,control:c,bounds,widget:widget_id,theme}.show(ui,&mut self.form_picture_textures,commands);}
                                 ControlKind::ComboBox=> {combo::ComboBox{ide,instance,control:c,bounds,widget:widget_id,theme}.show(ui,commands);}
                                 ControlKind::ListBox => {list::ListBox{ide,instance,control:c,bounds,widget:widget_id,theme}.show(ui,commands);}

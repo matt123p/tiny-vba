@@ -91,6 +91,7 @@ pub(crate) fn control_class(kind: ControlKind) -> String {
         ControlKind::MultiPage => 13,
         ControlKind::Page => 14,
         ControlKind::Image => 15,
+        ControlKind::RefEdit => 16,
     };
     s.push_str(&format!(
         "Public Property Get VbaKind() As Integer\nVbaKind={kind_code}\nEnd Property\n"
@@ -98,6 +99,7 @@ pub(crate) fn control_class(kind: ControlKind) -> String {
     if !matches!(
         kind,
         ControlKind::TextBox
+            | ControlKind::RefEdit
             | ControlKind::ScrollBar
             | ControlKind::SpinButton
             | ControlKind::ListBox
@@ -159,8 +161,11 @@ pub(crate) fn control_class(kind: ControlKind) -> String {
         s.push_str(&crate::form_list::members());
     } else if matches!(kind, ControlKind::ScrollBar | ControlKind::SpinButton) {
         s.push_str(&crate::form_numeric::members(kind));
-    } else if kind == ControlKind::TextBox {
+    } else if matches!(kind, ControlKind::TextBox | ControlKind::RefEdit) {
         s.push_str(crate::form_text::members());
+        if kind == ControlKind::RefEdit {
+            s.push_str(crate::form_refedit::MEMBERS);
+        }
     } else {
         s.push_str("Public Event Click\nPublic Sub VbaClick()\nRaiseEvent Click\nEnd Sub\n");
     }

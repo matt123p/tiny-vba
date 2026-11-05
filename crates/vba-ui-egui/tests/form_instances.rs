@@ -1430,3 +1430,59 @@ fn native_image_zero_extent_zoom_and_one_pixel_tiling_are_bounded() -> R {
     assert!(h.state().errors.is_empty(), "{:?}", h.state().errors);
     Ok(())
 }
+
+#[test]
+fn native_refedit_reduce_restore_uses_canonical_modal_state() -> R {
+    let mut ide = Ide::new();
+    ide.import_native_form_export(
+        "NativeForm.frm",
+        &fixture::export(),
+        1252,
+        &[NativeFormResource {
+            name: "NativeForm.frx".into(),
+            bytes: fixture::refedit_companion(),
+        }],
+    )?;
+    ide.add_module("Main.bas", "Sub Main()\nNativeForm.Show\nEnd Sub")?;
+    ide.dispatch(Action::Run, &mut NoHost)?;
+    for _ in 0..100 {
+        if ide.mode() != Mode::Running {
+            break;
+        }
+        ide.tick(&mut NoHost)?;
+    }
+    assert_eq!(ide.mode(), Mode::Waiting, "{:?}", ide.diagnostics);
+    let mut view = EditorUi::default();
+    view.range_selection_enabled = true;
+    let mut h = Harness::builder()
+        .with_size(egui::vec2(1400., 1000.))
+        .build_ui_state(
+            |ui, s: &mut State| {
+                for command in s.view.show_forms(ui.ctx(), &s.ide, Theme::light()) {
+                    if let Err(e) = apply(&mut s.ide, command, &mut NoHost) {
+                        s.errors.push(e.to_string());
+                    }
+                }
+                if let Err(e) = s.ide.tick(&mut NoHost) {
+                    s.errors.push(e.to_string());
+                }
+            },
+            State {
+                ide,
+                view,
+                errors: vec![],
+            },
+        );
+    h.run_steps(4);
+    h.get_by_label("Select range").click();
+    h.run_steps(6);
+    assert!(h.state().errors.is_empty(), "{:?}", h.state().errors);
+    assert!(h.state().ide.form_range_selection()?.is_some());
+    assert!(h.query_by_label("Apply").is_none());
+    h.get_by_label("Restore dialog").click();
+    h.run_steps(6);
+    assert!(h.state().errors.is_empty(), "{:?}", h.state().errors);
+    assert_eq!(h.state().ide.form_range_selection()?, None);
+    assert!(h.query_by_label("Apply").is_some());
+    Ok(())
+}

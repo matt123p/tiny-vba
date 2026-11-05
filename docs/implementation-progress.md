@@ -1,5 +1,26 @@
 # Implementation progress
 
+## M7A.4 continued — native RefEdit (2026-11-05)
+
+Implemented [ADR 0060](decisions/0060-native-refedit.md): bounded inert native
+class-table resolution, RefEdit MorphData, typed ordinary RefEdit text/drop state,
+focus/validation and Change/DropButtonClick continuations. Picker ownership is
+derived from live modal state, including parked callbacks; Reset stays inert.
+The shared reduce/restore UI uses original vector marks and an injected host
+selection capability. GridCraft supplies authorized worksheet references through
+the ordinary text-input path and retains debugger visibility across Stop.
+Shared CI, WASM, actual WASI (79 runtime/20 decoder cases), UI (19 actual
+widget cases), native capture and web gates PASS. Ten expanded/collapsed renders
+were inspected across light/dark/narrow/scaled/injected-host themes; caption and
+restore marks use injected tokens and original vector drawing. Actual Chromium
+RefEdit text input, modal handler Stop/resume and exact authored source retention
+PASS with no page errors. Original M7 artifact hashes PASS. Application integration
+validation is in progress. M7A.4 remains IN PROGRESS for dynamic
+collections, bindings, remaining control/platform/property/event/lifecycle
+contracts and broader RefEdit semantics. Native edited saving/removal remain
+M7A.5/.6. Fresh Office traces remain NOT_RUN under M8.5. Next: dynamic native
+Tabs/Pages collection mutation and the remaining semantic ledger.
+
 ## M7A.4 continued — native Image/pictures (2026-11-05)
 
 Implemented [ADR 0059](decisions/0059-native-image-pictures.md): cached native

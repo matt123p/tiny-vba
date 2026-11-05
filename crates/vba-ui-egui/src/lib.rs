@@ -242,6 +242,8 @@ enum EditOperation {
 /// Persistent view preferences; source and execution live in `Ide`, not in this renderer.
 pub struct EditorUi {
     pub form_view: bool,
+    /// Embedding provides authorized worksheet selection for native RefEdit.
+    pub range_selection_enabled: bool,
     pub form_report: Option<FormLayoutReport>,
     form_modal: bool,
     form_last_focus: Option<egui::Id>,
@@ -319,6 +321,7 @@ impl Default for EditorUi {
     fn default() -> Self {
         Self {
             form_view: false,
+            range_selection_enabled: false,
             form_report: None,
             form_modal: true,
             form_drag: None,
@@ -520,6 +523,12 @@ if let Some(instancing)=m.instancing(){ui.label(theme.label("Instancing"));ui.la
         });
         self.windows(ui, ide, &mut commands, theme);
         self.form_windows(ui.ctx(), ide, &mut commands, theme);
+        commands
+    }
+    /// Render native form windows without mounting the editor panels.
+    pub fn show_forms(&mut self, ctx: &egui::Context, ide: &Ide, theme: Theme) -> Vec<Command> {
+        let mut commands = Vec::new();
+        self.form_windows(ctx, ide, &mut commands, theme);
         commands
     }
     fn find_occurrence(&mut self, ide: &Ide, commands: &mut Vec<Command>, backwards: bool) {

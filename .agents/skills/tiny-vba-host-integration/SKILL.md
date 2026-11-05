@@ -296,3 +296,12 @@ enumeration/default selection and authorized widget input. Canonical state stays
 in ordinary classes; inert queries/rendering do not instantiate or execute VBA.
 MultiPage, dynamic tab mutation/index/name semantics and the remaining M7A.4
 ledger stay open. Native edited persistence and .tvform removal remain separate.
+
+[ADR 0060](../../../docs/decisions/0060-native-refedit.md) adds bounded inert RefEdit class-table
+resolution, ordinary typed RefEdit text/drop state and selected focus/validation/
+Change/DropButtonClick behavior. The shared renderer accepts host range-selection
+availability and collapses/restores modal RefEdit; GridCraft owns worksheet
+selection and authorization. Original source/resources stay separate. Broader
+RefEdit/platform/property/event/binding semantics and the unchanged M7A.4 ledger
+remain open. Native edited saving/removal stay M7A.5/.6; fresh Office traces stay
+NOT_RUN under M8.5.

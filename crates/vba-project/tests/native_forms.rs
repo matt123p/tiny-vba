@@ -583,3 +583,43 @@ fn native_image_raster_codecs_are_bounded_and_preserve_dimensions() {
         .unwrap();
     assert!(decode(&fixture::image_companion_with_picture(&png.into_inner())).is_err());
 }
+
+#[test]
+fn refedit_class_table_is_inert_bounded_and_requires_native_drop_properties() {
+    let bytes = fixture::refedit_companion();
+    let native = decode(&bytes).unwrap();
+    assert_eq!(native.design.controls[1].kind, Kind::RefEdit);
+    assert_eq!(native.design.controls[1].text, "initial");
+    assert_eq!(native.source, fixture::SOURCE);
+    assert_eq!(native.resources[1].bytes, bytes);
+    let rewrite = |name: &str, change: &dyn Fn(&mut Vec<u8>)| {
+        let mut cfb = cfb::CompoundFile::open(std::io::Cursor::new(bytes[4..].to_vec())).unwrap();
+        use std::io::{Read, Write};
+        let mut data = Vec::new();
+        cfb.open_stream(name)
+            .unwrap()
+            .read_to_end(&mut data)
+            .unwrap();
+        change(&mut data);
+        cfb.create_stream(name).unwrap().write_all(&data).unwrap();
+        let b = cfb.into_inner().into_inner();
+        let mut out = (b.len() as u32).to_le_bytes().to_vec();
+        out.extend(b);
+        out
+    };
+    let changed = rewrite("/o", &|o| {
+        let offset = fixture::controls()[0].len();
+        o[offset + 12] = 1;
+    });
+    assert!(decode(&changed).is_err());
+    let changed = rewrite("/f", &|f| {
+        let offset = 4 + usize::from(u16::from_le_bytes([f[2], f[3]]));
+        f[offset..offset + 2].copy_from_slice(&129u16.to_le_bytes());
+    });
+    assert_eq!(decode(&changed).unwrap_err().code, "VBA_PROJECT_LIMIT");
+    let changed = rewrite("/f", &|f| {
+        let offset = 4 + usize::from(u16::from_le_bytes([f[2], f[3]]));
+        f[offset + 14] ^= 1;
+    });
+    assert!(decode(&changed).is_err());
+}

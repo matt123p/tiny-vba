@@ -21,6 +21,7 @@ pub enum ControlKind {
     MultiPage,
     Page,
     Image,
+    RefEdit,
 }
 impl ControlKind {
     pub fn name(self) -> &'static str {
@@ -40,11 +41,13 @@ impl ControlKind {
             Self::MultiPage => "MultiPage",
             Self::Page => "Page",
             Self::Image => "Image",
+            Self::RefEdit => "RefEdit",
         }
     }
     pub fn default_event(self) -> &'static str {
         match self {
             Self::TextBox
+            | Self::RefEdit
             | Self::ScrollBar
             | Self::SpinButton
             | Self::ListBox

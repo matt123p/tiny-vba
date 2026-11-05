@@ -237,3 +237,12 @@ budgets. Further picture metadata/platform/format and event/presentation cases,
 RefEdit, bindings, dynamic collections and remaining M7A.4 semantics stay open.
 Native edited saving/.tvform removal remain M7A.5/.6; Office traces remain NOT_RUN
 under M8.5.
+
+[ADR 0060](docs/decisions/0060-native-refedit.md) adds bounded inert RefEdit class-table
+resolution, ordinary typed RefEdit text/drop state and selected focus/validation/
+Change/DropButtonClick behavior. The shared renderer accepts host range-selection
+availability and collapses/restores modal RefEdit; GridCraft owns worksheet
+selection and authorization. Original source/resources stay separate. Broader
+RefEdit/platform/property/event/binding semantics and the unchanged M7A.4 ledger
+remain open. Native edited saving/removal stay M7A.5/.6; fresh Office traces stay
+NOT_RUN under M8.5.

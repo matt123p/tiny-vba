@@ -433,6 +433,7 @@ pub(crate) fn class_name(kind: ControlKind) -> &'static str {
         ControlKind::MultiPage => "VbaFormMultiPage",
         ControlKind::Page => "VbaFormPage",
         ControlKind::Image => "VbaFormImage",
+        ControlKind::RefEdit => "VbaFormRefEdit",
     }
 }
 pub(crate) fn checked_handlers(
@@ -539,6 +540,7 @@ pub(crate) fn checked_handlers(
                 && p.name.spelling.get(c.name.len() + 1..).is_some_and(|e| {
                     crate::form_numeric::event(c.kind, e)
                         .or_else(|| crate::form_list::event(c.kind, e))
+                        .or_else(|| crate::form_refedit::event(c.kind, e))
                         .or_else(|| crate::form_tabs::event(c.kind, e))
                         .is_some()
                 })
@@ -736,6 +738,7 @@ fn compiled_form(form: &Form, module: &Module, native: Option<&NativeForm>) -> R
         if !matches!(
             c.kind,
             ControlKind::TextBox
+                | ControlKind::RefEdit
                 | ControlKind::ScrollBar
                 | ControlKind::SpinButton
                 | ControlKind::ListBox
@@ -746,7 +749,7 @@ fn compiled_form(form: &Form, module: &Module, native: Option<&NativeForm>) -> R
         ) {
             source.push_str(&format!("{temp}.Caption={}\n", vba_string(&c.caption)));
         }
-        if c.kind == ControlKind::TextBox {
+        if matches!(c.kind, ControlKind::TextBox | ControlKind::RefEdit) {
             source.push_str(&format!("{temp}.VbaText={}\n", vba_string(&c.text)));
         }
         if matches!(
@@ -801,6 +804,7 @@ fn compiled_form(form: &Form, module: &Module, native: Option<&NativeForm>) -> R
             if matches!(
                 c.kind,
                 ControlKind::TextBox
+                    | ControlKind::RefEdit
                     | ControlKind::CheckBox
                     | ControlKind::OptionButton
                     | ControlKind::ToggleButton
@@ -871,7 +875,7 @@ fn compiled_form(form: &Form, module: &Module, native: Option<&NativeForm>) -> R
                     source.push_str(&format!("{temp}.LargeChange={}\n", n.large_change));
                 }
             }
-            if c.kind == ControlKind::TextBox {
+            if matches!(c.kind, ControlKind::TextBox | ControlKind::RefEdit) {
                 source.push_str(&format!("{temp}.MaxLength={}\n{temp}.MultiLine={}\n{temp}.WordWrap={}\n{temp}.EnterKeyBehavior={}\n{temp}.TabKeyBehavior={}\n{temp}.EnterFieldBehavior={}\n", control.max_length,boolean(control.text_behavior.multi_line),boolean(control.text_behavior.word_wrap),boolean(control.text_behavior.enter_key),boolean(control.text_behavior.tab_key),u8::from(control.text_behavior.recall_selection)));
                 if control.text_behavior.password_char != 0 {
                     source.push_str(&format!(
@@ -1377,6 +1381,7 @@ impl Ide {
                 .flatten();
             let canonical = if let Some(name) = crate::form_numeric::event(c.kind, event)
                 .or_else(|| crate::form_list::event(c.kind, event))
+                .or_else(|| crate::form_refedit::event(c.kind, event))
                 .or_else(|| crate::form_tabs::event(c.kind, event))
             {
                 name
@@ -1495,6 +1500,7 @@ impl Ide {
                 ControlKind::MultiPage,
                 ControlKind::Page,
                 ControlKind::Image,
+                ControlKind::RefEdit,
             ]
             .into_iter()
             .enumerate()
@@ -1918,7 +1924,7 @@ impl Ide {
             host,
         )
     }
-    /// Open/close a ComboBox through ordinary authorized focus/event frames.
+    /// Open/close a native ComboBox or modal RefEdit through authorized focus/event frames.
     pub fn form_instance_drop(
         &mut self,
         instance: FormInstance,
@@ -2062,6 +2068,7 @@ impl Ide {
         host: &mut impl Host,
     ) -> Result<()> {
         let focus = input == FormInput::Focus;
+        let modal = self.form_instance_is_modal(instance);
         self.validate_form_instance(instance)?;
         let id = instance.source;
         if self.stale
@@ -2173,7 +2180,10 @@ impl Ide {
                 return Err(error("invalid numeric control input"));
             }
             if matches!(input, FormInput::Text { .. })
-                && !matches!(c.kind, ControlKind::TextBox | ControlKind::ComboBox)
+                && !matches!(
+                    c.kind,
+                    ControlKind::TextBox | ControlKind::RefEdit | ControlKind::ComboBox
+                )
             {
                 return Err(error("text input requires a TextBox"));
             }
@@ -2206,8 +2216,11 @@ impl Ide {
                 object = instance.object;
                 ("VbaTabInput", vec![Value::Long(index), Value::Long(tab)])
             } else if let FormInput::Drop(opened) = input {
-                if c.kind != ControlKind::ComboBox {
-                    return Err(error("drop input requires a ComboBox"));
+                if c.kind == ControlKind::RefEdit && !modal {
+                    return Err(error("RefEdit range selection requires a modal UserForm"));
+                }
+                if !matches!(c.kind, ControlKind::ComboBox | ControlKind::RefEdit) {
+                    return Err(error("drop input requires a ComboBox or RefEdit"));
                 }
                 let index = designer
                     .form()
@@ -2274,7 +2287,10 @@ impl Ide {
                     .ok_or_else(|| error("unknown native control index"))?;
                 object = instance.object;
                 ("VbaFocusIndex", vec![Value::Long(index)])
-            } else if matches!(c.kind, ControlKind::TextBox | ControlKind::ComboBox) {
+            } else if matches!(
+                c.kind,
+                ControlKind::TextBox | ControlKind::RefEdit | ControlKind::ComboBox
+            ) {
                 let text = text.ok_or_else(|| error("text change requires text"))?;
                 if text.units().len() > 16384 {
                     return Err(error("control text budget"));

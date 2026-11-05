@@ -143,7 +143,7 @@ Remaining M7A.4 requirements, without reducing the milestone's scope:
   and remaining property/default/error/coercion contracts,
   including native dynamic TypeName. ADR 0048 implements the selected flat native
   focus/typed cancellation path, without claiming the full event/property matrix.
-- Excel RefEdit remains refused. ADR 0059 adds selected Image raster records,
+- ADR 0060 adds selected native RefEdit text/drop semantics and host picker integration; broader RefEdit/platform behavior remains open. ADR 0059 adds selected Image raster records,
   picture identity/assignment, layout and Click; further picture formats/metadata,
   loading/platform services and the complete event/presentation matrix stay open. ADR 0058 adds selected native MultiPage/Page;
   dynamic Pages, further transitions/properties/resources, programmatic selection/
@@ -204,3 +204,12 @@ budgets. Further picture metadata/platform/format and event/presentation cases,
 RefEdit, bindings, dynamic collections and remaining M7A.4 semantics stay open.
 Native edited saving/.tvform removal remain M7A.5/.6; Office traces remain NOT_RUN
 under M8.5.
+
+[ADR 0060](decisions/0060-native-refedit.md) adds bounded inert RefEdit class-table
+resolution, ordinary typed RefEdit text/drop state and selected focus/validation/
+Change/DropButtonClick behavior. The shared renderer accepts host range-selection
+availability and collapses/restores modal RefEdit; GridCraft owns worksheet
+selection and authorization. Original source/resources stay separate. Broader
+RefEdit/platform/property/event/binding semantics and the unchanged M7A.4 ledger
+remain open. Native edited saving/removal stay M7A.5/.6; fresh Office traces stay
+NOT_RUN under M8.5.

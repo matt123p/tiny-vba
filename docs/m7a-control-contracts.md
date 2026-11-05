@@ -71,7 +71,7 @@ unlisted property remains outside the selected import/runtime claim.
 | ScrollBar | Selected Long Value/bounds/increments/orientation/delay; further resources/properties remain U | Change/drag-only Scroll, selected input/focus | D/P | shared | selected packet | U |
 | SpinButton | Selected Long Value/bounds/increment/orientation/delay; further resources/properties remain U | Change/SpinUp/SpinDown, selected input/focus | D/P | shared | selected packet | U |
 | Image | Picture identity/assignment, raster resource, PictureSizeMode/Alignment/Tiling, AutoSize and geometry | Nonfocusable Click | D/P | shared | selected packet (ADR 0059) | U |
-| Excel RefEdit | Range-selection text/reference, Excel owner/binding/resource class | Change, host range-selection/input | U | U | U | U |
+| Excel RefEdit | Canonical text/selection/drop state; non-cached native class identity | Change/DropButtonClick, selected focus/input; host range selection | D/P | shared; picker supplied by Excel host | selected packet (ADR 0060); integration validation in progress | U |
 
 The last row is an Office-supplied Excel extension, not a generic MSForms control
 or third-party control. Other Office references/extensions need an explicit
@@ -208,3 +208,12 @@ budgets. Further picture metadata/platform/format and event/presentation cases,
 RefEdit, bindings, dynamic collections and remaining M7A.4 semantics stay open.
 Native edited saving/.tvform removal remain M7A.5/.6; Office traces remain NOT_RUN
 under M8.5.
+
+[ADR 0060](decisions/0060-native-refedit.md) adds bounded inert RefEdit class-table
+resolution, ordinary typed RefEdit text/drop state and selected focus/validation/
+Change/DropButtonClick behavior. The shared renderer accepts host range-selection
+availability and collapses/restores modal RefEdit; GridCraft owns worksheet
+selection and authorization. Original source/resources stay separate. Broader
+RefEdit/platform/property/event/binding semantics and the unchanged M7A.4 ledger
+remain open. Native edited saving/removal stay M7A.5/.6; fresh Office traces stay
+NOT_RUN under M8.5.

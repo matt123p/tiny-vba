@@ -15,6 +15,9 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         .nth(1)
         .unwrap_or_else(|| "reports/ui".into());
     std::fs::create_dir_all(&folder)?;
+    let refedit = std::env::args()
+        .nth(2)
+        .is_some_and(|o| o == "--refedit-controls");
     let images = std::env::args()
         .nth(2)
         .is_some_and(|o| o == "--image-controls");
@@ -48,7 +51,9 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             1252,
             &[NativeFormResource {
                 name: "NativeForm.frx".into(),
-                bytes: if images {
+                bytes: if refedit {
+                    fixture::refedit_companion()
+                } else if images {
                     fixture::image_companion()
                 } else if pages {
                     fixture::multipage_companion(1)
@@ -67,7 +72,9 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                 },
             }],
         )?;
-        let main = if images {
+        let main = if refedit {
+            "Sub Main()\nNativeForm.Show\nEnd Sub"
+        } else if images {
             "Sub Main()\nSet NativeForm.Image2.Picture=NativeForm.Image1.Picture\nNativeForm.Image2.PictureTiling=True\nNativeForm.Image2.PictureSizeMode=fmPictureSizeModeClip\nNativeForm.Show 0\nEnd Sub"
         } else if pages {
             "Sub Main()\nNativeForm.Show 0\nNativeForm.Multi1.SetFocus\nEnd Sub"
@@ -97,7 +104,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             }
         }
         if ide.form_instances()?.len()
-            != if metadata || frames || tabs || pages || images {
+            != if metadata || frames || tabs || pages || images || refedit {
                 1
             } else {
                 2
@@ -119,7 +126,11 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                 },
                 State {
                     ide,
-                    view: EditorUi::default(),
+                    view: {
+                        let mut view = EditorUi::default();
+                        view.range_selection_enabled = refedit;
+                        view
+                    },
                     theme,
                     metadata,
                 },
@@ -137,7 +148,9 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                 return Err("expected native tooltip".into());
             }
         }
-        let prefix = if images {
+        let prefix = if refedit {
+            "m7a4-native-refedit"
+        } else if images {
             "m7a4-native-images"
         } else if pages {
             "m7a4-native-pages"
@@ -155,6 +168,20 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             "m7a4-instances"
         };
         h.render()?.save(format!("{folder}/{prefix}-{name}.png"))?;
+        if refedit {
+            let s = h.state_mut();
+            let owner = *s.ide.form_instances()?.first().ok_or("form instance")?;
+            s.ide.form_instance_drop(owner, 12, true, &mut NoHost)?;
+            for _ in 0..100 {
+                if s.ide.mode() != Mode::Running {
+                    break;
+                }
+                s.ide.tick(&mut NoHost)?;
+            }
+            h.run_steps(5);
+            h.render()?
+                .save(format!("{folder}/{prefix}-collapsed-{name}.png"))?;
+        }
     }
     Ok(())
 }

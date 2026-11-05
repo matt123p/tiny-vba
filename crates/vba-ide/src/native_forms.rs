@@ -213,6 +213,7 @@ impl Ide {
                     Kind::Frame => ControlKind::Frame,
                     Kind::Label => ControlKind::Label,
                     Kind::TextBox => ControlKind::TextBox,
+                    Kind::RefEdit => ControlKind::RefEdit,
                     Kind::ListBox => ControlKind::ListBox,
                     Kind::ComboBox => ControlKind::ComboBox,
                     Kind::CommandButton => ControlKind::CommandButton,

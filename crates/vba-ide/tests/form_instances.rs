@@ -2613,3 +2613,133 @@ fn native_container_focus_skips_images_without_reading_nonexistent_tab_propertie
     assert_eq!(ide.output(), vec!["initialized", "Frame1\tEntry"]);
     Ok(())
 }
+
+#[test]
+fn native_refedit_typed_text_drop_and_stop_keep_canonical_owner_and_resources() -> R {
+    let mut ide = Ide::new();
+    let source=fixture::SOURCE.replace("Private Sub Apply_Click()", "Private Sub Entry_DropButtonClick()\nDebug.Print \"drop\"\nStop\nDebug.Print Entry.Text\nEnd Sub\nPrivate Sub Entry_Change()\nDebug.Print \"change\",Entry.Text\nEnd Sub\nPrivate Sub Apply_Click()");
+    let export = String::from_utf8(fixture::export())?.replace(fixture::SOURCE, &source);
+    let id = ide.import_native_form_export(
+        "NativeForm.frm",
+        export.as_bytes(),
+        1252,
+        &[NativeFormResource {
+            name: "NativeForm.frx".into(),
+            bytes: fixture::refedit_companion(),
+        }],
+    )?;
+    let native = ide.native_form(id).ok_or("native")?.clone();
+    assert_eq!(ide.form_range_selection()?, None);
+    assert!(ide.form_instances()?.is_empty());
+    ide.add_module("Main.bas","Sub Main()\nDim r As RefEdit.RefEdit\nSet r=NativeForm.Entry\nDebug.Print r.Value,r.Parent Is NativeForm\nNativeForm.Show\nEnd Sub")?;
+    ide.dispatch(Action::Run, &mut NoHost)?;
+    settle(&mut ide)?;
+    assert_eq!(ide.mode(), Mode::Waiting, "{:?}", ide.diagnostics);
+    let f = *ide.form_instances()?.first().ok_or("instance")?;
+    ide.form_instance_drop(f, 12, true, &mut NoHost)?;
+    settle(&mut ide)?;
+    assert_eq!(ide.mode(), Mode::Break, "{:?}", ide.diagnostics);
+    assert_eq!(ide.form_range_selection()?, Some((f, 12)));
+    assert!(
+        ide.form_instance_text(
+            f,
+            12,
+            VbaString::from_utf8("Sheet1!$B$2:$C$4")?,
+            (0, 0),
+            &mut NoHost
+        )
+        .is_err()
+    );
+    ide.dispatch(Action::Run, &mut NoHost)?;
+    settle(&mut ide)?;
+    ide.form_instance_text(
+        f,
+        12,
+        VbaString::from_utf8("Sheet1!$B$2:$C$4")?,
+        (0, 0),
+        &mut NoHost,
+    )?;
+    settle(&mut ide)?;
+    assert_eq!(
+        ide.form_instance_field(f, Some(12), "VbaText")?,
+        Value::String(VbaString::from_utf8("Sheet1!$B$2:$C$4")?)
+    );
+    assert_eq!(
+        ide.output(),
+        vec![
+            "initialized",
+            "initial\tTrue",
+            "drop",
+            "initial",
+            "change\tSheet1!$B$2:$C$4"
+        ]
+    );
+    ide.form_instance_drop(f, 12, false, &mut NoHost)?;
+    settle(&mut ide)?;
+    assert_eq!(ide.form_range_selection()?, None);
+    assert_eq!(ide.native_form(id), Some(&native));
+    ide.dispatch(Action::Reset, &mut NoHost)?;
+    assert_eq!(ide.form_range_selection()?, None);
+    Ok(())
+}
+
+#[test]
+fn native_refedit_picker_refuses_modeless_and_respects_cancellable_focus() -> R {
+    let mut native = vba_project::forms::decode_export(
+        "NativeForm.frm",
+        &fixture::export(),
+        1252,
+        &[NativeFormResource {
+            name: "NativeForm.frx".into(),
+            bytes: fixture::refedit_companion(),
+        }],
+        &vba_project::Limits::default(),
+    )?;
+    let mut other = native.design.controls.get(1).ok_or("control")?.clone();
+    other.id = 14;
+    other.name = "Other".into();
+    other.kind = vba_project::forms::Kind::TextBox;
+    other.tab_index = 0;
+    native
+        .design
+        .controls
+        .get_mut(1)
+        .ok_or("control")?
+        .tab_index = 1;
+    native
+        .design
+        .controls
+        .get_mut(2)
+        .ok_or("control")?
+        .tab_index = 2;
+    native.design.controls.push(other);
+    native.source.push_str("\nPrivate Sub Other_BeforeUpdate(ByVal Cancel As MSForms.ReturnBoolean)\nCancel.Value=True\nEnd Sub\n");
+    let mut ide = Ide::new();
+    ide.attach_native_form(native)?;
+    ide.add_module("Main.bas", "Sub Main()\nNativeForm.Show 0\nEnd Sub")?;
+    ide.dispatch(Action::Run, &mut NoHost)?;
+    settle(&mut ide)?;
+    let f = *ide.form_instances()?.first().ok_or("instance")?;
+    assert!(ide.form_instance_drop(f, 12, true, &mut NoHost).is_err());
+    assert_eq!(ide.form_range_selection()?, None);
+    ide.dispatch(Action::Reset, &mut NoHost)?;
+    ide.active = ide
+        .modules
+        .iter()
+        .position(|m| m.name == "Main.bas")
+        .ok_or("main")?;
+    ide.set_text("Sub Main()\nNativeForm.Show\nEnd Sub".into())?;
+    ide.dispatch(Action::Run, &mut NoHost)?;
+    settle(&mut ide)?;
+    let f = *ide.form_instances()?.first().ok_or("instance")?;
+    ide.form_instance_text(f, 14, VbaString::from_utf8("dirty")?, (0, 0), &mut NoHost)?;
+    settle(&mut ide)?;
+    ide.form_instance_drop(f, 12, true, &mut NoHost)?;
+    settle(&mut ide)?;
+    assert_eq!(ide.form_range_selection()?, None);
+    assert_eq!(
+        ide.form_instance_field(f, None, "VbaActiveControl")?,
+        ide.form_instance_field(f, None, "VbaOther")?
+    );
+    Ok(())
+}

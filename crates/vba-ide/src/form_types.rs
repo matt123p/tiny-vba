@@ -218,6 +218,38 @@ impl Ide {
                 });
             }
         }
+        let index = if let Some(index) = libraries
+            .iter()
+            .position(|l| l.name.eq_ignore_ascii_case("RefEdit"))
+        {
+            index
+        } else {
+            libraries.push(ReferenceLibrary {
+                name: "RefEdit".into(),
+                version: "1.2".into(),
+                available: true,
+                types: vec![],
+                constants: vec![],
+            });
+            libraries.len() - 1
+        };
+        let library = libraries
+            .get_mut(index)
+            .ok_or_else(|| error("RefEdit reference index"))?;
+        if let Some(ty) = library
+            .types
+            .iter()
+            .find(|ty| ty.name.eq_ignore_ascii_case("RefEdit"))
+        {
+            if ty.kind != ReferenceTypeKind::Object {
+                return Err(error("RefEdit reference type conflict"));
+            }
+        } else {
+            library.types.push(ReferenceType {
+                name: "RefEdit".into(),
+                kind: ReferenceTypeKind::Object,
+            });
+        }
         ReferenceSet::new(libraries)
     }
     pub(crate) fn form_interfaces(
@@ -237,6 +269,19 @@ impl Ide {
                 event_names: events.then(Vec::new),
             })
         };
+        bindings.insert(
+            "VbaFormRefEdit".into(),
+            vec![
+                vba_ir::ClassInterface {
+                    ty: references
+                        .object_type("RefEdit.RefEdit")?
+                        .ok_or_else(|| error("RefEdit reference missing"))?,
+                    events: true,
+                    event_names: Some(vec!["Change".into(), "DropButtonClick".into()]),
+                },
+                claim("Control", false)?,
+            ],
+        );
         for (kind, name) in [
             (ControlKind::Label, "Label"),
             (ControlKind::TextBox, "TextBox"),

@@ -30,6 +30,7 @@ pub enum Kind {
     MultiPage,
     Page,
     Image,
+    RefEdit,
 }
 /// Coordinates are original signed HIMETRIC units, not pixels or points.
 #[derive(Clone, Debug, PartialEq, Eq)]

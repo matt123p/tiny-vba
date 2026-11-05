@@ -16,7 +16,7 @@ pub(crate) fn event(kind: ControlKind, name: &str) -> Option<(&'static str, bool
     }
     if matches!(
         kind,
-        ControlKind::TextBox | ControlKind::ListBox | ControlKind::ComboBox
+        ControlKind::TextBox | ControlKind::RefEdit | ControlKind::ListBox | ControlKind::ComboBox
     ) {
         for (event, cancel) in [("BeforeUpdate", true), ("AfterUpdate", false)] {
             if name.eq_ignore_ascii_case(event) {
@@ -73,6 +73,10 @@ If previous.MatchRequired And Not previous.MatchFound Then Exit Sub
 If previous.VbaDropVisible Then previous.VbaSetDrop False
 If serial<>VbaFocusSerial Or Not VbaLoaded Or Not VbaVisible Then Exit Sub
 End If
+If previous.VbaKind=16 Then
+If previous.VbaDropVisible Then previous.VbaSetDrop False
+If serial<>VbaFocusSerial Or Not VbaLoaded Or Not VbaVisible Then Exit Sub
+End If
 If previous.VbaDirty Then
 Set cancel=New VbaFormReturnBoolean
 VbaBeforeUpdate previous,cancel
@@ -112,7 +116,7 @@ VbaEnter path(count-1-i)
 If serial<>VbaFocusSerial Or Not VbaLoaded Or Not VbaVisible Then Exit Sub
 Next i
 kind=target.VbaKind
-If kind=2 Or kind=10 Then target.VbaEnterEdit
+If kind=2 Or kind=10 Or kind=16 Then target.VbaEnterEdit
 VbaEnter target
 If serial<>VbaFocusSerial Or Not VbaLoaded Or Not VbaVisible Then Exit Sub
 If Not VbaEligible(target) Then Exit Sub
@@ -162,6 +166,19 @@ VbaMoveFocus control
 If Not (VbaActiveControl Is control) Then Exit Sub
 End If
 If Not VbaVisible Or Not VbaLoaded Or Not control.Enabled Or Not control.Visible Then Exit Sub
+If opened And control.VbaKind=16 Then
+Dim entries As Variant,other As Object,i As Long
+entries=VbaAllControls.VbaEntries
+For i=0 To VbaAllControls.VbaTotal-1
+Set other=entries(i)
+If other.VbaKind=16 Then
+If Not (other Is control) Then
+If other.VbaDropVisible Then other.VbaSetDrop False
+End If
+End If
+Next i
+If Not VbaVisible Or Not VbaLoaded Then Exit Sub
+End If
 control.VbaSetDrop opened
 End Sub
 Public Sub VbaListInput(ByVal index As Long,ByVal row As Long,ByVal commit As Boolean)
@@ -200,7 +217,7 @@ VbaMoveFocus control
 If Not (VbaActiveControl Is control) Then Exit Sub
 End If
 If Not VbaVisible Or Not VbaLoaded Or Not control.Enabled Or Not control.Visible Then Exit Sub
-If control.VbaKind=2 Or control.VbaKind=10 Then
+If control.VbaKind=2 Or control.VbaKind=10 Or control.VbaKind=16 Then
 control.VbaSetText text
 Else
 control.VbaClick
@@ -244,6 +261,12 @@ End Sub
             "Private Sub Vba{0}_VbaFocusRequested(ByVal target As Object)\nVbaMoveFocus target\ntarget.VbaFocusConfirmed=True\nEnd Sub\n",
             control.name
         ));
+    }
+    if !form.controls.iter().any(|c| c.kind == ControlKind::RefEdit) {
+        source = source
+            .replace(" Or kind=16", "")
+            .replace(" Or control.VbaKind=16", "");
+        source=source.replace("If previous.VbaKind=16 Then\nIf previous.VbaDropVisible Then previous.VbaSetDrop False\nIf serial<>VbaFocusSerial Or Not VbaLoaded Or Not VbaVisible Then Exit Sub\nEnd If\n", "");
     }
     source
 }
