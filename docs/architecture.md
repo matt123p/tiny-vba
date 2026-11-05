@@ -59,7 +59,7 @@ See the [M2 compiler contract](compiler.md) for supported source, API and struct
 | vba-vm | Frames, instruction pointer, budgets, inspection hooks; host-root binding and protocol checks | diagnostics, ir, values, runtime, foreign |
 | vba-debug | Breakpoint/step/inspection controller | diagnostics, vm |
 | vba-dap | Optional bounded M10 Debug Adapter Protocol frontend | ide, serde_json (=1.0.154) |
-| vba-project | Bounded read-only MS-OVBA source/project and selected native UserForm decoder | diagnostics, cfb (=0.14.0), encoding_rs (=0.8.42) |
+| vba-project | Bounded read-only MS-OVBA source/project, native UserForm and inert raster decoding | diagnostics, cfb (=0.14.0), encoding_rs (=0.8.42), image (=0.25.10; explicit raster features, ADR 0059) |
 | vba-testkit | Deterministic generic foreign host, trace support and bounded embedding driver | debug, diagnostics, foreign, ir, values, vm |
 | vba-conformance | Scenario validation, typed expectations and M4 outcome judgment; comparison/reports later | diagnostics, testkit, values, vm |
 | vba-cli | Source parsing, compilation/disassembly/execution, fixture validation and optional DAP stdio | conformance, diagnostics, syntax, compiler, ir, values, vm; dap optional |
@@ -394,3 +394,12 @@ Click and repeated-selection behavior also correct the prior TabStrip contract.
 Dynamic page/tab mutation, further persistence/property/event/lifecycle cases and
 the full remaining M7A.4 ledger remain open. Native edited saving/removal stay
 M7A.5/.6; fresh Office traces remain NOT_RUN under M8.5.
+
+[ADR 0059](decisions/0059-native-image-pictures.md) adds selected native Image,
+bounded inert BMP/GIF/JPEG/ICO decoding, canonical stdole picture identity and
+assignment, display properties and nonfocusable Click. Immutable raster assets
+and capped derivative texture caches preserve source/resources and existing VM
+budgets. Further picture metadata/platform/format and event/presentation cases,
+RefEdit, bindings, dynamic collections and remaining M7A.4 semantics stay open.
+Native edited saving/.tvform removal remain M7A.5/.6; Office traces remain NOT_RUN
+under M8.5.

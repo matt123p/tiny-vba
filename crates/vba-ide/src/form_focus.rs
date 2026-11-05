@@ -3,7 +3,10 @@ use crate::forms::{ControlKind, Form};
 use std::collections::BTreeSet;
 
 pub(crate) fn event(kind: ControlKind, name: &str) -> Option<(&'static str, bool)> {
-    if matches!(kind, ControlKind::Label | ControlKind::Page) {
+    if matches!(
+        kind,
+        ControlKind::Label | ControlKind::Page | ControlKind::Image
+    ) {
         return None;
     }
     for (event, cancel) in [("Enter", false), ("Exit", true)] {
@@ -53,7 +56,9 @@ End Property
 Public Sub VbaMoveFocus(ByVal target As Object)
 If Not VbaLoaded Or Not VbaVisible Then Err.Raise 2110
 If target Is Nothing Then Err.Raise 2110
-If target.VbaKind=1 Or Not target.Enabled Or Not target.Visible Then Err.Raise 2110
+Dim kind As Integer
+kind=target.VbaKind
+If kind=1 Or kind=15 Or Not target.Enabled Or Not target.Visible Then Err.Raise 2110
 Set target=VbaFocusTarget(target)
 If Not VbaEligible(target) Then Err.Raise 2110
 If target Is VbaActiveControl Then Exit Sub
@@ -106,7 +111,8 @@ For i=0 To count-1
 VbaEnter path(count-1-i)
 If serial<>VbaFocusSerial Or Not VbaLoaded Or Not VbaVisible Then Exit Sub
 Next i
-If target.VbaKind=2 Or target.VbaKind=10 Then target.VbaEnterEdit
+kind=target.VbaKind
+If kind=2 Or kind=10 Then target.VbaEnterEdit
 VbaEnter target
 If serial<>VbaFocusSerial Or Not VbaLoaded Or Not VbaVisible Then Exit Sub
 If Not VbaEligible(target) Then Exit Sub
@@ -117,17 +123,20 @@ Public Sub VbaFocusIndex(ByVal index As Long)
 VbaMoveFocus VbaAllControls.Item(index)
 End Sub
 Private Sub VbaInitialFocus()
-Dim control As Object,best As Object,scan As Long
+Dim control As Object,best As Object,scan As Long,kind As Integer
 If Not (VbaActiveControl Is Nothing) Then Exit Sub
 Dim entries As Variant
 entries=VbaAllControls.VbaEntries
 For scan=0 To VbaAllControls.VbaTotal-1
 Set control=entries(scan)
-If control.VbaKind<>1 And control.VbaKind<>11 And control.VbaKind<>14 And VbaEligible(control,True) Then
+kind=control.VbaKind
+If kind<>1 And kind<>15 And kind<>11 And kind<>14 Then
+If VbaEligible(control,True) Then
 If best Is Nothing Then
 Set best=control
 ElseIf control.VbaNavigationRank<best.VbaNavigationRank Then
 Set best=control
+End If
 End If
 End If
 Next scan
@@ -182,7 +191,7 @@ End Sub
 Public Sub VbaInput(ByVal index As Long,ByVal text As String)
 Dim control As Object
 Set control=VbaAllControls.Item(index)
-If control.VbaKind=11 Then
+If control.VbaKind=11 Or control.VbaKind=15 Then
 control.VbaClick
 Exit Sub
 End If
@@ -225,11 +234,12 @@ End Sub
         }
         source.push_str("End Sub\n");
     }
-    for control in form
-        .controls
-        .iter()
-        .filter(|c| !matches!(c.kind, ControlKind::Label | ControlKind::Page))
-    {
+    for control in form.controls.iter().filter(|c| {
+        !matches!(
+            c.kind,
+            ControlKind::Label | ControlKind::Page | ControlKind::Image
+        )
+    }) {
         source.push_str(&format!(
             "Private Sub Vba{0}_VbaFocusRequested(ByVal target As Object)\nVbaMoveFocus target\ntarget.VbaFocusConfirmed=True\nEnd Sub\n",
             control.name

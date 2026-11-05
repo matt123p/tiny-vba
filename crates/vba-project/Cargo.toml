@@ -13,4 +13,5 @@ workspace = true
 [dependencies]
 cfb = "=0.14.0"
 encoding_rs = "=0.8.42"
+image = { workspace = true, features = ["bmp", "gif", "jpeg", "ico"] }
 vba-diagnostics.workspace = true

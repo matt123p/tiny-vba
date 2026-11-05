@@ -1,5 +1,32 @@
 # Implementation progress
 
+## M7A.4 continued — native Image/pictures (2026-11-05)
+
+Implemented [ADR 0059](decisions/0059-native-image-pictures.md): cached native
+Image records and inert bounded BMP/GIF/JPEG/ICO resources, ordinary Image and
+stdole picture objects, typed assignment/clearing and shared immutable assets.
+Clip/stretch/zoom, corner/centre alignment, repeat tiling and selected AutoSize/
+border/effect properties use canonical fields. Nonfocusable Click preserves dirty
+text focus and resumes once after Stop; inspection does not load or execute forms.
+Native container focus now skips controls without tab properties and caches kind
+reads, preserving existing VM budgets. Original source/resources stay independent.
+Shared CI, WASM, actual WASI (77 runtime/19 decoder cases), UI (18 actual
+widget cases), native capture and web gates PASS. Five light/dark/narrow/scaled/
+injected-host image renders were inspected. Actual Chromium Image clicks, picture
+assignment/alignment, modal Stop/resume and exact source retention PASS. Zero-size
+zoom/tiling and one-pixel repeat regressions keep painting bounded. Application
+integration validation is in progress. The reviewed headless project -> image codec edge and
+explicit feature/license/budget policy are recorded in the ADR and architecture.
+M7A.4 remains IN PROGRESS for further picture format/metadata/platform/event/
+presentation cases, RefEdit, dynamic collections, bindings, platform controls and
+remaining lifecycle/property/default/error contracts in the unchanged ledger.
+Native edited saving/removal remain M7A.5/.6. Fresh Office traces remain NOT_RUN
+under M8.5. Next: RefEdit applicability/native-format and GridCraft range selection,
+then the remaining semantic requirements. The published
+[RefEdit persistence contract](https://learn.microsoft.com/en-us/openspecs/office_file_formats/ms-oshared/45556c0e-0f42-4c79-864e-503cd04e38ba)
+uses TextBox MorphData with Always/Reduce drop-button properties; native class
+resolution and the GridCraft-owned range picker remain unimplemented.
+
 ## M7A.4 continued — native MultiPage/Page (2026-11-05)
 
 Implemented [ADR 0058](decisions/0058-native-multipage.md): bounded native

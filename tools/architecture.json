@@ -50,6 +50,7 @@
     "vba-project": [
       "cfb",
       "encoding_rs",
+      "image",
       "vba-diagnostics"
     ],
     "vba-semantics": [

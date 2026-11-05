@@ -43,6 +43,11 @@ def layers():
                     raise ValueError(f'unreviewed external dependency version: {dependency["name"]}')
             elif dependency['name'] not in allowed:
                 raise ValueError(f'{package["name"]}: unreviewed dependency {dependency["name"]}')
+            # ADR 0059: image is also a headless in-memory raster codec. Keep
+            # its reviewed codec feature set explicit; GUI/platform crates remain forbidden.
+            if dependency['name'] == 'image' and dependency['kind'] is None:
+                if dependency['uses_default_features'] or not set(dependency['features']) <= {'bmp', 'gif', 'jpeg', 'ico', 'png'}:
+                    raise ValueError('unreviewed image codec/default features')
             if dependency['name'] in {'vba-testkit', 'vba-conformance'} and not (
                 package['name'] == 'vba-conformance' or
                 (package['name'] == 'vba-cli' and dependency['name'] == 'vba-conformance')
@@ -75,7 +80,7 @@ def layers():
             if name in seen:
                 continue
             seen.add(name)
-            if name in {'egui', 'eframe', 'vba-ui-egui', 'vba-ide-app', 'image', 'web-sys'}:
+            if name in {'egui', 'eframe', 'vba-ui-egui', 'vba-ide-app', 'web-sys'}:
                 raise ValueError(f'{root}: UI/platform dependency crossed the headless boundary')
             pending.extend(actual.get(name, []))
     from check_ui_provenance import check

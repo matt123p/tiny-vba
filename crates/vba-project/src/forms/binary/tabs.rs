@@ -129,6 +129,7 @@ pub(super) fn control(bytes: &[u8], site: Site) -> Result<Control> {
         numeric: None,
         list: None,
         combo: None,
+        image: None,
         tabs: Some(TabBehavior {
             selected,
             tabs,

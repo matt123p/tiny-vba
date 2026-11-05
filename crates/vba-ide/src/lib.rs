@@ -14,6 +14,7 @@ mod form_combo;
 mod form_container;
 mod form_controls;
 mod form_focus;
+mod form_image;
 mod form_list;
 mod form_numeric;
 mod form_project;

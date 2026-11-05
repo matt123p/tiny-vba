@@ -9,6 +9,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     );
     std::fs::create_dir_all(&dir)?;
     let option = std::env::args().nth(2);
+    let images = option.as_deref() == Some("--image-controls");
     let pages = option.as_deref() == Some("--page-controls");
     let tabs = option.as_deref() == Some("--tab-controls");
     let frames = option.as_deref() == Some("--frame-controls");
@@ -25,11 +26,13 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         Some(
             "--focus-events" | "--text-controls" | "--password-text" | "--numeric-controls"
             | "--list-controls" | "--combo-controls" | "--metadata" | "--frame-controls"
-            | "--tab-controls" | "--page-controls",
+            | "--tab-controls" | "--page-controls" | "--image-controls",
         ) => false,
         Some(_) => return Err("unknown fixture option".into()),
     };
-    let body = if pages {
+    let body = if images {
+        "Stop\r\nDebug.Print Image1.PictureAlignment\r\nDebug.Print Image2.Picture Is Image1.Picture"
+    } else if pages {
         "Stop\r\nDebug.Print Multi1.Value\r\nDebug.Print Multi1.SelectedItem.Caption"
     } else if tabs {
         "Stop\r\nDebug.Print Tabs1.Value\r\nDebug.Print Tabs1.SelectedItem.Caption"
@@ -54,6 +57,9 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             " ClientHeight",
             " Tag = \"form metadata\"\r\n HelpContextID = 7\r\n ClientHeight",
         );
+    }
+    if images {
+        text.push_str("\r\nPrivate Sub Image1_Click()\r\nSet Image2.Picture=Image1.Picture\r\nImage1.PictureAlignment=fmPictureAlignmentTopLeft\r\nEnd Sub\r\n");
     }
     if pages {
         text.push_str("\r\nPrivate Sub UserForm_Activate()\r\nMulti1.SetFocus\r\nEnd Sub\r\n");
@@ -83,7 +89,9 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     std::fs::write(dir.join("NativeForm.frm"), text)?;
     std::fs::write(
         dir.join("NativeForm.frx"),
-        if pages {
+        if images {
+            fixture::image_companion()
+        } else if pages {
             fixture::multipage_companion(0)
         } else if tabs {
             fixture::tab_companion(0)

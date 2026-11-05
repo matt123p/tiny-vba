@@ -116,12 +116,45 @@ impl Ide {
         }
         let point = |n: i32| n as f32 * (72.0 / 2540.0);
         let mut total_tabs = 0usize;
+        let mut image_bytes = 0usize;
         for c in &native.design.controls {
             if c.id == 0
                 || c.id > i32::MAX as u32
                 || (matches!(c.kind, Kind::TabStrip | Kind::MultiPage)) != c.tabs.is_some()
             {
                 return Err(error("invalid native control identity/tab metadata"));
+            }
+            if (c.kind == Kind::Image) != c.image.is_some() {
+                return Err(error("Image metadata/kind mismatch"));
+            }
+            if let Some(image) = &c.image {
+                if ![0, 1, 3].contains(&image.size_mode)
+                    || image.alignment > 4
+                    || image.border_style > 1
+                    || ![0, 1, 2, 3, 6].contains(&image.special_effect)
+                {
+                    return Err(error("Image metadata"));
+                }
+                if let Some(p) = &image.picture {
+                    let size = p
+                        .width
+                        .checked_mul(p.height)
+                        .and_then(|n| n.checked_mul(4))
+                        .filter(|n| *n > 0 && *n as usize == p.rgba.len() && *n <= 4 * 1024 * 1024)
+                        .ok_or_else(|| error("picture dimensions/budget"))?;
+                    if p.width > 4096
+                        || p.height > 4096
+                        || p.himetric_width < 0
+                        || p.himetric_height < 0
+                        || ![1, 3].contains(&p.picture_type)
+                    {
+                        return Err(error("picture metadata"));
+                    }
+                    image_bytes = image_bytes.saturating_add(size as usize);
+                    if image_bytes > 4 * 1024 * 1024 {
+                        return Err(error("picture payload budget"));
+                    }
+                }
             }
             if c.kind == Kind::MultiPage {
                 let children = native
@@ -176,6 +209,7 @@ impl Ide {
                     Kind::TabStrip => ControlKind::TabStrip,
                     Kind::MultiPage => ControlKind::MultiPage,
                     Kind::Page => ControlKind::Page,
+                    Kind::Image => ControlKind::Image,
                     Kind::Frame => ControlKind::Frame,
                     Kind::Label => ControlKind::Label,
                     Kind::TextBox => ControlKind::TextBox,

@@ -20,6 +20,7 @@ const TYPES: &[&str] = &[
     "TabStrip",
     "MultiPage",
     "Page",
+    "Image",
     "Pages",
     "Tab",
     "Tabs",
@@ -83,6 +84,24 @@ impl Ide {
             }
         }
         for (enum_name, constants) in [
+            (
+                "fmPictureSizeMode",
+                &[
+                    ("fmPictureSizeModeClip", 0),
+                    ("fmPictureSizeModeStretch", 1),
+                    ("fmPictureSizeModeZoom", 3),
+                ][..],
+            ),
+            (
+                "fmPictureAlignment",
+                &[
+                    ("fmPictureAlignmentTopLeft", 0),
+                    ("fmPictureAlignmentTopRight", 1),
+                    ("fmPictureAlignmentCenter", 2),
+                    ("fmPictureAlignmentBottomLeft", 3),
+                    ("fmPictureAlignmentBottomRight", 4),
+                ][..],
+            ),
             (
                 "fmTabStyle",
                 &[
@@ -165,6 +184,40 @@ impl Ide {
                 }
             }
         }
+        let index = if let Some(index) = libraries
+            .iter()
+            .position(|l| l.name.eq_ignore_ascii_case("stdole"))
+        {
+            index
+        } else {
+            libraries.push(ReferenceLibrary {
+                name: "stdole".into(),
+                version: "2.0".into(),
+                available: true,
+                types: vec![],
+                constants: vec![],
+            });
+            libraries.len() - 1
+        };
+        let library = libraries
+            .get_mut(index)
+            .ok_or_else(|| error("picture reference index"))?;
+        for name in ["StdPicture", "IPictureDisp"] {
+            if let Some(existing) = library
+                .types
+                .iter()
+                .find(|ty| ty.name.eq_ignore_ascii_case(name))
+            {
+                if existing.kind != ReferenceTypeKind::Object {
+                    return Err(error("picture reference type conflict"));
+                }
+            } else {
+                library.types.push(ReferenceType {
+                    name: name.into(),
+                    kind: ReferenceTypeKind::Object,
+                });
+            }
+        }
         ReferenceSet::new(libraries)
     }
     pub(crate) fn form_interfaces(
@@ -199,6 +252,7 @@ impl Ide {
             (ControlKind::TabStrip, "TabStrip"),
             (ControlKind::MultiPage, "MultiPage"),
             (ControlKind::Page, "Page"),
+            (ControlKind::Image, "Image"),
         ] {
             let mut specific = claim(name, kind != ControlKind::Page)?;
             specific.event_names = Some(match kind {
@@ -238,6 +292,18 @@ impl Ide {
         bindings.insert("VbaFormTabs".into(), vec![claim("Tabs", false)?]);
         bindings.insert("VbaFormPages".into(), vec![claim("Pages", false)?]);
         bindings.insert("VbaFormTab".into(), vec![claim("Tab", false)?]);
+        let mut pictures = Vec::new();
+        for name in ["StdPicture", "IPictureDisp"] {
+            pictures.push(vba_ir::ClassInterface {
+                ty: references
+                    .object_type(&format!("stdole.{name}"))?
+                    .ok_or_else(|| error("picture reference missing"))?,
+                events: false,
+                event_names: None,
+            });
+        }
+        bindings.insert("VbaFormPicture".into(), pictures);
+
         for name in ["ReturnBoolean", "ReturnInteger"] {
             bindings.insert(format!("VbaForm{name}"), vec![claim(name, false)?]);
         }

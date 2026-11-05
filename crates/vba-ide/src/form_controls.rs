@@ -72,7 +72,7 @@ pub(crate) fn control_class(kind: ControlKind) -> String {
     );
     s.push_str("Public Tag As String\nPublic ControlTipText As String\nPublic VbaHelpContextID As Long\nPublic Property Get HelpContextID() As Long\nHelpContextID=VbaHelpContextID\nEnd Property\nPublic Property Let HelpContextID(ByVal value As Long)\nIf value<0 Then Err.Raise 380\nVbaHelpContextID=value\nEnd Property\n");
     s.push_str(crate::form_container::COMMON);
-    if kind != ControlKind::Label {
+    if !matches!(kind, ControlKind::Label | ControlKind::Image) {
         s.push_str("Public VbaFocusConfirmed As Boolean\nPublic Event VbaFocusRequested(ByVal target As Object)\nPublic Sub SetFocus()\nVbaFocusConfirmed=False\nRaiseEvent VbaFocusRequested(Me)\nIf Not VbaFocusConfirmed Then Err.Raise 2110\nEnd Sub\n");
     }
     let kind_code = match kind {
@@ -90,6 +90,7 @@ pub(crate) fn control_class(kind: ControlKind) -> String {
         ControlKind::TabStrip => 12,
         ControlKind::MultiPage => 13,
         ControlKind::Page => 14,
+        ControlKind::Image => 15,
     };
     s.push_str(&format!(
         "Public Property Get VbaKind() As Integer\nVbaKind={kind_code}\nEnd Property\n"
@@ -103,6 +104,7 @@ pub(crate) fn control_class(kind: ControlKind) -> String {
             | ControlKind::ComboBox
             | ControlKind::TabStrip
             | ControlKind::MultiPage
+            | ControlKind::Image
     ) {
         s.push_str("Public Caption As String\n");
     }
@@ -140,6 +142,8 @@ pub(crate) fn control_class(kind: ControlKind) -> String {
             s.push_str("If IsNull(VbaValue) Then\nMe.Value=False\nElseIf VbaValue Then\nIf TripleState Then\nMe.Value=Null\nElse\nMe.Value=False\nEnd If\nElse\nMe.Value=True\nEnd If\n");
         }
         s.push_str("End Sub\n");
+    } else if kind == ControlKind::Image {
+        s.push_str(crate::form_image::IMAGE);
     } else if kind == ControlKind::TabStrip {
         s.push_str(crate::form_tabs::STRIP);
     } else if kind == ControlKind::MultiPage {
@@ -164,6 +168,14 @@ pub(crate) fn control_class(kind: ControlKind) -> String {
         s.push_str("Public Property Get Value() As Boolean\nAttribute Value.VB_UserMemId = 0\nValue=False\nEnd Property\nPublic Property Let Value(ByVal value As Boolean)\nIf value Then RaiseEvent Click\nEnd Property\n");
         for property in ["Default", "Cancel"] {
             s.push_str(&format!("Public Vba{property} As Boolean\nPublic Event Vba{property}Changed(ByVal value As Boolean)\nPublic Property Get {property}() As Boolean\n{property}=Vba{property}\nEnd Property\nPublic Property Let {property}(ByVal value As Boolean)\nVba{property}=value\nIf value Then RaiseEvent Vba{property}Changed(value)\nEnd Property\n"));
+        }
+    }
+    if kind == ControlKind::Image {
+        s = s.replace("Public TabStop As Boolean", "Public VbaTabStop As Boolean");
+        let start = s.find("Public Property Get TabIndex()");
+        let end = s.find("Public Tag As String");
+        if let (Some(start), Some(end)) = (start, end) {
+            s.replace_range(start..end, "");
         }
     }
     s

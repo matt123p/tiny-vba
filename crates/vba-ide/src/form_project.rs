@@ -432,6 +432,7 @@ pub(crate) fn class_name(kind: ControlKind) -> &'static str {
         ControlKind::TabStrip => "VbaFormTabStrip",
         ControlKind::MultiPage => "VbaFormMultiPage",
         ControlKind::Page => "VbaFormPage",
+        ControlKind::Image => "VbaFormImage",
     }
 }
 pub(crate) fn checked_handlers(
@@ -723,6 +724,9 @@ fn compiled_form(form: &Form, module: &Module, native: Option<&NativeForm>) -> R
             c.bounds.width,
             c.bounds.height
         );
+        if c.kind == ControlKind::Image {
+            setup = setup.replace(&format!("{temp}.TabStop="), &format!("{temp}.VbaTabStop="));
+        }
         if c.kind == ControlKind::Page {
             for name in ["Left", "Top", "Width", "Height", "TabStop"] {
                 setup = setup.replace(&format!("{temp}.{name}="), &format!("{temp}.Vba{name}="));
@@ -738,6 +742,7 @@ fn compiled_form(form: &Form, module: &Module, native: Option<&NativeForm>) -> R
                 | ControlKind::ComboBox
                 | ControlKind::TabStrip
                 | ControlKind::MultiPage
+                | ControlKind::Image
         ) {
             source.push_str(&format!("{temp}.Caption={}\n", vba_string(&c.caption)));
         }
@@ -820,6 +825,14 @@ fn compiled_form(form: &Form, module: &Module, native: Option<&NativeForm>) -> R
                     "{temp}.Accelerator={}\n",
                     vba_string(&tab.accelerator)
                 ));
+            }
+            if let Some(image) = &control.image {
+                source.push_str(&format!("{temp}.VbaPictureSizeMode={}\n{temp}.VbaPictureAlignment={}\n{temp}.PictureTiling={}\n{temp}.VbaAutoSize={}\n{temp}.VbaBorderStyle={}\n{temp}.VbaSpecialEffect={}\n",image.size_mode,image.alignment,boolean(image.tiling),boolean(image.auto_size),image.border_style,image.special_effect));
+                if let Some(picture) = &image.picture {
+                    let source_id = i32::try_from(module.id.0)
+                        .map_err(|_| error("picture source identity budget"))?;
+                    source.push_str(&format!("Dim VbaPicture{} As VbaFormPicture\nSet VbaPicture{}=New VbaFormPicture\nVbaPicture{}.VbaSource={source_id}\nVbaPicture{}.VbaControl={}\nVbaPicture{}.VbaWidth={}\nVbaPicture{}.VbaHeight={}\nVbaPicture{}.VbaType={}\nSet {temp}.VbaPicture=VbaPicture{}\n{temp}.VbaFitPicture\n",c.id,c.id,c.id,c.id,c.id,c.id,picture.himetric_width,c.id,picture.himetric_height,c.id,picture.picture_type,c.id));
+                }
             }
             if let Some(combo) = &control.combo {
                 source.push_str(&format!("{temp}.VbaStyle={}\n{temp}.VbaMatchEntry={}\n{temp}.MatchRequired={}\n{temp}.VbaListRows={}\n{temp}.VbaMaxLength={}\n{temp}.VbaEnterFieldBehavior={}\n{temp}.VbaText={}\n",combo.style,combo.match_entry,boolean(combo.match_required),combo.list_rows,control.max_length,u8::from(control.text_behavior.recall_selection),vba_string(&control.text)));
@@ -1481,6 +1494,7 @@ impl Ide {
                 ControlKind::TabStrip,
                 ControlKind::MultiPage,
                 ControlKind::Page,
+                ControlKind::Image,
             ]
             .into_iter()
             .enumerate()
@@ -1556,6 +1570,11 @@ impl Ide {
                     crate::form_tabs::TAB.to_owned(),
                 ),
                 (u64::MAX - 41, "VbaFormTabs", crate::form_tabs::collection()),
+                (
+                    u64::MAX - 43,
+                    "VbaFormPicture",
+                    crate::form_image::PICTURE.to_owned(),
+                ),
                 (
                     u64::MAX - 42,
                     "VbaFormPages",
@@ -1756,6 +1775,12 @@ impl Ide {
             "width" => "VbaWidth",
             "height" => "VbaHeight",
             "tabindex" => "VbaTabIndex",
+            "picture" => "VbaPicture",
+            "picturesizemode" => "VbaPictureSizeMode",
+            "picturealignment" => "VbaPictureAlignment",
+            "autosize" => "VbaAutoSize",
+            "borderstyle" => "VbaBorderStyle",
+            "specialeffect" => "VbaSpecialEffect",
             "tabfixedwidth" => "VbaTabFixedWidth",
             "tabfixedheight" => "VbaTabFixedHeight",
             "taborientation" => "VbaTabOrientation",
@@ -2237,8 +2262,8 @@ impl Ide {
                     ],
                 )
             } else if focus {
-                if c.kind == ControlKind::Label {
-                    return Err(error("labels cannot receive focus"));
+                if matches!(c.kind, ControlKind::Label | ControlKind::Image) {
+                    return Err(error("this control cannot receive focus"));
                 }
                 let index = designer
                     .form()

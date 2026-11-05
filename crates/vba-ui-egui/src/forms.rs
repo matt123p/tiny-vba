@@ -1,6 +1,7 @@
 //! Reusable form designer and real runtime controls. All edits/events are explicit IDE commands.
 use super::*;
 mod combo;
+mod images;
 mod list;
 mod numeric;
 mod tabs;
@@ -1209,7 +1210,7 @@ impl EditorUi {
                             Ok(vba_ide::Value::Long(n)) => n,
                             _ => i32::MAX,
                         };
-                        if enabled && if native { c.kind != ControlKind::Label && !matches!(c.kind,ControlKind::Frame|ControlKind::Page) } else { tab_stop } {
+                        if enabled && if native { c.kind != ControlKind::Label && !matches!(c.kind,ControlKind::Frame|ControlKind::Page|ControlKind::Image) } else { tab_stop } {
                             focus.push((index, c.id, widget_id));
                         }
                         let previous_clip=ui.clip_rect();
@@ -1228,6 +1229,7 @@ impl EditorUi {
                                 }
                                 ControlKind::TabStrip | ControlKind::MultiPage=> {tabs::Tabs{ide,instance,control:c,bounds,widget:widget_id,theme}.show(ui,commands);}
 
+                                ControlKind::Image=> {images::Image{ide,instance,control:c,bounds,widget:widget_id,theme}.show(ui,&mut self.form_picture_textures,commands);}
                                 ControlKind::ComboBox=> {combo::ComboBox{ide,instance,control:c,bounds,widget:widget_id,theme}.show(ui,commands);}
                                 ControlKind::ListBox => {list::ListBox{ide,instance,control:c,bounds,widget:widget_id,theme}.show(ui,commands);}
                                 ControlKind::SpinButton|ControlKind::ScrollBar=> {numeric::Numeric{ide,instance,control:c,bounds,widget:widget_id,theme}.show(ui,commands);}

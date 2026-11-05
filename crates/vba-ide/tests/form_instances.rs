@@ -2469,3 +2469,147 @@ fn native_pages_do_not_inherit_frame_control_methods_or_authored_events() -> R {
     assert_eq!(ide.output(), vec!["initialized", "2", "438"]);
     Ok(())
 }
+
+fn image_setup(main: &str, extra: &str) -> R<Ide> {
+    let mut ide = Ide::new();
+    let export = String::from_utf8(fixture::export())?
+        .replace(fixture::SOURCE, &(fixture::SOURCE.to_owned() + extra));
+    ide.import_native_form_export(
+        "NativeForm.frm",
+        export.as_bytes(),
+        1252,
+        &[NativeFormResource {
+            name: "NativeForm.frx".into(),
+            bytes: fixture::image_companion(),
+        }],
+    )?;
+    assert!(ide.form_instances()?.is_empty());
+    ide.add_module("Main.bas", main)?;
+    ide.dispatch(Action::Run, &mut NoHost)?;
+    settle(&mut ide)?;
+    Ok(ide)
+}
+#[test]
+fn native_images_share_canonical_picture_identity_and_validate_display_properties() -> R {
+    let ide = image_setup(
+        r#"Sub Main()
+Dim i As MSForms.Image,p As stdole.IPictureDisp,q As stdole.StdPicture
+Set i=NativeForm.Image1
+Set p=i.Picture
+Set q=p
+Debug.Print NativeForm.Controls.Count,p.Width,p.Height,p.Type,p Is q
+Debug.Print i.PictureSizeMode,i.PictureAlignment,i.PictureTiling
+Set NativeForm.Image2.Picture=p
+Debug.Print NativeForm.Image2.Picture Is i.Picture
+NativeForm.Image2.AutoSize=True
+Debug.Print NativeForm.Image2.Width,NativeForm.Image2.Height
+NativeForm.Image2.PictureAlignment=fmPictureAlignmentBottomRight
+NativeForm.Image2.PictureSizeMode=fmPictureSizeModeStretch
+On Error Resume Next
+NativeForm.Image2.PictureSizeMode=2
+Debug.Print Err.Number,NativeForm.Image2.PictureSizeMode
+Err.Clear
+Set NativeForm.Image2.Picture=NativeForm.Entry
+Debug.Print Err.Number,NativeForm.Image2.Picture Is p
+Err.Clear
+Set NativeForm.Image2.Picture=Nothing
+Debug.Print NativeForm.Image2.Picture Is Nothing,i.Picture Is p
+End Sub"#,
+        " ",
+    )?;
+    assert_eq!(ide.mode(), Mode::Completed, "{:?}", ide.diagnostics);
+    assert_eq!(
+        ide.output(),
+        vec![
+            "initialized",
+            "5\t1200\t720\t1\tTrue",
+            "3\t2\tFalse",
+            "True",
+            "34.01575\t20.40945",
+            "380\t1",
+            "13\tTrue",
+            "True\tTrue"
+        ]
+    );
+    Ok(())
+}
+#[test]
+fn native_image_click_is_nonfocusable_and_resumes_once_without_mutating_resources() -> R {
+    let mut ide = image_setup(
+        "Sub Main()\nNativeForm.Show 0\nEnd Sub",
+        "Private Sub Image1_Click()\nDebug.Print \"image\"\nStop\nImage1.PictureAlignment=fmPictureAlignmentTopLeft\nEnd Sub\nPrivate Sub Entry_BeforeUpdate(ByVal Cancel As MSForms.ReturnBoolean)\nDebug.Print \"validation\"\nEnd Sub\n",
+    )?;
+    assert_eq!(ide.mode(), Mode::Completed, "{:?}", ide.diagnostics);
+    let f = *ide.form_instances()?.first().ok_or("form")?;
+    let native = ide.native_form(f.source).ok_or("native")?.clone();
+    ide.form_instance_text(f, 12, VbaString::from_utf8("dirty")?, (5, 0), &mut NoHost)?;
+    settle(&mut ide)?;
+    ide.form_instance_event(f, Some(14), None, &mut NoHost)?;
+    settle(&mut ide)?;
+    assert_eq!(ide.mode(), Mode::Break, "{:?}", ide.diagnostics);
+    assert_eq!(ide.output(), vec!["initialized", "image"]);
+    assert_eq!(
+        ide.form_instance_field(f, None, "VbaActiveControl")?,
+        ide.form_instance_field(f, None, "VbaEntry")?
+    );
+    assert_eq!(
+        ide.form_instance_picture(f, 14)?
+            .ok_or("picture")?
+            .rgba
+            .len(),
+        120 * 72 * 4
+    );
+    ide.dispatch(Action::Run, &mut NoHost)?;
+    settle(&mut ide)?;
+    assert_eq!(ide.output(), vec!["initialized", "image"]);
+    assert_eq!(
+        ide.form_instance_field(f, Some(14), "PictureAlignment")?,
+        Value::Integer(0)
+    );
+    assert_eq!(ide.native_form(f.source), Some(&native));
+    Ok(())
+}
+
+#[test]
+fn native_container_focus_skips_images_without_reading_nonexistent_tab_properties() -> R {
+    let mut native = vba_project::forms::decode_export(
+        "NativeForm.frm",
+        &fixture::export(),
+        1252,
+        &[NativeFormResource {
+            name: "NativeForm.frx".into(),
+            bytes: fixture::image_companion(),
+        }],
+        &vba_project::Limits::default(),
+    )?;
+    let mut frame = vba_project::forms::decode_export(
+        "NativeForm.frm",
+        &fixture::export(),
+        1252,
+        &[NativeFormResource {
+            name: "NativeForm.frx".into(),
+            bytes: fixture::frame_companion(1),
+        }],
+        &vba_project::Limits::default(),
+    )?
+    .design
+    .controls
+    .into_iter()
+    .find(|c| c.kind == vba_project::forms::Kind::Frame)
+    .ok_or("frame")?;
+    frame.id = 20;
+    for c in &mut native.design.controls {
+        if [12, 14].contains(&c.id) {
+            c.parent = Some(20);
+        }
+    }
+    native.design.controls.insert(0, frame);
+    let mut ide = Ide::new();
+    ide.attach_native_form(native)?;
+    ide.add_module("Main.bas","Sub Main()\nNativeForm.Show 0\nNativeForm.Frame1.SetFocus\nDebug.Print NativeForm.ActiveControl.Name,NativeForm.Frame1.ActiveControl.Name\nEnd Sub")?;
+    ide.dispatch(Action::Run, &mut NoHost)?;
+    settle(&mut ide)?;
+    assert_eq!(ide.mode(), Mode::Completed, "{:?}", ide.diagnostics);
+    assert_eq!(ide.output(), vec!["initialized", "Frame1\tEntry"]);
+    Ok(())
+}

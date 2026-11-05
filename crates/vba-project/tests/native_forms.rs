@@ -486,3 +486,100 @@ fn native_multipage_rejects_inconsistent_x_and_orphan_page_storages() {
         assert!(decode(&bytes).is_err(), "fault {fault}");
     }
 }
+
+#[test]
+fn native_image_decodes_original_raster_physical_extents_and_empty_picture() {
+    let bytes = fixture::image_companion();
+    let form = decode(&bytes).unwrap();
+    let image = form.design.controls[3].image.as_ref().unwrap();
+    assert_eq!(form.design.controls[3].kind, Kind::Image);
+    assert_eq!(
+        (image.size_mode, image.alignment, image.tiling),
+        (3, 2, false)
+    );
+    let picture = image.picture.as_ref().unwrap();
+    assert_eq!(
+        (
+            picture.width,
+            picture.height,
+            picture.himetric_width,
+            picture.himetric_height,
+            picture.picture_type
+        ),
+        (120, 72, 1200, 720, 1)
+    );
+    assert_eq!(picture.rgba.len(), 120 * 72 * 4);
+    assert!(
+        form.design.controls[4]
+            .image
+            .as_ref()
+            .unwrap()
+            .picture
+            .is_none()
+    );
+    assert_eq!(form.resources[1].bytes, bytes);
+}
+#[test]
+fn native_image_corruption_oversized_dimensions_and_unsupported_rasters_refuse() {
+    for fault in 0..4 {
+        let mut bmp = fixture::picture_bitmap();
+        match fault {
+            0 => {
+                bmp.truncate(50);
+            }
+            1 => {
+                bmp[18..22].copy_from_slice(&i32::MAX.to_le_bytes());
+            }
+            2 => {
+                bmp[22..26].copy_from_slice(&i32::MAX.to_le_bytes());
+            }
+            _ => {
+                bmp = b"not a picture".to_vec();
+            }
+        }
+        assert!(decode(&fixture::image_companion_with_picture(&bmp)).is_err());
+    }
+}
+
+#[test]
+fn native_image_raster_codecs_are_bounded_and_preserve_dimensions() {
+    use std::io::Cursor;
+    let original = image::load_from_memory(&fixture::picture_bitmap()).unwrap();
+    for format in [
+        image::ImageFormat::Gif,
+        image::ImageFormat::Jpeg,
+        image::ImageFormat::Ico,
+    ] {
+        let mut bytes = Cursor::new(Vec::new());
+        let raster = if format == image::ImageFormat::Jpeg {
+            image::DynamicImage::ImageRgb8(original.to_rgb8())
+        } else {
+            image::DynamicImage::ImageRgba8(original.to_rgba8())
+        };
+        raster.write_to(&mut bytes, format).unwrap();
+        let bytes = bytes.into_inner();
+        let form = decode(&fixture::image_companion_with_picture(&bytes)).unwrap();
+        let picture = form.design.controls[3]
+            .image
+            .as_ref()
+            .unwrap()
+            .picture
+            .as_ref()
+            .unwrap();
+        assert_eq!((picture.width, picture.height), (120, 72));
+        assert_eq!(picture.rgba.len(), 120 * 72 * 4);
+        assert_eq!(
+            picture.picture_type,
+            if format == image::ImageFormat::Ico {
+                3
+            } else {
+                1
+            }
+        );
+    }
+    let mut png = Cursor::new(Vec::new());
+    original
+        .write_to(&mut png, image::ImageFormat::Png)
+        .unwrap();
+    assert!(decode(&fixture::image_companion_with_picture(&png.into_inner())).is_err());
+}

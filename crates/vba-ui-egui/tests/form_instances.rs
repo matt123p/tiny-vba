@@ -1298,3 +1298,135 @@ fn native_multipage_pointer_and_arrows_select_actual_page_containers() -> R {
     assert!(h.state().errors.is_empty(), "{:?}", h.state().errors);
     Ok(())
 }
+
+#[test]
+fn native_image_pixels_and_pointer_clicks_preserve_text_focus_and_resource_identity() -> R {
+    let mut ide = Ide::new();
+    let text=String::from_utf8(fixture::export())?.replace(fixture::SOURCE,&(fixture::SOURCE.to_owned()+"Private Sub Image1_Click()\nDebug.Print \"image clicked\"\nSet Image2.Picture=Image1.Picture\nImage2.PictureTiling=True\nEnd Sub\n"));
+    ide.import_native_form_export(
+        "NativeForm.frm",
+        text.as_bytes(),
+        1252,
+        &[NativeFormResource {
+            name: "NativeForm.frx".into(),
+            bytes: fixture::image_companion(),
+        }],
+    )?;
+    ide.add_module("Main.bas", "Sub Main()\nNativeForm.Show 0\nEnd Sub")?;
+    ide.dispatch(Action::Run, &mut NoHost)?;
+    for _ in 0..100 {
+        ide.tick(&mut NoHost)?;
+        if ide.mode() == Mode::Completed {
+            break;
+        }
+    }
+    assert_eq!(ide.mode(), Mode::Completed, "{:?}", ide.diagnostics);
+    let f = *ide.form_instances()?.first().ok_or("form")?;
+    let mut h = Harness::builder()
+        .with_size(egui::vec2(1400., 1000.))
+        .build_ui_state(
+            |ui, s: &mut State| {
+                for c in s.view.show(ui, &s.ide, Theme::light()) {
+                    if let Err(e) = apply(&mut s.ide, c, &mut NoHost) {
+                        s.errors.push(e.to_string());
+                    }
+                }
+                if let Err(e) = s.ide.tick(&mut NoHost) {
+                    s.errors.push(e.to_string());
+                }
+            },
+            State {
+                ide,
+                view: EditorUi::default(),
+                errors: vec![],
+            },
+        );
+    h.run_steps(5);
+    h.get(
+        egui_kittest::kittest::By::new()
+            .label("Image1")
+            .role(egui::accesskit::Role::Image),
+    )
+    .click();
+    h.run_steps(10);
+    assert_eq!(h.state().ide.output(), vec!["initialized", "image clicked"]);
+    assert_eq!(
+        h.state()
+            .ide
+            .form_instance_field(f, None, "VbaActiveControl")?,
+        h.state().ide.form_instance_field(f, None, "VbaEntry")?
+    );
+    assert!(std::sync::Arc::ptr_eq(
+        &h.state()
+            .ide
+            .form_instance_picture(f, 14)?
+            .ok_or("picture")?
+            .rgba,
+        &h.state()
+            .ide
+            .form_instance_picture(f, 15)?
+            .ok_or("picture")?
+            .rgba
+    ));
+    assert!(h.state().errors.is_empty(), "{:?}", h.state().errors);
+    Ok(())
+}
+
+#[test]
+fn native_image_zero_extent_zoom_and_one_pixel_tiling_are_bounded() -> R {
+    let mut ide = Ide::new();
+    let text=String::from_utf8(fixture::export())?.replace(fixture::SOURCE,&(fixture::SOURCE.to_owned()+"Private Sub Image1_Click()\nDebug.Print \"image clicked\"\nSet Image2.Picture=Image1.Picture\nImage2.PictureTiling=True\nEnd Sub\n"));
+    ide.import_native_form_export(
+        "NativeForm.frm",
+        text.as_bytes(),
+        1252,
+        &[NativeFormResource {
+            name: "NativeForm.frx".into(),
+            bytes: fixture::image_companion_with_picture(&fixture::picture_bitmap_size(1, 1)),
+        }],
+    )?;
+    ide.add_module("Main.bas", "Sub Main()\nNativeForm.Image1.Width=0\nNativeForm.Image1.PictureTiling=True\nSet NativeForm.Image2.Picture=NativeForm.Image1.Picture\nNativeForm.Image2.PictureTiling=True\nNativeForm.Image2.PictureSizeMode=fmPictureSizeModeClip\nNativeForm.Show 0\nEnd Sub")?;
+    ide.dispatch(Action::Run, &mut NoHost)?;
+    for _ in 0..100 {
+        ide.tick(&mut NoHost)?;
+        if ide.mode() == Mode::Completed {
+            break;
+        }
+    }
+    assert_eq!(ide.mode(), Mode::Completed, "{:?}", ide.diagnostics);
+    let f = *ide.form_instances()?.first().ok_or("form")?;
+    let mut h = Harness::builder()
+        .with_size(egui::vec2(1400., 1000.))
+        .build_ui_state(
+            |ui, s: &mut State| {
+                for c in s.view.show(ui, &s.ide, Theme::light()) {
+                    if let Err(e) = apply(&mut s.ide, c, &mut NoHost) {
+                        s.errors.push(e.to_string());
+                    }
+                }
+                if let Err(e) = s.ide.tick(&mut NoHost) {
+                    s.errors.push(e.to_string());
+                }
+            },
+            State {
+                ide,
+                view: EditorUi::default(),
+                errors: vec![],
+            },
+        );
+    h.run_steps(5);
+    assert!(std::sync::Arc::ptr_eq(
+        &h.state()
+            .ide
+            .form_instance_picture(f, 14)?
+            .ok_or("picture")?
+            .rgba,
+        &h.state()
+            .ide
+            .form_instance_picture(f, 15)?
+            .ok_or("picture")?
+            .rgba
+    ));
+    assert!(h.state().errors.is_empty(), "{:?}", h.state().errors);
+    Ok(())
+}

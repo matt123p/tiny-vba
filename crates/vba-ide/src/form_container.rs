@@ -63,16 +63,18 @@ Next i
 Err.Raise 7
 End Function
 Private Function VbaEligible(ByVal child As Object,Optional ByVal tabbing As Boolean=False,Optional ByVal scope As Long=0) As Boolean
-Dim current As Object,i As Long
+Dim current As Object,i As Long,kind As Integer
 Set current=child
 For i=0 To 8
 If Not current.Enabled Or Not current.Visible Then Exit Function
-If current.VbaKind=14 Then
+kind=current.VbaKind
+If kind=14 Then
 If VbaLookup(current.VbaParentKey).Value<>current.Index Then Exit Function
 End If
 If current.VbaId=scope Then tabbing=False
 If tabbing Then
-If current.VbaKind<>14 Then
+If kind=15 Then Exit Function
+If kind<>14 Then
 If Not current.TabStop Then Exit Function
 End If
 End If
@@ -85,9 +87,10 @@ Next i
 Err.Raise 7
 End Function
 Private Function VbaFocusTarget(ByVal target As Object) As Object
-Dim scan As Long
+Dim scan As Long,kind As Integer
 Dim control As Object,best As Object
-If target.VbaKind<>11 And target.VbaKind<>14 Then
+kind=target.VbaKind
+If kind<>11 And kind<>14 Then
 Set VbaFocusTarget=target
 Exit Function
 End If
@@ -95,12 +98,15 @@ Dim entries As Variant
 entries=VbaAllControls.VbaEntries
 For scan=0 To VbaAllControls.VbaTotal-1
 Set control=entries(scan)
-If control.VbaKind<>1 And control.VbaKind<>11 And control.VbaKind<>14 And control.TabStop Then
+kind=control.VbaKind
+If kind<>1 And kind<>15 And kind<>11 And kind<>14 Then
+If control.TabStop Then
 If VbaWithin(control,target.VbaId) And VbaEligible(control,True,target.VbaId) Then
 If best Is Nothing Then
 Set best=control
 ElseIf control.VbaNavigationRank<best.VbaNavigationRank Then
 Set best=control
+End If
 End If
 End If
 End If
@@ -134,7 +140,7 @@ VbaScopeOrder 0,position
 End Sub
 Private Sub VbaScopeOrder(ByVal parent As Long,ByRef position As Long)
 Dim scan As Long
-Dim i As Long,control As Object,children As Object
+Dim i As Long,control As Object,children As Object,kind As Integer
 Set children=VbaScopeControls(parent)
 Dim entries As Variant
 entries=children.VbaEntries
@@ -144,7 +150,8 @@ Set control=entries(scan)
 If control.VbaTabIndex=i Then
 control.VbaNavigationRank=position
 position=position+1
-If control.VbaKind=11 Or control.VbaKind=13 Or control.VbaKind=14 Then VbaScopeOrder control.VbaId,position
+kind=control.VbaKind
+If kind=11 Or kind=13 Or kind=14 Then VbaScopeOrder control.VbaId,position
 End If
 Next scan
 Next i

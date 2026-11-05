@@ -143,8 +143,9 @@ Remaining M7A.4 requirements, without reducing the milestone's scope:
   and remaining property/default/error/coercion contracts,
   including native dynamic TypeName. ADR 0048 implements the selected flat native
   focus/typed cancellation path, without claiming the full event/property matrix.
-- Native Image and Excel RefEdit packets, including pictures, bindings and
-  presentation, remain refused. ADR 0058 adds selected native MultiPage/Page;
+- Excel RefEdit remains refused. ADR 0059 adds selected Image raster records,
+  picture identity/assignment, layout and Click; further picture formats/metadata,
+  loading/platform services and the complete event/presentation matrix stay open. ADR 0058 adds selected native MultiPage/Page;
   dynamic Pages, further transitions/properties/resources, programmatic selection/
   focus and lifecycle edge cases remain open.
   ADR 0057 implements selected native TabStrip records and ordinary Tab/Tabs;
@@ -194,3 +195,12 @@ Click and repeated-selection behavior also correct the prior TabStrip contract.
 Dynamic page/tab mutation, further persistence/property/event/lifecycle cases and
 the full remaining M7A.4 ledger remain open. Native edited saving/removal stay
 M7A.5/.6; fresh Office traces remain NOT_RUN under M8.5.
+
+[ADR 0059](decisions/0059-native-image-pictures.md) adds selected native Image,
+bounded inert BMP/GIF/JPEG/ICO decoding, canonical stdole picture identity and
+assignment, display properties and nonfocusable Click. Immutable raster assets
+and capped derivative texture caches preserve source/resources and existing VM
+budgets. Further picture metadata/platform/format and event/presentation cases,
+RefEdit, bindings, dynamic collections and remaining M7A.4 semantics stay open.
+Native edited saving/.tvform removal remain M7A.5/.6; Office traces remain NOT_RUN
+under M8.5.

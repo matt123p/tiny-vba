@@ -2,6 +2,7 @@
 use super::{Control, Design, Format, Kind, MAX_CONTROLS, NativeForm, Resource, frame};
 use crate::{Reader, Result, budget, corrupt, text, unsupported};
 use std::collections::BTreeSet;
+mod images;
 mod pages;
 mod tabs;
 
@@ -130,9 +131,20 @@ pub(super) fn decode(
     }
     let mut ids = BTreeSet::new();
     let mut names = BTreeSet::new();
+    let mut picture_bytes = 0usize;
     let mut default = false;
     let mut cancel = false;
     for control in &result.design.controls {
+        picture_bytes = picture_bytes
+            .checked_add(
+                control
+                    .image
+                    .as_ref()
+                    .and_then(|i| i.picture.as_ref())
+                    .map_or(0, |p| p.rgba.len()),
+            )
+            .filter(|n| *n <= super::MAX_RESOURCE_BYTES)
+            .ok_or_else(budget)?;
         if !ids.insert(control.id)
             || !names.insert(control.name.to_ascii_lowercase())
             || control.name.eq_ignore_ascii_case(&header.name)
@@ -346,6 +358,7 @@ fn container(
                 list: None,
                 combo: None,
                 tabs,
+                image: None,
             });
             for mut control in child.design.controls {
                 if control.parent.is_none() {
@@ -434,6 +447,7 @@ fn site(r: &mut Reader<'_>) -> Result<Site> {
     let tab = field(&mut b, m, 6, 2, 0xffff)? as u16 as i16;
     let class = field(&mut b, m, 7, 2, 0x7fff)?;
     let kind = match class {
+        12 => Kind::Image,
         7 => Kind::Page,
         57 => Kind::MultiPage,
         14 => Kind::Frame,
@@ -491,6 +505,9 @@ fn site(r: &mut Reader<'_>) -> Result<Site> {
     })
 }
 fn control(bytes: &[u8], site: Site) -> Result<Control> {
+    if site.kind == Kind::Image {
+        return images::control(bytes, site);
+    }
     if site.kind == Kind::TabStrip {
         return tabs::control(bytes, site);
     }
@@ -710,6 +727,7 @@ fn control(bytes: &[u8], site: Site) -> Result<Control> {
         list,
         combo,
         tabs: None,
+        image: None,
     })
 }
 
@@ -787,6 +805,7 @@ fn numeric_control(r: Reader<'_>, mut b: Reader<'_>, site: Site) -> Result<Contr
         list: None,
         combo: None,
         tabs: None,
+        image: None,
         numeric: Some(super::NumericBehavior {
             minimum,
             maximum,

@@ -20,6 +20,7 @@ pub enum ControlKind {
     TabStrip,
     MultiPage,
     Page,
+    Image,
 }
 impl ControlKind {
     pub fn name(self) -> &'static str {
@@ -38,6 +39,7 @@ impl ControlKind {
             Self::TabStrip => "TabStrip",
             Self::MultiPage => "MultiPage",
             Self::Page => "Page",
+            Self::Image => "Image",
         }
     }
     pub fn default_event(self) -> &'static str {
@@ -55,7 +57,8 @@ impl ControlKind {
             | Self::OptionButton
             | Self::ToggleButton
             | Self::Frame
-            | Self::Page => "Click",
+            | Self::Page
+            | Self::Image => "Click",
         }
     }
 }

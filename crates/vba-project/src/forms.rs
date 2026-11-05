@@ -29,6 +29,7 @@ pub enum Kind {
     TabStrip,
     MultiPage,
     Page,
+    Image,
 }
 /// Coordinates are original signed HIMETRIC units, not pixels or points.
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -61,6 +62,7 @@ pub struct Control {
     pub list: Option<ListBehavior>,
     pub combo: Option<ComboBehavior>,
     pub tabs: Option<TabBehavior>,
+    pub image: Option<ImageBehavior>,
 }
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct TabBehavior {
@@ -256,4 +258,25 @@ pub(crate) fn embedded(
     result.attributes = crate::text::attributes(source, name)?;
     result.resources = resources;
     Ok(result)
+}
+
+/// Decoded original raster; no native handle or platform object is created.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct Picture {
+    pub width: u32,
+    pub height: u32,
+    pub himetric_width: i32,
+    pub himetric_height: i32,
+    pub picture_type: i16,
+    pub rgba: std::sync::Arc<[u8]>,
+}
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct ImageBehavior {
+    pub picture: Option<Picture>,
+    pub size_mode: u8,
+    pub alignment: u8,
+    pub tiling: bool,
+    pub auto_size: bool,
+    pub border_style: u8,
+    pub special_effect: u8,
 }

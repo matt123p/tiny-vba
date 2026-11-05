@@ -463,3 +463,12 @@ Click and repeated-selection behavior also correct the prior TabStrip contract.
 Dynamic page/tab mutation, further persistence/property/event/lifecycle cases and
 the full remaining M7A.4 ledger remain open. Native edited saving/removal stay
 M7A.5/.6; fresh Office traces remain NOT_RUN under M8.5.
+
+[ADR 0059](decisions/0059-native-image-pictures.md) adds selected native Image,
+bounded inert BMP/GIF/JPEG/ICO decoding, canonical stdole picture identity and
+assignment, display properties and nonfocusable Click. Immutable raster assets
+and capped derivative texture caches preserve source/resources and existing VM
+budgets. Further picture metadata/platform/format and event/presentation cases,
+RefEdit, bindings, dynamic collections and remaining M7A.4 semantics stay open.
+Native edited saving/.tvform removal remain M7A.5/.6; Office traces remain NOT_RUN
+under M8.5.
