@@ -9,6 +9,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     );
     std::fs::create_dir_all(&dir)?;
     let option = std::env::args().nth(2);
+    let tabs = option.as_deref() == Some("--tab-controls");
     let frames = option.as_deref() == Some("--frame-controls");
     let metadata = option.as_deref() == Some("--metadata");
     let combo = option.as_deref() == Some("--combo-controls");
@@ -22,11 +23,14 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         Some("--boolean-controls") => true,
         Some(
             "--focus-events" | "--text-controls" | "--password-text" | "--numeric-controls"
-            | "--list-controls" | "--combo-controls" | "--metadata" | "--frame-controls",
+            | "--list-controls" | "--combo-controls" | "--metadata" | "--frame-controls"
+            | "--tab-controls",
         ) => false,
         Some(_) => return Err("unknown fixture option".into()),
     };
-    let body = if combo {
+    let body = if tabs {
+        "Stop\r\nDebug.Print Tabs1.Value\r\nDebug.Print Tabs1.SelectedItem.Caption"
+    } else if combo {
         "Stop\r\nDebug.Print Combo1.ListIndex\r\nDebug.Print Combo1.Value"
     } else if list {
         "Stop\r\nDebug.Print List1.ListIndex\r\nDebug.Print List1.Value"
@@ -47,6 +51,9 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             " ClientHeight",
             " Tag = \"form metadata\"\r\n HelpContextID = 7\r\n ClientHeight",
         );
+    }
+    if tabs {
+        text.push_str("\r\nPrivate Sub UserForm_Activate()\r\nTabs1.SetFocus\r\nEnd Sub\r\n");
     }
     if focus {
         text = text.replace(
@@ -70,7 +77,9 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     std::fs::write(dir.join("NativeForm.frm"), text)?;
     std::fs::write(
         dir.join("NativeForm.frx"),
-        if frames {
+        if tabs {
+            fixture::tab_companion(0)
+        } else if frames {
             fixture::frame_companion(2)
         } else if metadata {
             fixture::metadata_companion()

@@ -70,6 +70,7 @@ and native save/reopen. See [ADR 0041](decisions/0041-worksheet-form-controls.md
   Shared 2D List/Column loading and indexed/current-row Column access follow ADR 0053.
   ADR 0054 adds bounded array readback; ADR 0055 adds native metadata/control tips.
   ADR 0056 adds bounded native Frame containers, scoped collections/groups and focus.
+  ADR 0057 adds selected native TabStrip records, Tab/Tabs identity and input.
   Remaining requirements and integration are recorded there. Reuse the shared runtime
   behind native forms and close Office compatibility gaps for the inventoried
   standard controls. Match instance/default-instance behavior, lifecycle, modal/

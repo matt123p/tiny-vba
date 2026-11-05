@@ -17,6 +17,9 @@ const TYPES: &[&str] = &[
     "ListBox",
     "ComboBox",
     "Frame",
+    "TabStrip",
+    "Tab",
+    "Tabs",
     "ReturnBoolean",
     "ReturnInteger",
 ];
@@ -77,6 +80,23 @@ impl Ide {
             }
         }
         for (enum_name, constants) in [
+            (
+                "fmTabStyle",
+                &[
+                    ("fmTabStyleTabs", 0),
+                    ("fmTabStyleButtons", 1),
+                    ("fmTabStyleNone", 2),
+                ][..],
+            ),
+            (
+                "fmTabOrientation",
+                &[
+                    ("fmTabOrientationTop", 0),
+                    ("fmTabOrientationBottom", 1),
+                    ("fmTabOrientationLeft", 2),
+                    ("fmTabOrientationRight", 3),
+                ][..],
+            ),
             (
                 "fmStyle",
                 &[("fmStyleDropDownCombo", 0), ("fmStyleDropDownList", 2)][..],
@@ -173,6 +193,7 @@ impl Ide {
             (ControlKind::ListBox, "ListBox"),
             (ControlKind::ComboBox, "ComboBox"),
             (ControlKind::Frame, "Frame"),
+            (ControlKind::TabStrip, "TabStrip"),
         ] {
             let mut specific = claim(name, true)?;
             specific.event_names = Some(match kind {
@@ -181,6 +202,7 @@ impl Ide {
                     vec!["Change".into(), "SpinUp".into(), "SpinDown".into()]
                 }
                 ControlKind::TextBox => vec!["Change".into()],
+                ControlKind::TabStrip => vec!["Change".into(), "Click".into()],
                 ControlKind::ComboBox => {
                     vec!["Change".into(), "Click".into(), "DropButtonClick".into()]
                 }
@@ -198,6 +220,8 @@ impl Ide {
             );
         }
         bindings.insert("VbaFormControls".into(), vec![claim("Controls", false)?]);
+        bindings.insert("VbaFormTabs".into(), vec![claim("Tabs", false)?]);
+        bindings.insert("VbaFormTab".into(), vec![claim("Tab", false)?]);
         for name in ["ReturnBoolean", "ReturnInteger"] {
             bindings.insert(format!("VbaForm{name}"), vec![claim(name, false)?]);
         }

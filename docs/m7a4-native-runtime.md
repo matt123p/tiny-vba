@@ -143,9 +143,11 @@ Remaining M7A.4 requirements, without reducing the milestone's scope:
   and remaining property/default/error/coercion contracts,
   including native dynamic TypeName. ADR 0048 implements the selected flat native
   focus/typed cancellation path, without claiming the full event/property matrix.
-- Native MultiPage, TabStrip, Image and Excel RefEdit packets, including
+- Native MultiPage, Image and Excel RefEdit packets, including
   page collections, pictures, bindings and presentation. These remain refused.
-  ADR 0056 implements selected native Frame parents; additional storage variants,
+  ADR 0057 implements selected native TabStrip records and ordinary Tab/Tabs;
+  tab structural mutation, writable Index/Name and full event/presentation parity
+  remain open. ADR 0056 implements selected native Frame parents; additional storage variants,
   properties, resource/presentation and full event parity remain open.
   ComboBox and ListBox now have selected unbound packets; further array-shape/loading cases, multiple selection, bindings and further presentation remain open. The selected numeric packet does not close all
   ScrollBar/SpinButton property/resource/presentation cases.
@@ -174,3 +176,10 @@ clipping and accessible groups use the shared renderer. Original source/resource
 stay inert and unchanged. Further container/page/image/binding/platform semantics,
 native edited persistence and .tvform removal remain in M7A; fresh Office traces
 remain NOT_RUN under M8.5.
+
+[ADR 0057](decisions/0057-native-tabstrip.md) adds selected native TabStrip
+records and separate ordinary Tab/Tabs identity, indexed/named lookup,
+enumeration/default selection and authorized widget input. Canonical state stays
+in ordinary classes; inert queries/rendering do not instantiate or execute VBA.
+MultiPage, dynamic tab mutation/index/name semantics and the remaining M7A.4
+ledger stay open. Native edited persistence and .tvform removal remain separate.

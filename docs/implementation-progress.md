@@ -1,5 +1,23 @@
 # Implementation progress
 
+## M7A.4 continued — native TabStrip (2026-11-05)
+
+Implemented [ADR 0057](decisions/0057-native-tabstrip.md): selected native
+TabStrip records, distinct nominal Tab/Tabs objects, canonical indexed/named
+lookup, enumeration, selection/default properties and authorized actual widget
+input. Change commits before Stop; Click resumes once. Tabs remain separate
+from the form's Controls and do not contain nearby controls. Source/resource
+bytes remain independent. Shared CI, WASM, actual WASI (69 instance/14 decoder
+cases), UI (15 runtime widget cases), native capture and web gates PASS. Five
+light/dark/narrow/scaled/injected-host captures were inspected, including visible
+keyboard focus and preserved missing-glyph text. Chromium TabStrip arrow input,
+modal Stop/resume and exact source retention PASS, alongside Frame, focus, list,
+ComboBox, metadata/control-tip, editor and legacy form regressions. Application
+integration is being validated; M7A.4 is not complete. MultiPage/Page, Image/RefEdit, tab structural
+mutation and writable Index/Name, further property/event/binding/platform and
+lifecycle semantics remain required. Native saving/removal remain M7A.5/.6.
+Fresh Office traces remain NOT_RUN under M8.5.
+
 ## M7A.4 continued — native Frame containers (2026-11-05)
 
 Implemented [ADR 0056](decisions/0056-native-frame-containers.md): nested native

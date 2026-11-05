@@ -2177,3 +2177,99 @@ fn invalid_native_frame_ancestry_refuses_before_attaching_source_or_design() -> 
     }
     Ok(())
 }
+
+fn tab_setup(main: &str, extra: &str) -> R<Ide> {
+    let mut ide = Ide::new();
+    let export = String::from_utf8(fixture::export())?
+        .replace(fixture::SOURCE, &(fixture::SOURCE.to_owned() + extra));
+    ide.import_native_form_export(
+        "NativeForm.frm",
+        export.as_bytes(),
+        1252,
+        &[NativeFormResource {
+            name: "NativeForm.frx".into(),
+            bytes: fixture::tab_companion(0),
+        }],
+    )?;
+    assert!(ide.form_instances()?.is_empty());
+    ide.add_module("Main.bas", main)?;
+    ide.dispatch(Action::Run, &mut NoHost)?;
+    settle(&mut ide)?;
+    Ok(ide)
+}
+#[test]
+fn native_tabs_are_distinct_nominal_objects_with_canonical_selection_and_enumeration() -> R {
+    let ide = tab_setup(
+        r#"Sub Main()
+Dim s As MSForms.TabStrip,t As MSForms.Tab,tabs As MSForms.Tabs
+Set s=NativeForm.Tabs1
+Set tabs=s.Tabs
+Debug.Print NativeForm.Controls.Count,s.Count,tabs.Count
+Debug.Print s.SelectedItem Is tabs(0)
+Debug.Print s.FirstTab Is tabs(0)
+For Each t In tabs
+Debug.Print t.Name,t.Index
+Next t
+s.Value=1
+Debug.Print CStr(s)
+Debug.Print s.SelectedItem.Caption,s.Tabs("SecondTab").Tag
+s.SelectedItem.Caption="changed"
+Debug.Print s.Tabs(1).Caption
+s.Value=-1
+Debug.Print s.SelectedItem Is Nothing
+On Error Resume Next
+s.Value=3
+Debug.Print Err.Number,s.Value
+End Sub"#,
+        "Private Sub Tabs1_Change()\nDebug.Print \"changed selection\"\nEnd Sub\n",
+    )?;
+    assert_eq!(ide.mode(), Mode::Completed, "{:?}", ide.diagnostics);
+    assert_eq!(
+        ide.output(),
+        vec![
+            "initialized",
+            "4\t3\t3",
+            "True",
+            "True",
+            "FirstTab\t0",
+            "SecondTab\t1",
+            "BlockedTab\t2",
+            "changed selection",
+            "Second😀",
+            "Second😀\ttwo",
+            "changed",
+            "changed selection",
+            "True",
+            "380\t-1"
+        ]
+    );
+    Ok(())
+}
+#[test]
+fn native_tab_input_commits_before_change_stop_and_resumes_click_once() -> R {
+    let mut ide = tab_setup(
+        "Sub Main()\nNativeForm.Show 0\nEnd Sub",
+        "Private Sub Tabs1_Change()\nDebug.Print Tabs1.Value\nStop\nEnd Sub\nPrivate Sub Tabs1_Click()\nDebug.Print \"click\"\nEnd Sub\n",
+    )?;
+    let f = *ide.form_instances()?.first().ok_or("form")?;
+    let original = ide.native_form(f.source).ok_or("native")?.clone();
+    assert!(ide.form_instance_tab(f, 14, 2, &mut NoHost).is_err());
+    ide.form_instance_tab(f, 14, 1, &mut NoHost)?;
+    settle(&mut ide)?;
+    assert_eq!(ide.mode(), Mode::Break, "{:?}", ide.diagnostics);
+    assert_eq!(ide.output(), vec!["initialized", "1"]);
+    assert_eq!(
+        ide.form_instance_field(f, Some(14), "Value")?,
+        Value::Long(1)
+    );
+    ide.dispatch(Action::Run, &mut NoHost)?;
+    settle(&mut ide)?;
+    assert_eq!(ide.mode(), Mode::Completed, "{:?}", ide.diagnostics);
+    assert_eq!(ide.output(), vec!["initialized", "1", "click"]);
+    assert_eq!(ide.native_form(f.source), Some(&original));
+    assert_eq!(
+        ide.form_instance_tab_field(f, 14, 1, "Caption")?,
+        Value::String(VbaString::from_utf8("Second😀")?)
+    );
+    Ok(())
+}

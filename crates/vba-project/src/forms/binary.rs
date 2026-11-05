@@ -2,6 +2,7 @@
 use super::{Control, Design, Format, Kind, MAX_CONTROLS, NativeForm, Resource, frame};
 use crate::{Reader, Result, budget, corrupt, text, unsupported};
 use std::collections::BTreeSet;
+mod tabs;
 
 fn block<'a>(r: &mut Reader<'a>, version: u16) -> Result<Reader<'a>> {
     if r.u16()? != version {
@@ -325,6 +326,7 @@ fn container(
                 numeric: None,
                 list: None,
                 combo: None,
+                tabs: None,
             });
             for mut control in child.design.controls {
                 if control.parent.is_none() {
@@ -412,6 +414,7 @@ fn site(r: &mut Reader<'_>) -> Result<Site> {
     let class = field(&mut b, m, 7, 2, 0x7fff)?;
     let kind = match class {
         14 => Kind::Frame,
+        18 => Kind::TabStrip,
         16 => Kind::SpinButton,
         47 => Kind::ScrollBar,
         17 => Kind::CommandButton,
@@ -463,6 +466,9 @@ fn site(r: &mut Reader<'_>) -> Result<Site> {
     })
 }
 fn control(bytes: &[u8], site: Site) -> Result<Control> {
+    if site.kind == Kind::TabStrip {
+        return tabs::control(bytes, site);
+    }
     let mut r = Reader::new(bytes);
     let mut b = block(&mut r, 0x0200)?;
     if matches!(site.kind, Kind::SpinButton | Kind::ScrollBar) {
@@ -678,6 +684,7 @@ fn control(bytes: &[u8], site: Site) -> Result<Control> {
         numeric: None,
         list,
         combo,
+        tabs: None,
     })
 }
 
@@ -754,6 +761,7 @@ fn numeric_control(r: Reader<'_>, mut b: Reader<'_>, site: Site) -> Result<Contr
         text_behavior: super::TextBehavior::default(),
         list: None,
         combo: None,
+        tabs: None,
         numeric: Some(super::NumericBehavior {
             minimum,
             maximum,

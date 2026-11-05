@@ -17,6 +17,7 @@ mod form_focus;
 mod form_list;
 mod form_numeric;
 mod form_project;
+mod form_tabs;
 mod form_text;
 mod form_types;
 pub use form_project::{FormInstance, FormNumericInput};

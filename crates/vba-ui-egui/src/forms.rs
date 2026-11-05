@@ -3,6 +3,7 @@ use super::*;
 mod combo;
 mod list;
 mod numeric;
+mod tabs;
 mod text;
 use vba_ide::forms::{Align, Bounds, ControlKind, DesignEdit, SameSize};
 #[derive(Clone, Debug)]
@@ -24,6 +25,7 @@ pub enum FormCommand {
     InstanceNavigate(vba_ide::FormInstance, u32, i32),
     InstanceDrop(vba_ide::FormInstance, u32, bool),
     InstanceList(vba_ide::FormInstance, u32, i32),
+    InstanceTab(vba_ide::FormInstance, u32, i32),
     InstanceNumeric(vba_ide::FormInstance, u32, vba_ide::FormNumericInput),
     InstanceText(vba_ide::FormInstance, u32, vba_ide::VbaString, (u32, u32)),
 }
@@ -80,6 +82,9 @@ pub(super) fn apply_form(
         }
         FormCommand::InstanceList(instance, control, row) => {
             ide.form_instance_list(instance, control, row, host)
+        }
+        FormCommand::InstanceTab(instance, control, tab) => {
+            ide.form_instance_tab(instance, control, tab, host)
         }
         FormCommand::InstanceNumeric(instance, control, input) => {
             ide.form_instance_numeric(instance, control, input, host)
@@ -182,6 +187,41 @@ fn control_text(value: vba_ide::Value) -> String {
     match value {
         vba_ide::Value::String(text) => String::from_utf16_lossy(text.units()),
         value => vba_ide::display_value(&value),
+    }
+}
+fn control_tip(
+    ui: &egui::Ui,
+    widget: egui::Id,
+    bounds: egui::Rect,
+    tip: &vba_ide::VbaString,
+    theme: Theme,
+) {
+    if tip.units().is_empty() {
+        return;
+    }
+    let remaining =
+        ui.style().interaction.tooltip_delay - ui.input(|i| i.pointer.time_since_last_movement());
+    if remaining > 0. {
+        ui.ctx().request_repaint_after(
+            std::time::Duration::try_from_secs_f32(remaining)
+                .unwrap_or(std::time::Duration::from_millis(50)),
+        );
+    } else {
+        let mut tooltip = egui::Tooltip::always_open(
+            ui.ctx().clone(),
+            ui.layer_id(),
+            widget.with("control.tip"),
+            bounds,
+        )
+        .at_pointer();
+        tooltip.popup = tooltip.popup.frame(
+            egui::Frame::popup(ui.style())
+                .fill(theme.editor)
+                .stroke(egui::Stroke::new(1., theme.border)),
+        );
+        tooltip.show(|ui| {
+            ui.label(egui::RichText::new(String::from_utf16_lossy(tip.units())).color(theme.text));
+        });
     }
 }
 fn command(commands: &mut Vec<Command>, id: SourceId, edit: DesignEdit) {
@@ -1149,6 +1189,7 @@ impl EditorUi {
                                     response.widget_info(||egui::WidgetInfo::labeled(egui::accesskit::Role::Group,enabled,&c.name));
                                     if response.clicked() {commands.push(Command::Form(FormCommand::InstanceEvent(instance,Some(c.id),None)));}
                                 }
+                                ControlKind::TabStrip=> {tabs::Tabs{ide,instance,control:c,bounds,widget:widget_id,theme}.show(ui,commands);}
 
                                 ControlKind::ComboBox=> {combo::ComboBox{ide,instance,control:c,bounds,widget:widget_id,theme}.show(ui,commands);}
                                 ControlKind::ListBox => {list::ListBox{ide,instance,control:c,bounds,widget:widget_id,theme}.show(ui,commands);}
@@ -1282,18 +1323,11 @@ impl EditorUi {
                                 }
                             });
                         });
-                        if native && enabled && ui.rect_contains_pointer(bounds)
+                        if native && c.kind!=ControlKind::TabStrip && enabled && ui.rect_contains_pointer(bounds)
                             && !ui.input(|i| i.pointer.any_down())
                             && let Ok(vba_ide::Value::String(tip)) = ide.form_instance_field(instance, Some(c.id), "ControlTipText")
                             && !tip.units().is_empty() {
-                            let remaining=ui.style().interaction.tooltip_delay-ui.input(|i|i.pointer.time_since_last_movement());
-                            if remaining>0. {
-                                ui.ctx().request_repaint_after(std::time::Duration::try_from_secs_f32(remaining).unwrap_or(std::time::Duration::from_millis(50)));
-                            } else {
-                                let mut tooltip=egui::Tooltip::always_open(ui.ctx().clone(),ui.layer_id(),widget_id.with("control.tip"),bounds).at_pointer();
-                                tooltip.popup=tooltip.popup.frame(egui::Frame::popup(ui.style()).fill(theme.editor).stroke(egui::Stroke::new(1.,theme.border)));
-                                tooltip.show(|ui| {ui.label(egui::RichText::new(String::from_utf16_lossy(tip.units())).color(theme.text));});
-                            }
+                            control_tip(ui,widget_id,bounds,&tip,theme);
                         }
                         ui.set_clip_rect(previous_clip);
                     }
@@ -1302,7 +1336,7 @@ impl EditorUi {
                         let active = ide.form_instance_field(instance, None, "VbaActiveControl").ok();
                         let active_id = focus.iter().find(|(_, control, _)| form.controls.iter().find(|c| c.id == *control).is_some_and(|c| ide.form_instance_field(instance, None, &format!("Vba{}",c.name)).ok() == active));
                         let requested = focus.iter().find(|(_, _, target)| Some(*target) == focused);
-                        let pending = commands.iter().any(|command| matches!(command, Command::Form(FormCommand::InstanceFocus(owner, _) | FormCommand::InstanceActivate(owner, _) | FormCommand::InstanceText(owner, _, _, _) | FormCommand::InstanceNumeric(owner, _, _) | FormCommand::InstanceList(owner, _, _) | FormCommand::InstanceDrop(owner, _, _) | FormCommand::InstanceNavigate(owner, _, _) | FormCommand::InstanceEvent(owner, _, _)) if *owner == instance));
+                        let pending = commands.iter().any(|command| matches!(command, Command::Form(FormCommand::InstanceFocus(owner, _) | FormCommand::InstanceActivate(owner, _) | FormCommand::InstanceText(owner, _, _, _) | FormCommand::InstanceNumeric(owner, _, _) | FormCommand::InstanceList(owner, _, _) | FormCommand::InstanceTab(owner, _, _) | FormCommand::InstanceDrop(owner, _, _) | FormCommand::InstanceNavigate(owner, _, _) | FormCommand::InstanceEvent(owner, _, _)) if *owner == instance));
                         if let Some((_, control, _)) = requested && requested != active_id && !pending {
                             commands.push(Command::Form(FormCommand::InstanceFocus(instance, *control)));
                         }

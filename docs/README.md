@@ -221,3 +221,10 @@ pause/resume. Full [M7A.4](m7a4-native-runtime.md) remains in progress.
 [Native array readback (ADR 0054)](decisions/0054-native-list-array-readback.md) and [native metadata/control tips (ADR 0055)](decisions/0055-native-form-metadata-and-control-tips.md) extend the current M7A.4 packet.
 
 [Native Frame containers (ADR 0056)](decisions/0056-native-frame-containers.md) add bounded nested resources, scoped collections and shared native/browser input.
+
+[ADR 0057](decisions/0057-native-tabstrip.md) adds selected native TabStrip
+records and separate ordinary Tab/Tabs identity, indexed/named lookup,
+enumeration/default selection and authorized widget input. Canonical state stays
+in ordinary classes; inert queries/rendering do not instantiate or execute VBA.
+MultiPage, dynamic tab mutation/index/name semantics and the remaining M7A.4
+ledger stay open. Native edited persistence and .tvform removal remain separate.

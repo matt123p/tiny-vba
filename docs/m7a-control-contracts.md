@@ -67,7 +67,7 @@ unlisted property remains outside the selected import/runtime claim.
 | ListBox | Selected unbound indexed rows, ListCount/ListIndex/Selected, Value/Text/columns, 2D List/Column loading/readback and indexed/current-row Column; further shape/loading cases, multiple selection and bindings remain U | Selected Change/Click, input/focus/update | D/P | shared | selected packet | U |
 | Frame | Caption, child Controls/Parent, ActiveControl, scoped tab/groups | Click and selected authored focus handlers | D/P (bounded parent storages) | shared | Click and selected authored focus handlers | U |
 | MultiPage | Pages/Controls/Value, child identities/layout | Change, applicable focus/input | U | U | U | U |
-| TabStrip | Tabs/Value, layout/selection | Change, applicable focus/input | U | U | U | U |
+| TabStrip | Tabs/Value/SelectedItem, metadata, layout/selection | Change/Click and selected focus/input | D/P | shared | selected packet (ADR 0057) | U |
 | ScrollBar | Selected Long Value/bounds/increments/orientation/delay; further resources/properties remain U | Change/drag-only Scroll, selected input/focus | D/P | shared | selected packet | U |
 | SpinButton | Selected Long Value/bounds/increment/orientation/delay; further resources/properties remain U | Change/SpinUp/SpinDown, selected input/focus | D/P | shared | selected packet | U |
 | Image | Picture resource, PictureSizeMode/Alignment/Tiling, geometry | Applicable mouse/input events | U | U | U | U |
@@ -183,3 +183,10 @@ clipping and accessible groups use the shared renderer. Original source/resource
 stay inert and unchanged. Further container/page/image/binding/platform semantics,
 native edited persistence and .tvform removal remain in M7A; fresh Office traces
 remain NOT_RUN under M8.5.
+
+[ADR 0057](decisions/0057-native-tabstrip.md) adds selected native TabStrip
+records and separate ordinary Tab/Tabs identity, indexed/named lookup,
+enumeration/default selection and authorized widget input. Canonical state stays
+in ordinary classes; inert queries/rendering do not instantiate or execute VBA.
+MultiPage, dynamic tab mutation/index/name semantics and the remaining M7A.4
+ledger stay open. Native edited persistence and .tvform removal remain separate.

@@ -14,6 +14,7 @@ enum FormInput {
     List(i32),
     Navigate(i32),
     Drop(bool),
+    Tab(i32),
 }
 /// Native numeric widget actions; values still pass through ordinary VBA properties.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -22,6 +23,19 @@ pub enum FormNumericInput {
     Drag(i32),
 }
 const GATE_OBJECT: u64 = u64::MAX;
+fn tab_object(session: &Session, control: ObjectRef, index: i32) -> Result<ObjectRef> {
+    let Value::Object(tabs) = session.read_instance_field(control, "VbaTabs")? else {
+        return Err(error("missing tabs"));
+    };
+    let Value::Array(entries) = session.read_instance_field(tabs, "VbaEntries")? else {
+        return Err(error("invalid tabs"));
+    };
+    let index = usize::try_from(index).map_err(|_| error("tab index"))?;
+    let Some(Value::Object(tab)) = entries.elements().get(index) else {
+        return Err(error("tab index"));
+    };
+    Ok(*tab)
+}
 // Reserved form-interface range, disjoint from the gate itself. No object store.
 const ENUM_OBJECT_MIN: u64 = u64::MAX - 65536;
 #[derive(Default)]
@@ -70,7 +84,9 @@ impl<H: Host> FormHost<'_, H> {
                 return Err(error(91, "missing collection owner"));
             };
             let mut values = Vec::new();
-            if objects.instances("VbaFormControls")?.contains(&owner) {
+            if objects.instances("VbaFormControls")?.contains(&owner)
+                || objects.instances("VbaFormTabs")?.contains(&owner)
+            {
                 let Value::Long(total) = objects.public_field(owner, "VbaTotal")? else {
                     return Err(error(13, "invalid collection count"));
                 };
@@ -409,6 +425,7 @@ pub(crate) fn class_name(kind: ControlKind) -> &'static str {
         ControlKind::ListBox => "VbaFormListBox",
         ControlKind::ComboBox => "VbaFormComboBox",
         ControlKind::Frame => "VbaFormFrame",
+        ControlKind::TabStrip => "VbaFormTabStrip",
     }
 }
 pub(crate) fn checked_handlers(
@@ -512,6 +529,7 @@ pub(crate) fn checked_handlers(
                 && p.name.spelling.get(c.name.len() + 1..).is_some_and(|e| {
                     crate::form_numeric::event(c.kind, e)
                         .or_else(|| crate::form_list::event(c.kind, e))
+                        .or_else(|| crate::form_tabs::event(c.kind, e))
                         .is_some()
                 })
                 && p.name
@@ -669,6 +687,7 @@ fn compiled_form(form: &Form, module: &Module, native: Option<&NativeForm>) -> R
                 | ControlKind::SpinButton
                 | ControlKind::ListBox
                 | ControlKind::ComboBox
+                | ControlKind::TabStrip
         ) {
             source.push_str(&format!("{temp}.Caption={}\n", vba_string(&c.caption)));
         }
@@ -747,6 +766,13 @@ fn compiled_form(form: &Form, module: &Module, native: Option<&NativeForm>) -> R
                     "{temp}.VbaColumnCount={}\n{temp}.VbaBoundColumn={}\n{temp}.VbaTextColumn={}\n",
                     list.column_count, list.bound_column, list.text_column
                 ));
+            }
+            if let Some(tabs) = &control.tabs {
+                source.push_str(&format!("{temp}.VbaValue={}\n{temp}.VbaTabOrientation={}\n{temp}.VbaStyle={}\n{temp}.MultiRow={}\n{temp}.ShowToolTips={}\n{temp}.TabFixedWidth={}\n{temp}.TabFixedHeight={}\n",tabs.selected,tabs.orientation,tabs.style,boolean(tabs.multi_row),boolean(tabs.tooltips),tabs.fixed_width as f32*(72./2540.),tabs.fixed_height as f32*(72./2540.)));
+                for (i, tab) in tabs.tabs.iter().enumerate() {
+                    let name = format!("VbaTab{}_{}", c.id, i);
+                    source.push_str(&format!("Dim {name} As VbaFormTab\nSet {name}=New VbaFormTab\n{name}.VbaName={}\n{name}.VbaCaption={}\n{name}.VbaIndex={i}\n{name}.Tag={}\n{name}.ControlTipText={}\n{name}.Accelerator={}\n{name}.Enabled={}\n{name}.Visible={}\n{temp}.VbaTabs.VbaAdd {name}\n",vba_string(&tab.name),vba_string(&tab.caption),vba_string(&tab.tag),vba_string(&tab.tooltip),vba_string(&tab.accelerator),boolean(tab.enabled),boolean(tab.visible)));
+                }
             }
             if let Some(n) = &control.numeric {
                 let number = |n: i32| {
@@ -850,6 +876,7 @@ fn compiled_form(form: &Form, module: &Module, native: Option<&NativeForm>) -> R
     }
     if native.is_some() {
         source.push_str(&crate::form_focus::members(form, &handlers));
+        source.push_str(crate::form_tabs::INPUT);
     }
     if handlers.contains("userform_terminate") {
         source.push_str("Private Sub Class_Terminate()\nUserForm_Terminate\nEnd Sub\n");
@@ -1258,6 +1285,7 @@ impl Ide {
                 .flatten();
             let canonical = if let Some(name) = crate::form_numeric::event(c.kind, event)
                 .or_else(|| crate::form_list::event(c.kind, event))
+                .or_else(|| crate::form_tabs::event(c.kind, event))
             {
                 name
             } else if let Some((name, _)) = focus {
@@ -1369,16 +1397,79 @@ impl Ide {
                 ControlKind::ListBox,
                 ControlKind::ComboBox,
                 ControlKind::Frame,
+                ControlKind::TabStrip,
             ]
             .into_iter()
             .enumerate()
             {
+                let mut source = crate::form_controls::control_class(kind);
+                if kind == ControlKind::TabStrip {
+                    let mut names = BTreeSet::new();
+                    let reserved = [
+                        "value",
+                        "selecteditem",
+                        "count",
+                        "tabs",
+                        "style",
+                        "taborientation",
+                        "tabfixedwidth",
+                        "tabfixedheight",
+                        "showtooltips",
+                        "multirow",
+                        "name",
+                        "caption",
+                        "enabled",
+                        "visible",
+                        "tabstop",
+                        "tabindex",
+                        "left",
+                        "top",
+                        "width",
+                        "height",
+                        "setfocus",
+                        "parent",
+                        "tag",
+                        "controltiptext",
+                        "helpcontextid",
+                        "click",
+                        "change",
+                        "class_initialize",
+                    ];
+                    for tab in self
+                        .native_forms
+                        .values()
+                        .flat_map(|f| &f.design.controls)
+                        .filter_map(|c| c.tabs.as_ref())
+                        .flat_map(|t| &t.tabs)
+                    {
+                        let key = tab.name.to_ascii_lowercase();
+                        if !key.starts_with("vba")
+                            && !reserved.contains(&key.as_str())
+                            && names.insert(key)
+                        {
+                            source.push_str(&format!("Public Property Get {}() As Object\nSet {}=VbaTabs.VbaNamed({})\nEnd Property\n",tab.name,tab.name,vba_string(&tab.name)));
+                        }
+                    }
+                }
                 modules.push(parse(
                     &SourceFile::new(
                         SourceId(u64::MAX - 16 - i as u64),
                         format!("{}.cls", class_name(kind)),
-                        crate::form_controls::control_class(kind),
+                        source,
                     )?,
+                    ModuleKind::Class,
+                )?);
+            }
+            for (id, name, source) in [
+                (
+                    u64::MAX - 40,
+                    "VbaFormTab",
+                    crate::form_tabs::TAB.to_owned(),
+                ),
+                (u64::MAX - 41, "VbaFormTabs", crate::form_tabs::collection()),
+            ] {
+                modules.push(parse(
+                    &SourceFile::new(SourceId(id), format!("{name}.cls"), source)?,
                     ModuleKind::Class,
                 )?);
             }
@@ -1571,6 +1662,9 @@ impl Ide {
             "width" => "VbaWidth",
             "height" => "VbaHeight",
             "tabindex" => "VbaTabIndex",
+            "tabfixedwidth" => "VbaTabFixedWidth",
+            "tabfixedheight" => "VbaTabFixedHeight",
+            "taborientation" => "VbaTabOrientation",
             "default" => "VbaDefault",
             "cancel" => "VbaCancel",
             "smallchange" => "VbaSmallChange",
@@ -1768,6 +1862,74 @@ impl Ide {
             host,
         )
     }
+    /// Native tab input executes focus/validation and authored callbacks.
+    pub fn form_instance_tab(
+        &mut self,
+        instance: FormInstance,
+        control: u32,
+        tab: i32,
+        host: &mut impl Host,
+    ) -> Result<()> {
+        if self.native_form(instance.source).is_none() {
+            return Err(error("tab input requires a native form"));
+        }
+        self.deliver_form_input(instance, Some(control), None, FormInput::Tab(tab), host)
+    }
+    /// Read canonical tab fields without invoking VBA or constructing a form.
+    pub fn form_instance_tab_count(&self, instance: FormInstance, control: u32) -> Result<i32> {
+        let Value::Object(tabs) = self.form_instance_field(instance, Some(control), "VbaTabs")?
+        else {
+            return Err(error("missing tabs"));
+        };
+        let session = self
+            .session
+            .as_ref()
+            .ok_or_else(|| error("no form session"))?;
+        let Value::Long(count) = session.read_instance_field(tabs, "VbaTotal")? else {
+            return Err(error("invalid tabs"));
+        };
+        if !(0..=128).contains(&count) {
+            return Err(error("tab count budget"));
+        }
+        Ok(count)
+    }
+    pub fn form_instance_tab_field(
+        &self,
+        instance: FormInstance,
+        control: u32,
+        tab: i32,
+        field: &str,
+    ) -> Result<Value> {
+        self.validate_form_instance(instance)?;
+        let designer = self
+            .forms
+            .get(&instance.source)
+            .ok_or_else(|| error("form"))?;
+        let name = &designer
+            .form()
+            .controls
+            .iter()
+            .find(|c| c.id == control && c.kind == ControlKind::TabStrip)
+            .ok_or_else(|| error("TabStrip"))?
+            .name;
+        let session = self
+            .session
+            .as_ref()
+            .ok_or_else(|| error("no form session"))?;
+        let Value::Object(control) =
+            session.read_instance_field(instance.object, &format!("Vba{name}"))?
+        else {
+            return Err(error("unloaded control"));
+        };
+        let tab = tab_object(session, control, tab)?;
+        let field = match field.to_ascii_lowercase().as_str() {
+            "name" => "VbaName",
+            "caption" => "VbaCaption",
+            "index" => "VbaIndex",
+            _ => field,
+        };
+        session.read_instance_field(tab, field)
+    }
     fn deliver_form_input(
         &mut self,
         instance: FormInstance,
@@ -1878,7 +2040,26 @@ impl Ide {
             {
                 return Err(error("drop-list ComboBox does not accept typed text"));
             }
-            if let FormInput::Drop(opened) = input {
+            if let FormInput::Tab(tab) = input {
+                if c.kind != ControlKind::TabStrip {
+                    return Err(error("tab input requires a TabStrip"));
+                }
+                let tab_object = tab_object(session, object, tab)?;
+                for field in ["Enabled", "Visible"] {
+                    if session.read_instance_field(tab_object, field)? != Value::Boolean(true) {
+                        return Err(error("tab is disabled or hidden"));
+                    }
+                }
+                let index = designer
+                    .form()
+                    .controls
+                    .iter()
+                    .position(|c| c.id == id)
+                    .and_then(|n| i32::try_from(n).ok())
+                    .ok_or_else(|| error("tab control index"))?;
+                object = instance.object;
+                ("VbaTabInput", vec![Value::Long(index), Value::Long(tab)])
+            } else if let FormInput::Drop(opened) = input {
                 if c.kind != ControlKind::ComboBox {
                     return Err(error("drop input requires a ComboBox"));
                 }

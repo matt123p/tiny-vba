@@ -391,3 +391,35 @@ fn native_frame_storage_claims_flags_and_missing_resources_refuse_atomically() {
         assert!(decode(&out).is_err());
     }
 }
+
+#[test]
+fn native_tabstrip_decodes_distinct_tab_identity_unicode_arrays_and_flags() {
+    let bytes = fixture::tab_companion(1);
+    let form = decode(&bytes).unwrap();
+    let strip = form
+        .design
+        .controls
+        .iter()
+        .find(|c| c.kind == Kind::TabStrip)
+        .unwrap();
+    assert_eq!(strip.parent, None);
+    let tabs = strip.tabs.as_ref().unwrap();
+    assert_eq!(tabs.selected, 1);
+    assert_eq!(tabs.tabs.len(), 3);
+    assert_eq!(tabs.tabs[1].caption, "Second😀");
+    assert_eq!(tabs.tabs[1].name, "SecondTab");
+    assert_eq!(tabs.tabs[1].tag, "two");
+    assert!(!tabs.tabs[2].enabled);
+    assert!(tabs.tabs[2].visible);
+    assert_eq!(form.resources[1].bytes, bytes);
+    assert!(decode(&fixture::tab_companion(3)).is_err());
+    assert!(decode(&fixture::tab_companion(-2)).is_err());
+    assert_eq!(
+        decode(&fixture::tab_companion(-1)).unwrap().design.controls[3]
+            .tabs
+            .as_ref()
+            .unwrap()
+            .selected,
+        -1
+    );
+}

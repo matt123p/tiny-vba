@@ -65,6 +65,7 @@ impl Command {
                         | FormCommand::InstanceText(..)
                         | FormCommand::InstanceNumeric(..)
                         | FormCommand::InstanceList(..)
+                        | FormCommand::InstanceTab(..)
                         | FormCommand::InstanceDrop(..)
                         | FormCommand::InstanceNavigate(..)
                 )

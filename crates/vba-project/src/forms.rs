@@ -26,6 +26,7 @@ pub enum Kind {
     ListBox,
     ComboBox,
     Frame,
+    TabStrip,
 }
 /// Coordinates are original signed HIMETRIC units, not pixels or points.
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -57,6 +58,28 @@ pub struct Control {
     pub numeric: Option<NumericBehavior>,
     pub list: Option<ListBehavior>,
     pub combo: Option<ComboBehavior>,
+    pub tabs: Option<TabBehavior>,
+}
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct TabBehavior {
+    pub selected: i32,
+    pub tabs: Vec<Tab>,
+    pub orientation: u32,
+    pub style: u32,
+    pub multi_row: bool,
+    pub tooltips: bool,
+    pub fixed_width: u32,
+    pub fixed_height: u32,
+}
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct Tab {
+    pub name: String,
+    pub caption: String,
+    pub tag: String,
+    pub tooltip: String,
+    pub accelerator: String,
+    pub visible: bool,
+    pub enabled: bool,
 }
 /// Native ComboBox style and matching metadata; never an activated external control.
 #[derive(Clone, Debug, PartialEq, Eq)]

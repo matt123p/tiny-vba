@@ -199,3 +199,10 @@ clipping and accessible groups use the shared renderer. Original source/resource
 stay inert and unchanged. Further container/page/image/binding/platform semantics,
 native edited persistence and .tvform removal remain in M7A; fresh Office traces
 remain NOT_RUN under M8.5.
+
+[ADR 0057](../../../docs/decisions/0057-native-tabstrip.md) adds selected native TabStrip
+records and separate ordinary Tab/Tabs identity, indexed/named lookup,
+enumeration/default selection and authorized widget input. Canonical state stays
+in ordinary classes; inert queries/rendering do not instantiate or execute VBA.
+MultiPage, dynamic tab mutation/index/name semantics and the remaining M7A.4
+ledger stay open. Native edited persistence and .tvform removal remain separate.

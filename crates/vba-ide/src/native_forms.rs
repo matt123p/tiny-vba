@@ -115,6 +115,38 @@ impl Ide {
             return Err(error("native form metadata outside supported limits"));
         }
         let point = |n: i32| n as f32 * (72.0 / 2540.0);
+        let mut total_tabs = 0usize;
+        for c in &native.design.controls {
+            if c.id == 0 || c.id > i32::MAX as u32 || (c.kind == Kind::TabStrip) != c.tabs.is_some()
+            {
+                return Err(error("invalid native control identity/tab metadata"));
+            }
+            if let Some(tabs) = &c.tabs {
+                total_tabs = total_tabs.saturating_add(tabs.tabs.len());
+                let mut names = BTreeSet::new();
+                if total_tabs > 128
+                    || tabs.selected < -1
+                    || tabs.selected >= tabs.tabs.len() as i32
+                    || tabs.orientation > 3
+                    || tabs.style > 2
+                    || tabs.fixed_width > 254000
+                    || tabs.fixed_height > 254000
+                    || tabs.tabs.iter().any(|tab| {
+                        tab.name.is_empty()
+                            || !tab.name.bytes().enumerate().all(|(i, b)| {
+                                b.is_ascii_alphabetic() || b == b'_' || i > 0 && b.is_ascii_digit()
+                            })
+                            || tab.name.len() > 64
+                            || !names.insert(tab.name.to_ascii_lowercase())
+                            || [&tab.caption, &tab.tag, &tab.tooltip, &tab.accelerator]
+                                .iter()
+                                .any(|s| s.encode_utf16().count() > 16384)
+                    })
+                {
+                    return Err(error("native tab metadata budget/identity"));
+                }
+            }
+        }
         let mut controls = Vec::new();
         let mut order = Vec::new();
         for (ordinal, c) in native.design.controls.iter().enumerate() {
@@ -122,6 +154,7 @@ impl Ide {
                 id: c.id,
                 name: c.name.clone(),
                 kind: match c.kind {
+                    Kind::TabStrip => ControlKind::TabStrip,
                     Kind::Frame => ControlKind::Frame,
                     Kind::Label => ControlKind::Label,
                     Kind::TextBox => ControlKind::TextBox,
