@@ -1,13 +1,12 @@
 # M7A native forms — implementation inventory and work ledger
 
-Updated 2026-11-04. **IN PROGRESS**. FC0 contracts and FC3.1–FC3.4 are complete for
-`native-userform-import-v1`; see the [control/property/event/format/host matrix](m7a-control-contracts.md)
-and [ADR 0040](decisions/0040-native-userform-import-and-attachment.md). The first FC1.1 metadata slice remains partial under
-[ADR 0038](decisions/0038-native-office-forms-and-compatibility-only.md) and
-[ADR 0039](decisions/0039-m7a-native-control-metadata.md). It is not M7A sign-off.
-Native import now supports flat Label/TextBox/CommandButton and selected
-CheckBox/OptionButton/ToggleButton/ScrollBar/SpinButton/ListBox/ComboBox forms; see [the current runtime record](m7a4-native-runtime.md). Native edited
-persistence and `.tvform` removal remain unimplemented.
+Updated 2026-11-05. **IN PROGRESS**. FC0 and FC3.1–FC3.4 are complete for
+`native-userform-import-v1`; see the [control/property/event/format/host matrix](m7a-control-contracts.md).
+M7A.3's worksheet profile is implemented under
+[ADR 0041](decisions/0041-worksheet-form-controls.md). Shared runtime increments
+now include selected native Frames under [ADR 0056](decisions/0056-native-frame-containers.md).
+Remaining semantics, native edited persistence, format removal and acceptance
+retain their full M7A scope. The audited paths below preserve the initial inventory.
 
 ## Audited implementation paths — FC0.1
 

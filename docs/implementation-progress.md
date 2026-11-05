@@ -11,11 +11,19 @@ Shared CI, WASM, actual WASI (67 instance/13 decoder cases), UI (14 runtime
 widget and two native designer/import cases), native capture and web gates PASS.
 Light/dark/narrow/scaled/injected-host Frame captures were inspected. Chromium
 editor, legacy form, native focus/text/numeric/boolean/list/ComboBox/metadata
-regressions PASS; native Frame modal Stop/resume and source retention PASS.
-Fork integration is being validated; no full milestone acceptance is claimed. Remaining M7A.4 includes MultiPage/TabStrip/Image/RefEdit, further
+regressions PASS; native Frame Unicode input, Tab/Shift+Tab, modal Stop/resume and source retention PASS.
+Both forks pin shared product revision `e246411f`: GridCraft `fd631b3f` and
+WordCraft `ed52222d`. Full CI (10/8 gates), eight native and eight actual Node 22
+WASM package cases per fork, strict optional VBA/UI Clippy and optional VBA web
+builds PASS. The Frame package cases verify inert import, nominal access, scoped
+collections/Parent/ActiveControl, trusted nested input and exact original XLSM/
+DOCM project bytes after reopen; WordCraft also verifies trust revocation.
+Both existing GridCraft embedded-form UI/consent cases PASS. Original M7 artifact
+hashes and changed Markdown targets PASS. No full milestone acceptance is claimed. Remaining M7A.4 includes MultiPage/TabStrip/Image/RefEdit, further
 property/event/resource/binding/platform and lifecycle cases. Native edited saving,
 .tvform removal and full acceptance remain M7A.5–M7A.7. Fresh Office observations
-remain NOT_RUN under M8.5. Next: native page/container collections and resources.
+remain NOT_RUN under M8.5. Next: native TabStrip records/Tabs and MultiPage f/o/x page identity, collections
+and selection, building on the bounded Frame ancestry path.
 
 ## M7A.4 continued — array readback and native metadata (2026-11-04)
 

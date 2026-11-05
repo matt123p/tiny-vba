@@ -1,6 +1,6 @@
 # Remaining implementation plan
 
-Updated 2026-11-04. This plan contains **remaining work only**: M7A followed by stable M8 IDs,
+Updated 2026-11-05. This plan contains **remaining work only**: M7A followed by stable M8 IDs,
 after completed M1–M6, M6A and M7 for their declared profiles.
 [M7 acceptance](m7-acceptance.md) records the authored unchanged-document/package
 profile and [ADR 0037](decisions/0037-m7-package-preservation-and-writeback.md)
