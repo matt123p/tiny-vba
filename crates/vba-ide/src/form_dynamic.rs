@@ -155,11 +155,8 @@ key=CStr(data(1))
 End If
 If Len(key)=0 Or Len(key)>128 Then Err.Raise 380
 If VbaAllControls.VbaFind(key)>=0 Then Err.Raise 380
-VbaInitializeControl control,True,data(2),True,collection.Count,0,0,72,18,key,VbaNextPageId(),parentKey,0,"","",0
+VbaInitializeControl control,True,data(2),True,collection.Count,0,0,72,18,key,VbaNextPageId(),parentKey,0,"","",0,key,"",False,False,False,False,"",VbaContext
 control.VbaRuntime=True
-If control.VbaKind=4 Or control.VbaKind=5 Or control.VbaKind=6 Then control.VbaValue=False
-If control.VbaKind=1 Or control.VbaKind=3 Or control.VbaKind=4 Or control.VbaKind=5 Or control.VbaKind=6 Or control.VbaKind=11 Then control.Caption=key
-Set control.VbaContext=VbaContext
 If control.VbaKind=11 Then control.VbaConfigureChildren
 VbaAllControls.VbaAdd control
 collection.VbaAdd control
@@ -404,10 +401,12 @@ impl crate::Ide {
 }
 
 pub(crate) const INITIALIZE: &str = r#"
-Public Sub VbaInitializeControl(ByVal control As Object,ByVal enabled As Boolean,ByVal visible As Boolean,ByVal tabStop As Boolean,ByVal tabIndex As Integer,ByVal left As Single,ByVal top As Single,ByVal width As Single,ByVal height As Single,ByVal name As String,ByVal id As Long,ByVal parent As Long,ByVal rank As Long,ByVal tag As String,ByVal tip As String,ByVal help As Long)
+Public Sub VbaInitializeControl(ByVal control As Object,ByVal enabled As Boolean,ByVal visible As Boolean,ByVal tabStop As Boolean,ByVal tabIndex As Integer,ByVal left As Single,ByVal top As Single,ByVal width As Single,ByVal height As Single,ByVal name As String,ByVal id As Long,ByVal parent As Long,ByVal rank As Long,ByVal tag As String,ByVal tip As String,ByVal help As Long,Optional ByVal caption As String="",Optional ByVal text As String="",Optional ByVal value As Variant=False,Optional ByVal locked As Boolean=False,Optional ByVal isDefault As Boolean=False,Optional ByVal isCancel As Boolean=False,Optional ByVal group As String="",Optional ByVal context As Object=Nothing)
+Dim kind As Integer
+kind=control.VbaKind
 control.Enabled=enabled
 control.Visible=visible
-If control.VbaKind=14 Or control.VbaKind=15 Then
+If kind=14 Or kind=15 Then
 control.VbaTabStop=tabStop
 Else
 control.TabStop=tabStop
@@ -424,6 +423,25 @@ control.VbaNavigationRank=rank
 control.Tag=tag
 control.ControlTipText=tip
 control.VbaHelpContextID=help
+If Not (context Is Nothing) Then Set control.VbaContext=context
+If kind=1 Or kind=3 Or kind=4 Or kind=5 Or kind=6 Or kind=11 Or kind=14 Then control.Caption=caption
+If kind=2 Or kind=16 Then control.VbaText=text
+If kind=4 Or kind=5 Or kind=6 Then control.VbaValue=value
+If kind=2 Or kind=4 Or kind=5 Or kind=6 Or kind=9 Or kind=10 Or kind=16 Then control.Locked=locked
+If kind=3 Then
+control.VbaDefault=isDefault
+control.VbaCancel=isCancel
+End If
+If kind=5 Then control.GroupName=group
+End Sub
+Public Sub VbaInitializeText(ByVal control As Object,ByVal maxLength As Long,ByVal multiLine As Boolean,ByVal wordWrap As Boolean,ByVal enterKey As Boolean,ByVal tabKey As Boolean,ByVal behavior As Long,ByVal password As Long)
+control.MaxLength=maxLength
+control.MultiLine=multiLine
+control.WordWrap=wordWrap
+control.EnterKeyBehavior=enterKey
+control.TabKeyBehavior=tabKey
+control.EnterFieldBehavior=behavior
+If password<>0 Then control.PasswordChar=VBA.ChrW(password)
 End Sub
 "#;
 

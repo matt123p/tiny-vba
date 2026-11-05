@@ -102,6 +102,12 @@ pub trait Host {
             description: format!("intrinsic host service unavailable: {}", call.intrinsic),
         })
     }
+    /// Optional read-only data epoch for an existing object. Validate full handle
+    /// identity/lifetime and return None unless every relevant data change changes
+    /// the epoch. Never execute getters/user code, perform IO or activate objects.
+    fn object_revision(&mut self, _target: ObjectRef) -> Result<Option<u64>, ForeignError> {
+        Ok(None)
+    }
     fn resume(&mut self, token: u64) -> Reply;
     fn cancel(&mut self, token: u64);
 }

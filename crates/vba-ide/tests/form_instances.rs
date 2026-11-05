@@ -3483,3 +3483,90 @@ End Sub"#,
     );
     Ok(())
 }
+
+#[test]
+fn native_binding_sources_require_an_explicit_range_capability_and_fail_without_mutation() -> R {
+    let ide = list_setup(
+        r#"Sub Main()
+Dim f As NativeForm
+Set f=NativeForm
+Debug.Print f.Entry.ControlSource,f.List1.RowSource
+On Error Resume Next
+f.Entry.ControlSource="A1"
+Debug.Print Err.Number,f.Entry.Text,f.Entry.ControlSource
+Err.Clear
+f.List1.AddItem "kept"
+f.List1.RowSource="A1:B2"
+Debug.Print Err.Number,f.List1.ListCount,f.List1.List(0),f.List1.RowSource
+End Sub"#,
+        "",
+    )?;
+    assert_eq!(ide.mode(), Mode::Completed, "{:?}", ide.diagnostics);
+    assert_eq!(
+        ide.output(),
+        vec!["initialized", "\t", "380\tinitial\t", "380\t1\tkept\t"]
+    );
+    Ok(())
+}
+
+#[test]
+fn native_range_capability_keeps_unbound_queries_inert_and_compiles_binding_helpers() -> R {
+    let mut ide = list_setup(
+        "Sub Main()\nDebug.Print NativeForm.Entry.ControlSource,NativeForm.List1.RowSource,NativeForm.Entry.Text,NativeForm.List1.ListCount\nEnd Sub",
+        "",
+    )?;
+    struct IdleHost {
+        calls: usize,
+    }
+    impl vba_foreign::Host for IdleHost {
+        fn identity(&self) -> u64 {
+            7
+        }
+        fn invoke(&mut self, _: vba_foreign::HostCall) -> vba_foreign::Reply {
+            self.calls += 1;
+            vba_foreign::Reply::Error(vba_foreign::ForeignError {
+                number: 5,
+                description: "unexpected host invocation".into(),
+            })
+        }
+        fn resume(&mut self, _: u64) -> vba_foreign::Reply {
+            vba_foreign::Reply::Error(vba_foreign::ForeignError {
+                number: 5,
+                description: "unexpected host wait".into(),
+            })
+        }
+        fn cancel(&mut self, _: u64) {}
+    }
+    let mut host = IdleHost { calls: 0 };
+    let expected = ide.output().to_vec();
+    ide.dispatch(Action::Reset, &mut NoHost)?;
+    ide.configure_host(
+        vec![vba_foreign::Import {
+            name: "Range".into(),
+            root: "Data".into(),
+            member: Some("Resolve".into()),
+            kind: vba_foreign::InvokeKind::Call,
+        }],
+        [(
+            "Data".into(),
+            vba_ide::ObjectRef {
+                host: 7,
+                object: 42,
+                generation: 1,
+            },
+        )]
+        .into(),
+        vec![],
+    )?;
+    ide.dispatch(Action::Run, &mut host)?;
+    for _ in 0..2000 {
+        if ide.mode() != Mode::Running {
+            break;
+        }
+        ide.tick(&mut host)?;
+    }
+    assert_eq!(host.calls, 0);
+    assert_eq!(ide.mode(), Mode::Completed, "{:?}", ide.diagnostics);
+    assert_eq!(ide.output(), expected);
+    Ok(())
+}

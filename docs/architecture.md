@@ -436,3 +436,10 @@ pointer/keyboard input. [ADR 0064](decisions/0064-native-runtime-type-names.md) 
 IR 12 inert runtime class names and native TypeName through canonical aliases.
 State stays in ordinary classes, rendering stays inert, and budgets are unchanged.
 Bindings and the remaining M7A.4 ledger remain open; M7A.5/.6 and M8.5 are separate.
+
+[ADR 0065](decisions/0065-native-cell-and-row-bindings.md) defines native
+ControlSource/RowSource through ordinary classes and the existing explicit host
+range import. Import and rendering remain inert; GridCraft owns cell commands,
+trust and revision-driven callbacks. The owner approved 4,096 static permission
+entries on 2026-11-05; per-site authorization and executed-call/work/memory limits
+remain in force. Further binding timing/types and the broader M7A.4 ledger remain open.

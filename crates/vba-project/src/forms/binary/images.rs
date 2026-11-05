@@ -130,6 +130,8 @@ pub(super) fn control(bytes: &[u8], site: Site) -> Result<Control> {
         caption: String::new(),
         tag: site.tag,
         control_tip_text: site.control_tip_text,
+        control_source: site.control_source,
+        row_source: site.row_source,
         help_context_id: site.help_context_id,
         text: String::new(),
         enabled: flags & 2 != 0,

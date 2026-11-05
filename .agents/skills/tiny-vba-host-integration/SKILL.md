@@ -305,3 +305,15 @@ selection and authorization. Original source/resources stay separate. Broader
 RefEdit/platform/property/event/binding semantics and the unchanged M7A.4 ledger
 remain open. Native edited saving/removal stay M7A.5/.6; fresh Office traces stay
 NOT_RUN under M8.5.
+
+[ADR 0065](../../../docs/decisions/0065-native-cell-and-row-bindings.md) defines native
+ControlSource/RowSource through ordinary classes and the existing explicit host
+range import. Import and rendering remain inert; GridCraft owns cell commands,
+trust and revision-driven callbacks. The owner approved 4,096 static permission
+entries on 2026-11-05; per-site authorization and executed-call/work/memory limits
+remain in force. Further binding timing/types and the broader M7A.4 ledger remain open.
+
+Optional `Host::object_revision` is a read-only validated data epoch, never an
+authorization shortcut. Return None unless all relevant value changes invalidate
+it; formula ranges in GridCraft deliberately use the uncached path. Binding
+callbacks retain current trust, canonical VM state and bounded input ownership.

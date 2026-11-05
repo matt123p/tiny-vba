@@ -611,7 +611,7 @@ impl Session {
             }
         }
         if let Some(binding) = &binding {
-            if binding.permitted.len() > 1024 {
+            if binding.permitted.len() > HostBinding::MAX_STATIC_PERMISSIONS {
                 return Err(command("host permission limit"));
             }
             for (procedure, site) in &binding.permitted {
@@ -3790,7 +3790,11 @@ impl Session {
             self.push_prepaid(target)?;
             return self.advance();
         }
-        if matches!(site.kind, ir::ForeignKind::Enumerate) && matches!(target, Value::Array(_)) {
+        if matches!(
+            site.kind,
+            ir::ForeignKind::Enumerate | ir::ForeignKind::EnumerateObjects
+        ) && matches!(target, Value::Array(_))
+        {
             self.push_prepaid(target)?;
             return self.advance();
         }
@@ -4475,6 +4479,9 @@ impl Host for NoHost {
 }
 
 impl HostBinding {
+    /// Maximum authorized static call sites, separate from executed-call limits.
+    pub const MAX_STATIC_PERMISSIONS: usize = 4096;
+
     /// Explicitly authorize this compiled program's foreign sites for the supplied host roots.
     pub fn for_program(
         program: &ir::VerifiedProgram,
@@ -4484,7 +4491,7 @@ impl HostBinding {
         let mut permitted = BTreeSet::new();
         for (procedure, p) in program.program().procedures.iter().enumerate() {
             for site in 0..p.foreign.len() {
-                if permitted.len() >= 1024 {
+                if permitted.len() >= Self::MAX_STATIC_PERMISSIONS {
                     return Err(command("host permission limit"));
                 }
                 permitted.insert((

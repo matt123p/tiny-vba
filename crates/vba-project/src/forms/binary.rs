@@ -339,6 +339,8 @@ fn container(
                 name: site.name,
                 tag: site.tag,
                 control_tip_text: site.control_tip_text,
+                control_source: site.control_source,
+                row_source: site.row_source,
                 help_context_id: site.help_context_id,
                 kind: site.kind,
                 left: site.left,
@@ -425,6 +427,8 @@ struct Site {
     name: String,
     tag: String,
     control_tip_text: String,
+    control_source: String,
+    row_source: String,
     help_context_id: i32,
     flags: u32,
     bytes: usize,
@@ -435,7 +439,7 @@ struct Site {
 }
 fn site(r: &mut Reader<'_>, classes: &[[u8; 16]]) -> Result<Site> {
     let mut b = block(r, 0)?;
-    let m = mask(&mut b, 0x0bff, 0x00a5)? as u64;
+    let m = mask(&mut b, 0x6bff, 0x00a5)? as u64;
     let name = field(&mut b, m, 0, 4, 0)?;
     let tag = field(&mut b, m, 1, 4, 0)?;
     let id = field(&mut b, m, 2, 4, 0)?;
@@ -483,6 +487,8 @@ fn site(r: &mut Reader<'_>, classes: &[[u8; 16]]) -> Result<Site> {
         return Err(unsupported("native control group"));
     }
     let tooltip = field(&mut b, m, 11, 4, 0)?;
+    let control_source = field(&mut b, m, 13, 4, 0)?;
+    let row_source = field(&mut b, m, 14, 4, 0)?;
     align(&mut b, 4)?;
     let name = string(&mut b, name)?;
     text::identifier(&name)?;
@@ -493,8 +499,33 @@ fn site(r: &mut Reader<'_>, classes: &[[u8; 16]]) -> Result<Site> {
         (0, 0)
     };
     let control_tip_text = string(&mut b, tooltip)?;
+    let control_source = string(&mut b, control_source)?;
+    let row_source = string(&mut b, row_source)?;
+    if !control_source.is_empty()
+        && !matches!(
+            kind,
+            Kind::TextBox
+                | Kind::RefEdit
+                | Kind::CheckBox
+                | Kind::OptionButton
+                | Kind::ToggleButton
+                | Kind::SpinButton
+                | Kind::ScrollBar
+                | Kind::ListBox
+                | Kind::ComboBox
+        )
+    {
+        return Err(unsupported(
+            "ControlSource requires a value-bearing native control",
+        ));
+    }
+    if !row_source.is_empty() && !matches!(kind, Kind::ListBox | Kind::ComboBox) {
+        return Err(unsupported("RowSource requires a native list control"));
+    }
     b.end()?;
     Ok(Site {
+        control_source,
+        row_source,
         tag,
         control_tip_text,
         help_context_id,
@@ -729,6 +760,8 @@ fn control(bytes: &[u8], site: Site) -> Result<Control> {
         name: site.name,
         tag: site.tag,
         control_tip_text: site.control_tip_text,
+        control_source: site.control_source,
+        row_source: site.row_source,
         help_context_id: site.help_context_id,
         kind: site.kind,
         left: site.left,
@@ -808,6 +841,8 @@ fn numeric_control(r: Reader<'_>, mut b: Reader<'_>, site: Site) -> Result<Contr
         name: site.name,
         tag: site.tag,
         control_tip_text: site.control_tip_text,
+        control_source: site.control_source,
+        row_source: site.row_source,
         help_context_id: site.help_context_id,
         kind: site.kind,
         left: site.left,

@@ -66,7 +66,7 @@ End Function
     s
 }
 
-pub(crate) fn control_class(kind: ControlKind) -> String {
+pub(crate) fn control_class(kind: ControlKind, ranges: bool) -> String {
     if kind == ControlKind::Page {
         return crate::form_container::page_class();
     }
@@ -227,7 +227,7 @@ pub(crate) fn control_class(kind: ControlKind) -> String {
     } else {
         s.push_str(&format!("Private Sub Class_Initialize()\n{init}End Sub\n"));
     }
-    s
+    crate::form_bindings::decorate(kind, s, ranges)
 }
 
 pub(crate) fn userforms_class(components: &[String]) -> String {

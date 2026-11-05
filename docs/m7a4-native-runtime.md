@@ -6,10 +6,18 @@ Updated 2026-11-05. **IN PROGRESS. M7A.4 is not complete.** This record extends
 
 Implemented in shared tiny-vba:
 
+- [Native cell/row bindings](decisions/0065-native-cell-and-row-bindings.md): inert
+  ControlSource/RowSource site metadata, ordinary single-cell value links and
+  bounded contiguous list sources through an explicit existing host Range import.
+  Bound rows remain read-only during authored callbacks; protected writes are
+  preflighted. Inert rendering/inspection and trusted revision-driven callbacks
+  retain canonical state and original resources. Further binding timing/types
+  remain open.
+
 - [Native array readback](decisions/0054-native-list-array-readback.md): detached
   zero-based two-dimensional List/Column snapshots for the current ten-column
   unbound packet, singleton/empty cases, named Forms parameters and independent
-  lifetime across Clear/Stop. Further shape/loading/binding parity remains open.
+  lifetime across Clear/Stop. Further shape/loading and binding timing/type parity remains open.
 - [Native metadata and tips](decisions/0055-native-form-metadata-and-control-tips.md):
   inert Tag/ControlTipText/HelpContextID decoding, ordinary per-instance state and
   theme-injected runtime tips without focus/code execution. Actual Help/F1 routing,
@@ -30,7 +38,7 @@ Implemented in shared tiny-vba:
   records, indexed ten-column row data, AddItem/RemoveItem/Clear, selection,
   Value/Text/column properties, ordinary Change/Click and authorized pointer/key
   input. Focus/validation, original resources and debugger continuations remain
-  intact. Multiple-selection/binding and further list properties stay open.
+  intact. ADR 0063 adds multiple selection; ADR 0065 adds selected bindings. Further list properties remain open.
 
 - [Native SpinButton/ScrollBar](decisions/0050-native-spinbutton-and-scrollbar.md):
   distinct native resource packets, Long bounds/value/increments, orientation and
@@ -152,7 +160,7 @@ Remaining M7A.4 requirements, without reducing the milestone's scope:
   ADR 0061 adds tab structural mutation and writable Index/runtime Name; further
   mutation/error/locale and full event/presentation parity remain open. ADR 0056 implements selected native Frame parents; additional storage variants,
   properties, resource/presentation and full event parity remain open.
-  ComboBox and ListBox now have selected unbound packets; further array-shape/loading cases, bindings and further presentation remain open; ADR 0063 implements native multiple selection. The selected numeric packet does not close all
+  ComboBox and ListBox now have selected unbound packets; further array-shape/loading cases, binding timing/types and further presentation remain open; ADR 0063 implements native multiple selection. The selected numeric packet does not close all
   ScrollBar/SpinButton property/resource/presentation cases.
 - Applicable Office-supplied worksheet ActiveX/platform packets; third-party
   controls and COM/OCX loading remain outside scope.
@@ -243,3 +251,10 @@ pointer/keyboard input. [ADR 0064](decisions/0064-native-runtime-type-names.md) 
 IR 12 inert runtime class names and native TypeName through canonical aliases.
 State stays in ordinary classes, rendering stays inert, and budgets are unchanged.
 Bindings and the remaining M7A.4 ledger remain open; M7A.5/.6 and M8.5 are separate.
+
+[ADR 0065](decisions/0065-native-cell-and-row-bindings.md) defines native
+ControlSource/RowSource through ordinary classes and the existing explicit host
+range import. Import and rendering remain inert; GridCraft owns cell commands,
+trust and revision-driven callbacks. The owner approved 4,096 static permission
+entries on 2026-11-05; per-site authorization and executed-call/work/memory limits
+remain in force. Further binding timing/types and the broader M7A.4 ledger remain open.

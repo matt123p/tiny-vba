@@ -613,3 +613,14 @@ fn refedit_class_table_is_inert_bounded_and_requires_native_drop_properties() {
     });
     assert!(decode(&changed).is_err());
 }
+
+#[test]
+fn native_binding_site_strings_are_decoded_inertly_with_exact_resources() {
+    let bytes = fixture::binding_companion();
+    let form = decode(&bytes).unwrap();
+    assert_eq!(form.design.controls[1].control_source, "$A$1");
+    assert_eq!(form.design.controls[3].control_source, "$D$1");
+    assert_eq!(form.design.controls[3].row_source, "$B$1:$C$2");
+    assert!(form.design.controls[0].control_source.is_empty());
+    assert!(form.resources.iter().any(|r| r.bytes == bytes));
+}

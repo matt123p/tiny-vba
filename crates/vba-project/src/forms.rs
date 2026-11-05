@@ -47,6 +47,8 @@ pub struct Control {
     pub caption: String,
     pub tag: String,
     pub control_tip_text: String,
+    pub control_source: String,
+    pub row_source: String,
     pub help_context_id: i32,
     pub text: String,
     pub enabled: bool,

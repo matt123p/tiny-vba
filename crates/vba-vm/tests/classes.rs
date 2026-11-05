@@ -1041,3 +1041,67 @@ fn typename_uses_verified_runtime_metadata_without_default_getters_or_losing_ide
     assert!(compile_modules(&modules, &options).is_err());
     Ok(())
 }
+
+#[test]
+fn static_host_permission_budget_bounds_derived_and_supplied_allowlists() -> R {
+    let mut main = String::from("Function Answer(ByVal target As Object) As Long\n");
+    for _ in 0..vba_vm::HostBinding::MAX_STATIC_PERMISSIONS {
+        main.push_str("target.Touch\n");
+    }
+    main.push_str("Answer=1\nEnd Function");
+    let source = SourceFile::new(SourceId(1), "Main.bas".into(), main.clone())?;
+    let p = vba_compiler::compile(
+        &source,
+        &CompileOptions {
+            capabilities: vba_vm::capabilities(),
+            ..Default::default()
+        },
+    )?;
+    let mut binding = vba_vm::HostBinding::for_program(&p, 7, Default::default())?;
+    assert_eq!(
+        binding.permitted.len(),
+        vba_vm::HostBinding::MAX_STATIC_PERMISSIONS
+    );
+    let _ = Session::new(
+        p.clone(),
+        1,
+        vec![Value::Nothing],
+        Some(binding.clone()),
+        Limits::default(),
+    )?;
+    binding.permitted.insert((
+        vba_ir::ProcedureId(0),
+        vba_ir::ForeignSiteId(vba_vm::HostBinding::MAX_STATIC_PERMISSIONS as u32),
+    ));
+    let error = Session::new(p, 1, vec![Value::Nothing], Some(binding), Limits::default())
+        .err()
+        .ok_or("oversized supplied allowlist accepted")?;
+    assert!(error.message.contains("host permission limit"));
+    main = main.replace(
+        "Answer=1\nEnd Function",
+        "target.Touch\nAnswer=1\nEnd Function",
+    );
+    let source = SourceFile::new(SourceId(1), "Main.bas".into(), main)?;
+    let p = vba_compiler::compile(
+        &source,
+        &CompileOptions {
+            capabilities: vba_vm::capabilities(),
+            ..Default::default()
+        },
+    )?;
+    assert!(vba_vm::HostBinding::for_program(&p, 7, Default::default()).is_err());
+    Ok(())
+}
+
+#[test]
+fn object_for_each_over_a_variant_array_keeps_project_identity_without_a_host_dispatch() -> R {
+    let mut s = session(
+        "Function Answer() As Long\nDim a As New Counter,items(0 To 1) As Object,data As Variant,c As Object\nSet items(0)=a\nSet items(1)=a\ndata=items\nFor Each c In data\nc.n=c.n+1\nNext c\nAnswer=a.n\nEnd Function",
+        "Public n As Long",
+    )?;
+    assert_eq!(
+        drive(&mut s)?,
+        Outcome::Completed(ReturnValue::Function(Value::Long(2)))
+    );
+    Ok(())
+}

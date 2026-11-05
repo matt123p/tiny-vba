@@ -37,11 +37,11 @@ in M7A.4; a declared unsupported packet is not implementation evidence.
 | CommandButton | Caption/geometry, Enabled/Visible, default/cancel/focus, Click | Selected native decode + shared runtime; edited native save UNSUPPORTED |
 | Label | Caption/geometry, formatting, visibility, Click | Selected native decode + shared runtime; edited native save UNSUPPORTED |
 | TextBox | Text/Value, geometry, selection, validation, Change/focus/key events | Selected native decode + shared Text/Change runtime; edited native save UNSUPPORTED |
-| CheckBox | Value/three-state/group/binding, Change/Click | Native decode/runtime/input; binding and native edited save unsupported |
-| OptionButton | Value/group/binding, Change/Click | Native decode/runtime/input and parent-scoped groups; binding/native edited save unsupported |
+| CheckBox | Value/three-state/group/binding, Change/Click | Native decode/runtime/input; selected cell binding (ADR 0065); native edited save unsupported |
+| OptionButton | Value/group/binding, Change/Click | Native decode/runtime/input and parent-scoped groups; selected cell binding (ADR 0065); native edited save unsupported |
 | ToggleButton | Value/binding, Change/Click | Native decode/runtime/input; binding/native edited save unsupported |
-| ComboBox | Items/selection/columns/binding/style, Change/Click/drop/update events | Selected native unbound editable/drop-list packet; further list/binding/resource/lifecycle cases and edited save remain unsupported |
-| ListBox | Items/selection/columns/multiselect/binding, Change/Click | Selected native unbound indexed rows/columns, single selection, Value/Text and input; 2D List/Column loading/readback and indexed/current-row Column implemented; further shape/loading cases/multiple selection/bindings/save remain unsupported |
+| ComboBox | Items/selection/columns/binding/style, Change/Click/drop/update events | Selected native editable/drop-list packet and cell/row binding (ADR 0065); further list/binding/resource/lifecycle cases and edited save remain unsupported |
+| ListBox | Items/selection/columns/multiselect/binding, Change/Click | Selected native unbound indexed rows/columns, single selection, Value/Text and input; 2D List/Column loading/readback and indexed/current-row Column implemented; multiple selection (ADR 0063) and selected cell/row binding (ADR 0065) implemented; further shape/loading/binding timing and edited save remain unsupported |
 | Frame | Caption/container/child Controls/Parent/ActiveControl/scoped grouping and tab/focus | Selected native packet under ADR 0056; further resource/event/property variants remain open |
 | MultiPage | Pages/selected Value, child controls, Change | Selected native f/o/x joins, Page/Pages identity, lookup/enumeration, selection-gated child input/focus/rendering (ADR 0058); selected Add/Remove/Clear/Index/runtime Name (ADR 0061); broader event/resource contracts open |
 | TabStrip | Tabs/selected Value, Change | Selected native decode, ordinary Tab/Tabs, lookup/enumeration/selection/input; selected Add/Remove/Clear/Index/runtime Name (ADR 0061); further APIs/events/presentation remain open |
@@ -221,3 +221,10 @@ pointer/keyboard input. [ADR 0064](decisions/0064-native-runtime-type-names.md) 
 IR 12 inert runtime class names and native TypeName through canonical aliases.
 State stays in ordinary classes, rendering stays inert, and budgets are unchanged.
 Bindings and the remaining M7A.4 ledger remain open; M7A.5/.6 and M8.5 are separate.
+
+[ADR 0065](decisions/0065-native-cell-and-row-bindings.md) defines native
+ControlSource/RowSource through ordinary classes and the existing explicit host
+range import. Import and rendering remain inert; GridCraft owns cell commands,
+trust and revision-driven callbacks. The owner approved 4,096 static permission
+entries on 2026-11-05; per-site authorization and executed-call/work/memory limits
+remain in force. Further binding timing/types and the broader M7A.4 ledger remain open.

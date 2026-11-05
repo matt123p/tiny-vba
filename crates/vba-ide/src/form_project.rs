@@ -4,9 +4,10 @@ use crate::{
     *,
 };
 use vba_foreign::{Completion, ForeignError, HostCall, Reply};
-#[derive(Clone, Copy, PartialEq, Eq)]
+#[derive(Clone, PartialEq, Eq)]
 enum FormInput {
     Physical,
+    Refresh(Vec<ObjectRef>),
     Focus,
     Activate,
     Text { start: i32, length: i32 },
@@ -201,10 +202,38 @@ impl<H: Host> Host for FormHost<'_, H> {
             self.host.identity()
         }
     }
+    fn object_revision(
+        &mut self,
+        target: ObjectRef,
+    ) -> std::result::Result<Option<u64>, ForeignError> {
+        self.host.object_revision(target)
+    }
     fn invoke(&mut self, call: HostCall) -> Reply {
         if call.target.object != GATE_OBJECT || call.target.generation != GATE_OBJECT {
             let reply = self.host.invoke(call);
             return self.external_reply(reply);
+        }
+        if call.member == "BindingRevision" && call.arguments.len() == 1 {
+            let Some(Value::Object(target)) = call.arguments.first().map(|a| &a.value) else {
+                return refusal("binding revision target required");
+            };
+            return match self.host.object_revision(*target) {
+                Ok(revision) => {
+                    let value = if let Some(revision) = revision {
+                        match VbaString::from_utf8(&revision.to_string()) {
+                            Ok(value) => Value::String(value),
+                            Err(_) => return refusal("binding revision allocation"),
+                        }
+                    } else {
+                        Value::Null
+                    };
+                    Reply::Complete(Completion {
+                        value,
+                        writes: vec![],
+                    })
+                }
+                Err(error) => Reply::Error(error),
+            };
         }
         if call.member == "Release" && call.arguments.len() == 2 {
             let (Some(Value::String(component)), Some(Value::Object(object))) = (
@@ -666,7 +695,12 @@ pub(crate) fn checked_handlers(
     }
     Ok(names)
 }
-fn compiled_form(form: &Form, module: &Module, native: Option<&NativeForm>) -> Result<String> {
+fn compiled_form(
+    form: &Form,
+    module: &Module,
+    native: Option<&NativeForm>,
+    ranges: bool,
+) -> Result<String> {
     form.validate()?;
     let handlers = checked_handlers(form, module, native.is_some())?;
     let call = |name: &str| {
@@ -754,8 +788,14 @@ fn compiled_form(form: &Form, module: &Module, native: Option<&NativeForm>) -> R
     for c in &form.controls {
         let temp = format!("VbaInit{}", c.id);
         let metadata = native.and_then(|n| n.design.controls.iter().find(|n| n.id == c.id));
+        let initial = match c.text.as_str() {
+            "1" => "True",
+            "0" => "False",
+            "" if native.is_none() => "False",
+            _ => "Null",
+        };
         let mut setup = format!(
-            "Dim {temp} As {class}\nSet {temp}=New {class}\nVbaInitializeControl {temp},{enabled},{visible},{stop},{index},{left},{top},{width},{height},{name},{id},{parent},{rank},{tag},{tip},{help}\n",
+            "Dim {temp} As {class}\nSet {temp}=New {class}\nVbaInitializeControl {temp},{enabled},{visible},{stop},{index},{left},{top},{width},{height},{name},{id},{parent},{rank},{tag},{tip},{help},{caption},{text},{initial},{locked},{is_default},{is_cancel},{group},{context}\n",
             class = class_name(c.kind),
             enabled = boolean(c.enabled),
             visible = boolean(c.visible),
@@ -787,7 +827,18 @@ fn compiled_form(form: &Form, module: &Module, native: Option<&NativeForm>) -> R
             tip = metadata
                 .map(|n| vba_string(&n.control_tip_text))
                 .unwrap_or_else(|| "\"\"".into()),
-            help = metadata.map_or(0, |n| n.help_context_id)
+            help = metadata.map_or(0, |n| n.help_context_id),
+            caption = vba_string(&c.caption),
+            text = vba_string(&c.text),
+            locked = boolean(metadata.is_some_and(|n| n.locked)),
+            is_default = boolean(metadata.is_some_and(|n| n.default)),
+            is_cancel = boolean(metadata.is_some_and(|n| n.cancel)),
+            group = vba_string(metadata.map_or("", |n| n.group_name.as_str())),
+            context = if native.is_some() {
+                "VbaContext"
+            } else {
+                "Nothing"
+            },
         );
         if c.kind == ControlKind::Image {
             setup = setup.replace(&format!("{temp}.TabStop="), &format!("{temp}.VbaTabStop="));
@@ -798,49 +849,12 @@ fn compiled_form(form: &Form, module: &Module, native: Option<&NativeForm>) -> R
             }
         }
         source.push_str(&setup);
-        if !matches!(
-            c.kind,
-            ControlKind::TextBox
-                | ControlKind::RefEdit
-                | ControlKind::ScrollBar
-                | ControlKind::SpinButton
-                | ControlKind::ListBox
-                | ControlKind::ComboBox
-                | ControlKind::TabStrip
-                | ControlKind::MultiPage
-                | ControlKind::Image
-        ) {
-            source.push_str(&format!("{temp}.Caption={}\n", vba_string(&c.caption)));
-        }
-        if matches!(c.kind, ControlKind::TextBox | ControlKind::RefEdit) {
-            source.push_str(&format!("{temp}.VbaText={}\n", vba_string(&c.text)));
-        }
-        if matches!(
-            c.kind,
-            ControlKind::CheckBox | ControlKind::OptionButton | ControlKind::ToggleButton
-        ) {
-            let initial = match c.text.as_str() {
-                "1" => "True",
-                "0" => "False",
-                "" if native.is_none() => "False",
-                _ => "Null",
-            };
-            source.push_str(&format!("{temp}.VbaValue={initial}\n"));
-        }
         source.push_str(&format!(
             "Set Vba{}={temp}\nVbaAllControls.VbaAdd {temp}\n",
             c.name
         ));
-        if native.is_some()
-            && matches!(
-                c.kind,
-                ControlKind::Frame | ControlKind::Page | ControlKind::MultiPage
-            )
-        {
-            source.push_str(&format!("Set {temp}.VbaContext=VbaContext\n"));
-            if matches!(c.kind, ControlKind::Frame | ControlKind::Page) {
-                source.push_str(&format!("{temp}.VbaConfigureChildren\n"));
-            }
+        if native.is_some() && matches!(c.kind, ControlKind::Frame | ControlKind::Page) {
+            source.push_str(&format!("{temp}.VbaConfigureChildren\n"));
         }
         if let Some(parent) = c.parent {
             let owner = form
@@ -854,24 +868,6 @@ fn compiled_form(form: &Form, module: &Module, native: Option<&NativeForm>) -> R
         }
         if let Some(control) = native.and_then(|n| n.design.controls.iter().find(|n| n.id == c.id))
         {
-            if matches!(
-                c.kind,
-                ControlKind::TextBox
-                    | ControlKind::RefEdit
-                    | ControlKind::CheckBox
-                    | ControlKind::OptionButton
-                    | ControlKind::ToggleButton
-                    | ControlKind::ListBox
-                    | ControlKind::ComboBox
-            ) {
-                source.push_str(&format!("{temp}.Locked={}\n", boolean(control.locked)));
-            }
-            if c.kind == ControlKind::OptionButton {
-                source.push_str(&format!(
-                    "{temp}.GroupName={}\n",
-                    vba_string(&control.group_name)
-                ));
-            }
             if c.kind == ControlKind::Page
                 && let Some(tab) = native
                     .and_then(|n| n.design.controls.iter().find(|p| Some(p.id) == c.parent))
@@ -932,19 +928,15 @@ fn compiled_form(form: &Form, module: &Module, native: Option<&NativeForm>) -> R
                 }
             }
             if matches!(c.kind, ControlKind::TextBox | ControlKind::RefEdit) {
-                source.push_str(&format!("{temp}.MaxLength={}\n{temp}.MultiLine={}\n{temp}.WordWrap={}\n{temp}.EnterKeyBehavior={}\n{temp}.TabKeyBehavior={}\n{temp}.EnterFieldBehavior={}\n", control.max_length,boolean(control.text_behavior.multi_line),boolean(control.text_behavior.word_wrap),boolean(control.text_behavior.enter_key),boolean(control.text_behavior.tab_key),u8::from(control.text_behavior.recall_selection)));
-                if control.text_behavior.password_char != 0 {
-                    source.push_str(&format!(
-                        "{temp}.PasswordChar=ChrW({})\n",
-                        control.text_behavior.password_char
-                    ));
-                }
-            }
-            if c.kind == ControlKind::CommandButton {
                 source.push_str(&format!(
-                    "{temp}.VbaDefault={}\n{temp}.VbaCancel={}\n",
-                    boolean(control.default),
-                    boolean(control.cancel)
+                    "VbaInitializeText {temp},{},{},{},{},{},{},{}\n",
+                    control.max_length,
+                    boolean(control.text_behavior.multi_line),
+                    boolean(control.text_behavior.word_wrap),
+                    boolean(control.text_behavior.enter_key),
+                    boolean(control.text_behavior.tab_key),
+                    u8::from(control.text_behavior.recall_selection),
+                    control.text_behavior.password_char
                 ));
             }
         }
@@ -962,6 +954,24 @@ fn compiled_form(form: &Form, module: &Module, native: Option<&NativeForm>) -> R
     }
     if containers {
         source.push_str("VbaReorderTabs\n");
+    }
+    if let Some(native) = native {
+        for control in &native.design.controls {
+            if !control.row_source.is_empty() {
+                source.push_str(&format!(
+                    "Vba{}.RowSource={}\n",
+                    control.name,
+                    vba_string(&control.row_source)
+                ));
+            }
+            if !control.control_source.is_empty() {
+                source.push_str(&format!(
+                    "Vba{}.ControlSource={}\n",
+                    control.name,
+                    vba_string(&control.control_source)
+                ));
+            }
+        }
     }
     source.push_str(&call("UserForm_Initialize"));
     source.push_str("End Sub\nPublic Sub VbaLoad()\nIf Not VbaLoaded Then Class_Initialize\nEnd Sub\nPublic Sub Show(Optional ByVal modal As Variant=1)\nIf modal<>0 And modal<>1 Then\nErr.Raise 5\nEnd If\nIf Not VbaLoaded Then Class_Initialize\nIf VbaVisible Then\nIf modal=1 Then Err.Raise 400\nExit Sub\nEnd If\nSet VbaDisplayOwner=Me\nVbaVisible=True\n");
@@ -1075,6 +1085,9 @@ fn compiled_form(form: &Form, module: &Module, native: Option<&NativeForm>) -> R
     if native.is_some() {
         source.push_str(&crate::form_focus::members(form, &handlers));
         source.push_str(crate::form_tabs::INPUT);
+    }
+    if ranges {
+        source.push_str("Public Sub VbaRefreshBindings(ByVal targets As Variant)\nDim control As Object\nFor Each control In targets\nIf Not VbaLoaded Then Exit Sub\nIf Not control.VbaDetached Then VbaReadControlBinding control\nNext control\nEnd Sub\n");
     }
     if handlers.contains("userform_terminate") {
         source.push_str("Private Sub Class_Terminate()\nUserForm_Terminate\nEnd Sub\n");
@@ -1577,7 +1590,12 @@ impl Ide {
                     &SourceFile::new(
                         m.id,
                         m.name.clone(),
-                        compiled_form(designer.form(), m, self.native_forms.get(&m.id))?,
+                        compiled_form(
+                            designer.form(),
+                            m,
+                            self.native_forms.get(&m.id),
+                            self.form_range_import().is_some(),
+                        )?,
                     )?,
                     ModuleKind::Class,
                 )?);
@@ -1610,7 +1628,8 @@ impl Ide {
             .into_iter()
             .enumerate()
             {
-                let mut source = crate::form_controls::control_class(kind);
+                let mut source =
+                    crate::form_controls::control_class(kind, self.form_range_import().is_some());
                 if matches!(kind, ControlKind::TabStrip | ControlKind::MultiPage) {
                     let mut names = BTreeSet::new();
                     let reserved = [
@@ -1678,6 +1697,11 @@ impl Ide {
             }
             for (id, name, source) in [
                 (
+                    u64::MAX - 48,
+                    "VbaFormBinding",
+                    crate::form_bindings::CLASS.to_owned(),
+                ),
+                (
                     u64::MAX - 46,
                     "VbaFormControlContext",
                     crate::form_dynamic::CONTEXT.to_owned(),
@@ -1709,6 +1733,9 @@ impl Ide {
                     crate::form_tab_collection::source(true),
                 ),
             ] {
+                if name == "VbaFormBinding" && self.form_range_import().is_none() {
+                    continue;
+                }
                 modules.push(parse(
                     &SourceFile::new(SourceId(id), format!("{name}.cls"), source)?,
                     ModuleKind::Class,
@@ -1759,6 +1786,9 @@ impl Ide {
             let mut support =
                 String::from("Public Const vbModal As Long=1\nPublic Const vbModeless As Long=0\n");
             support.push_str(crate::form_dynamic::INITIALIZE);
+            if self.form_range_import().is_some() {
+                support.push_str(&crate::form_bindings::support(true));
+            }
             support.push_str("Public Function VbaControlRequest(ByVal context As VbaFormControlContext,ByVal operation As Integer,ByVal target As Object,ByVal argument As Variant) As Object\nSet VbaControlRequest=context.VbaInvoke(operation,target,argument)\nEnd Function\n");
             support.push_str("Public Function VbaNextPageId() As Long\nStatic nextId As Long\nIf nextId= -2147483647 Then Err.Raise 7\nnextId=nextId-1\nVbaNextPageId=nextId\nEnd Function\n");
             support.push_str("Public Function VbaUserForms(Optional ByVal index As Variant) As Object\nIf IsMissing(index) Then\nSet VbaUserForms=VbaFormUserForms\nElse\nSet VbaUserForms=VbaFormUserForms.Item(index)\nEnd If\nEnd Function\n");
@@ -1798,9 +1828,34 @@ impl Ide {
         }
         Ok(modules)
     }
+    fn form_range_import(&self) -> Option<Import> {
+        self.imports
+            .iter()
+            .find(|import| {
+                import.name.eq_ignore_ascii_case("Range")
+                    && import.kind == vba_foreign::InvokeKind::Call
+            })
+            .cloned()
+            .map(|mut import| {
+                import.name = "VbaFormBindingRange".into();
+                import
+            })
+    }
     pub(crate) fn form_imports(&self) -> Vec<Import> {
         let mut imports = self.imports.clone();
         if !self.forms.is_empty() {
+            if let Some(import) = self.form_range_import() {
+                imports.push(import);
+            }
+            if self.form_range_import().is_some() {
+                imports.push(Import {
+                    name: "VbaFormBindingRevision".into(),
+                    root: "VbaFormsGate".into(),
+                    member: Some("BindingRevision".into()),
+                    kind: vba_foreign::InvokeKind::Call,
+                });
+            }
+
             imports.push(Import {
                 name: "VbaFormEnumInterface".into(),
                 kind: vba_foreign::InvokeKind::Call,
@@ -1884,6 +1939,23 @@ impl Ide {
                 return Err(error("control kind"));
             };
             let kind = crate::form_dynamic::kind(code)?;
+            let rows = field.eq_ignore_ascii_case("RowSource");
+            if field.eq_ignore_ascii_case("ControlSource") && crate::form_bindings::supported(kind)
+                || rows && matches!(kind, ControlKind::ListBox | ControlKind::ComboBox)
+            {
+                if self.form_range_import().is_none() {
+                    return Ok(Value::String(VbaString::from_utf8("")?));
+                }
+                return match session.read_instance_field(
+                    object,
+                    if rows { "VbaRowsBinding" } else { "VbaBinding" },
+                )? {
+                    Value::Nothing => Ok(Value::String(VbaString::from_utf8("")?)),
+                    Value::Object(binding) => session.read_instance_field(binding, "VbaSource"),
+                    _ => Err(error("invalid native binding")),
+                };
+            }
+
             if kind == ControlKind::Page
                 && ["name", "vbaname", "index", "vbaindex"]
                     .contains(&field.to_ascii_lowercase().as_str())
@@ -2132,6 +2204,48 @@ impl Ide {
             FormInput::Selection(input),
             host,
         )
+    }
+    /// Refresh linked native values after an embedding document revision changes.
+    /// Inert inspection discovers targets; actual reads/events use ordinary authorized VBA frames.
+    pub fn refresh_form_bindings(
+        &mut self,
+        instance: FormInstance,
+        host: &mut impl Host,
+    ) -> Result<bool> {
+        if self.form_range_import().is_none() || !self.form_instance_can_deliver(instance) {
+            return Ok(false);
+        }
+        let session = self
+            .session
+            .as_ref()
+            .ok_or_else(|| error("no form session"))?;
+        let mut targets = Vec::new();
+        for object in crate::form_dynamic::objects(session, instance.object)? {
+            let Value::Integer(code) = session.read_instance_field(object, "VbaKind")? else {
+                return Err(error("control kind"));
+            };
+            let kind = crate::form_dynamic::kind(code)?;
+            if !crate::form_bindings::supported(kind) {
+                continue;
+            }
+            let bound = matches!(
+                session.read_instance_field(object, "VbaBinding")?,
+                Value::Object(_)
+            );
+            let rows = matches!(kind, ControlKind::ListBox | ControlKind::ComboBox)
+                && matches!(
+                    session.read_instance_field(object, "VbaRowsBinding")?,
+                    Value::Object(_)
+                );
+            if bound || rows {
+                targets.push(object);
+            }
+        }
+        if targets.is_empty() {
+            return Ok(false);
+        }
+        self.deliver_form_input(instance, None, None, FormInput::Refresh(targets), host)?;
+        Ok(true)
     }
     pub fn form_instance_numeric(
         &mut self,
@@ -2486,6 +2600,20 @@ impl Ide {
                 }
                 ("VbaClick", vec![])
             }
+        } else if let FormInput::Refresh(ref targets) = input {
+            let upper = i32::try_from(
+                targets
+                    .len()
+                    .checked_sub(1)
+                    .ok_or_else(|| error("empty binding refresh"))?,
+            )
+            .map_err(|_| error("binding refresh budget"))?;
+            let mut values =
+                vba_values::VbaArray::new(ScalarKind::Object, vec![(0, upper)], false)?;
+            for (index, target) in targets.iter().enumerate() {
+                values.set(index, Value::Object(*target))?;
+            }
+            ("VbaRefreshBindings", vec![Value::Array(values)])
         } else {
             if text.is_some() {
                 return Err(error("close does not accept text"));

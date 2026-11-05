@@ -1,5 +1,24 @@
 # Implementation progress
 
+## M7A.4 continued — native cell/row bindings (2026-11-05)
+
+Implemented shared packet under ADR 0065: inert native source metadata,
+ordinary binding objects, explicit range-import routing, two-way value/list
+synchronization and an optional validated host data epoch. The owner approved a
+static permission allowlist maximum of 4,096 entries; execution and memory limits
+are unchanged. Generic object-array For Each now preserves project identity when
+the array is held in Variant. Shared constructor helpers consolidate repeated setup.
+
+Validation PASS: full CI, WASM compilation, actual WASI execution, UI, native
+application capture, web and actual Chromium selection/Stop/resume regression.
+All 96 form-instance, 34 generic class and 22 widget cases pass. GridCraft's local
+integration passes all 18 native-form package cases plus actual typed text/list
+widget input, engine refresh and trust revocation; the render was inspected.
+These cover native bindings before Initialize, read-only rows inside Change,
+larger-list epoch reuse, protected value/selection/row/bounds failures and exact
+XLSM resource retention. Final pinned fork CI/Node-WASM integration is in progress.
+The remaining M7A.4 ledger is still open.
+
 ## M7A.4 continued — multiple selection and TypeName (2026-11-05)
 
 Implemented under ADR 0063/0064: native ListBox MultiSelect metadata/constants,
