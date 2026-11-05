@@ -85,6 +85,8 @@ pub(crate) fn control_class(kind: ControlKind) -> String {
         ControlKind::ComboBox => 10,
         ControlKind::Frame => 11,
         ControlKind::TabStrip => 12,
+        ControlKind::MultiPage => 13,
+        ControlKind::Page => 14,
     };
     s.push_str(&format!(
         "Public Property Get VbaKind() As Integer\nVbaKind={kind_code}\nEnd Property\n"
@@ -97,6 +99,7 @@ pub(crate) fn control_class(kind: ControlKind) -> String {
             | ControlKind::ListBox
             | ControlKind::ComboBox
             | ControlKind::TabStrip
+            | ControlKind::MultiPage
     ) {
         s.push_str("Public Caption As String\n");
     }
@@ -136,6 +139,11 @@ pub(crate) fn control_class(kind: ControlKind) -> String {
         s.push_str("End Sub\n");
     } else if kind == ControlKind::TabStrip {
         s.push_str(crate::form_tabs::STRIP);
+    } else if kind == ControlKind::MultiPage {
+        s.push_str(&crate::form_tabs::multipage());
+    } else if kind == ControlKind::Page {
+        s.push_str(crate::form_container::FRAME);
+        s.push_str("Public VbaIndex As Long\nPublic Accelerator As String\nPublic Property Get Index() As Long\nIndex=VbaIndex\nEnd Property\n");
     } else if kind == ControlKind::Frame {
         s.push_str(crate::form_container::FRAME);
     } else if kind == ControlKind::ComboBox {

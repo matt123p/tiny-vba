@@ -117,9 +117,28 @@ impl Ide {
         let point = |n: i32| n as f32 * (72.0 / 2540.0);
         let mut total_tabs = 0usize;
         for c in &native.design.controls {
-            if c.id == 0 || c.id > i32::MAX as u32 || (c.kind == Kind::TabStrip) != c.tabs.is_some()
+            if c.id == 0
+                || c.id > i32::MAX as u32
+                || (matches!(c.kind, Kind::TabStrip | Kind::MultiPage)) != c.tabs.is_some()
             {
                 return Err(error("invalid native control identity/tab metadata"));
+            }
+            if c.kind == Kind::MultiPage {
+                let children = native
+                    .design
+                    .controls
+                    .iter()
+                    .filter(|p| p.parent == Some(c.id))
+                    .collect::<Vec<_>>();
+                if !c.tabs.as_ref().is_some_and(|t| {
+                    t.tabs.len() == children.len()
+                        && t.tabs
+                            .iter()
+                            .zip(&children)
+                            .all(|(tab, page)| page.kind == Kind::Page && tab.name == page.name)
+                }) {
+                    return Err(error("MultiPage page/tab identity mismatch"));
+                }
             }
             if let Some(tabs) = &c.tabs {
                 total_tabs = total_tabs.saturating_add(tabs.tabs.len());
@@ -155,6 +174,8 @@ impl Ide {
                 name: c.name.clone(),
                 kind: match c.kind {
                     Kind::TabStrip => ControlKind::TabStrip,
+                    Kind::MultiPage => ControlKind::MultiPage,
+                    Kind::Page => ControlKind::Page,
                     Kind::Frame => ControlKind::Frame,
                     Kind::Label => ControlKind::Label,
                     Kind::TextBox => ControlKind::TextBox,

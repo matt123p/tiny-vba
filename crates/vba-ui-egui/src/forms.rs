@@ -117,15 +117,51 @@ fn ancestors<'a>(
         if result.len() >= 8 {
             return None;
         }
-        let node = form
-            .controls
-            .iter()
-            .find(|c| c.id == id && c.kind == ControlKind::Frame)?;
+        let node = form.controls.iter().find(|c| {
+            c.id == id
+                && matches!(
+                    c.kind,
+                    ControlKind::Frame | ControlKind::MultiPage | ControlKind::Page
+                )
+        })?;
         result.push(node);
         parent = node.parent;
     }
     result.reverse();
     Some(result)
+}
+fn native_page_visible(
+    ide: &Ide,
+    instance: vba_ide::FormInstance,
+    form: &vba_ide::forms::Form,
+    control: &vba_ide::forms::Control,
+) -> bool {
+    let Some(parents) = ancestors(form, control) else {
+        return false;
+    };
+    parents
+        .into_iter()
+        .chain(std::iter::once(control))
+        .all(|c| {
+            if ide
+                .form_instance_field(instance, Some(c.id), "Visible")
+                .ok()
+                != Some(vba_ide::Value::Boolean(true))
+            {
+                return false;
+            }
+            if c.kind != ControlKind::Page {
+                return true;
+            }
+            let Some(parent) = c.parent else {
+                return false;
+            };
+            ide.form_instance_field(instance, Some(parent), "Value")
+                .ok()
+                == ide
+                    .form_instance_field(instance, Some(c.id), "VbaIndex")
+                    .ok()
+        })
 }
 fn native_eligible(
     ide: &Ide,
@@ -137,18 +173,19 @@ fn native_eligible(
     let Some(parents) = ancestors(form, control) else {
         return false;
     };
-    parents
-        .into_iter()
-        .chain(std::iter::once(control))
-        .all(|c| {
-            ["Visible", "Enabled"]
-                .into_iter()
-                .chain(tabbing.then_some("TabStop"))
-                .all(|name| {
-                    ide.form_instance_field(instance, Some(c.id), name).ok()
-                        == Some(vba_ide::Value::Boolean(true))
-                })
-        })
+    native_page_visible(ide, instance, form, control)
+        && parents
+            .into_iter()
+            .chain(std::iter::once(control))
+            .all(|c| {
+                ["Visible", "Enabled"]
+                    .into_iter()
+                    .chain(tabbing.then_some("TabStop"))
+                    .all(|name| {
+                        ide.form_instance_field(instance, Some(c.id), name).ok()
+                            == Some(vba_ide::Value::Boolean(true))
+                    })
+            })
 }
 fn parent_geometry(
     ide: &Ide,
@@ -1115,7 +1152,7 @@ impl EditorUi {
                     );
                     let mut focus = Vec::new();
                     for c in &form.controls {
-                        if native && !ancestors(form,c).is_some_and(|parents|parents.iter().all(|p|ide.form_instance_field(instance,Some(p.id),"Visible").ok()==Some(vba_ide::Value::Boolean(true)))) {continue;}
+                        if native && !native_page_visible(ide,instance,form,c) {continue;}
                         let Some((offset,parent_clip))=parent_geometry(ide,instance,form,c,rect) else {continue;};
                         if ide
                             .form_instance_field(instance, Some(c.id), "Visible")
@@ -1172,7 +1209,7 @@ impl EditorUi {
                             Ok(vba_ide::Value::Long(n)) => n,
                             _ => i32::MAX,
                         };
-                        if enabled && if native { c.kind != ControlKind::Label && c.kind!=ControlKind::Frame } else { tab_stop } {
+                        if enabled && if native { c.kind != ControlKind::Label && !matches!(c.kind,ControlKind::Frame|ControlKind::Page) } else { tab_stop } {
                             focus.push((index, c.id, widget_id));
                         }
                         let previous_clip=ui.clip_rect();
@@ -1181,15 +1218,15 @@ impl EditorUi {
                         let control_scope=if let Some(parent)=c.parent {control_scope.accessibility_parent(ui.scope_id().with(("runtime.control",parent)))} else {control_scope};
                         ui.scope_builder(control_scope, |ui| {
                             ui.add_enabled_ui(enabled, |ui| match c.kind {
-                                ControlKind::Frame=> {
+                                ControlKind::Frame | ControlKind::Page=> {
                                     let response=ui.interact(bounds,widget_id,egui::Sense::click());
                                     ui.painter().rect_filled(bounds,2.,theme.chrome);
                                     ui.painter().rect_stroke(bounds.shrink(1.),2.,egui::Stroke::new(1.,theme.border),egui::StrokeKind::Inside);
-                                    ui.painter().text(bounds.left_top()+egui::vec2(6.,3.),egui::Align2::LEFT_TOP,&caption,egui::TextStyle::Body.resolve(ui.style()),theme.text);
+                                    if c.kind==ControlKind::Frame {ui.painter().text(bounds.left_top()+egui::vec2(6.,3.),egui::Align2::LEFT_TOP,&caption,egui::TextStyle::Body.resolve(ui.style()),theme.text);}
                                     response.widget_info(||egui::WidgetInfo::labeled(egui::accesskit::Role::Group,enabled,&c.name));
                                     if response.clicked() {commands.push(Command::Form(FormCommand::InstanceEvent(instance,Some(c.id),None)));}
                                 }
-                                ControlKind::TabStrip=> {tabs::Tabs{ide,instance,control:c,bounds,widget:widget_id,theme}.show(ui,commands);}
+                                ControlKind::TabStrip | ControlKind::MultiPage=> {tabs::Tabs{ide,instance,control:c,bounds,widget:widget_id,theme}.show(ui,commands);}
 
                                 ControlKind::ComboBox=> {combo::ComboBox{ide,instance,control:c,bounds,widget:widget_id,theme}.show(ui,commands);}
                                 ControlKind::ListBox => {list::ListBox{ide,instance,control:c,bounds,widget:widget_id,theme}.show(ui,commands);}
@@ -1323,7 +1360,7 @@ impl EditorUi {
                                 }
                             });
                         });
-                        if native && c.kind!=ControlKind::TabStrip && enabled && ui.rect_contains_pointer(bounds)
+                        if native && !matches!(c.kind,ControlKind::TabStrip|ControlKind::MultiPage) && enabled && ui.rect_contains_pointer(bounds)
                             && !ui.input(|i| i.pointer.any_down())
                             && let Ok(vba_ide::Value::String(tip)) = ide.form_instance_field(instance, Some(c.id), "ControlTipText")
                             && !tip.units().is_empty() {

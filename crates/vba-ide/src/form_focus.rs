@@ -119,9 +119,11 @@ End Sub
 Private Sub VbaInitialFocus()
 Dim control As Object,best As Object,scan As Long
 If Not (VbaActiveControl Is Nothing) Then Exit Sub
-For scan=0 To VbaAllControls.Count-1
-Set control=VbaAllControls.Item(scan)
-If control.VbaKind<>1 And control.VbaKind<>11 And VbaEligible(control,True) Then
+Dim entries As Variant
+entries=VbaAllControls.VbaEntries
+For scan=0 To VbaAllControls.VbaTotal-1
+Set control=entries(scan)
+If control.VbaKind<>1 And control.VbaKind<>11 And control.VbaKind<>14 And VbaEligible(control,True) Then
 If best Is Nothing Then
 Set best=control
 ElseIf control.VbaNavigationRank<best.VbaNavigationRank Then

@@ -27,6 +27,8 @@ pub enum Kind {
     ComboBox,
     Frame,
     TabStrip,
+    MultiPage,
+    Page,
 }
 /// Coordinates are original signed HIMETRIC units, not pixels or points.
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -137,7 +139,7 @@ pub struct Design {
     pub help_context_id: i32,
     pub width: i32,
     pub height: i32,
-    /// Native painting preorder, retaining immediate Frame parent identity.
+    /// Native painting preorder, retaining immediate native parent identity.
     pub controls: Vec<Control>,
 }
 #[derive(Clone, Debug, PartialEq, Eq)]

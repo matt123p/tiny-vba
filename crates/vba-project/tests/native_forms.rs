@@ -423,3 +423,66 @@ fn native_tabstrip_decodes_distinct_tab_identity_unicode_arrays_and_flags() {
         -1
     );
 }
+
+#[test]
+fn native_multipage_joins_internal_tabs_pages_and_original_resources() {
+    let bytes = fixture::multipage_companion(1);
+    let form = decode(&bytes).unwrap();
+    let multi = &form.design.controls[3];
+    assert_eq!(multi.kind, Kind::MultiPage);
+    assert_eq!(multi.tabs.as_ref().unwrap().selected, 1);
+    assert_eq!(form.design.controls.len(), 10);
+    assert_eq!(form.design.controls[4].name, "FirstTab");
+    assert_eq!(form.design.controls[4].parent, Some(20));
+    assert_eq!(form.design.controls[5].parent, Some(31));
+    assert_eq!(form.design.controls[6].caption, "Second😀");
+    assert!(!form.design.controls[8].enabled);
+    assert!(
+        !form
+            .design
+            .controls
+            .iter()
+            .any(|c| c.name == "InternalTabs")
+    );
+    assert_eq!(form.resources[1].bytes, bytes);
+}
+
+#[test]
+fn native_multipage_rejects_inconsistent_x_and_orphan_page_storages() {
+    use std::io::{Cursor, Read, Write};
+    for fault in 0..5 {
+        let bytes = fixture::multipage_companion(0);
+        let mut file = cfb::CompoundFile::open(Cursor::new(bytes[4..].to_vec())).unwrap();
+        let mut x = Vec::new();
+        file.open_stream("/i20/x")
+            .unwrap()
+            .read_to_end(&mut x)
+            .unwrap();
+        match fault {
+            0 => {
+                file.remove_stream("/i20/x").unwrap();
+            }
+            1 => {
+                let n = x.len();
+                x[n - 4..].copy_from_slice(&31u32.to_le_bytes());
+            }
+            2 => {
+                let n = x.len();
+                x[n - 4..].copy_from_slice(&99u32.to_le_bytes());
+            }
+            3 => {
+                x[40..44].copy_from_slice(&2u32.to_le_bytes());
+            }
+            _ => {
+                x.push(0);
+            }
+        }
+        if fault != 0 {
+            file.create_stream("/i20/x").unwrap().write_all(&x).unwrap();
+        }
+        let data = file.into_inner().into_inner();
+        let mut bytes = (data.len() as u32).to_le_bytes().to_vec();
+        bytes.extend(data);
+        assert!(decode(&bytes).is_err(), "fault {fault}");
+    }
+}

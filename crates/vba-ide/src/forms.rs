@@ -18,6 +18,8 @@ pub enum ControlKind {
     ComboBox,
     Frame,
     TabStrip,
+    MultiPage,
+    Page,
 }
 impl ControlKind {
     pub fn name(self) -> &'static str {
@@ -34,6 +36,8 @@ impl ControlKind {
             Self::ComboBox => "ComboBox",
             Self::Frame => "Frame",
             Self::TabStrip => "TabStrip",
+            Self::MultiPage => "MultiPage",
+            Self::Page => "Page",
         }
     }
     pub fn default_event(self) -> &'static str {
@@ -43,13 +47,15 @@ impl ControlKind {
             | Self::SpinButton
             | Self::ListBox
             | Self::ComboBox
-            | Self::TabStrip => "Change",
+            | Self::TabStrip
+            | Self::MultiPage => "Change",
             Self::Label
             | Self::CommandButton
             | Self::CheckBox
             | Self::OptionButton
             | Self::ToggleButton
-            | Self::Frame => "Click",
+            | Self::Frame
+            | Self::Page => "Click",
         }
     }
 }
@@ -85,7 +91,7 @@ pub struct Control {
     pub visible: bool,
     pub tab_stop: bool,
     pub group: Option<u32>,
-    /// Immediate native Frame; independent of designer selection groups.
+    /// Immediate native container; independent of designer selection groups.
     pub parent: Option<u32>,
 }
 #[derive(Clone, Debug, PartialEq)]
@@ -168,6 +174,14 @@ impl Form {
             }
         }
         for c in &self.controls {
+            let owner = c
+                .parent
+                .and_then(|id| self.controls.iter().find(|p| p.id == id));
+            if (c.kind == ControlKind::Page)
+                != owner.is_some_and(|p| p.kind == ControlKind::MultiPage)
+            {
+                return Err(error("Page must be an immediate child of MultiPage"));
+            }
             let mut parent = c.parent;
             let mut ancestors = BTreeSet::new();
             ancestors.insert(c.id);
@@ -178,7 +192,13 @@ impl Form {
                 let owner = self
                     .controls
                     .iter()
-                    .find(|c| c.id == id && c.kind == ControlKind::Frame)
+                    .find(|c| {
+                        c.id == id
+                            && matches!(
+                                c.kind,
+                                ControlKind::Frame | ControlKind::MultiPage | ControlKind::Page
+                            )
+                    })
                     .ok_or_else(|| error("missing native Frame parent"))?;
                 let parent_at = self
                     .controls

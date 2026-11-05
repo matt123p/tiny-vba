@@ -1,6 +1,9 @@
 //! Native tabs remain ordinary instance objects, independently of form controls.
 pub(crate) fn event(kind: crate::forms::ControlKind, name: &str) -> Option<&'static str> {
-    if kind != crate::forms::ControlKind::TabStrip {
+    if !matches!(
+        kind,
+        crate::forms::ControlKind::TabStrip | crate::forms::ControlKind::MultiPage
+    ) {
         return None;
     }
     ["Change", "Click"]
@@ -72,7 +75,7 @@ If value<0 Or value>7200 Then Err.Raise 380
 VbaTabFixedHeight=value
 End Property
 Public Event Change
-Public Event Click
+Public Event Click(ByVal index As Long)
 Private Sub Class_Initialize()
 Set VbaTabs=New VbaFormTabs
 VbaValue=-1
@@ -119,11 +122,11 @@ Public Sub VbaSelect(ByVal value As Long)
 Dim tab As Object
 Set tab=VbaTabs.Item(value)
 If Not tab.Visible Or Not tab.Enabled Then Exit Sub
+If VbaValue=value Then Exit Sub
 Me.Value=value
-RaiseEvent Click
+RaiseEvent Click(value)
 End Sub
 Public Sub VbaClick()
-RaiseEvent Click
 End Sub
 "#;
 pub(crate) const INPUT: &str = r#"
@@ -136,3 +139,30 @@ If Not VbaLoaded Or Not VbaVisible Or Not VbaEligible(control) Then Exit Sub
 control.VbaSelect value
 End Sub
 "#;
+
+/// Pages are the actual container objects, not copies of internal Tab objects.
+pub(crate) fn multipage() -> String {
+    let mut source = STRIP
+        .replace("VbaFormTabs", "VbaFormPages")
+        .replace("VbaTabs", "VbaPages")
+        .replace(
+            "If value< -1 Or value>=VbaPages.Count",
+            "If value<0 Or value>=VbaPages.Count",
+        )
+        .replace("Property Get Tabs(", "Property Get Pages(")
+        .replace("Set Tabs=", "Set Pages=")
+        .replace("Attribute SelectedItem.VB_UserMemId = 0\n", "")
+        .replace(
+            "Public Property Get Value() As Long\n",
+            "Public Property Get Value() As Long\nAttribute Value.VB_UserMemId = 0\n",
+        );
+    source.push_str("Public VbaActiveControl As Object\nPublic Sub VbaAdd(ByVal page As Object)\npage.VbaIndex=VbaPages.Count\nVbaPages.VbaAdd page\nEnd Sub\n");
+    source
+}
+
+pub(crate) fn indexed(kind: crate::forms::ControlKind, event: &str) -> bool {
+    matches!(
+        kind,
+        crate::forms::ControlKind::TabStrip | crate::forms::ControlKind::MultiPage
+    ) && event.eq_ignore_ascii_case("Click")
+}

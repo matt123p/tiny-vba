@@ -452,5 +452,14 @@ remain NOT_RUN under M8.5.
 records and separate ordinary Tab/Tabs identity, indexed/named lookup,
 enumeration/default selection and authorized widget input. Canonical state stays
 in ordinary classes; inert queries/rendering do not instantiate or execute VBA.
-MultiPage, dynamic tab mutation/index/name semantics and the remaining M7A.4
+Dynamic page/tab mutation/index/name semantics and the remaining M7A.4
 ledger stay open. Native edited persistence and .tvform removal remain separate.
+
+[ADR 0058](decisions/0058-native-multipage.md) adds selected native MultiPage
+f/o/x reconciliation, distinct Page/Pages identity, immediate child collections,
+selection-gated input/focus and actual page rendering. Internal tabs stay private;
+canonical state remains ordinary classes and source/resources stay inert. Indexed
+Click and repeated-selection behavior also correct the prior TabStrip contract.
+Dynamic page/tab mutation, further persistence/property/event/lifecycle cases and
+the full remaining M7A.4 ledger remain open. Native edited saving/removal stay
+M7A.5/.6; fresh Office traces remain NOT_RUN under M8.5.

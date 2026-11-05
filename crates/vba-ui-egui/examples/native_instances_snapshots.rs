@@ -15,6 +15,9 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         .nth(1)
         .unwrap_or_else(|| "reports/ui".into());
     std::fs::create_dir_all(&folder)?;
+    let pages = std::env::args()
+        .nth(2)
+        .is_some_and(|o| o == "--page-controls");
     let tabs = std::env::args()
         .nth(2)
         .is_some_and(|o| o == "--tab-controls");
@@ -42,7 +45,9 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             1252,
             &[NativeFormResource {
                 name: "NativeForm.frx".into(),
-                bytes: if tabs {
+                bytes: if pages {
+                    fixture::multipage_companion(1)
+                } else if tabs {
                     fixture::tab_companion(1)
                 } else if frames {
                     fixture::frame_companion(2)
@@ -57,7 +62,9 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                 },
             }],
         )?;
-        let main = if tabs {
+        let main = if pages {
+            "Sub Main()\nNativeForm.Show 0\nNativeForm.Multi1.SetFocus\nEnd Sub"
+        } else if tabs {
             "Sub Main()\nNativeForm.Show 0\nNativeForm.Tabs1.SetFocus\nEnd Sub"
         } else if frames {
             "Sub Main()\nNativeForm.Show 0\nEnd Sub"
@@ -82,7 +89,13 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                 break;
             }
         }
-        if ide.form_instances()?.len() != if metadata || frames || tabs { 1 } else { 2 } {
+        if ide.form_instances()?.len()
+            != if metadata || frames || tabs || pages {
+                1
+            } else {
+                2
+            }
+        {
             return Err("expected two live native form instances".into());
         }
         let mut h = Harness::builder()
@@ -117,7 +130,9 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                 return Err("expected native tooltip".into());
             }
         }
-        let prefix = if tabs {
+        let prefix = if pages {
+            "m7a4-native-pages"
+        } else if tabs {
             "m7a4-native-tabs"
         } else if frames {
             "m7a4-native-frames"

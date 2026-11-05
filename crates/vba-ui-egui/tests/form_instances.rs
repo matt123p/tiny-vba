@@ -1210,3 +1210,91 @@ fn native_tabstrip_pointer_and_arrows_use_canonical_tabs_and_authorized_commands
     assert!(h.state().errors.is_empty(), "{:?}", h.state().errors);
     Ok(())
 }
+
+#[test]
+fn native_multipage_pointer_and_arrows_select_actual_page_containers() -> R {
+    let mut ide = Ide::new();
+    ide.import_native_form_export(
+        "NativeForm.frm",
+        &fixture::export(),
+        1252,
+        &[NativeFormResource {
+            name: "NativeForm.frx".into(),
+            bytes: fixture::multipage_companion(0),
+        }],
+    )?;
+    ide.add_module(
+        "Main.bas",
+        "Sub Main()\nNativeForm.Show 0\nNativeForm.Multi1.SetFocus\nEnd Sub",
+    )?;
+    ide.dispatch(Action::Run, &mut NoHost)?;
+    for _ in 0..100 {
+        ide.tick(&mut NoHost)?;
+        if ide.mode() == Mode::Completed {
+            break;
+        }
+    }
+    let f = *ide.form_instances()?.first().ok_or("instance")?;
+    assert!(
+        vba_ui_egui::Command::Form(vba_ui_egui::FormCommand::InstanceTab(f, 20, 1)).executes_code()
+    );
+    let mut h = Harness::builder()
+        .allow_missing_glyphs()
+        .with_size(egui::vec2(1400., 1000.))
+        .build_ui_state(
+            |ui, s: &mut State| {
+                for c in s.view.show(ui, &s.ide, Theme::light()) {
+                    if let Err(e) = apply(&mut s.ide, c, &mut NoHost) {
+                        s.errors.push(e.to_string());
+                    }
+                }
+                if let Err(e) = s.ide.tick(&mut NoHost) {
+                    s.errors.push(e.to_string());
+                }
+            },
+            State {
+                ide,
+                view: EditorUi::default(),
+                errors: vec![],
+            },
+        );
+    h.run_steps(5);
+    assert!(h.query_by_label("PageEntry1").is_some());
+    assert!(h.query_by_label("PageEntry2").is_none());
+    assert!(
+        h.get(
+            egui_kittest::kittest::By::new()
+                .label("Multi1")
+                .role(egui::accesskit::Role::TabList)
+        )
+        .query(
+            egui_kittest::kittest::By::new()
+                .label("Second😀")
+                .role(egui::accesskit::Role::Tab)
+        )
+        .is_some()
+    );
+    h.get_by_label("Second😀").click();
+    h.run_steps(8);
+    assert_eq!(
+        h.state().ide.form_instance_field(f, Some(20), "Value")?,
+        vba_ide::Value::Long(1)
+    );
+    assert!(h.query_by_label("PageEntry1").is_none());
+    assert!(h.query_by_label("PageEntry2").is_some());
+    h.key_press(egui::Key::ArrowRight);
+    h.run_steps(8);
+    assert_eq!(
+        h.state().ide.form_instance_field(f, Some(20), "Value")?,
+        vba_ide::Value::Long(0)
+    );
+    assert_eq!(
+        h.state()
+            .ide
+            .form_instance_field(f, None, "VbaActiveControl")?,
+        h.state().ide.form_instance_field(f, None, "VbaMulti1")?
+    );
+    assert_eq!(h.state().ide.output(), vec!["initialized"]);
+    assert!(h.state().errors.is_empty(), "{:?}", h.state().errors);
+    Ok(())
+}

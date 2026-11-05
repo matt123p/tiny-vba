@@ -2249,7 +2249,7 @@ End Sub"#,
 fn native_tab_input_commits_before_change_stop_and_resumes_click_once() -> R {
     let mut ide = tab_setup(
         "Sub Main()\nNativeForm.Show 0\nEnd Sub",
-        "Private Sub Tabs1_Change()\nDebug.Print Tabs1.Value\nStop\nEnd Sub\nPrivate Sub Tabs1_Click()\nDebug.Print \"click\"\nEnd Sub\n",
+        "Private Sub Tabs1_Change()\nDebug.Print Tabs1.Value\nStop\nEnd Sub\nPrivate Sub Tabs1_Click(ByVal Index As Long)\nDebug.Print \"click\"\nEnd Sub\n",
     )?;
     let f = *ide.form_instances()?.first().ok_or("form")?;
     let original = ide.native_form(f.source).ok_or("native")?.clone();
@@ -2271,5 +2271,184 @@ fn native_tab_input_commits_before_change_stop_and_resumes_click_once() -> R {
         ide.form_instance_tab_field(f, 14, 1, "Caption")?,
         Value::String(VbaString::from_utf8("Second😀")?)
     );
+    Ok(())
+}
+
+fn multipage_setup(main: &str, extra: &str) -> R<Ide> {
+    let mut ide = Ide::new();
+    let export = String::from_utf8(fixture::export())?
+        .replace(fixture::SOURCE, &(fixture::SOURCE.to_owned() + extra));
+    ide.import_native_form_export(
+        "NativeForm.frm",
+        export.as_bytes(),
+        1252,
+        &[NativeFormResource {
+            name: "NativeForm.frx".into(),
+            bytes: fixture::multipage_companion(0),
+        }],
+    )?;
+    assert!(ide.form_instances()?.is_empty());
+    ide.add_module("Main.bas", main)?;
+    ide.dispatch(Action::Run, &mut NoHost)?;
+    settle(&mut ide)?;
+    Ok(ide)
+}
+#[test]
+fn native_multipage_pages_are_canonical_containers_with_distinct_collections() -> R {
+    let ide = multipage_setup(
+        r#"Sub Main()
+Dim m As MSForms.MultiPage,p As MSForms.Page,pages As MSForms.Pages,c As Object
+Set m=NativeForm.Multi1
+Set pages=m.Pages
+Debug.Print NativeForm.Controls.Count,pages.Count
+Set p=pages("SecondTab")
+Debug.Print p Is NativeForm.SecondTab,p.Parent Is m,p.Controls(0) Is NativeForm.PageEntry2
+Debug.Print NativeForm.PageEntry2.Parent Is p,p.Caption,p.Index
+For Each p In pages
+Debug.Print p.Name,p.Controls.Count
+Next p
+m.Value=1
+Debug.Print CLng(m),m.Pages(m.Value).Caption
+Debug.Print m.SelectedItem Is m.SecondTab
+On Error Resume Next
+m.Value=3
+Debug.Print Err.Number,m.Value
+End Sub"#,
+        "Private Sub Multi1_Change()\nDebug.Print \"change\"\nEnd Sub\n",
+    )?;
+    assert_eq!(ide.mode(), Mode::Completed, "{:?}", ide.diagnostics);
+    assert_eq!(
+        ide.output(),
+        vec![
+            "initialized",
+            "4\t3",
+            "True\tTrue\tTrue",
+            "True\tSecond😀\t1",
+            "FirstTab\t1",
+            "SecondTab\t1",
+            "BlockedTab\t1",
+            "change",
+            "1\tSecond😀",
+            "True",
+            "380\t1"
+        ]
+    );
+    Ok(())
+}
+#[test]
+fn native_multipage_input_rejects_hidden_page_children_and_preserves_stopped_selection() -> R {
+    let mut ide = multipage_setup(
+        "Sub Main()\nNativeForm.Show 0\nEnd Sub",
+        "Private Sub Multi1_Change()\nDebug.Print Multi1.Value\nStop\nEnd Sub\nPrivate Sub Multi1_Click(ByVal Index As Long)\nDebug.Print \"click\"\nEnd Sub\n",
+    )?;
+    assert_eq!(ide.mode(), Mode::Completed, "{:?}", ide.diagnostics);
+    let f = *ide.form_instances()?.first().ok_or("form")?;
+    let original = ide.native_form(f.source).ok_or("native")?.clone();
+    assert!(
+        ide.form_instance_text(f, 41, VbaString::from_utf8("hidden")?, (6, 0), &mut NoHost)
+            .is_err()
+    );
+    assert!(ide.form_instance_tab(f, 20, 2, &mut NoHost).is_err());
+    ide.form_instance_tab(f, 20, 1, &mut NoHost)?;
+    settle(&mut ide)?;
+    assert_eq!(ide.mode(), Mode::Break, "{:?}", ide.diagnostics);
+    assert_eq!(
+        ide.form_instance_field(f, Some(20), "Value")?,
+        Value::Long(1)
+    );
+    assert_eq!(ide.output(), vec!["initialized", "1"]);
+    ide.dispatch(Action::Run, &mut NoHost)?;
+    settle(&mut ide)?;
+    assert_eq!(ide.output(), vec!["initialized", "1", "click"]);
+    assert!(
+        ide.form_instance_text(f, 40, VbaString::from_utf8("hidden")?, (6, 0), &mut NoHost)
+            .is_err()
+    );
+    ide.form_instance_text(
+        f,
+        41,
+        VbaString::from_utf8("selected")?,
+        (8, 0),
+        &mut NoHost,
+    )?;
+    settle(&mut ide)?;
+    assert_eq!(
+        ide.form_instance_field(f, Some(41), "VbaText")?,
+        Value::String(VbaString::from_utf8("selected")?)
+    );
+    assert_eq!(ide.native_form(f.source), Some(&original));
+    Ok(())
+}
+
+#[test]
+fn native_multipage_selection_waits_for_dirty_page_validation_and_cancellation() -> R {
+    let mut ide = multipage_setup(
+        "Sub Main()\nNativeForm.Show 0\nNativeForm.PageEntry1.SetFocus\nEnd Sub",
+        r#"
+Private attempts As Long
+Private Sub PageEntry1_BeforeUpdate(ByVal Cancel As MSForms.ReturnBoolean)
+attempts=attempts+1
+Stop
+If attempts=1 Then Cancel=True
+End Sub
+Private Sub Multi1_Change()
+Debug.Print "change"
+End Sub
+"#,
+    )?;
+    assert_eq!(ide.mode(), Mode::Completed, "{:?}", ide.diagnostics);
+    let f = *ide.form_instances()?.first().ok_or("form")?;
+    ide.form_instance_text(f, 40, VbaString::from_utf8("dirty")?, (5, 0), &mut NoHost)?;
+    settle(&mut ide)?;
+    for selected in [0, 1] {
+        ide.form_instance_tab(f, 20, 1, &mut NoHost)?;
+        settle(&mut ide)?;
+        assert_eq!(ide.mode(), Mode::Break, "{:?}", ide.diagnostics);
+        assert_eq!(
+            ide.form_instance_field(f, Some(20), "Value")?,
+            Value::Long(0)
+        );
+        ide.dispatch(Action::Run, &mut NoHost)?;
+        settle(&mut ide)?;
+        assert_eq!(ide.mode(), Mode::Completed, "{:?}", ide.diagnostics);
+        assert_eq!(
+            ide.form_instance_field(f, Some(20), "Value")?,
+            Value::Long(selected)
+        );
+    }
+    assert_eq!(ide.output(), vec!["initialized", "change"]);
+    Ok(())
+}
+
+#[test]
+fn native_page_and_tab_click_handlers_receive_long_indices_only_on_new_selection() -> R {
+    for pages in [false, true] {
+        let name = if pages { "Multi1" } else { "Tabs1" };
+        let extra =
+            format!("Private Sub {name}_Click(ByVal Index As Long)\nDebug.Print Index\nEnd Sub\n");
+        let main = "Sub Main()\nNativeForm.Show 0\nEnd Sub";
+        let mut ide = if pages {
+            multipage_setup(main, &extra)?
+        } else {
+            tab_setup(main, &extra)?
+        };
+        let f = *ide.form_instances()?.first().ok_or("form")?;
+        let id = if pages { 20 } else { 14 };
+        for tab in [0, 1, 1, 0] {
+            ide.form_instance_tab(f, id, tab, &mut NoHost)?;
+            settle(&mut ide)?;
+        }
+        assert_eq!(ide.mode(), Mode::Completed, "{:?}", ide.diagnostics);
+        assert_eq!(ide.output(), vec!["initialized", "1", "0"]);
+        let invalid = format!("Private Sub {name}_Click()\nEnd Sub\n");
+        assert!(
+            if pages {
+                multipage_setup(main, &invalid)
+            } else {
+                tab_setup(main, &invalid)
+            }
+            .is_err()
+        );
+    }
     Ok(())
 }

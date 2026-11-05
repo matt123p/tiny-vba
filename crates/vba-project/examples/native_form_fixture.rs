@@ -9,6 +9,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     );
     std::fs::create_dir_all(&dir)?;
     let option = std::env::args().nth(2);
+    let pages = option.as_deref() == Some("--page-controls");
     let tabs = option.as_deref() == Some("--tab-controls");
     let frames = option.as_deref() == Some("--frame-controls");
     let metadata = option.as_deref() == Some("--metadata");
@@ -24,11 +25,13 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         Some(
             "--focus-events" | "--text-controls" | "--password-text" | "--numeric-controls"
             | "--list-controls" | "--combo-controls" | "--metadata" | "--frame-controls"
-            | "--tab-controls",
+            | "--tab-controls" | "--page-controls",
         ) => false,
         Some(_) => return Err("unknown fixture option".into()),
     };
-    let body = if tabs {
+    let body = if pages {
+        "Stop\r\nDebug.Print Multi1.Value\r\nDebug.Print Multi1.SelectedItem.Caption"
+    } else if tabs {
         "Stop\r\nDebug.Print Tabs1.Value\r\nDebug.Print Tabs1.SelectedItem.Caption"
     } else if combo {
         "Stop\r\nDebug.Print Combo1.ListIndex\r\nDebug.Print Combo1.Value"
@@ -51,6 +54,9 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             " ClientHeight",
             " Tag = \"form metadata\"\r\n HelpContextID = 7\r\n ClientHeight",
         );
+    }
+    if pages {
+        text.push_str("\r\nPrivate Sub UserForm_Activate()\r\nMulti1.SetFocus\r\nEnd Sub\r\n");
     }
     if tabs {
         text.push_str("\r\nPrivate Sub UserForm_Activate()\r\nTabs1.SetFocus\r\nEnd Sub\r\n");
@@ -77,7 +83,9 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     std::fs::write(dir.join("NativeForm.frm"), text)?;
     std::fs::write(
         dir.join("NativeForm.frx"),
-        if tabs {
+        if pages {
+            fixture::multipage_companion(0)
+        } else if tabs {
             fixture::tab_companion(0)
         } else if frames {
             fixture::frame_companion(2)

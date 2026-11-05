@@ -18,6 +18,9 @@ const TYPES: &[&str] = &[
     "ComboBox",
     "Frame",
     "TabStrip",
+    "MultiPage",
+    "Page",
+    "Pages",
     "Tab",
     "Tabs",
     "ReturnBoolean",
@@ -194,6 +197,8 @@ impl Ide {
             (ControlKind::ComboBox, "ComboBox"),
             (ControlKind::Frame, "Frame"),
             (ControlKind::TabStrip, "TabStrip"),
+            (ControlKind::MultiPage, "MultiPage"),
+            (ControlKind::Page, "Page"),
         ] {
             let mut specific = claim(name, true)?;
             specific.event_names = Some(match kind {
@@ -202,7 +207,9 @@ impl Ide {
                     vec!["Change".into(), "SpinUp".into(), "SpinDown".into()]
                 }
                 ControlKind::TextBox => vec!["Change".into()],
-                ControlKind::TabStrip => vec!["Change".into(), "Click".into()],
+                ControlKind::TabStrip | ControlKind::MultiPage => {
+                    vec!["Change".into(), "Click".into()]
+                }
                 ControlKind::ComboBox => {
                     vec!["Change".into(), "Click".into(), "DropButtonClick".into()]
                 }
@@ -216,11 +223,16 @@ impl Ide {
             });
             bindings.insert(
                 crate::form_project::class_name(kind).into(),
-                vec![specific, claim("Control", false)?],
+                if kind == ControlKind::Page {
+                    vec![specific]
+                } else {
+                    vec![specific, claim("Control", false)?]
+                },
             );
         }
         bindings.insert("VbaFormControls".into(), vec![claim("Controls", false)?]);
         bindings.insert("VbaFormTabs".into(), vec![claim("Tabs", false)?]);
+        bindings.insert("VbaFormPages".into(), vec![claim("Pages", false)?]);
         bindings.insert("VbaFormTab".into(), vec![claim("Tab", false)?]);
         for name in ["ReturnBoolean", "ReturnInteger"] {
             bindings.insert(format!("VbaForm{name}"), vec![claim(name, false)?]);

@@ -71,6 +71,8 @@ and native save/reopen. See [ADR 0041](decisions/0041-worksheet-form-controls.md
   ADR 0054 adds bounded array readback; ADR 0055 adds native metadata/control tips.
   ADR 0056 adds bounded native Frame containers, scoped collections/groups and focus.
   ADR 0057 adds selected native TabStrip records, Tab/Tabs identity and input.
+  ADR 0058 adds selected MultiPage/Page f/o/x joins, collections and rendering,
+  and corrects indexed Click and repeated-selection behavior for both tab controls.
   Remaining requirements and integration are recorded there. Reuse the shared runtime
   behind native forms and close Office compatibility gaps for the inventoried
   standard controls. Match instance/default-instance behavior, lifecycle, modal/

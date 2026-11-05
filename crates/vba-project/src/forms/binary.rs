@@ -1,7 +1,8 @@
-//! Independent bounded MS-OFORMS decoding for cached controls and native Frames.
+//! Independent bounded MS-OFORMS decoding for cached controls and native containers.
 use super::{Control, Design, Format, Kind, MAX_CONTROLS, NativeForm, Resource, frame};
 use crate::{Reader, Result, budget, corrupt, text, unsupported};
 use std::collections::BTreeSet;
+mod pages;
 mod tabs;
 
 fn block<'a>(r: &mut Reader<'a>, version: u16) -> Result<Reader<'a>> {
@@ -123,7 +124,7 @@ pub(super) fn decode(
     root: &str,
     header: &frame::Header,
 ) -> Result<NativeForm> {
-    let result = container(resources, root, header, 0)?;
+    let result = container(resources, root, header, 0, None)?;
     if result.design.controls.len() > MAX_CONTROLS {
         return Err(budget());
     }
@@ -153,6 +154,7 @@ fn container(
     root: &str,
     header: &frame::Header,
     depth: usize,
+    role: Option<Kind>,
 ) -> Result<NativeForm> {
     if depth > 8 {
         return Err(budget());
@@ -286,7 +288,13 @@ fn container(
         {
             return Err(corrupt("duplicate native control identity"));
         }
-        if site.kind == Kind::Frame {
+        if site.kind == Kind::Page && role != Some(Kind::MultiPage) {
+            return Err(unsupported("Page outside MultiPage"));
+        }
+        if role == Some(Kind::MultiPage) && !matches!(site.kind, Kind::Page | Kind::TabStrip) {
+            return Err(unsupported("MultiPage child is not Page/internal TabStrip"));
+        }
+        if matches!(site.kind, Kind::Frame | Kind::MultiPage | Kind::Page) {
             if site.bytes != 0 {
                 return Err(corrupt("nonstreamed Frame has object bytes"));
             }
@@ -296,7 +304,18 @@ fn container(
                 properties: Default::default(),
                 source_start: 0,
             };
-            let child = container(resources, &child_root, &child_header, depth + 1)?;
+            let mut child = container(
+                resources,
+                &child_root,
+                &child_header,
+                depth + 1,
+                Some(site.kind),
+            )?;
+            let tabs = if site.kind == Kind::MultiPage {
+                Some(pages::reconcile(resources, &child_root, &mut child.design)?)
+            } else {
+                None
+            };
             children.push(child_root);
             let frame_id = site.id;
             controls.push(Control {
@@ -306,7 +325,7 @@ fn container(
                 tag: site.tag,
                 control_tip_text: site.control_tip_text,
                 help_context_id: site.help_context_id,
-                kind: Kind::Frame,
+                kind: site.kind,
                 left: site.left,
                 top: site.top,
                 width: child.design.width,
@@ -326,7 +345,7 @@ fn container(
                 numeric: None,
                 list: None,
                 combo: None,
-                tabs: None,
+                tabs,
             });
             for mut control in child.design.controls {
                 if control.parent.is_none() {
@@ -365,9 +384,11 @@ fn container(
         .iter()
         .filter(|r| r.name.to_ascii_lowercase().starts_with(&prefix))
     {
-        if ![&f, &o, &frame, &comp]
-            .iter()
-            .any(|n| n.eq_ignore_ascii_case(&resource.name))
+        if !(role == Some(Kind::MultiPage)
+            && resource.name.eq_ignore_ascii_case(&format!("{root}/x")))
+            && ![&f, &o, &frame, &comp]
+                .iter()
+                .any(|n| n.eq_ignore_ascii_case(&resource.name))
             && !children.iter().any(|child| {
                 resource
                     .name
@@ -413,6 +434,8 @@ fn site(r: &mut Reader<'_>) -> Result<Site> {
     let tab = field(&mut b, m, 6, 2, 0xffff)? as u16 as i16;
     let class = field(&mut b, m, 7, 2, 0x7fff)?;
     let kind = match class {
+        7 => Kind::Page,
+        57 => Kind::MultiPage,
         14 => Kind::Frame,
         18 => Kind::TabStrip,
         16 => Kind::SpinButton,
@@ -428,8 +451,10 @@ fn site(r: &mut Reader<'_>) -> Result<Site> {
         _ => return Err(unsupported(&format!("native control class index {class}"))),
     };
     if flags & !0x4203f != 0
-        || (kind == Kind::Frame && (flags & 0x42010) != 0x42000)
-        || (kind != Kind::Frame && (flags & 0x42010) != 0x10)
+        || (matches!(kind, Kind::Frame | Kind::MultiPage | Kind::Page)
+            && (flags & 0x42010) != 0x42000)
+        || (!matches!(kind, Kind::Frame | Kind::MultiPage | Kind::Page)
+            && (flags & 0x42010) != 0x10)
     {
         return Err(unsupported("native site storage/container flags"));
     }

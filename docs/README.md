@@ -34,6 +34,8 @@ the selected native UserForm import/attachment profile under
 [ADR 0040](decisions/0040-native-userform-import-and-attachment.md) and the
 [control/format/host contract matrix](m7a-control-contracts.md). Native UserForm edited saving
 and `.tvform` removal are still open; current custom-format code remains legacy.
+[Native MultiPage/Page](decisions/0058-native-multipage.md) extends the current
+M7A.4 runtime; the full milestone remains in progress.
 
 [VBA attributes and Excel code-view investigation](vba-attributes-and-editor-projection.md)
 documents hidden module/member metadata, recorded-macro attributes, the blank
@@ -226,5 +228,5 @@ pause/resume. Full [M7A.4](m7a4-native-runtime.md) remains in progress.
 records and separate ordinary Tab/Tabs identity, indexed/named lookup,
 enumeration/default selection and authorized widget input. Canonical state stays
 in ordinary classes; inert queries/rendering do not instantiate or execute VBA.
-MultiPage, dynamic tab mutation/index/name semantics and the remaining M7A.4
+Further MultiPage variants, dynamic page/tab mutation/index/name semantics and the remaining M7A.4
 ledger stay open. Native edited persistence and .tvform removal remain separate.
