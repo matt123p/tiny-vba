@@ -143,9 +143,10 @@ Remaining M7A.4 requirements, without reducing the milestone's scope:
   and remaining property/default/error/coercion contracts,
   including native dynamic TypeName. ADR 0048 implements the selected flat native
   focus/typed cancellation path, without claiming the full event/property matrix.
-- Native Frame, MultiPage, TabStrip,
-  Image and Excel RefEdit packets, including real container/resource identity,
-  list/page collections, pictures, bindings and presentation. These remain refused.
+- Native MultiPage, TabStrip, Image and Excel RefEdit packets, including
+  page collections, pictures, bindings and presentation. These remain refused.
+  ADR 0056 implements selected native Frame parents; additional storage variants,
+  properties, resource/presentation and full event parity remain open.
   ComboBox and ListBox now have selected unbound packets; further array-shape/loading cases, multiple selection, bindings and further presentation remain open. The selected numeric packet does not close all
   ScrollBar/SpinButton property/resource/presentation cases.
 - Applicable Office-supplied worksheet ActiveX/platform packets; third-party
@@ -164,3 +165,12 @@ Source basis: [MS-OFORMS cached classes](https://learn.microsoft.com/en-us/opens
 [Click](https://learn.microsoft.com/en-us/office/vba/language/reference/user-interface-help/click-event),
 [MaxLength](https://learn.microsoft.com/en-us/office/vba/language/reference/user-interface-help/maxlength-property).
 These references do not establish fresh measured Office event traces or full parity.
+
+Native Frame containers follow [ADR 0056](decisions/0056-native-frame-containers.md):
+bounded native parent storages, immediate child Controls/Parent identity, scoped
+TabIndex/option groups and nested ActiveControl/focus cancellation. Canonical state
+remains ordinary classes; effective ancestor flags, live relative geometry,
+clipping and accessible groups use the shared renderer. Original source/resources
+stay inert and unchanged. Further container/page/image/binding/platform semantics,
+native edited persistence and .tvform removal remain in M7A; fresh Office traces
+remain NOT_RUN under M8.5.

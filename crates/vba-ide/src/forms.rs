@@ -16,6 +16,7 @@ pub enum ControlKind {
     SpinButton,
     ListBox,
     ComboBox,
+    Frame,
 }
 impl ControlKind {
     pub fn name(self) -> &'static str {
@@ -30,6 +31,7 @@ impl ControlKind {
             Self::SpinButton => "SpinButton",
             Self::ListBox => "ListBox",
             Self::ComboBox => "ComboBox",
+            Self::Frame => "Frame",
         }
     }
     pub fn default_event(self) -> &'static str {
@@ -41,7 +43,8 @@ impl ControlKind {
             | Self::CommandButton
             | Self::CheckBox
             | Self::OptionButton
-            | Self::ToggleButton => "Click",
+            | Self::ToggleButton
+            | Self::Frame => "Click",
         }
     }
 }
@@ -77,6 +80,8 @@ pub struct Control {
     pub visible: bool,
     pub tab_stop: bool,
     pub group: Option<u32>,
+    /// Immediate native Frame; independent of designer selection groups.
+    pub parent: Option<u32>,
 }
 #[derive(Clone, Debug, PartialEq)]
 pub struct Form {
@@ -155,6 +160,35 @@ impl Form {
                 || c.text.len() > 16384
             {
                 return Err(error("duplicate or oversized form control"));
+            }
+        }
+        for c in &self.controls {
+            let mut parent = c.parent;
+            let mut ancestors = BTreeSet::new();
+            ancestors.insert(c.id);
+            while let Some(id) = parent {
+                if !ancestors.insert(id) || ancestors.len() > 9 {
+                    return Err(error("invalid native container ancestry"));
+                }
+                let owner = self
+                    .controls
+                    .iter()
+                    .find(|c| c.id == id && c.kind == ControlKind::Frame)
+                    .ok_or_else(|| error("missing native Frame parent"))?;
+                let parent_at = self
+                    .controls
+                    .iter()
+                    .position(|v| v.id == owner.id)
+                    .ok_or_else(|| error("missing Frame"))?;
+                let child_at = self
+                    .controls
+                    .iter()
+                    .position(|v| v.id == c.id)
+                    .ok_or_else(|| error("missing child"))?;
+                if parent_at >= child_at {
+                    return Err(error("Frame must precede its descendants"));
+                }
+                parent = owner.parent;
             }
         }
         if self.tab_order.iter().copied().collect::<BTreeSet<_>>() != ids {
@@ -473,6 +507,7 @@ impl FormDesigner {
                     visible: true,
                     tab_stop: kind != ControlKind::Label,
                     group: None,
+                    parent: None,
                 });
                 candidate.tab_order.push(id);
                 added = Some(id);

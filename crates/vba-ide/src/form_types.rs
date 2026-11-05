@@ -16,6 +16,7 @@ const TYPES: &[&str] = &[
     "SpinButton",
     "ListBox",
     "ComboBox",
+    "Frame",
     "ReturnBoolean",
     "ReturnInteger",
 ];
@@ -171,6 +172,7 @@ impl Ide {
             (ControlKind::SpinButton, "SpinButton"),
             (ControlKind::ListBox, "ListBox"),
             (ControlKind::ComboBox, "ComboBox"),
+            (ControlKind::Frame, "Frame"),
         ] {
             let mut specific = claim(name, true)?;
             specific.event_names = Some(match kind {

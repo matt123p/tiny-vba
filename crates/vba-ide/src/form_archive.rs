@@ -148,6 +148,7 @@ pub fn decode(input: &str) -> Result<(Form, String)> {
                     visible: flag(&fields, 11)?,
                     tab_stop: flag(&fields, 12)?,
                     group: if group == 0 { None } else { Some(group) },
+                    parent: None,
                 });
             }
             "O" if order.is_none() && source.is_none() && fields.len() <= 129 => {

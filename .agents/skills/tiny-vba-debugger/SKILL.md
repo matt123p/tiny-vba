@@ -155,3 +155,12 @@ commands execute VBA and require the same authorization and modal ownership as
 input; widget focus follows canonical state after cancellation/Stop/resume.
 Preserve typed ByVal return identity, inert source/resources and leaf event
 exposure. Broader M7A.4 control/platform semantics remain open.
+
+Native Frame containers follow [ADR 0056](../../../docs/decisions/0056-native-frame-containers.md):
+bounded native parent storages, immediate child Controls/Parent identity, scoped
+TabIndex/option groups and nested ActiveControl/focus cancellation. Canonical state
+remains ordinary classes; effective ancestor flags, live relative geometry,
+clipping and accessible groups use the shared renderer. Original source/resources
+stay inert and unchanged. Further container/page/image/binding/platform semantics,
+native edited persistence and .tvform removal remain in M7A; fresh Office traces
+remain NOT_RUN under M8.5.

@@ -25,11 +25,14 @@ pub enum Kind {
     SpinButton,
     ListBox,
     ComboBox,
+    Frame,
 }
 /// Coordinates are original signed HIMETRIC units, not pixels or points.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Control {
     pub id: u32,
+    /// Immediate native container site ID; None denotes the UserForm.
+    pub parent: Option<u32>,
     pub name: String,
     pub kind: Kind,
     pub left: i32,
@@ -106,11 +109,12 @@ impl Default for TextBehavior {
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Design {
     pub caption: String,
+    pub enabled: bool,
     pub tag: String,
     pub help_context_id: i32,
     pub width: i32,
     pub height: i32,
-    /// Native site/painting order. Only immediate children are admitted in v1.
+    /// Native painting preorder, retaining immediate Frame parent identity.
     pub controls: Vec<Control>,
 }
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -158,7 +162,7 @@ pub(crate) fn open_resource<'a>(
     for e in file.walk() {
         count += 1;
         if count > 512.min(limits.entries)
-            || e.path().components().count() > 4
+            || e.path().components().count() > 12
             || e.len() > MAX_RESOURCE_BYTES.min(limits.stream_bytes) as u64
         {
             return Err(budget());

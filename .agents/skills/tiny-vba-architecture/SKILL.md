@@ -221,3 +221,12 @@ IR 11 class interfaces and Forms library bindings follow
 Preserve exact nominal identity and event-source/exposure, bounded immutable
 descriptors, restored-session validation and source-function alias shadowing.
 MSForms names stay in the IDE provider; no new store, COM or unsafe evaluation.
+
+Native Frame containers follow [ADR 0056](../../../docs/decisions/0056-native-frame-containers.md):
+bounded native parent storages, immediate child Controls/Parent identity, scoped
+TabIndex/option groups and nested ActiveControl/focus cancellation. Canonical state
+remains ordinary classes; effective ancestor flags, live relative geometry,
+clipping and accessible groups use the shared renderer. Original source/resources
+stay inert and unchanged. Further container/page/image/binding/platform semantics,
+native edited persistence and .tvform removal remain in M7A; fresh Office traces
+remain NOT_RUN under M8.5.

@@ -219,3 +219,5 @@ pause/resume. Full [M7A.4](m7a4-native-runtime.md) remains in progress.
 [Native list array loading (ADR 0053)](decisions/0053-native-list-array-loading.md) records the selected bulk-loading/Column packet and remaining array gaps.
 
 [Native array readback (ADR 0054)](decisions/0054-native-list-array-readback.md) and [native metadata/control tips (ADR 0055)](decisions/0055-native-form-metadata-and-control-tips.md) extend the current M7A.4 packet.
+
+[Native Frame containers (ADR 0056)](decisions/0056-native-frame-containers.md) add bounded nested resources, scoped collections and shared native/browser input.

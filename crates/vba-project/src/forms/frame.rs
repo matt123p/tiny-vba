@@ -315,6 +315,7 @@ pub fn decode_export(
             source: String::new(),
             attributes: vec![],
             design: Design {
+                enabled: true,
                 tag: metadata(&header)?.0,
                 help_context_id: metadata(&header)?.1,
                 caption: header

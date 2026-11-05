@@ -102,6 +102,82 @@ pub struct FormLayoutReport {
     pub controls: Vec<(u32, egui::Rect)>,
     pub handles: Vec<(u32, egui::Rect)>,
 }
+fn ancestors<'a>(
+    form: &'a vba_ide::forms::Form,
+    control: &vba_ide::forms::Control,
+) -> Option<Vec<&'a vba_ide::forms::Control>> {
+    let mut result = Vec::new();
+    let mut parent = control.parent;
+    while let Some(id) = parent {
+        if result.len() >= 8 {
+            return None;
+        }
+        let node = form
+            .controls
+            .iter()
+            .find(|c| c.id == id && c.kind == ControlKind::Frame)?;
+        result.push(node);
+        parent = node.parent;
+    }
+    result.reverse();
+    Some(result)
+}
+fn native_eligible(
+    ide: &Ide,
+    instance: vba_ide::FormInstance,
+    form: &vba_ide::forms::Form,
+    control: &vba_ide::forms::Control,
+    tabbing: bool,
+) -> bool {
+    let Some(parents) = ancestors(form, control) else {
+        return false;
+    };
+    parents
+        .into_iter()
+        .chain(std::iter::once(control))
+        .all(|c| {
+            ["Visible", "Enabled"]
+                .into_iter()
+                .chain(tabbing.then_some("TabStop"))
+                .all(|name| {
+                    ide.form_instance_field(instance, Some(c.id), name).ok()
+                        == Some(vba_ide::Value::Boolean(true))
+                })
+        })
+}
+fn parent_geometry(
+    ide: &Ide,
+    instance: vba_ide::FormInstance,
+    form: &vba_ide::forms::Form,
+    control: &vba_ide::forms::Control,
+    rect: egui::Rect,
+) -> Option<(egui::Vec2, egui::Rect)> {
+    let mut offset = egui::Vec2::ZERO;
+    let mut clip = egui::Rect::EVERYTHING;
+    for parent in ancestors(form, control)? {
+        let number = |name: &str, fallback: f32| match ide.form_instance_field(
+            instance,
+            Some(parent.id),
+            name,
+        ) {
+            Ok(vba_ide::Value::Single(n)) if n.is_finite() && n.abs() <= 32767. => n,
+            _ => fallback,
+        };
+        offset += egui::vec2(
+            number("Left", parent.bounds.left),
+            number("Top", parent.bounds.top),
+        ) * (4. / 3.);
+        let bounds = egui::Rect::from_min_size(
+            rect.min + offset,
+            egui::vec2(
+                number("Width", parent.bounds.width).max(0.),
+                number("Height", parent.bounds.height).max(0.),
+            ) * (4. / 3.),
+        );
+        clip = clip.intersect(bounds.shrink(1.));
+    }
+    Some((offset, clip))
+}
 fn control_text(value: vba_ide::Value) -> String {
     match value {
         vba_ide::Value::String(text) => String::from_utf16_lossy(text.units()),
@@ -339,6 +415,7 @@ impl EditorUi {
                                     if matches!(
                                         c.kind,
                                         ControlKind::Label
+                                            | ControlKind::Frame
                                             | ControlKind::CommandButton
                                             | ControlKind::CheckBox
                                             | ControlKind::OptionButton
@@ -528,14 +605,52 @@ impl EditorUi {
                     handles: vec![],
                 };
                 for c in &form.controls {
+                    let Some(parents) = ancestors(form, c) else {
+                        continue;
+                    };
+                    let mut offset = egui::Vec2::ZERO;
+                    let previous_clip = ui.clip_rect();
+                    let mut clip = previous_clip;
+                    for parent in parents {
+                        offset += egui::vec2(parent.bounds.left, parent.bounds.top) * scale;
+                        clip = clip.intersect(
+                            egui::Rect::from_min_size(
+                                rect.min + offset,
+                                egui::vec2(parent.bounds.width, parent.bounds.height) * scale,
+                            )
+                            .shrink(1.),
+                        );
+                    }
+                    ui.set_clip_rect(clip);
                     let bounds = egui::Rect::from_min_size(
-                        rect.min + egui::vec2(c.bounds.left, c.bounds.top) * scale,
+                        rect.min + offset + egui::vec2(c.bounds.left, c.bounds.top) * scale,
                         egui::vec2(c.bounds.width, c.bounds.height) * scale,
                     );
                     let label = format!("{} ({})", c.name, c.kind.name());
                     let selected = designer.selection().contains(&c.id);
-                    let response = ui
-                        .put(
+                    let response = if c.kind == ControlKind::Frame {
+                        let response = ui.interact(
+                            bounds,
+                            ui.scope_id().with(("form.frame", c.id)),
+                            egui::Sense::click_and_drag(),
+                        );
+                        ui.painter().rect_filled(bounds, 0., theme.chrome);
+                        ui.painter().rect_stroke(
+                            bounds.shrink(1.),
+                            0.,
+                            egui::Stroke::new(1., theme.border),
+                            egui::StrokeKind::Inside,
+                        );
+                        ui.painter().text(
+                            bounds.left_top() + egui::vec2(6., 3.),
+                            egui::Align2::LEFT_TOP,
+                            &c.caption,
+                            egui::TextStyle::Body.resolve(ui.style()),
+                            theme.text,
+                        );
+                        response
+                    } else {
+                        ui.put(
                             bounds,
                             egui::Button::new(if c.kind == ControlKind::TextBox {
                                 format!("{}: {}", c.name, c.text)
@@ -545,7 +660,8 @@ impl EditorUi {
                             .selected(selected)
                             .sense(egui::Sense::click_and_drag()),
                         )
-                        .on_hover_text(&label);
+                    }
+                    .on_hover_text(&label);
                     response.widget_info(|| {
                         egui::WidgetInfo::selected(
                             egui::accesskit::Role::Button,
@@ -600,6 +716,7 @@ impl EditorUi {
                     if response.has_focus() && editable {
                         self.form_keys(ui, id, designer.grid(), commands);
                     }
+                    ui.set_clip_rect(previous_clip);
                 }
                 if response.has_focus() && editable {
                     self.form_keys(ui, id, designer.grid(), commands);
@@ -759,6 +876,7 @@ impl EditorUi {
                         form.controls.iter().find(|c| {
                             c.id == *id
                                 && matches!(c.kind, ControlKind::TextBox | ControlKind::ComboBox)
+                                && native_eligible(ide, instance, form, c, false)
                         })
                     })
             } else {
@@ -778,15 +896,29 @@ impl EditorUi {
                 .filter(|(source, control, _)| {
                     *source == instance
                         && (!native
+                            || form
+                                .controls
+                                .iter()
+                                .find(|c| c.id == *control)
+                                .is_some_and(|c| native_eligible(ide, instance, form, c, true)))
+                        && (!native
                             || ide
                                 .form_instance_field(instance, Some(*control), "TabStop")
                                 .ok()
                                 == Some(vba_ide::Value::Boolean(true)))
                 })
                 .map(|(_, control, target)| {
-                    let index = match ide.form_instance_field(instance, Some(*control), "TabIndex")
-                    {
+                    let index = match ide.form_instance_field(
+                        instance,
+                        Some(*control),
+                        if native {
+                            "VbaNavigationRank"
+                        } else {
+                            "TabIndex"
+                        },
+                    ) {
                         Ok(vba_ide::Value::Integer(n)) => i32::from(n),
+                        Ok(vba_ide::Value::Long(n)) => n,
                         _ => i32::MAX,
                     };
                     (index, *control, *target)
@@ -891,6 +1023,9 @@ impl EditorUi {
                         })
                     });
                     if let Some(control) = chosen.filter(|c| {
+                        if native && !native_eligible(ide, instance, form, c, false) {
+                            return false;
+                        }
                         ["Enabled", "Visible"].iter().all(|property| {
                             ide.form_instance_field(instance, Some(c.id), property).ok()
                                 == Some(vba_ide::Value::Boolean(true))
@@ -940,6 +1075,8 @@ impl EditorUi {
                     );
                     let mut focus = Vec::new();
                     for c in &form.controls {
+                        if native && !ancestors(form,c).is_some_and(|parents|parents.iter().all(|p|ide.form_instance_field(instance,Some(p.id),"Visible").ok()==Some(vba_ide::Value::Boolean(true)))) {continue;}
+                        let Some((offset,parent_clip))=parent_geometry(ide,instance,form,c,rect) else {continue;};
                         if ide
                             .form_instance_field(instance, Some(c.id), "Visible")
                             .ok()
@@ -947,7 +1084,7 @@ impl EditorUi {
                         {
                             continue;
                         }
-                        let enabled = ide
+                        let enabled = (!native || native_eligible(ide,instance,form,c,false)) && ide
                             .form_instance_field(instance, Some(c.id), "Enabled")
                             .ok()
                             == Some(vba_ide::Value::Boolean(true));
@@ -968,7 +1105,7 @@ impl EditorUi {
                             _ => fallback,
                         };
                         let bounds = egui::Rect::from_min_size(
-                            rect.min
+                            rect.min+offset
                                 + egui::vec2(
                                     number("Left", c.bounds.left),
                                     number("Top", c.bounds.top),
@@ -989,16 +1126,30 @@ impl EditorUi {
                             .form_instance_field(instance, Some(c.id), "TabStop")
                             .ok()
                             == Some(vba_ide::Value::Boolean(true));
-                        let index = match ide.form_instance_field(instance, Some(c.id), "TabIndex")
+                        let index = match ide.form_instance_field(instance, Some(c.id), if native {"VbaNavigationRank"} else {"TabIndex"})
                         {
                             Ok(vba_ide::Value::Integer(n)) => i32::from(n),
+                            Ok(vba_ide::Value::Long(n)) => n,
                             _ => i32::MAX,
                         };
-                        if enabled && if native { c.kind != ControlKind::Label } else { tab_stop } {
+                        if enabled && if native { c.kind != ControlKind::Label && c.kind!=ControlKind::Frame } else { tab_stop } {
                             focus.push((index, c.id, widget_id));
                         }
-                        ui.push_id(("runtime", c.id), |ui| {
+                        let previous_clip=ui.clip_rect();
+                        ui.set_clip_rect(previous_clip.intersect(parent_clip));
+                        let control_scope=egui::UiBuilder::new().id_salt(("runtime",c.id));
+                        let control_scope=if let Some(parent)=c.parent {control_scope.accessibility_parent(ui.scope_id().with(("runtime.control",parent)))} else {control_scope};
+                        ui.scope_builder(control_scope, |ui| {
                             ui.add_enabled_ui(enabled, |ui| match c.kind {
+                                ControlKind::Frame=> {
+                                    let response=ui.interact(bounds,widget_id,egui::Sense::click());
+                                    ui.painter().rect_filled(bounds,2.,theme.chrome);
+                                    ui.painter().rect_stroke(bounds.shrink(1.),2.,egui::Stroke::new(1.,theme.border),egui::StrokeKind::Inside);
+                                    ui.painter().text(bounds.left_top()+egui::vec2(6.,3.),egui::Align2::LEFT_TOP,&caption,egui::TextStyle::Body.resolve(ui.style()),theme.text);
+                                    response.widget_info(||egui::WidgetInfo::labeled(egui::accesskit::Role::Group,enabled,&c.name));
+                                    if response.clicked() {commands.push(Command::Form(FormCommand::InstanceEvent(instance,Some(c.id),None)));}
+                                }
+
                                 ControlKind::ComboBox=> {combo::ComboBox{ide,instance,control:c,bounds,widget:widget_id,theme}.show(ui,commands);}
                                 ControlKind::ListBox => {list::ListBox{ide,instance,control:c,bounds,widget:widget_id,theme}.show(ui,commands);}
                                 ControlKind::SpinButton|ControlKind::ScrollBar=> {numeric::Numeric{ide,instance,control:c,bounds,widget:widget_id,theme}.show(ui,commands);}
@@ -1144,6 +1295,7 @@ impl EditorUi {
                                 tooltip.show(|ui| {ui.label(egui::RichText::new(String::from_utf16_lossy(tip.units())).color(theme.text));});
                             }
                         }
+                        ui.set_clip_rect(previous_clip);
                     }
                     if native && idle && keyboard_owner == Some(instance) {
                         let focused = ui.ctx().memory(|m| m.focused());

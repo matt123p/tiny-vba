@@ -9,6 +9,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     );
     std::fs::create_dir_all(&dir)?;
     let option = std::env::args().nth(2);
+    let frames = option.as_deref() == Some("--frame-controls");
     let metadata = option.as_deref() == Some("--metadata");
     let combo = option.as_deref() == Some("--combo-controls");
     let list = option.as_deref() == Some("--list-controls");
@@ -21,7 +22,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         Some("--boolean-controls") => true,
         Some(
             "--focus-events" | "--text-controls" | "--password-text" | "--numeric-controls"
-            | "--list-controls" | "--combo-controls" | "--metadata",
+            | "--list-controls" | "--combo-controls" | "--metadata" | "--frame-controls",
         ) => false,
         Some(_) => return Err("unknown fixture option".into()),
     };
@@ -69,7 +70,9 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     std::fs::write(dir.join("NativeForm.frm"), text)?;
     std::fs::write(
         dir.join("NativeForm.frx"),
-        if metadata {
+        if frames {
+            fixture::frame_companion(2)
+        } else if metadata {
             fixture::metadata_companion()
         } else if combo {
             fixture::combo_companion(3, 1)

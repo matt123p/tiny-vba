@@ -203,3 +203,12 @@ copy canonical cells with explicit bounds, preserving Err, selection and events.
 [ADR 0055](docs/decisions/0055-native-form-metadata-and-control-tips.md) keeps native
 metadata in ordinary fields and tooltip hover inert, bounded and theme-injected.
 Help/F1 routing, native persistence/removal and the broader M7A scope stay open.
+
+Native Frame containers follow [ADR 0056](docs/decisions/0056-native-frame-containers.md):
+bounded native parent storages, immediate child Controls/Parent identity, scoped
+TabIndex/option groups and nested ActiveControl/focus cancellation. Canonical state
+remains ordinary classes; effective ancestor flags, live relative geometry,
+clipping and accessible groups use the shared renderer. Original source/resources
+stay inert and unchanged. Further container/page/image/binding/platform semantics,
+native edited persistence and .tvform removal remain in M7A; fresh Office traces
+remain NOT_RUN under M8.5.

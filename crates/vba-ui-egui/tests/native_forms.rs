@@ -58,6 +58,9 @@ fn native_import_reaches_project_explorer_properties_and_actual_runtime_controls
         }
     }
     assert_eq!(h.state().ide.mode(), Mode::Waiting);
+    // The draw callback ticks after painting. Render the new modal layout before
+    // resolving a pointer target from the preceding modeless/running frame.
+    h.run_steps(3);
     assert!(h.query_by_label("Apply").is_some());
     h.get_by_label("Apply").click();
     for _ in 0..100 {
@@ -68,8 +71,62 @@ fn native_import_reaches_project_explorer_properties_and_actual_runtime_controls
     }
     assert_eq!(
         h.state().ide.output(),
-        vec!["initialized".to_string(), "initial".to_string()]
+        vec!["initialized".to_string(), "initial".to_string()],
+        "mode={:?}, errors={:?}, diagnostics={:?}",
+        h.state().ide.mode(),
+        h.state().errors,
+        h.state().ide.diagnostics
     );
+    assert!(h.state().errors.is_empty(), "{:?}", h.state().errors);
+    Ok(())
+}
+
+#[test]
+fn native_frame_designer_keeps_relative_geometry_and_child_selection_inert() -> R {
+    let mut ide = Ide::new();
+    let id = ide.import_native_form_export(
+        "NativeForm.frm",
+        &fixture::export(),
+        1252,
+        &[NativeFormResource {
+            name: "NativeForm.frx".into(),
+            bytes: fixture::frame_companion(2),
+        }],
+    )?;
+    let original = ide.native_form(id).ok_or("native")?.clone();
+    let mut view = EditorUi::default();
+    view.form_view = true;
+    let mut h = Harness::builder()
+        .with_size(egui::vec2(1400., 1000.))
+        .build_ui_state(
+            draw,
+            State {
+                ide,
+                view,
+                errors: vec![],
+            },
+        );
+    h.run_steps(3);
+    let report = h.state().view.form_report.as_ref().ok_or("report")?;
+    let bounds = |id| {
+        report
+            .controls
+            .iter()
+            .find(|(key, _)| *key == id)
+            .map(|(_, rect)| *rect)
+            .ok_or("bounds")
+    };
+    let outer = bounds(20)?;
+    let inner = bounds(21)?;
+    let entry = bounds(12)?;
+    assert!(outer.contains_rect(inner));
+    assert!(inner.contains_rect(entry));
+    h.get_by_label("Entry (TextBox)").click();
+    h.run();
+    assert_eq!(h.state().ide.form(id).ok_or("form")?.primary(), Some(12));
+    assert!(h.state().ide.output().is_empty());
+    assert!(h.state().ide.form_instances()?.is_empty());
+    assert_eq!(h.state().ide.native_form(id), Some(&original));
     assert!(h.state().errors.is_empty(), "{:?}", h.state().errors);
     Ok(())
 }

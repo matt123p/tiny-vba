@@ -438,3 +438,12 @@ promotes native Tag/ControlTipText/HelpContextID into ordinary instance metadata
 and renders canonical control tips without executing code or changing focus.
 Original resources stay independent; actual Help-file/F1 routing and the broader
 M7A control/persistence/removal requirements remain open.
+
+Native Frame containers follow [ADR 0056](decisions/0056-native-frame-containers.md):
+bounded native parent storages, immediate child Controls/Parent identity, scoped
+TabIndex/option groups and nested ActiveControl/focus cancellation. Canonical state
+remains ordinary classes; effective ancestor flags, live relative geometry,
+clipping and accessible groups use the shared renderer. Original source/resources
+stay inert and unchanged. Further container/page/image/binding/platform semantics,
+native edited persistence and .tvform removal remain in M7A; fresh Office traces
+remain NOT_RUN under M8.5.

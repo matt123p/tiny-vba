@@ -408,6 +408,7 @@ pub(crate) fn class_name(kind: ControlKind) -> &'static str {
         ControlKind::SpinButton => "VbaFormSpinButton",
         ControlKind::ListBox => "VbaFormListBox",
         ControlKind::ComboBox => "VbaFormComboBox",
+        ControlKind::Frame => "VbaFormFrame",
     }
 }
 pub(crate) fn checked_handlers(
@@ -613,7 +614,7 @@ fn compiled_form(form: &Form, module: &Module, native: Option<&NativeForm>) -> R
         source.push_str("\nAttribute VB_PredeclaredId = True\n");
     }
     source.push_str(
-        "\nPublic VbaVisible As Boolean\nPublic VbaLoaded As Boolean\nPublic VbaCaption As String\nPublic Property Get Caption() As String\nIf Not VbaLoaded Then Class_Initialize\nCaption=VbaCaption\nEnd Property\nPublic Property Let Caption(ByVal value As String)\nIf Not VbaLoaded Then Class_Initialize\nVbaCaption=value\nEnd Property\nPrivate VbaControls As VbaFormControls\nPublic Property Get Controls(Optional ByVal index As Variant) As Object\nIf Not VbaLoaded Then Class_Initialize\nIf IsMissing(index) Then\nSet Controls=VbaControls\nElse\nSet Controls=VbaControls.Item(index)\nEnd If\nEnd Property\n",
+        "\nPublic VbaVisible As Boolean\nPublic VbaLoaded As Boolean\nPublic VbaCaption As String\nPublic Property Get Caption() As String\nIf Not VbaLoaded Then Class_Initialize\nCaption=VbaCaption\nEnd Property\nPublic Property Let Caption(ByVal value As String)\nIf Not VbaLoaded Then Class_Initialize\nVbaCaption=value\nEnd Property\nPrivate VbaAllControls As VbaFormControls\nPrivate VbaControls As VbaFormControls\nPublic Property Get Controls(Optional ByVal index As Variant) As Object\nIf Not VbaLoaded Then Class_Initialize\nIf IsMissing(index) Then\nSet Controls=VbaControls\nElse\nSet Controls=VbaControls.Item(index)\nEnd If\nEnd Property\n",
     );
     source.push_str(&format!(
         "Public Property Get Name() As String\nName={}\nEnd Property\n",
@@ -638,7 +639,13 @@ fn compiled_form(form: &Form, module: &Module, native: Option<&NativeForm>) -> R
     for c in &form.controls {
         source.push_str(&format!("Public Property Get {0}() As {1}\nIf Not VbaLoaded Then Class_Initialize\nSet {0}=Vba{0}\nEnd Property\n",c.name,class_name(c.kind)));
     }
+    let containers = form.controls.iter().any(|c| c.kind == ControlKind::Frame);
     source.push_str("Private Sub Class_Initialize()\nVbaLoaded=True\nVbaVisible=False\nSet VbaControls=New VbaFormControls\n");
+    source.push_str(if containers {
+        "Set VbaAllControls=New VbaFormControls\n"
+    } else {
+        "Set VbaAllControls=VbaControls\n"
+    });
     source.push_str(&format!(
         "VbaCaption={}\nVbaWidth={}\nVbaHeight={}\n",
         vba_string(&form.caption),
@@ -654,7 +661,7 @@ fn compiled_form(form: &Form, module: &Module, native: Option<&NativeForm>) -> R
     }
     for c in &form.controls {
         let temp = format!("VbaInit{}", c.id);
-        source.push_str(&format!("Dim {temp} As {}\nSet {temp}=New {}\n{temp}.Enabled={}\n{temp}.Visible={}\n{temp}.TabStop={}\n{temp}.VbaTabIndex={}\n{temp}.Left={}\n{temp}.Top={}\n{temp}.Width={}\n{temp}.Height={}\n",class_name(c.kind),class_name(c.kind),boolean(c.enabled),boolean(c.visible),boolean(c.tab_stop),form.tab_order.iter().position(|id|*id==c.id).unwrap_or(0),c.bounds.left,c.bounds.top,c.bounds.width,c.bounds.height));
+        source.push_str(&format!("Dim {temp} As {}\nSet {temp}=New {}\n{temp}.Enabled={}\n{temp}.Visible={}\n{temp}.TabStop={}\n{temp}.VbaTabIndex={}\n{temp}.Left={}\n{temp}.Top={}\n{temp}.Width={}\n{temp}.Height={}\n",class_name(c.kind),class_name(c.kind),boolean(c.enabled),boolean(c.visible),boolean(c.tab_stop),form.tab_order.iter().filter(|id| form.controls.iter().any(|peer|peer.id==**id && peer.parent==c.parent)).position(|id|*id==c.id).unwrap_or(0),c.bounds.left,c.bounds.top,c.bounds.width,c.bounds.height));
         if !matches!(
             c.kind,
             ControlKind::TextBox
@@ -681,10 +688,29 @@ fn compiled_form(form: &Form, module: &Module, native: Option<&NativeForm>) -> R
             source.push_str(&format!("{temp}.VbaValue={initial}\n"));
         }
         source.push_str(&format!(
-            "{temp}.VbaName={}\nSet Vba{}={temp}\nVbaControls.VbaAdd {temp}\n",
+            "{temp}.VbaName={}\nSet Vba{}={temp}\nVbaAllControls.VbaAdd {temp}\n",
             vba_string(&c.name),
             c.name
         ));
+        source.push_str(&format!(
+            "{temp}.VbaId={}\n{temp}.VbaParentKey={}\n{temp}.VbaNavigationRank={}\n",
+            c.id,
+            c.parent.unwrap_or(0),
+            form.tab_order
+                .iter()
+                .position(|id| *id == c.id)
+                .unwrap_or(0)
+        ));
+        if let Some(parent) = c.parent {
+            let owner = form
+                .controls
+                .iter()
+                .find(|p| p.id == parent)
+                .ok_or_else(|| error("missing Frame owner"))?;
+            source.push_str(&format!("Vba{}.VbaAdd {temp}\n", owner.name));
+        } else if containers {
+            source.push_str(&format!("VbaControls.VbaAdd {temp}\n"));
+        }
         if let Some(control) = native.and_then(|n| n.design.controls.iter().find(|n| n.id == c.id))
         {
             source.push_str(&format!(
@@ -753,6 +779,9 @@ fn compiled_form(form: &Form, module: &Module, native: Option<&NativeForm>) -> R
             }
         }
     }
+    if containers {
+        source.push_str("VbaReorderTabs\n");
+    }
     source.push_str(&call("UserForm_Initialize"));
     source.push_str("End Sub\nPublic Sub VbaLoad()\nIf Not VbaLoaded Then Class_Initialize\nEnd Sub\nPublic Sub Show(Optional ByVal modal As Variant=1)\nIf modal<>0 And modal<>1 Then\nErr.Raise 5\nEnd If\nIf Not VbaLoaded Then Class_Initialize\nIf VbaVisible Then\nIf modal=1 Then Err.Raise 400\nExit Sub\nEnd If\nSet VbaDisplayOwner=Me\nVbaVisible=True\n");
     source.push_str(&call("UserForm_Activate"));
@@ -773,13 +802,22 @@ fn compiled_form(form: &Form, module: &Module, native: Option<&NativeForm>) -> R
     for c in &form.controls {
         source.push_str(&format!("Set Vba{}=Nothing\n", c.name));
     }
-    source.push_str("Set VbaControls=Nothing\n");
+    source.push_str("Set VbaControls=Nothing\nSet VbaAllControls=Nothing\n");
     // Unload drops the displayed state and its default reference, not aliased code state.
     source.push_str(&format!("VbaFormRelease {},Me\n", quoted(&form.name)));
     source.push_str("End If\nEnd Sub\n");
-    source.push_str("Private Sub VbaTabChange(ByVal origin As Object,ByVal previous As Integer,ByVal requested As Integer)\nDim i As Long,peer As Object\nIf requested>VbaControls.Count-1 Then requested=VbaControls.Count-1\nFor i=0 To VbaControls.Count-1\nSet peer=VbaControls.Item(i)\nIf Not (peer Is origin) Then\nIf requested<previous Then\nIf peer.VbaTabIndex>=requested And peer.VbaTabIndex<previous Then peer.VbaTabIndex=peer.VbaTabIndex+1\nElse\nIf peer.VbaTabIndex>previous And peer.VbaTabIndex<=requested Then peer.VbaTabIndex=peer.VbaTabIndex-1\nEnd If\nEnd If\nNext i\norigin.VbaTabIndex=requested\nEnd Sub\n");
-    source.push_str("Private Sub VbaRoleChange(ByVal origin As Object,ByVal role As Integer)\nDim i As Long,peer As Object\nFor i=0 To VbaControls.Count-1\nSet peer=VbaControls.Item(i)\nIf Not (peer Is origin) Then\nIf peer.VbaKind=3 Then\nIf role=0 Then\npeer.VbaDefault=False\nElse\npeer.VbaCancel=False\nEnd If\nEnd If\nEnd If\nNext i\nEnd Sub\n");
-    source.push_str("Private Sub VbaOptionSelected(ByVal origin As Object)\nDim i As Long,peer As Object\nFor i=0 To VbaControls.Count-1\nSet peer=VbaControls.Item(i)\nIf Not (peer Is origin) Then\nIf peer.VbaKind=5 Then\nIf peer.GroupName=origin.GroupName Then peer.Value=False\nEnd If\nEnd If\nNext i\nEnd Sub\n");
+    source.push_str(crate::form_container::ROOT);
+    source.push_str("Private Function VbaLookup(ByVal key As Long) As Object\n");
+    for c in &form.controls {
+        source.push_str(&format!(
+            "If key={} Then\nSet VbaLookup=Vba{}\nExit Function\nEnd If\n",
+            c.id, c.name
+        ));
+    }
+    source.push_str("Err.Raise 91\nEnd Function\n");
+    for control in &form.controls {
+        source.push_str(&format!("Private Sub Vba{}_VbaParentRequested(ByVal child As Object,ByRef owner As Object)\nIf child.VbaParentKey=0 Then\nSet owner=Me\nElse\nSet owner=VbaLookup(child.VbaParentKey)\nEnd If\nEnd Sub\n",control.name));
+    }
     for c in &form.controls {
         for event in [
             "Click",
@@ -1330,6 +1368,7 @@ impl Ide {
                 ControlKind::SpinButton,
                 ControlKind::ListBox,
                 ControlKind::ComboBox,
+                ControlKind::Frame,
             ]
             .into_iter()
             .enumerate()
@@ -1769,6 +1808,27 @@ impl Ide {
                 .iter()
                 .find(|c| c.id == id)
                 .ok_or_else(|| error("unknown control"))?;
+            let mut parent = c.parent;
+            for _ in 0..8 {
+                let Some(id) = parent else { break };
+                let owner = designer
+                    .form()
+                    .controls
+                    .iter()
+                    .find(|c| c.id == id)
+                    .ok_or_else(|| error("missing Frame parent"))?;
+                let Value::Object(owner_object) =
+                    session.read_instance_field(instance.object, &format!("Vba{}", owner.name))?
+                else {
+                    return Err(error("Frame is unloaded"));
+                };
+                if session.read_instance_field(owner_object, "Enabled")? != Value::Boolean(true)
+                    || session.read_instance_field(owner_object, "Visible")? != Value::Boolean(true)
+                {
+                    return Err(error("Frame is disabled or hidden"));
+                }
+                parent = owner.parent;
+            }
             let Value::Object(child) =
                 session.read_instance_field(object, &format!("Vba{}", c.name))?
             else {

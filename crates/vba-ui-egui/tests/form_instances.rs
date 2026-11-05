@@ -1034,3 +1034,95 @@ fn native_control_tip_uses_canonical_text_without_focus_or_macro_execution() -> 
     assert!(h.state().errors.is_empty(), "{:?}", h.state().errors);
     Ok(())
 }
+
+#[test]
+fn native_nested_frames_render_groups_and_tab_from_the_child_to_the_outer_button() -> R {
+    let mut ide = Ide::new();
+    ide.import_native_form_export(
+        "NativeForm.frm",
+        &fixture::export(),
+        1252,
+        &[NativeFormResource {
+            name: "NativeForm.frx".into(),
+            bytes: fixture::frame_companion(2),
+        }],
+    )?;
+    ide.add_module("Main.bas", "Sub Main()\nNativeForm.Show 0\nEnd Sub")?;
+    ide.dispatch(Action::Run, &mut NoHost)?;
+    for _ in 0..100 {
+        ide.tick(&mut NoHost)?;
+        if ide.mode() == Mode::Completed {
+            break;
+        }
+    }
+    let f = *ide.form_instances()?.first().ok_or("instance")?;
+    let mut h = Harness::builder()
+        .with_size(egui::vec2(1400., 1000.))
+        .build_ui_state(
+            |ui, s: &mut State| {
+                for c in s.view.show(ui, &s.ide, Theme::light()) {
+                    if let Err(e) = apply(&mut s.ide, c, &mut NoHost) {
+                        s.errors.push(e.to_string());
+                    }
+                }
+                if let Err(e) = s.ide.tick(&mut NoHost) {
+                    s.errors.push(e.to_string());
+                }
+            },
+            State {
+                ide,
+                view: EditorUi::default(),
+                errors: vec![],
+            },
+        );
+    h.run_steps(5);
+    assert!(
+        h.query(
+            egui_kittest::kittest::By::new()
+                .label("Frame1")
+                .role(egui::accesskit::Role::Group)
+        )
+        .is_some()
+    );
+    assert!(
+        h.query(
+            egui_kittest::kittest::By::new()
+                .label("Frame2")
+                .role(egui::accesskit::Role::Group)
+        )
+        .is_some()
+    );
+    assert!(
+        h.get(
+            egui_kittest::kittest::By::new()
+                .label("Frame1")
+                .role(egui::accesskit::Role::Group)
+        )
+        .query(
+            egui_kittest::kittest::By::new()
+                .label("Entry")
+                .role(egui::accesskit::Role::TextInput)
+        )
+        .is_some()
+    );
+    h.get(
+        egui_kittest::kittest::By::new()
+            .label("Entry")
+            .role(egui::accesskit::Role::TextInput),
+    )
+    .click();
+    h.run_steps(5);
+    h.key_press(egui::Key::Tab);
+    h.run_steps(8);
+    assert_eq!(
+        h.state()
+            .ide
+            .form_instance_field(f, None, "VbaActiveControl")?,
+        h.state().ide.form_instance_field(f, None, "VbaApply")?
+    );
+    h.get_by_label("Apply").click();
+    h.run_steps(8);
+    assert_eq!(h.state().ide.output(), vec!["initialized", "initial"]);
+    assert!(h.state().errors.is_empty(), "{:?}", h.state().errors);
+    Ok(())
+}

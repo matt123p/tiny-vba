@@ -45,6 +45,16 @@ const assert = require('node:assert/strict');
     // The form designer owns F5: it launches the actual modal form.
     await click(130, 110); await page.keyboard.press('F5');
     await page.waitForFunction(() => document.querySelector('#vba-status').textContent === 'Waiting for host');
+    await settle();
+    if (process.env.VBA_NATIVE_FRAME_INPUT) {
+      // Initial focus enters both native Frames. Tab leaves for the outer button;
+      // Shift+Tab returns to the same nested TextBox before further real typing.
+      await page.keyboard.press('Control+a'); await page.keyboard.insertText('nested😀'); await settle();
+      await page.keyboard.press('Tab'); await settle();
+      await page.keyboard.press('Shift+Tab'); await settle();
+      await page.keyboard.press('End'); await page.keyboard.insertText('!'); await settle();
+      assert.equal((await page.locator('#vba-output').textContent()).trim(), 'initialized');
+    }
     await page.screenshot({ path: path.join(report, 'm7a-native-browser-runtime.png') });
     if (process.env.VBA_NATIVE_TOOLTIP) {
       await page.mouse.move(565, 435); await page.waitForTimeout(1000);
@@ -57,7 +67,7 @@ const assert = require('node:assert/strict');
     await page.screenshot({ path: path.join(report, 'm7a-native-browser-form-break.png') });
     await page.keyboard.press('F5');
     await page.waitForFunction(() => document.querySelector('#vba-status').textContent === 'Completed');
-    assert.equal((await page.locator('#vba-output').textContent()).trim(), 'initialized\ninitial');
+    assert.equal((await page.locator('#vba-output').textContent()).trim(), process.env.VBA_NATIVE_FRAME_INPUT ? 'initialized\nnested😀!' : 'initialized\ninitial');
     await page.screenshot({ path: path.join(report, 'm7a-native-browser-form-completed.png') });
     // Native edited saving is a separate milestone and must not create a custom archive.
     await page.keyboard.press('Control+e'); await settle();

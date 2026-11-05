@@ -122,6 +122,7 @@ impl Ide {
                 id: c.id,
                 name: c.name.clone(),
                 kind: match c.kind {
+                    Kind::Frame => ControlKind::Frame,
                     Kind::Label => ControlKind::Label,
                     Kind::TextBox => ControlKind::TextBox,
                     Kind::ListBox => ControlKind::ListBox,
@@ -145,6 +146,7 @@ impl Ide {
                 visible: c.visible,
                 tab_stop: c.tab_stop,
                 group: None,
+                parent: c.parent,
             });
             order.push((
                 if c.tab_index < 0 {

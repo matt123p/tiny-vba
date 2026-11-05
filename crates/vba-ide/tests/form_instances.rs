@@ -1958,3 +1958,222 @@ fn native_metadata_invalid_attachment_and_member_collisions_are_atomic() -> R {
     }
     Ok(())
 }
+
+fn frame_setup(main: &str, extra: &str) -> R<Ide> {
+    let mut ide = Ide::new();
+    let export = String::from_utf8(fixture::export())?
+        .replace(fixture::SOURCE, &(fixture::SOURCE.to_owned() + extra));
+    ide.import_native_form_export(
+        "NativeForm.frm",
+        export.as_bytes(),
+        1252,
+        &[NativeFormResource {
+            name: "NativeForm.frx".into(),
+            bytes: fixture::frame_companion(2),
+        }],
+    )?;
+    assert!(ide.form_instances()?.is_empty());
+    ide.add_module("Main.bas", main)?;
+    ide.dispatch(Action::Run, &mut NoHost)?;
+    settle(&mut ide)?;
+    Ok(ide)
+}
+#[test]
+fn native_frames_keep_child_collections_parent_identity_and_nested_active_control() -> R {
+    let ide = frame_setup(
+        r#"Sub Main()
+Dim f As New NativeForm,group As MSForms.Frame,c As MSForms.Control
+Set group=f.Frame1
+Debug.Print f.Controls.Count,group.Controls.Count,f.Frame2.Controls.Count
+Debug.Print f.Frame1.Parent Is f,f.Frame2.Parent Is f.Frame1,f.Entry.Parent Is f.Frame2
+Debug.Print f.Frame2.Controls("Entry") Is f.Entry
+For Each c In group.Controls
+Debug.Print c.Name
+Next c
+f.Show 0
+Debug.Print f.ActiveControl.Name,f.Frame1.ActiveControl.Name,f.Frame2.ActiveControl.Name
+f.Apply.SetFocus
+Debug.Print f.ActiveControl.Name
+f.Frame1.SetFocus
+Debug.Print f.ActiveControl.Name,f.Frame2.ActiveControl.Name
+f.Frame1.Enabled=False
+On Error Resume Next
+f.Entry.SetFocus
+Debug.Print Err.Number
+End Sub"#,
+        "",
+    )?;
+    assert_eq!(ide.mode(), Mode::Completed, "{:?}", ide.diagnostics);
+    assert_eq!(
+        ide.output(),
+        vec![
+            "initialized",
+            "3\t1\t1",
+            "True\tTrue\tTrue",
+            "True",
+            "Frame2",
+            "Frame1\tFrame2\tEntry",
+            "Apply",
+            "Frame1\tEntry",
+            "2110"
+        ]
+    );
+    Ok(())
+}
+#[test]
+fn native_frame_exit_cancellation_and_stop_keep_the_leaf_focus_and_resume_once() -> R {
+    let mut ide = frame_setup(
+        "Sub Main()\nNativeForm.Show 0\nEnd Sub",
+        "\r\nPrivate Sub Frame1_Exit(ByVal Cancel As MSForms.ReturnBoolean)\r\nDebug.Print \"frame exit\"\r\nStop\r\nCancel=True\r\nEnd Sub\r\n",
+    )?;
+    let f = *ide.form_instances()?.first().ok_or("instance")?;
+    let native = ide.native_form(f.source).ok_or("native")?.clone();
+    ide.form_instance_event(f, Some(13), None, &mut NoHost)?;
+    settle(&mut ide)?;
+    assert_eq!(ide.mode(), Mode::Break, "{:?}", ide.diagnostics);
+    assert_eq!(ide.output(), vec!["initialized", "frame exit"]);
+    ide.dispatch(Action::Run, &mut NoHost)?;
+    settle(&mut ide)?;
+    assert_eq!(ide.mode(), Mode::Completed, "{:?}", ide.diagnostics);
+    assert!(ide.form_instance_visible(f));
+    assert_eq!(
+        ide.form_instance_field(f, None, "VbaActiveControl")?,
+        ide.form_instance_field(f, None, "VbaEntry")?
+    );
+    assert_eq!(ide.output(), vec!["initialized", "frame exit"]);
+    assert_eq!(ide.native_form(f.source), Some(&native));
+    Ok(())
+}
+#[test]
+fn native_frame_ancestors_block_physical_input_without_blocking_programmatic_values() -> R {
+    let mut ide = frame_setup(
+        "Sub Main()\nNativeForm.Frame1.Enabled=False\nNativeForm.Entry.Text=\"programmatic\"\nNativeForm.Show 0\nEnd Sub",
+        "",
+    )?;
+    let f = *ide.form_instances()?.first().ok_or("instance")?;
+    assert!(
+        ide.form_instance_text(f, 12, VbaString::from_utf8("input")?, (5, 0), &mut NoHost)
+            .is_err()
+    );
+    assert_eq!(
+        ide.form_instance_field(f, Some(12), "VbaText")?,
+        Value::String(VbaString::from_utf8("programmatic")?)
+    );
+    assert_eq!(
+        ide.form_instance_field(f, None, "VbaActiveControl")?,
+        ide.form_instance_field(f, None, "VbaApply")?
+    );
+    assert_eq!(ide.output(), vec!["initialized"]);
+    Ok(())
+}
+#[test]
+fn native_frame_entry_continuation_orders_ancestors_before_the_leaf_without_replay() -> R {
+    let mut ide = frame_setup(
+        "Sub Main()\nNativeForm.Show 0\nDebug.Print NativeForm.ActiveControl.Name,NativeForm.Frame1.ActiveControl.Name\nEnd Sub",
+        "\r\nPrivate Sub Frame1_Enter()\r\nDebug.Print \"outer\"\r\nStop\r\nEnd Sub\r\nPrivate Sub Frame2_Enter()\r\nDebug.Print \"inner\"\r\nEnd Sub\r\nPrivate Sub Entry_Enter()\r\nDebug.Print \"leaf\"\r\nEnd Sub\r\n",
+    )?;
+    assert_eq!(ide.mode(), Mode::Break, "{:?}", ide.diagnostics);
+    assert_eq!(ide.output(), vec!["initialized", "outer"]);
+    ide.dispatch(Action::Run, &mut NoHost)?;
+    settle(&mut ide)?;
+    assert_eq!(ide.mode(), Mode::Completed, "{:?}", ide.diagnostics);
+    assert_eq!(
+        ide.output(),
+        vec!["initialized", "outer", "inner", "leaf", "Frame1\tFrame2"]
+    );
+    Ok(())
+}
+#[test]
+fn native_option_groups_are_scoped_to_their_frame_parent() -> R {
+    let mut native = vba_project::forms::decode_export(
+        "NativeForm.frm",
+        &fixture::export(),
+        1252,
+        &[vba_project::forms::Resource {
+            name: "NativeForm.frx".into(),
+            bytes: fixture::frame_companion(2),
+        }],
+        &vba_project::Limits::default(),
+    )?;
+    native.source = native.source.replace("Entry.Text", "Entry.Value");
+    let child = native
+        .design
+        .controls
+        .iter_mut()
+        .find(|c| c.id == 12)
+        .ok_or("entry")?;
+    child.kind = vba_project::forms::Kind::OptionButton;
+    child.text = "0".into();
+    child.caption = "Child option".into();
+    let mut peer = child.clone();
+    peer.id = 31;
+    peer.name = "Peer".into();
+    let mut outer = child.clone();
+    outer.id = 30;
+    outer.name = "Outer".into();
+    outer.parent = None;
+    native.design.controls.push(peer);
+    native.design.controls.push(outer);
+    let mut ide = Ide::new();
+    ide.attach_native_form(native)?;
+    ide.add_module("Main.bas","Sub Main()\nNativeForm.Entry.Value=True\nNativeForm.Peer.Value=True\nNativeForm.Outer.Value=True\nDebug.Print NativeForm.Entry.Value,NativeForm.Peer.Value,NativeForm.Outer.Value\nNativeForm.Entry.Value=True\nDebug.Print NativeForm.Entry.Value,NativeForm.Peer.Value,NativeForm.Outer.Value\nEnd Sub")?;
+    ide.dispatch(Action::Run, &mut NoHost)?;
+    settle(&mut ide)?;
+    assert_eq!(ide.mode(), Mode::Completed, "{:?}", ide.diagnostics);
+    assert_eq!(
+        ide.output(),
+        vec!["initialized", "False\tTrue\tTrue", "True\tFalse\tTrue"]
+    );
+    Ok(())
+}
+
+#[test]
+fn native_frame_tabindex_changes_only_reorder_the_immediate_scope() -> R {
+    let ide = frame_setup(
+        "Sub Main()\nDebug.Print NativeForm.Heading.TabIndex,NativeForm.Apply.TabIndex,NativeForm.Frame1.TabIndex\nDebug.Print NativeForm.Frame2.TabIndex,NativeForm.Entry.TabIndex\nNativeForm.Frame1.TabIndex=0\nDebug.Print NativeForm.Heading.TabIndex,NativeForm.Apply.TabIndex,NativeForm.Frame1.TabIndex\nNativeForm.Entry.TabIndex=100\nDebug.Print NativeForm.Frame2.TabIndex,NativeForm.Entry.TabIndex\nNativeForm.Frame1.TabStop=False\nNativeForm.Show 0\nDebug.Print NativeForm.ActiveControl.Name\nNativeForm.Frame1.SetFocus\nDebug.Print NativeForm.ActiveControl.Name,NativeForm.Frame2.ActiveControl.Name\nEnd Sub",
+        "",
+    )?;
+    assert_eq!(ide.mode(), Mode::Completed, "{:?}", ide.diagnostics);
+    assert_eq!(
+        ide.output(),
+        vec![
+            "initialized",
+            "0\t2\t1",
+            "0\t0",
+            "1\t2\t0",
+            "0\t0",
+            "Apply",
+            "Frame1\tEntry"
+        ]
+    );
+    Ok(())
+}
+
+#[test]
+fn invalid_native_frame_ancestry_refuses_before_attaching_source_or_design() -> R {
+    let original = vba_project::forms::decode_export(
+        "NativeForm.frm",
+        &fixture::export(),
+        1252,
+        &[vba_project::forms::Resource {
+            name: "NativeForm.frx".into(),
+            bytes: fixture::frame_companion(2),
+        }],
+        &vba_project::Limits::default(),
+    )?;
+    for parent in [12, 13, 999] {
+        let mut native = original.clone();
+        let child = native
+            .design
+            .controls
+            .iter_mut()
+            .find(|c| c.id == 12)
+            .ok_or("entry")?;
+        child.parent = Some(parent);
+        let mut ide = Ide::new();
+        assert!(ide.attach_native_form(native).is_err());
+        assert!(ide.modules.is_empty());
+        assert!(ide.form_instances()?.is_empty());
+    }
+    Ok(())
+}

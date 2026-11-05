@@ -280,3 +280,12 @@ Reuse ordinary list rows, canonical UTF-16 text/selection/drop state and existin
 locale services/refusals. Preserve authorized input, typed validation, source/
 resource identity and nonreplayed Change/Click/drop continuations. No new codec,
 COM or second mutable store; broader M7A.4 work stays explicit.
+
+Native Frame containers follow [ADR 0056](../../../docs/decisions/0056-native-frame-containers.md):
+bounded native parent storages, immediate child Controls/Parent identity, scoped
+TabIndex/option groups and nested ActiveControl/focus cancellation. Canonical state
+remains ordinary classes; effective ancestor flags, live relative geometry,
+clipping and accessible groups use the shared renderer. Original source/resources
+stay inert and unchanged. Further container/page/image/binding/platform semantics,
+native edited persistence and .tvform removal remain in M7A; fresh Office traces
+remain NOT_RUN under M8.5.

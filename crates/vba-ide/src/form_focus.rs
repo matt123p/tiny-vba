@@ -45,19 +45,21 @@ pub(crate) fn valid_handler(procedure: &vba_syntax::Procedure, cancel: bool) -> 
 pub(crate) fn members(form: &Form, handlers: &BTreeSet<String>) -> String {
     let mut source = String::from(
         r#"
-Public VbaActiveControl As Object
 Private VbaFocusSerial As Long
 Public Property Get ActiveControl() As Object
 If Not VbaLoaded Then Class_Initialize
-Set ActiveControl=VbaActiveControl
+Set ActiveControl=VbaPublicActive
 End Property
 Public Sub VbaMoveFocus(ByVal target As Object)
 If Not VbaLoaded Or Not VbaVisible Then Err.Raise 2110
 If target Is Nothing Then Err.Raise 2110
 If target.VbaKind=1 Or Not target.Enabled Or Not target.Visible Then Err.Raise 2110
+Set target=VbaFocusTarget(target)
+If Not VbaEligible(target) Then Err.Raise 2110
 If target Is VbaActiveControl Then Exit Sub
 VbaFocusSerial=VbaFocusSerial+1
 Dim serial As Long,previous As Object,cancel As MSForms.ReturnBoolean
+Dim scope As Object,path(0 To 7) As Object,count As Long,i As Long
 serial=VbaFocusSerial
 Set previous=VbaActiveControl
 If Not (previous Is Nothing) Then
@@ -79,33 +81,59 @@ Set cancel=New VbaFormReturnBoolean
 VbaExit previous,cancel
 If serial<>VbaFocusSerial Or Not VbaLoaded Or Not VbaVisible Then Exit Sub
 If cancel.Value Then Exit Sub
+Set scope=previous
+For i=0 To 7
+If scope.VbaParentKey=0 Then Exit For
+Set scope=VbaLookup(scope.VbaParentKey)
+If VbaWithin(target,scope.VbaId) Then Exit For
+Set cancel=New VbaFormReturnBoolean
+VbaExit scope,cancel
+If serial<>VbaFocusSerial Or Not VbaLoaded Or Not VbaVisible Then Exit Sub
+If cancel.Value Then Exit Sub
+Next i
 End If
+Set scope=target
+For i=0 To 7
+If scope.VbaParentKey=0 Then Exit For
+Set scope=VbaLookup(scope.VbaParentKey)
+If Not (previous Is Nothing) Then
+If VbaWithin(previous,scope.VbaId) Then Exit For
+End If
+Set path(count)=scope
+count=count+1
+Next i
+For i=0 To count-1
+VbaEnter path(count-1-i)
+If serial<>VbaFocusSerial Or Not VbaLoaded Or Not VbaVisible Then Exit Sub
+Next i
 If target.VbaKind=2 Or target.VbaKind=10 Then target.VbaEnterEdit
 VbaEnter target
 If serial<>VbaFocusSerial Or Not VbaLoaded Or Not VbaVisible Then Exit Sub
-If Not target.Enabled Or Not target.Visible Then Exit Sub
+If Not VbaEligible(target) Then Exit Sub
 Set VbaActiveControl=target
+VbaSetAncestorFocus target
 End Sub
 Public Sub VbaFocusIndex(ByVal index As Long)
-VbaMoveFocus VbaControls.Item(index)
+VbaMoveFocus VbaAllControls.Item(index)
 End Sub
 Private Sub VbaInitialFocus()
-Dim control As Object,best As Object
+Dim control As Object,best As Object,scan As Long
 If Not (VbaActiveControl Is Nothing) Then Exit Sub
-For Each control In VbaControls
-If control.VbaKind<>1 And control.Enabled And control.Visible And control.TabStop Then
+For scan=0 To VbaAllControls.Count-1
+Set control=VbaAllControls.Item(scan)
+If control.VbaKind<>1 And control.VbaKind<>11 And VbaEligible(control,True) Then
 If best Is Nothing Then
 Set best=control
-ElseIf control.TabIndex<best.TabIndex Then
+ElseIf control.VbaNavigationRank<best.VbaNavigationRank Then
 Set best=control
 End If
 End If
-Next control
+Next scan
 If Not (best Is Nothing) Then VbaMoveFocus best
 End Sub
 Public Sub VbaTextInput(ByVal index As Long,ByVal text As String,ByVal start As Long,ByVal length As Long,ByVal update As Boolean)
 Dim control As Object
-Set control=VbaControls.Item(index)
+Set control=VbaAllControls.Item(index)
 VbaMoveFocus control
 If Not (VbaActiveControl Is control) Then Exit Sub
 If Not VbaVisible Or Not VbaLoaded Or Not control.Enabled Or Not control.Visible Then Exit Sub
@@ -117,7 +145,7 @@ End If
 End Sub
 Public Sub VbaDropInput(ByVal index As Long,ByVal opened As Boolean)
 Dim control As Object
-Set control=VbaControls.Item(index)
+Set control=VbaAllControls.Item(index)
 If opened Then
 VbaMoveFocus control
 If Not (VbaActiveControl Is control) Then Exit Sub
@@ -127,7 +155,7 @@ control.VbaSetDrop opened
 End Sub
 Public Sub VbaListInput(ByVal index As Long,ByVal row As Long,ByVal commit As Boolean)
 Dim control As Object
-Set control=VbaControls.Item(index)
+Set control=VbaAllControls.Item(index)
 VbaMoveFocus control
 If Not (VbaActiveControl Is control) Then Exit Sub
 If Not VbaVisible Or Not VbaLoaded Or Not control.Enabled Or Not control.Visible Then Exit Sub
@@ -139,7 +167,7 @@ End If
 End Sub
 Public Sub VbaNumericInput(ByVal index As Long,ByVal mode As Long,ByVal value As Long,ByVal up As Boolean,ByVal large As Boolean)
 Dim control As Object
-Set control=VbaControls.Item(index)
+Set control=VbaAllControls.Item(index)
 VbaMoveFocus control
 If Not (VbaActiveControl Is control) Then Exit Sub
 If Not VbaVisible Or Not VbaLoaded Or Not control.Enabled Or Not control.Visible Then Exit Sub
@@ -151,7 +179,11 @@ End If
 End Sub
 Public Sub VbaInput(ByVal index As Long,ByVal text As String)
 Dim control As Object
-Set control=VbaControls.Item(index)
+Set control=VbaAllControls.Item(index)
+If control.VbaKind=11 Then
+control.VbaClick
+Exit Sub
+End If
 If control.VbaKind<>1 Then
 VbaMoveFocus control
 If Not (VbaActiveControl Is control) Then Exit Sub

@@ -333,3 +333,61 @@ fn native_site_and_frame_metadata_decode_without_changing_original_resources() {
         .is_err()
     );
 }
+
+#[test]
+fn native_frames_decode_nested_parent_identity_and_keep_original_storages() {
+    let bytes = fixture::frame_companion(2);
+    let f = decode(&bytes).unwrap();
+    assert_eq!(
+        f.design
+            .controls
+            .iter()
+            .map(|c| (&*c.name, c.parent, c.kind))
+            .collect::<Vec<_>>(),
+        vec![
+            ("Heading", None, Kind::Label),
+            ("Apply", None, Kind::CommandButton),
+            ("Frame1", None, Kind::Frame),
+            ("Frame2", Some(20), Kind::Frame),
+            ("Entry", Some(21), Kind::TextBox)
+        ]
+    );
+    assert_eq!(f.design.controls[2].caption, "Frame1");
+    assert_eq!(f.design.controls[4].text, "initial");
+    assert_eq!(f.resources[1].bytes, bytes);
+    assert!(decode(&fixture::frame_companion(9)).is_err());
+}
+#[test]
+fn native_frame_storage_claims_flags_and_missing_resources_refuse_atomically() {
+    use std::io::{Cursor, Read, Write};
+    for fault in 0..3 {
+        let bytes = fixture::frame_companion(2);
+        let mut file = cfb::CompoundFile::open(Cursor::new(bytes[4..].to_vec())).unwrap();
+        match fault {
+            0 => {
+                file.remove_stream("/i20/o").unwrap();
+            }
+            1 => {
+                file.create_storage("/i99").unwrap();
+                file.create_stream("/i99/f")
+                    .unwrap()
+                    .write_all(&[0; 4])
+                    .unwrap();
+            }
+            _ => {
+                let mut raw = Vec::new();
+                file.open_stream("/f")
+                    .unwrap()
+                    .read_to_end(&mut raw)
+                    .unwrap();
+                let name = raw.windows(6).position(|w| w == b"Frame1").unwrap();
+                raw[name - 12..name - 8].copy_from_slice(&0x40003u32.to_le_bytes());
+                file.create_stream("/f").unwrap().write_all(&raw).unwrap();
+            }
+        }
+        let data = file.into_inner().into_inner();
+        let mut out = (data.len() as u32).to_le_bytes().to_vec();
+        out.extend(data);
+        assert!(decode(&out).is_err());
+    }
+}

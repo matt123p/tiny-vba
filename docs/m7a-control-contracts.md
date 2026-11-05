@@ -1,6 +1,6 @@
 # M7A Office forms — control, property, event, format and host contracts
 
-Updated 2026-11-04. FC0.2/FC0.3 contract inventory under
+Updated 2026-11-05. FC0.2/FC0.3 contract inventory under
 [ADR 0038](decisions/0038-native-office-forms-and-compatibility-only.md),
 [ADR 0039](decisions/0039-m7a-native-control-metadata.md) and
 [ADR 0040](decisions/0040-native-userform-import-and-attachment.md).
@@ -36,7 +36,7 @@ are file-format defaults from MS-OFORMS, not undocumented VBE toolbox defaults.
 | Locked / multiline / password / MaxLength / scrolling changes | MorphData behavior fields or nondefault flags | Locked/MaxLength, multiline, password and selected Enter/Tab/field behavior decoded and executed; scrolling remains U |
 | ControlSource / RowSource / list metadata | Native binding/site fields | U; host binding packet M7A.4 |
 | Pictures / MouseIcon / custom pointers / non-cached class table | Native binary resource or reference-specific class | U; no resource execution/loading |
-| Container children | Native depth/sites and separate parent-control storage | U in v1; refuse instead of flattening |
+| Container children | Native immediate sites and separate Frame parent storage | D for selected bounded Frame packet (ADR 0056); other container variants U |
 
 Selected textual properties are strings, control dimensions are exposed as Single
 points, and Enabled/Visible/TabStop are Boolean in the existing shared runtime.
@@ -61,11 +61,11 @@ unlisted property remains outside the selected import/runtime claim.
 | TextBox | Common geometry/state/Text/Value; UTF-16 selection, typed validation, text limits, multiline/password; binding remains U | Change, Before/AfterUpdate, Enter/Exit, key/mouse | D/P | shared | Change, selected typed Enter/Exit/BeforeUpdate/AfterUpdate | U |
 | CommandButton | Common caption/geometry/state; Default, Cancel, accelerator/focus | Click; key/mouse/focus | D/P | shared | Click() | U |
 | CheckBox | Value/TripleState, caption; binding remains U | Change/Click, user cycling/Locked; selected Enter/Exit; key/mouse/binding remain U | D/P | shared | selected Value/Change/Click | U |
-| OptionButton | Value/GroupName, caption; binding remains U | Change/Click/root grouping; selected Enter/Exit; key/mouse/binding remain U | D/P | shared | selected Value/Change/Click | U |
+| OptionButton | Value/GroupName, caption; binding remains U | Change/Click/parent-scoped grouping; selected Enter/Exit; key/mouse/binding remain U | D/P | shared | selected Value/Change/Click | U |
 | ToggleButton | Value/TripleState, caption; binding remains U | Change/Click/user cycling/Locked; selected Enter/Exit; key/mouse/binding remain U | D/P | shared | selected Value/Change/Click | U |
 | ComboBox | Selected unbound rows/columns, 2D List/Column loading/readback, indexed/current-row Column, Value/Text/style/matching/selection; further list/binding APIs remain U | Selected Change/Click/DropButtonClick and input/focus/update | D/P | shared | selected packet | U |
 | ListBox | Selected unbound indexed rows, ListCount/ListIndex/Selected, Value/Text/columns, 2D List/Column loading/readback and indexed/current-row Column; further shape/loading cases, multiple selection and bindings remain U | Selected Change/Click, input/focus/update | D/P | shared | selected packet | U |
-| Frame | Caption, Controls/container/group/tab behavior | Click, applicable focus/input | U | U | U | U |
+| Frame | Caption, child Controls/Parent, ActiveControl, scoped tab/groups | Click and selected authored focus handlers | D/P (bounded parent storages) | shared | Click and selected authored focus handlers | U |
 | MultiPage | Pages/Controls/Value, child identities/layout | Change, applicable focus/input | U | U | U | U |
 | TabStrip | Tabs/Value, layout/selection | Change, applicable focus/input | U | U | U | U |
 | ScrollBar | Selected Long Value/bounds/increments/orientation/delay; further resources/properties remain U | Change/drag-only Scroll, selected input/focus | D/P | shared | selected packet | U |
@@ -174,3 +174,12 @@ import checkpoint; the runtime record supersedes those restrictions. ADR 0045–
 also add bounded Controls/UserForms iteration, scalar As New, MSForms interfaces,
 VBA.UserForms access and selected native focus/TextBox typed validation. Full native
 family/property/binding/platform scope remains required under M7A.4.
+
+Native Frame containers follow [ADR 0056](decisions/0056-native-frame-containers.md):
+bounded native parent storages, immediate child Controls/Parent identity, scoped
+TabIndex/option groups and nested ActiveControl/focus cancellation. Canonical state
+remains ordinary classes; effective ancestor flags, live relative geometry,
+clipping and accessible groups use the shared renderer. Original source/resources
+stay inert and unchanged. Further container/page/image/binding/platform semantics,
+native edited persistence and .tvform removal remain in M7A; fresh Office traces
+remain NOT_RUN under M8.5.

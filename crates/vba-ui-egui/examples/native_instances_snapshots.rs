@@ -21,6 +21,9 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let lists = std::env::args()
         .nth(2)
         .is_some_and(|option| option == "--list-controls");
+    let frames = std::env::args()
+        .nth(2)
+        .is_some_and(|o| o == "--frame-controls");
     let metadata = std::env::args().nth(2).is_some_and(|o| o == "--metadata");
     for (name, theme, width, scale) in [
         ("light", Theme::light(), 1400., 1.),
@@ -36,7 +39,9 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             1252,
             &[NativeFormResource {
                 name: "NativeForm.frx".into(),
-                bytes: if metadata {
+                bytes: if frames {
+                    fixture::frame_companion(2)
+                } else if metadata {
                     fixture::metadata_companion()
                 } else if combos {
                     fixture::combo_companion(3, 1)
@@ -47,7 +52,9 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                 },
             }],
         )?;
-        let main = if metadata {
+        let main = if frames {
+            "Sub Main()\nNativeForm.Show 0\nEnd Sub"
+        } else if metadata {
             "Sub Main()\nNativeForm.Entry.ControlTipText=\"A native form control tip\"\nNativeForm.Show 0\nEnd Sub"
         } else if lists || combos {
             "Sub Main()\nDim a As New NativeForm,b As New NativeForm\na.Caption=\"First window\"\nb.Caption=\"Second window\"\na.List1.AddItem \"alpha\"\na.List1.AddItem \"beta\"\na.List1.List(0,1)=\"A\"\na.List1.List(1,1)=\"B\"\na.List1.ListIndex=1\nb.List1.AddItem \"separate instance\"\nb.List1.List(0,1)=\"C\"\nb.List1.ListIndex=0\na.Show 0\nb.Show 0\nEnd Sub"
@@ -68,7 +75,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                 break;
             }
         }
-        if ide.form_instances()?.len() != if metadata { 1 } else { 2 } {
+        if ide.form_instances()?.len() != if metadata || frames { 1 } else { 2 } {
             return Err("expected two live native form instances".into());
         }
         let mut h = Harness::builder()
@@ -102,7 +109,9 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                 return Err("expected native tooltip".into());
             }
         }
-        let prefix = if metadata {
+        let prefix = if frames {
+            "m7a4-native-frames"
+        } else if metadata {
             "m7a4-native-metadata"
         } else if combos {
             "m7a4-combo-instances"

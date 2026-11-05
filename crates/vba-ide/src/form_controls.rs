@@ -7,7 +7,7 @@ pub(crate) fn collection_class() -> String {
 Public VbaEntries As Variant
 Public VbaTotal As Long
 Private Sub Class_Initialize()
-Dim initial(0 To 127) As Object
+Dim initial() As Object
 VbaEntries=initial
 End Sub
 Public Property Get VbaNewEnum() As Object
@@ -19,7 +19,11 @@ Set VbaNewEnum=enumerator
 End Property
 Public Sub VbaAdd(ByVal control As Object)
 If VbaTotal>=128 Then Err.Raise 7
-Set VbaEntries(VbaTotal)=control
+Dim data() As Object
+data=VbaEntries
+ReDim Preserve data(0 To VbaTotal)
+Set data(VbaTotal)=control
+VbaEntries=data
 VbaTotal=VbaTotal+1
 End Sub
 Public Property Get Count() As Long
@@ -64,6 +68,7 @@ pub(crate) fn control_class(kind: ControlKind) -> String {
         "Option Explicit\nPublic VbaName As String\nPublic VbaDirty As Boolean\nPublic Property Get Name() As String\nName=VbaName\nEnd Property\nPublic Enabled As Boolean\nPublic Visible As Boolean\nPublic TabStop As Boolean\nPublic VbaTabIndex As Integer\nPublic Event VbaTabChanged(ByVal previous As Integer,ByVal requested As Integer)\nPublic Property Get TabIndex() As Integer\nTabIndex=VbaTabIndex\nEnd Property\nPublic Property Let TabIndex(ByVal value As Integer)\nIf value<0 Then Err.Raise 380\nRaiseEvent VbaTabChanged(VbaTabIndex,value)\nEnd Property\n",
     );
     s.push_str("Public Tag As String\nPublic ControlTipText As String\nPublic VbaHelpContextID As Long\nPublic Property Get HelpContextID() As Long\nHelpContextID=VbaHelpContextID\nEnd Property\nPublic Property Let HelpContextID(ByVal value As Long)\nIf value<0 Then Err.Raise 380\nVbaHelpContextID=value\nEnd Property\n");
+    s.push_str(crate::form_container::COMMON);
     if kind != ControlKind::Label {
         s.push_str("Public VbaFocusConfirmed As Boolean\nPublic Event VbaFocusRequested(ByVal target As Object)\nPublic Sub SetFocus()\nVbaFocusConfirmed=False\nRaiseEvent VbaFocusRequested(Me)\nIf Not VbaFocusConfirmed Then Err.Raise 2110\nEnd Sub\n");
     }
@@ -78,6 +83,7 @@ pub(crate) fn control_class(kind: ControlKind) -> String {
         ControlKind::SpinButton => 8,
         ControlKind::ListBox => 9,
         ControlKind::ComboBox => 10,
+        ControlKind::Frame => 11,
     };
     s.push_str(&format!(
         "Public Property Get VbaKind() As Integer\nVbaKind={kind_code}\nEnd Property\n"
@@ -126,6 +132,8 @@ pub(crate) fn control_class(kind: ControlKind) -> String {
             s.push_str("If IsNull(VbaValue) Then\nMe.Value=False\nElseIf VbaValue Then\nIf TripleState Then\nMe.Value=Null\nElse\nMe.Value=False\nEnd If\nElse\nMe.Value=True\nEnd If\n");
         }
         s.push_str("End Sub\n");
+    } else if kind == ControlKind::Frame {
+        s.push_str(crate::form_container::FRAME);
     } else if kind == ControlKind::ComboBox {
         s.push_str(&crate::form_combo::members());
     } else if kind == ControlKind::ListBox {

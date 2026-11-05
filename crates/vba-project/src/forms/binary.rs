@@ -1,4 +1,4 @@
-//! Independent MS-OFORMS decoding for selected cached flat control families.
+//! Independent bounded MS-OFORMS decoding for cached controls and native Frames.
 use super::{Control, Design, Format, Kind, MAX_CONTROLS, NativeForm, Resource, frame};
 use crate::{Reader, Result, budget, corrupt, text, unsupported};
 use std::collections::BTreeSet;
@@ -122,21 +122,45 @@ pub(super) fn decode(
     root: &str,
     header: &frame::Header,
 ) -> Result<NativeForm> {
+    let result = container(resources, root, header, 0)?;
+    if result.design.controls.len() > MAX_CONTROLS {
+        return Err(budget());
+    }
+    let mut ids = BTreeSet::new();
+    let mut names = BTreeSet::new();
+    let mut default = false;
+    let mut cancel = false;
+    for control in &result.design.controls {
+        if !ids.insert(control.id)
+            || !names.insert(control.name.to_ascii_lowercase())
+            || control.name.eq_ignore_ascii_case(&header.name)
+        {
+            return Err(corrupt(
+                "duplicate native control identity across containers",
+            ));
+        }
+        if default && control.default || cancel && control.cancel {
+            return Err(corrupt("duplicate native default/cancel buttons"));
+        }
+        default |= control.default;
+        cancel |= control.cancel;
+    }
+    Ok(result)
+}
+fn container(
+    resources: &[Resource],
+    root: &str,
+    header: &frame::Header,
+    depth: usize,
+) -> Result<NativeForm> {
+    if depth > 8 {
+        return Err(budget());
+    }
     let f = format!("{root}/f");
     let o = format!("{root}/o");
     let frame = format!("{root}/\u{3}VBFrame");
     let comp = format!("{root}/\u{1}CompObj");
-    for resource in resources {
-        if ![&f, &o, &frame, &comp]
-            .iter()
-            .any(|s| s.eq_ignore_ascii_case(&resource.name))
-        {
-            return Err(unsupported(&format!(
-                "native designer stream {}",
-                resource.name
-            )));
-        }
-    }
+    let mut children = Vec::new();
     let mut r = Reader::new(stream(resources, &f)?);
     let mut b = block(&mut r, 0x0400)?;
     let allowed = (1 << 1)
@@ -163,7 +187,7 @@ pub(super) fn decode(
         field(&mut b, m, bit, 4, 0)?;
     }
     let flags = field(&mut b, m, 6, 4, 4)?;
-    if flags & !0xc004 != 0 || flags & 4 == 0 {
+    if flags & !0xc004 != 0 || depth == 0 && flags & 4 == 0 {
         return Err(unsupported("disabled or unknown form flags"));
     }
     field(&mut b, m, 7, 1, 0)?;
@@ -261,6 +285,58 @@ pub(super) fn decode(
         {
             return Err(corrupt("duplicate native control identity"));
         }
+        if site.kind == Kind::Frame {
+            if site.bytes != 0 {
+                return Err(corrupt("nonstreamed Frame has object bytes"));
+            }
+            let child_root = format!("{root}/i{:02}", site.id);
+            let child_header = frame::Header {
+                name: site.name.clone(),
+                properties: Default::default(),
+                source_start: 0,
+            };
+            let child = container(resources, &child_root, &child_header, depth + 1)?;
+            children.push(child_root);
+            let frame_id = site.id;
+            controls.push(Control {
+                id: site.id,
+                parent: None,
+                name: site.name,
+                tag: site.tag,
+                control_tip_text: site.control_tip_text,
+                help_context_id: site.help_context_id,
+                kind: Kind::Frame,
+                left: site.left,
+                top: site.top,
+                width: child.design.width,
+                height: child.design.height,
+                caption: child.design.caption,
+                text: String::new(),
+                enabled: child.design.enabled,
+                visible: site.flags & 2 != 0,
+                tab_stop: site.flags & 1 != 0,
+                tab_index: site.tab,
+                default: false,
+                cancel: false,
+                max_length: 0,
+                group_name: String::new(),
+                locked: false,
+                text_behavior: super::TextBehavior::default(),
+                numeric: None,
+                list: None,
+                combo: None,
+            });
+            for mut control in child.design.controls {
+                if control.parent.is_none() {
+                    control.parent = Some(frame_id);
+                }
+                controls.push(control);
+            }
+            if controls.len() > MAX_CONTROLS {
+                return Err(budget());
+            }
+            continue;
+        }
         let data = objects.take(site.bytes)?;
         let control = control(data, site)?;
         if controls.iter().any(|other: &Control| {
@@ -282,7 +358,28 @@ pub(super) fn decode(
         design.end()?;
     }
     r.end()?;
-    Ok(NativeForm { format: Format::Embedded, name: header.name.clone(), code_page: 1252, source: String::new(), attributes: vec![], design: Design { caption, tag: frame::metadata(header)?.0, help_context_id: frame::metadata(header)?.1, width,height,controls }, resources: vec![], diagnostics: vec!["Native resources retained; fonts, colours, decoration and window placement use the existing shared renderer. Full Office presentation/lifecycle parity is tracked separately in M7A.4.".into()] })
+    let prefix = format!("{root}/").to_ascii_lowercase();
+    for resource in resources
+        .iter()
+        .filter(|r| r.name.to_ascii_lowercase().starts_with(&prefix))
+    {
+        if ![&f, &o, &frame, &comp]
+            .iter()
+            .any(|n| n.eq_ignore_ascii_case(&resource.name))
+            && !children.iter().any(|child| {
+                resource
+                    .name
+                    .to_ascii_lowercase()
+                    .starts_with(&format!("{child}/").to_ascii_lowercase())
+            })
+        {
+            return Err(unsupported(&format!(
+                "unclaimed native designer stream {}",
+                resource.name
+            )));
+        }
+    }
+    Ok(NativeForm { format: Format::Embedded, name: header.name.clone(), code_page: 1252, source: String::new(), attributes: vec![], design: Design { caption, enabled: flags&4!=0, tag: frame::metadata(header)?.0, help_context_id: frame::metadata(header)?.1, width,height,controls }, resources: vec![], diagnostics: vec!["Native resources retained; fonts, colours, decoration and window placement use the existing shared renderer. Full Office presentation/lifecycle parity is tracked separately in M7A.4.".into()] })
 }
 struct Site {
     id: u32,
@@ -309,13 +406,12 @@ fn site(r: &mut Reader<'_>) -> Result<Site> {
     let help_context_id = i32::try_from(field(&mut b, m, 3, 4, 0)?)
         .map_err(|_| unsupported("native help context ID outside Long range"))?;
     let flags = field(&mut b, m, 4, 4, 0x33)?;
-    if flags & !0x3f != 0 || flags & 0x10 == 0 {
-        return Err(unsupported("native site flags/container/default/cancel"));
-    }
+
     let bytes = field(&mut b, m, 5, 4, 0)? as usize;
     let tab = field(&mut b, m, 6, 2, 0xffff)? as u16 as i16;
     let class = field(&mut b, m, 7, 2, 0x7fff)?;
     let kind = match class {
+        14 => Kind::Frame,
         16 => Kind::SpinButton,
         47 => Kind::ScrollBar,
         17 => Kind::CommandButton,
@@ -328,6 +424,12 @@ fn site(r: &mut Reader<'_>) -> Result<Site> {
         28 => Kind::ToggleButton,
         _ => return Err(unsupported(&format!("native control class index {class}"))),
     };
+    if flags & !0x4203f != 0
+        || (kind == Kind::Frame && (flags & 0x42010) != 0x42000)
+        || (kind != Kind::Frame && (flags & 0x42010) != 0x10)
+    {
+        return Err(unsupported("native site storage/container flags"));
+    }
     if kind != Kind::CommandButton && flags & 0xc != 0 {
         return Err(unsupported("default/cancel flags require a CommandButton"));
     }
@@ -551,6 +653,7 @@ fn control(bytes: &[u8], site: Site) -> Result<Control> {
     r.end()?;
     Ok(Control {
         id: site.id,
+        parent: None,
         name: site.name,
         tag: site.tag,
         control_tip_text: site.control_tip_text,
@@ -627,6 +730,7 @@ fn numeric_control(r: Reader<'_>, mut b: Reader<'_>, site: Site) -> Result<Contr
     r.end()?;
     Ok(Control {
         id: site.id,
+        parent: None,
         name: site.name,
         tag: site.tag,
         control_tip_text: site.control_tip_text,

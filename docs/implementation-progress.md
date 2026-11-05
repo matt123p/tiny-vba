@@ -1,5 +1,22 @@
 # Implementation progress
 
+## M7A.4 continued — native Frame containers (2026-11-05)
+
+Implemented [ADR 0056](decisions/0056-native-frame-containers.md): nested native
+Frame storages, immediate child Controls/Parent identity, nested ActiveControl,
+scoped TabIndex/option groups and ancestor focus/validation continuations. The
+renderer uses live relative geometry, parent clipping, effective input flags and
+accessible group ancestry. Original source/resources remain inert and independent.
+Shared CI, WASM, actual WASI (67 instance/13 decoder cases), UI (14 runtime
+widget and two native designer/import cases), native capture and web gates PASS.
+Light/dark/narrow/scaled/injected-host Frame captures were inspected. Chromium
+editor, legacy form, native focus/text/numeric/boolean/list/ComboBox/metadata
+regressions PASS; native Frame modal Stop/resume and source retention PASS.
+Fork integration is being validated; no full milestone acceptance is claimed. Remaining M7A.4 includes MultiPage/TabStrip/Image/RefEdit, further
+property/event/resource/binding/platform and lifecycle cases. Native edited saving,
+.tvform removal and full acceptance remain M7A.5–M7A.7. Fresh Office observations
+remain NOT_RUN under M8.5. Next: native page/container collections and resources.
+
 ## M7A.4 continued — array readback and native metadata (2026-11-04)
 
 Implemented [ADR 0054](decisions/0054-native-list-array-readback.md) and

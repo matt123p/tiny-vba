@@ -14,7 +14,7 @@ persistence and `.tvform` removal remain unimplemented.
 | Surface / owner | Actual path and current boundary | Required native work |
 |---|---|---|
 | Shared project decode / tiny-vba | `crates/vba-project/src/lib.rs::decode` retains `/PROJECTlk` refusal; `BaseClass` now yields a distinct UserForm with bounded designer resources | Implemented selected f/o/VBFrame resource/component result; broader controls/resources remain explicit gaps |
-| Shared design/runtime / tiny-vba | `vba-ide/src/forms.rs` has ten selected native flat families, 128 controls and 2 MiB model limit. `form_project.rs` generates ordinary class/event support separately from authored source | Native input now maps to validated design; instance/lifecycle/property/event gaps remain M7A.4 |
+| Shared design/runtime / tiny-vba | `vba-ide/src/forms.rs` has eleven selected native families including bounded Frame parents, 128 controls and 2 MiB model limit. `form_project.rs` generates ordinary class/event support separately from authored source | Native input now maps to validated design; instance/lifecycle/property/event gaps remain M7A.4 |
 | Shared exchange / tiny-vba | `Ide::import_form` / `export_form` consume the custom archive. Native `.frm/.frx` imports now attach through a caller-supplied bundle; native/browser IO routes accept the pair | Atomic native import implemented; native export and edited-resource encoding remain M7A.5; remove legacy routes in M7A.6 |
 | Worksheet package / GridCraft | `xlsx::passthrough::KeptReader::sheet_elements/vml` preserves `controls`, `ctrlProp` parts and VML. New `read_worksheet_controls` decodes a read-only Button snapshot | Finish DrawingML/VML reconciliation before native rendering/activation; preserve source graph separately from future writable state |
 | DrawingML shape identity / GridCraft | `xlsx::drawing::read_shape` reads nonempty `macro` into `on_action` but assigns model `id: 0`; source `cNvPr` identity is not retained as a native-control join key | Retain/reconcile native source identity; reject conflicting assignment/representation data; do not join by model sequence number or guessed caption |
@@ -38,12 +38,12 @@ in M7A.4; a declared unsupported packet is not implementation evidence.
 | CommandButton | Caption/geometry, Enabled/Visible, default/cancel/focus, Click | Selected native decode + shared runtime; edited native save UNSUPPORTED |
 | Label | Caption/geometry, formatting, visibility, Click | Selected native decode + shared runtime; edited native save UNSUPPORTED |
 | TextBox | Text/Value, geometry, selection, validation, Change/focus/key events | Selected native decode + shared Text/Change runtime; edited native save UNSUPPORTED |
-| CheckBox | Value/three-state/group/binding, Change/Click | Native flat decode/runtime/input; binding and native edited save unsupported |
-| OptionButton | Value/group/binding, Change/Click | Native flat decode/runtime/input and root groups; binding/native edited save unsupported |
-| ToggleButton | Value/binding, Change/Click | Native flat decode/runtime/input; binding/native edited save unsupported |
+| CheckBox | Value/three-state/group/binding, Change/Click | Native decode/runtime/input; binding and native edited save unsupported |
+| OptionButton | Value/group/binding, Change/Click | Native decode/runtime/input and parent-scoped groups; binding/native edited save unsupported |
+| ToggleButton | Value/binding, Change/Click | Native decode/runtime/input; binding/native edited save unsupported |
 | ComboBox | Items/selection/columns/binding/style, Change/Click/drop/update events | Selected native unbound editable/drop-list packet; further list/binding/resource/lifecycle cases and edited save remain unsupported |
 | ListBox | Items/selection/columns/multiselect/binding, Change/Click | Selected native unbound indexed rows/columns, single selection, Value/Text and input; 2D List/Column loading/readback and indexed/current-row Column implemented; further shape/loading cases/multiple selection/bindings/save remain unsupported |
-| Frame | Caption/container/child Controls/grouping/tab behavior | UNSUPPORTED |
+| Frame | Caption/container/child Controls/Parent/ActiveControl/scoped grouping and tab/focus | Selected native packet under ADR 0056; further resource/event/property variants remain open |
 | MultiPage | Pages/selected Value, child controls, Change | UNSUPPORTED |
 | TabStrip | Tabs/selected Value, Change | UNSUPPORTED |
 | ScrollBar | Value/range/increments/orientation, Change/Scroll | Selected native records, Long properties, reversed ranges and input/drag-only Scroll; further resources/properties/save remain unsupported |
@@ -154,3 +154,12 @@ retained-only. No shared VM/UI dependency enters GridCraft's model/XLSX layers.
 ADR 0053 adds shared ListBox/ComboBox two-dimensional List/Column loading and
 indexed/current-row Column access. See [the decision](decisions/0053-native-list-array-loading.md)
 for the selected string-cell profile, atomic validation and remaining array gaps.
+
+Native Frame containers follow [ADR 0056](decisions/0056-native-frame-containers.md):
+bounded native parent storages, immediate child Controls/Parent identity, scoped
+TabIndex/option groups and nested ActiveControl/focus cancellation. Canonical state
+remains ordinary classes; effective ancestor flags, live relative geometry,
+clipping and accessible groups use the shared renderer. Original source/resources
+stay inert and unchanged. Further container/page/image/binding/platform semantics,
+native edited persistence and .tvform removal remain in M7A; fresh Office traces
+remain NOT_RUN under M8.5.

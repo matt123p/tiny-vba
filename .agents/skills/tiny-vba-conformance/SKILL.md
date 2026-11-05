@@ -142,3 +142,12 @@ Controls/UserForms lookup and bounded transient project inspection. Canonical
 VM state remains authoritative; queries never load forms or invoke getters.
 Keep intrinsic providers/wait routing intact and do not extend .tvform. The
 milestone remains in progress with its remaining requirements recorded there.
+
+Native Frame containers follow [ADR 0056](../../../docs/decisions/0056-native-frame-containers.md):
+bounded native parent storages, immediate child Controls/Parent identity, scoped
+TabIndex/option groups and nested ActiveControl/focus cancellation. Canonical state
+remains ordinary classes; effective ancestor flags, live relative geometry,
+clipping and accessible groups use the shared renderer. Original source/resources
+stay inert and unchanged. Further container/page/image/binding/platform semantics,
+native edited persistence and .tvform removal remain in M7A; fresh Office traces
+remain NOT_RUN under M8.5.
