@@ -133,6 +133,7 @@ fn validate(
             | IR9_VERSION
             | IR10_VERSION
             | IR11_VERSION
+            | IR12_VERSION
     ) || p.profile != caps.profile
         || !caps.ir_versions.contains(&p.ir_version)
     {
@@ -213,6 +214,15 @@ fn validate(
         }
         feature(p, caps, "project-classes-v7")?;
         name(&class.name)?;
+        if let Some(runtime_name) = &class.runtime_name {
+            if p.ir_version < IR12_VERSION {
+                return Err(incompatible("runtime class names require IR 12"));
+            }
+            feature(p, caps, "runtime-class-names-v12")?;
+            name(runtime_name)?;
+            bound(runtime_name.len(), 128)?;
+            budget.text(runtime_name)?;
+        }
         bound(class.interfaces.len(), 32)?;
         if !class.interfaces.is_empty() {
             if p.ir_version < IR11_VERSION {

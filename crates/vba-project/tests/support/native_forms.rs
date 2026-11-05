@@ -287,13 +287,18 @@ pub fn numeric_companion() -> Vec<u8> {
 
 /// Original unbound ListBox; selected native column fields, no external list/binding data.
 pub fn list_companion() -> Vec<u8> {
+    list_selection_companion(0)
+}
+/// Original MultiSelect record, including invalid modes for inert refusal tests.
+pub fn list_selection_companion(mode: u8) -> Vec<u8> {
     let mut all = controls();
-    let mut body = u32s(&[0x80003940, 0]);
+    let mut body = u32s(&[0x80203940, 0]);
     body.push(2); // native fmDisplayStyleList
     body.push(0); // alignment before BoundColumn
     body.extend(2u16.to_le_bytes());
     body.extend(1i16.to_le_bytes());
     body.extend(2i16.to_le_bytes());
+    body.extend([mode, 0, 0, 0]);
     body.extend(u32s(&[6000, 1800]));
     let mut list = record(0x200, &body);
     list.extend(record(0x200, &[0; 4]));

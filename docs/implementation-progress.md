@@ -1,5 +1,19 @@
 # Implementation progress
 
+## M7A.4 continued — multiple selection and TypeName (2026-11-05)
+
+Implemented under ADR 0063/0064: native ListBox MultiSelect metadata/constants,
+canonical selected rows independent of focus, mutation and authorized pointer/
+keyboard routing; generic inert project TypeName and IR 12 native display names.
+Source/resources and all VM limits remain unchanged. Full CI, WASM, actual WASI,
+UI and web gates pass, including all 94 form-instance, 32 generic class and 22 widget
+cases. Ten multiple-selection/runtime-control renders were inspected across light,
+dark, narrow, scaled and host themes. Actual Chromium pointer/Shift/Ctrl/Space,
+independent focus/selection, Null Value, native TypeName, modal Stop/resume and
+exact source preservation pass. Native application capture also passes.
+M7A.4 remains open: bindings, remaining event/lifecycle/platform contracts and
+fork integration are still required.
+
 ## M7A.4 continued — native runtime Controls (2026-11-05)
 
 Implementation under [ADR 0062](decisions/0062-native-dynamic-controls.md): native

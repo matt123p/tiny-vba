@@ -15,6 +15,12 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         .nth(1)
         .unwrap_or_else(|| "reports/ui".into());
     std::fs::create_dir_all(&folder)?;
+    let multiple = std::env::args()
+        .nth(2)
+        .is_some_and(|o| o == "--multi-select");
+    let runtime_controls = std::env::args()
+        .nth(2)
+        .is_some_and(|o| o == "--runtime-controls");
     let dynamic = std::env::args()
         .nth(2)
         .is_some_and(|o| o.starts_with("--dynamic-"));
@@ -35,7 +41,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         .is_some_and(|option| option == "--combo-controls");
     let lists = std::env::args()
         .nth(2)
-        .is_some_and(|option| option == "--list-controls");
+        .is_some_and(|option| option == "--list-controls" || option == "--multi-select");
     let frames = std::env::args()
         .nth(2)
         .is_some_and(|o| o == "--frame-controls");
@@ -70,12 +76,18 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                     fixture::combo_companion(3, 1)
                 } else if lists {
                     fixture::list_companion()
+                } else if runtime_controls {
+                    fixture::companion()
                 } else {
                     fixture::boolean_companion()
                 },
             }],
         )?;
-        let main = if refedit {
+        let main = if runtime_controls {
+            "Sub Main()\nDim group As MSForms.Frame,entry As MSForms.TextBox,list As MSForms.ListBox,button As MSForms.CommandButton\nNativeForm.Caption=\"Runtime native controls\"\nNativeForm.Width=360\nNativeForm.Height=340\nSet group=NativeForm.Controls.Add(\"Forms.Frame.1\",\"RuntimeGroup\")\ngroup.Caption=\"Added through Controls.Add\"\ngroup.Top=100\ngroup.Width=320\ngroup.Height=200\nSet entry=group.Controls.Add(\"Forms.TextBox.1\",\"RuntimeEntry\")\nentry.Text=\"Canonical runtime text\"\nentry.Left=10\nentry.Top=24\nentry.Width=270\nSet list=group.Controls.Add(\"Forms.ListBox.1\",\"RuntimeList\")\nlist.Left=10\nlist.Top=60\nlist.Width=180\nlist.Height=110\nlist.AddItem \"Alpha\"\nlist.AddItem \"Beta\"\nlist.AddItem \"Gamma\"\nlist.MultiSelect=2\nlist.Selected(0)=True\nlist.Selected(2)=True\nSet button=group.Controls.Add(\"Forms.CommandButton.1\",\"RuntimeButton\")\nbutton.Caption=\"Action\"\nbutton.Left=205\nbutton.Top=90\nNativeForm.Show 0\nlist.SetFocus\nlist.ListIndex=1\nEnd Sub"
+        } else if multiple {
+            "Sub Main()\nDim a As New NativeForm,b As New NativeForm\na.Caption=\"Multi selection\"\nb.Caption=\"Extended selection\"\na.List1.MultiSelect=1\nb.List1.MultiSelect=2\na.List1.Height=100\nb.List1.Height=100\na.List1.AddItem \"Alpha\"\na.List1.AddItem \"Beta\"\na.List1.AddItem \"Gamma\"\nb.List1.AddItem \"Alpha\"\nb.List1.AddItem \"Beta\"\nb.List1.AddItem \"Gamma\"\na.List1.Selected(0)=True\na.List1.Selected(2)=True\nb.List1.Selected(0)=True\nb.List1.Selected(2)=True\na.Show 0\nb.Show 0\nb.List1.SetFocus\nb.List1.ListIndex=1\nEnd Sub"
+        } else if refedit {
             "Sub Main()\nNativeForm.Show\nEnd Sub"
         } else if images {
             "Sub Main()\nSet NativeForm.Image2.Picture=NativeForm.Image1.Picture\nNativeForm.Image2.PictureTiling=True\nNativeForm.Image2.PictureSizeMode=fmPictureSizeModeClip\nNativeForm.Show 0\nEnd Sub"
@@ -116,7 +128,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             }
         }
         if ide.form_instances()?.len()
-            != if metadata || frames || tabs || pages || images || refedit {
+            != if metadata || frames || tabs || pages || images || refedit || runtime_controls {
                 1
             } else {
                 2
@@ -160,7 +172,11 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                 return Err("expected native tooltip".into());
             }
         }
-        let prefix = if dynamic && pages {
+        let prefix = if runtime_controls {
+            "m7a4-runtime-controls"
+        } else if multiple {
+            "m7a4-multiple-selection"
+        } else if dynamic && pages {
             "m7a4-dynamic-pages"
         } else if dynamic {
             "m7a4-dynamic-tabs"

@@ -1,6 +1,6 @@
 # M3/M4 runtime and debugger
 
-Implemented 2026-10-26, extended by new M1.1. The current consumer is `m5-host-v1`, using verified IR 1/2/3/4/5/6/7/8/9/10/11.
+Implemented 2026-10-26, extended by new M1.1. The current consumer is `m5-host-v1`, using verified IR 1/2/3/4/5/6/7/8/9/10/11/12.
 The [M4 language contract](m4-language.md) and [ADR 0011](decisions/0011-m4-language-extension.md)
 define scalar coercions, arrays, arguments, persistent state, builtins and VBA handlers.
 [ADR 0013](decisions/0013-m5-host-contract.md) adds the versioned native host protocol and hidden
@@ -497,7 +497,7 @@ input from ordinary canonical objects; imported source/design/resources stay
 unchanged. Weak context requests avoid ownership cycles. Shared typed helpers,
 indexed verifier metadata and generic dispatch optimizations preserve all existing
 VM limits. Full M7A.4, native edited persistence/removal and M8.5 comparisons remain
-separate requirements; validation of this increment is in progress.
+separate requirements; CI/WASM/WASI validation of ADR 0062 passed.
 
 The generic VM avoids repeating instance-lifetime scans across scalar-only
 checkpoints. Reference-bearing stack/storage changes, frame changes, event
@@ -505,3 +505,10 @@ deliveries and enumeration-root removal invalidate the cached scan; every
 execution slice starts conservatively invalidated. Normal finalization still
 repeats to a fixed point before proceeding. Execution, allocation and host
 permission limits remain unchanged.
+
+[ADR 0063](decisions/0063-native-listbox-multiple-selection.md) adds native ListBox
+multiple selection, independent focus/selection, row mutation and authorized
+pointer/keyboard input. [ADR 0064](decisions/0064-native-runtime-type-names.md) adds
+IR 12 inert runtime class names and native TypeName through canonical aliases.
+State stays in ordinary classes, rendering stays inert, and budgets are unchanged.
+Bindings and the remaining M7A.4 ledger remain open; M7A.5/.6 and M8.5 are separate.

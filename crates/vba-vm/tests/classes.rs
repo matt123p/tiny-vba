@@ -991,3 +991,53 @@ End Function"#;
     assert_eq!(second.output(), expected);
     Ok(())
 }
+
+#[test]
+fn typename_uses_verified_runtime_metadata_without_default_getters_or_losing_identity() -> R {
+    let modules=[
+        parse(&SourceFile::new(SourceId(1),"Main.bas".into(),"Function Answer() As String\nDim c As Counter,o As Object,v As Variant\nSet c=New Counter\nSet o=c\nSet v=c\nAnswer=TypeName(c) & \":\" & TypeName(o) & \":\" & TypeName(v) & \":\" & TypeName(Nothing)\nEnd Function".into())?,ModuleKind::Standard)?,
+        parse(&SourceFile::new(SourceId(2),"Counter.cls".into(),"Public Property Get Value() As Long\nAttribute Value.VB_UserMemId = 0\nErr.Raise 5\nEnd Property".into())?,ModuleKind::Class)?,
+    ];
+    let mut options = CompileOptions {
+        capabilities: vba_vm::capabilities(),
+        ..Default::default()
+    };
+    for (name, expected) in [
+        (None, "Counter:Counter:Counter:Nothing"),
+        (Some("Widget"), "Widget:Widget:Widget:Nothing"),
+    ] {
+        options.class_runtime_names = name
+            .map(|name| [("Counter".into(), name.into())].into())
+            .unwrap_or_default();
+        let p = compile_modules(&modules, &options)?;
+        if name.is_some() {
+            assert_eq!(p.program().ir_version, vba_ir::IR12_VERSION);
+            let mut old = vba_ir::Capabilities::ir11_structural();
+            old.profile = p.program().profile.clone();
+            assert!(
+                vba_ir::verify(p.program().clone(), &old, &vba_ir::VerifyLimits::default())
+                    .is_err()
+            );
+            let mut downgraded = p.program().clone();
+            downgraded.ir_version = vba_ir::IR11_VERSION;
+            assert!(
+                vba_ir::verify(
+                    downgraded,
+                    &vba_vm::capabilities(),
+                    &vba_ir::VerifyLimits::default()
+                )
+                .is_err()
+            );
+        }
+        let mut s = Session::new(p, 1, vec![], None, Limits::default())?;
+        assert_eq!(
+            drive(&mut s)?,
+            Outcome::Completed(ReturnValue::Function(Value::String(
+                vba_values::VbaString::from_utf8(expected)?
+            )))
+        );
+    }
+    options.class_runtime_names = [("MissingOwner".into(), "Widget".into())].into();
+    assert!(compile_modules(&modules, &options).is_err());
+    Ok(())
+}

@@ -445,6 +445,27 @@ impl Session {
         self.instances = restored.instances;
         Ok(())
     }
+    pub(super) fn project_type_name(&mut self, value: Option<&Value>) -> Result<Option<Value>> {
+        let Some(Value::Object(object)) = value else {
+            return Ok(None);
+        };
+        if object.host != 0 {
+            return Ok(None);
+        }
+        self.class_lookup_work(self.program.program().classes.len())?;
+        let instance = self.instance_object(*object)?;
+        let class = self
+            .program
+            .program()
+            .classes
+            .iter()
+            .find(|class| class.source == instance.source)
+            .ok_or_else(|| invariant("runtime type class"))?;
+        let name = class.runtime_name.as_ref().unwrap_or(&class.name);
+        let value = Value::String(vba_values::VbaString::from_utf8(name)?);
+        self.charge(value_bytes(&value))?;
+        Ok(Some(value))
+    }
     pub(super) fn instance_object(&self, object: vba_values::ObjectRef) -> Result<&Instance> {
         object
             .object

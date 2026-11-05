@@ -16,7 +16,8 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let frames = option.as_deref() == Some("--frame-controls");
     let metadata = option.as_deref() == Some("--metadata");
     let combo = option.as_deref() == Some("--combo-controls");
-    let list = option.as_deref() == Some("--list-controls");
+    let multiple = option.as_deref() == Some("--multi-select");
+    let list = option.as_deref() == Some("--list-controls") || multiple;
     let numeric = option.as_deref() == Some("--numeric-controls");
     let focus = option.as_deref() == Some("--focus-events");
     let text_controls = option.as_deref() == Some("--text-controls");
@@ -26,8 +27,9 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         Some("--boolean-controls") => true,
         Some(
             "--focus-events" | "--text-controls" | "--password-text" | "--numeric-controls"
-            | "--list-controls" | "--combo-controls" | "--metadata" | "--frame-controls"
-            | "--tab-controls" | "--page-controls" | "--image-controls" | "--refedit-controls",
+            | "--list-controls" | "--multi-select" | "--combo-controls" | "--metadata"
+            | "--frame-controls" | "--tab-controls" | "--page-controls" | "--image-controls"
+            | "--refedit-controls",
         ) => false,
         Some(_) => return Err("unknown fixture option".into()),
     };
@@ -39,6 +41,8 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         "Stop\r\nDebug.Print Tabs1.Value\r\nDebug.Print Tabs1.SelectedItem.Caption"
     } else if combo {
         "Stop\r\nDebug.Print Combo1.ListIndex\r\nDebug.Print Combo1.Value"
+    } else if multiple {
+        "Stop\r\nDebug.Print List1.ListIndex\r\nDebug.Print List1.Selected(0)\r\nDebug.Print List1.Selected(1)\r\nDebug.Print List1.Selected(2)\r\nDebug.Print IsNull(List1.Value)\r\nDebug.Print TypeName(List1)"
     } else if list {
         "Stop\r\nDebug.Print List1.ListIndex\r\nDebug.Print List1.Value"
     } else if numeric {
@@ -104,6 +108,8 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             fixture::metadata_companion()
         } else if combo {
             fixture::combo_companion(3, 1)
+        } else if multiple {
+            fixture::list_selection_companion(2)
         } else if list {
             fixture::list_companion()
         } else if numeric {

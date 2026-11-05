@@ -120,6 +120,14 @@ impl Ide {
                 ][..],
             ),
             (
+                "fmMultiSelect",
+                &[
+                    ("fmMultiSelectSingle", 0),
+                    ("fmMultiSelectMulti", 1),
+                    ("fmMultiSelectExtended", 2),
+                ][..],
+            ),
+            (
                 "fmStyle",
                 &[("fmStyleDropDownCombo", 0), ("fmStyleDropDownList", 2)][..],
             ),
@@ -252,6 +260,35 @@ impl Ide {
         }
         ReferenceSet::new(libraries)
     }
+    pub(crate) fn form_runtime_names(
+        &self,
+        interfaces: &BTreeMap<String, Vec<vba_ir::ClassInterface>>,
+    ) -> BTreeMap<String, String> {
+        let mut names = BTreeMap::new();
+        for (name, interfaces) in interfaces {
+            if self
+                .forms
+                .values()
+                .any(|designer| designer.form().name.eq_ignore_ascii_case(name))
+            {
+                continue;
+            }
+            if let Some(interface) = interfaces.first()
+                && let Some(spelling) = TYPES
+                    .iter()
+                    .copied()
+                    .chain(["StdPicture", "RefEdit"])
+                    .find(|spelling| spelling.eq_ignore_ascii_case(interface.ty.name()))
+            {
+                names.insert(name.clone(), spelling.into());
+            }
+        }
+        if !self.forms.is_empty() {
+            names.insert("VbaFormUserForms".into(), "UserForms".into());
+        }
+        names
+    }
+
     pub(crate) fn form_interfaces(
         &self,
         references: &ReferenceSet,

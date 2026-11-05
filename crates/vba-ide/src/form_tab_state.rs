@@ -27,8 +27,10 @@ Set VbaOwner=owner
 End Function
 Public Sub VbaInitialize(ByVal index As Long)
 If index< -1 Or index>=VbaTotal Then Err.Raise 380
+Dim entries() As Object
+entries=VbaEntries
 Set VbaSelected=Nothing
-If index>=0 Then Set VbaSelected=VbaEntries(index)
+If index>=0 Then Set VbaSelected=entries(index)
 VbaValue=index
 End Sub
 Public Sub VbaSelect(ByVal index As Long)
@@ -53,16 +55,17 @@ End Sub
 Public Sub VbaInsert(ByVal cell As VbaFormTabPosition,ByVal index As Long,ByVal notify As Boolean)
 If VbaTotal>=128 Then Err.Raise 7
 If index<0 Or index>VbaTotal Then Err.Raise 380
-Dim entries() As Object,i As Long,previous As VbaFormTabPosition,value As Long
+Dim entries() As Object,old() As Object,i As Long,previous As VbaFormTabPosition,value As Long
 Set previous=VbaSelected
 value=VbaValue
+old=VbaEntries
 ReDim entries(0 To VbaTotal)
 For i=0 To index-1
-Set entries(i)=VbaEntries(i)
+Set entries(i)=old(i)
 Next i
 Set entries(index)=cell
 For i=index To VbaTotal-1
-Set entries(i+1)=VbaEntries(i)
+Set entries(i+1)=old(i)
 Next i
 cell.VbaAttached=True
 VbaEntries=entries
@@ -99,10 +102,11 @@ Public Sub VbaRename(ByVal cell As VbaFormTabPosition,ByVal value As String)
 If Not cell.VbaAttached Then Err.Raise 91
 If Not cell.VbaRuntime Then Err.Raise 382
 If Len(value)=0 Or Len(value)>128 Then Err.Raise 380
-Dim i As Long
+Dim i As Long,entries() As Object
+entries=VbaEntries
 i=VbaFind(value)
 If i>=0 Then
-If Not (VbaEntries(i) Is cell) Then Err.Raise 380
+If Not (entries(i) Is cell) Then Err.Raise 380
 End If
 cell.VbaName=value
 End Sub
@@ -130,16 +134,17 @@ VbaCommit previous,value,True
 End Sub
 Public Sub VbaRemove(ByVal index As Long,Optional ByVal notify As Boolean=True)
 If index<0 Or index>=VbaTotal Then Err.Raise -2147024809
-Dim entries() As Object,i As Long,cell As VbaFormTabPosition,previous As VbaFormTabPosition,value As Long
+Dim entries() As Object,old() As Object,i As Long,cell As VbaFormTabPosition,previous As VbaFormTabPosition,value As Long
 Set previous=VbaSelected
 value=VbaValue
-Set cell=VbaEntries(index)
+old=VbaEntries
+Set cell=old(index)
 If VbaTotal>1 Then ReDim entries(0 To VbaTotal-2)
 For i=0 To index-1
-Set entries(i)=VbaEntries(i)
+Set entries(i)=old(i)
 Next i
 For i=index+1 To VbaTotal-1
-Set entries(i-1)=VbaEntries(i)
+Set entries(i-1)=old(i)
 Next i
 VbaEntries=entries
 VbaTotal=VbaTotal-1

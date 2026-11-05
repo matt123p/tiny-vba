@@ -248,7 +248,11 @@ pub(crate) fn objects(
             })? {
                 if let Value::Object(page) = value
                     && !objects.contains(&page)
+                    && !pages.contains(&page)
                 {
+                    if objects.len().saturating_add(pages.len()) >= 256 {
+                        return Err(error("runtime hierarchy budget"));
+                    }
                     pages.push(page);
                 }
             }

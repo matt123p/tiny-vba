@@ -27,6 +27,18 @@ impl ListBox<'_> {
             .unwrap_or(0)
             .min(1024);
         let index = self.long("ListIndex", -1);
+        let multi = self.long("MultiSelect", 0);
+        let selections = match self.field("VbaSelected") {
+            Some(Value::Array(values)) => Some(values),
+            _ => None,
+        };
+        let modifiers = ui.input(|i| i.modifiers);
+        let input = |row, navigate, space| vba_ide::FormListInput {
+            row,
+            extend: modifiers.shift,
+            toggle: modifiers.ctrl || (space && multi == 1),
+            navigate,
+        };
         let columns = self.long("ColumnCount", 1);
         let columns = if columns == -1 {
             10
@@ -88,10 +100,18 @@ impl ListBox<'_> {
                 (egui::Key::PageDown, index.saturating_add(visible)),
                 (egui::Key::PageUp, index.saturating_sub(visible)),
             ] {
-                if ui.input_mut(|i| i.consume_key(egui::Modifiers::NONE, key)) {
-                    chosen = Some(desired.clamp(0, count as i32 - 1));
+                if ui.input_mut(|i| i.consume_key(modifiers, key)) {
+                    chosen = Some(input(desired.clamp(0, count as i32 - 1), true, false));
                 }
             }
+        }
+        if ui.is_enabled()
+            && response.has_focus()
+            && index >= 0
+            && index < count as i32
+            && ui.input_mut(|i| i.consume_key(modifiers, egui::Key::Space))
+        {
+            chosen = Some(input(index, false, true));
         }
         let content = self.bounds.shrink(3.);
         let mut child = ui.new_child(
@@ -136,7 +156,12 @@ impl ListBox<'_> {
                             .unwrap_or_default()
                     })
                     .collect::<Vec<_>>();
-                let selected = index == row as i32;
+                let selected = if multi == 0 {
+                    index == row as i32
+                } else {
+                    selections.as_ref().and_then(|s| s.elements().get(row))
+                        == Some(&Value::Boolean(true))
+                };
                 let (rect, response) =
                     ui.allocate_exact_size(egui::vec2(width, row_height), egui::Sense::click());
                 response.widget_info(|| {
@@ -179,18 +204,27 @@ impl ListBox<'_> {
                             foreground,
                         );
                 }
+                if index == row as i32 && ui.memory(|m| m.has_focus(self.widget)) {
+                    ui.painter().rect_stroke(
+                        rect.shrink(1.),
+                        0.,
+                        egui::Stroke::new(1., self.theme.text),
+                        egui::StrokeKind::Inside,
+                    );
+                }
                 if response.clicked() {
-                    chosen = Some(row as i32);
+                    chosen = Some(input(row as i32, false, false));
                 }
             }
         });
-        if let Some(row) = chosen {
+        if let Some(input) = chosen {
             ui.memory_mut(|m| m.request_focus(self.widget));
-            commands.push(Command::Form(FormCommand::InstanceList(
-                self.instance,
-                self.control.id,
-                row,
-            )));
+            let command = if self.control.kind == ControlKind::ListBox {
+                FormCommand::InstanceListSelection(self.instance, self.control.id, input)
+            } else {
+                FormCommand::InstanceList(self.instance, self.control.id, input.row)
+            };
+            commands.push(Command::Form(command));
         }
     }
 }

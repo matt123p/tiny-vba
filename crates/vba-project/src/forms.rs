@@ -94,9 +94,10 @@ pub struct ComboBehavior {
     pub match_required: bool,
     pub list_rows: u16,
 }
-/// Unbound, single-selection native list configuration.
+/// Unbound native list configuration.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct ListBehavior {
+    pub multi_select: u8,
     pub column_count: i16,
     pub bound_column: u16,
     pub text_column: i16,

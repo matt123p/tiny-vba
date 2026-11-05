@@ -65,6 +65,7 @@ impl Command {
                         | FormCommand::InstanceText(..)
                         | FormCommand::InstanceNumeric(..)
                         | FormCommand::InstanceList(..)
+                        | FormCommand::InstanceListSelection(..)
                         | FormCommand::InstanceTab(..)
                         | FormCommand::InstanceDrop(..)
                         | FormCommand::InstanceNavigate(..)
@@ -1155,10 +1156,14 @@ if let Some(instancing)=m.instancing(){ui.label(theme.label("Instancing"));ui.la
             self.find_open = true;
             self.focus_find = true;
         }
-        if ctx.input_mut(|i| {
-            i.consume_key(egui::Modifiers::CTRL, egui::Key::Space)
-                || i.consume_key(egui::Modifiers::CTRL, egui::Key::J)
-        }) {
+        if self
+            .editing_view
+            .is_some_and(|id| ctx.memory(|m| m.has_focus(id)))
+            && ctx.input_mut(|i| {
+                i.consume_key(egui::Modifiers::CTRL, egui::Key::Space)
+                    || i.consume_key(egui::Modifiers::CTRL, egui::Key::J)
+            })
+        {
             self.request_completion(ide);
         }
     }

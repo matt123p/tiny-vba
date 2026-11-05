@@ -36,7 +36,9 @@ pub const IR8_VERSION: u32 = 8;
 pub const IR9_VERSION: u32 = 9;
 pub const IR10_VERSION: u32 = 10;
 pub const IR11_VERSION: u32 = 11;
-pub const FEATURES: [&str; 27] = [
+pub const IR12_VERSION: u32 = 12;
+pub const FEATURES: [&str; 28] = [
+    "runtime-class-names-v12",
     "class-interfaces-v11",
     "auto-instancing-v10",
     "class-enumerators-v9",
@@ -477,6 +479,8 @@ pub struct ClassInterface {
 }
 #[derive(Clone, Debug)]
 pub struct Class {
+    /// Embedding-owned inert TypeName spelling; None uses the project class name.
+    pub runtime_name: Option<String>,
     /// Explicit embedding-owned nominal interface identities; never implicit activation.
     pub interfaces: Vec<ClassInterface>,
     pub events: Vec<ProcedureId>,
@@ -615,6 +619,7 @@ impl Capabilities {
                 .collect(),
             declarations: ScalarKind::ALL.into_iter().collect(),
         };
+        caps.features.remove("runtime-class-names-v12");
         caps.features.remove("class-interfaces-v11");
         caps.features.remove("auto-instancing-v10");
         caps.features.remove("class-enumerators-v9");
@@ -623,6 +628,13 @@ impl Capabilities {
         caps.features.remove("string-comparison-context-v1");
         caps.instructions.remove(&Opcode::IntrinsicCall);
         caps.instructions.remove(&Opcode::BinaryCompare);
+        caps
+    }
+    pub fn ir12_structural() -> Self {
+        let mut caps = Self::ir11_structural();
+        caps.profile = "ir12-structural".into();
+        caps.ir_versions.insert(IR12_VERSION);
+        caps.features.insert("runtime-class-names-v12".into());
         caps
     }
     pub fn ir11_structural() -> Self {

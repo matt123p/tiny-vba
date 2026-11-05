@@ -17,6 +17,7 @@ mod form_dynamic;
 mod form_focus;
 mod form_image;
 mod form_list;
+mod form_multiselect;
 mod form_numeric;
 mod form_project;
 mod form_refedit;
@@ -25,7 +26,7 @@ mod form_tab_state;
 mod form_tabs;
 mod form_text;
 mod form_types;
-pub use form_project::{FormInstance, FormNumericInput};
+pub use form_project::{FormInstance, FormListInput, FormNumericInput};
 pub mod forms;
 mod history;
 mod host_calls;
@@ -889,6 +890,7 @@ impl Ide {
                 capabilities: vba_vm::capabilities(),
                 imports: self.form_imports(),
                 references,
+                class_runtime_names: self.form_runtime_names(&class_interfaces),
                 class_interfaces,
                 procedure_aliases: self.form_procedure_aliases(),
                 document_members: self.document_members.clone(),
@@ -943,6 +945,7 @@ impl Ide {
                 capabilities: vba_vm::capabilities(),
                 imports: self.form_imports(),
                 references,
+                class_runtime_names: self.form_runtime_names(&class_interfaces),
                 class_interfaces,
                 procedure_aliases: self.form_procedure_aliases(),
                 document_members: self.document_members.clone(),

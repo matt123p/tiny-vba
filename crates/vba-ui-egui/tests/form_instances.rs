@@ -1674,3 +1674,123 @@ End Sub
     assert!(h.state().errors.is_empty(), "{:?}", h.state().errors);
     Ok(())
 }
+
+#[test]
+fn native_multiselect_pointer_shift_arrows_and_space_preserve_canonical_selection() -> R {
+    for mode in [1, 2] {
+        let mut ide = Ide::new();
+        ide.import_native_form_export(
+            "NativeForm.frm",
+            &fixture::export(),
+            1252,
+            &[NativeFormResource {
+                name: "NativeForm.frx".into(),
+                bytes: fixture::list_companion(),
+            }],
+        )?;
+        ide.add_module("Main.bas",&format!("Sub Main()\nNativeForm.List1.AddItem \"alpha\"\nNativeForm.List1.AddItem \"beta\"\nNativeForm.List1.AddItem \"gamma\"\nNativeForm.List1.List(0,1)=\"A\"\nNativeForm.List1.List(1,1)=\"B\"\nNativeForm.List1.List(2,1)=\"C\"\nNativeForm.List1.Height=90\nNativeForm.List1.MultiSelect={mode}\nNativeForm.Show 0\nEnd Sub"))?;
+        ide.dispatch(Action::Run, &mut NoHost)?;
+        for _ in 0..100 {
+            ide.tick(&mut NoHost)?;
+            if ide.mode() == Mode::Completed {
+                break;
+            }
+        }
+        assert_eq!(ide.mode(), Mode::Completed, "{:?}", ide.diagnostics);
+        let f = *ide.form_instances()?.first().ok_or("instance")?;
+        let mut h = Harness::builder()
+            .with_size(egui::vec2(1400., 1000.))
+            .build_ui_state(
+                |ui, s: &mut State| {
+                    for c in s.view.show(ui, &s.ide, Theme::light()) {
+                        if let Err(e) = apply(&mut s.ide, c, &mut NoHost) {
+                            s.errors.push(e.to_string());
+                        }
+                    }
+                    if let Err(e) = s.ide.tick(&mut NoHost) {
+                        s.errors.push(e.to_string());
+                    }
+                },
+                State {
+                    ide,
+                    view: EditorUi::default(),
+                    errors: vec![],
+                },
+            );
+        h.run_steps(5);
+        h.get_by_label("List1 row 0: alpha | A").click();
+        h.run_steps(15);
+        h.key_press_modifiers(egui::Modifiers::SHIFT, egui::Key::ArrowDown);
+        h.run_steps(15);
+        let selected = |h: &Harness<State>| -> Result<Vec<bool>, Box<dyn std::error::Error>> {
+            let vba_ide::Value::Array(a) =
+                h.state()
+                    .ide
+                    .form_instance_field(f, Some(14), "VbaSelected")?
+            else {
+                return Err("selection".into());
+            };
+            Ok(a.elements()
+                .iter()
+                .map(|v| *v == vba_ide::Value::Boolean(true))
+                .collect())
+        };
+        assert_eq!(
+            selected(&h)?,
+            if mode == 1 {
+                vec![true, false, false]
+            } else {
+                vec![true, true, false]
+            }
+        );
+        assert_eq!(
+            h.state()
+                .ide
+                .form_instance_field(f, Some(14), "ListIndex")?,
+            vba_ide::Value::Long(1)
+        );
+        h.key_press(egui::Key::Space);
+        h.run_steps(15);
+        assert_eq!(
+            selected(&h)?,
+            if mode == 1 {
+                vec![true, true, false]
+            } else {
+                vec![false, true, false]
+            }
+        );
+        h.key_press_modifiers(egui::Modifiers::CTRL, egui::Key::ArrowDown);
+        h.run_steps(15);
+        assert_eq!(
+            selected(&h)?,
+            if mode == 1 {
+                vec![true, true, false]
+            } else {
+                vec![false, true, false]
+            }
+        );
+        assert_eq!(
+            h.state()
+                .ide
+                .form_instance_field(f, Some(14), "ListIndex")?,
+            vba_ide::Value::Long(2),
+            "Ctrl+Down focus mode {mode}"
+        );
+        h.key_press_modifiers(egui::Modifiers::CTRL, egui::Key::Space);
+        h.run_steps(15);
+        assert_eq!(
+            selected(&h)?,
+            if mode == 1 {
+                vec![true, true, true]
+            } else {
+                vec![false, true, true]
+            }
+        );
+        assert_eq!(
+            h.state().ide.form_instance_field(f, Some(14), "Value")?,
+            vba_ide::Value::Null
+        );
+        assert!(h.state().errors.is_empty(), "{:?}", h.state().errors);
+    }
+    Ok(())
+}

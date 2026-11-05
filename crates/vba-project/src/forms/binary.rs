@@ -631,8 +631,16 @@ fn control(bytes: &[u8], site: Site) -> Result<Control> {
             } else {
                 1
             };
-            if field(&mut b, m, 17, 1, 0)? != 0 || (listbox && field(&mut b, m, 21, 1, 0)? != 0) {
-                return Err(unsupported("ListBox list style or multiple selection"));
+            if field(&mut b, m, 17, 1, 0)? != 0 {
+                return Err(unsupported("ListBox list style"));
+            }
+            let multi_select = if listbox {
+                field(&mut b, m, 21, 1, 0)? as u8
+            } else {
+                0
+            };
+            if multi_select > 2 {
+                return Err(unsupported("ListBox selection mode"));
             }
             if !(-1..=10).contains(&column_count)
                 || bound_column > 10
@@ -653,6 +661,7 @@ fn control(bytes: &[u8], site: Site) -> Result<Control> {
                 text_behavior.recall_selection = flags & (1 << 21) != 0;
             }
             list = Some(super::ListBehavior {
+                multi_select,
                 column_count,
                 bound_column,
                 text_column,

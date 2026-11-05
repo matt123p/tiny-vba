@@ -211,6 +211,7 @@ fn unbound_native_listbox_uses_cached_identity_and_inert_column_metadata() {
     assert_eq!(
         list.list,
         Some(forms::ListBehavior {
+            multi_select: 0,
             column_count: 2,
             bound_column: 2,
             text_column: 1
@@ -225,34 +226,23 @@ fn unbound_native_listbox_uses_cached_identity_and_inert_column_metadata() {
 }
 
 #[test]
-fn listbox_multiple_selection_and_external_list_resources_refuse_atomically() {
-    use std::io::{Cursor, Read, Write};
+fn listbox_multiple_selection_is_inert_and_external_list_resources_refuse_atomically() {
+    use std::io::{Cursor, Write};
     let companion = fixture::list_companion();
-    let mut file = cfb::CompoundFile::open(Cursor::new(companion[4..].to_vec())).unwrap();
-    let mut objects = Vec::new();
-    file.open_stream("/o")
-        .unwrap()
-        .read_to_end(&mut objects)
-        .unwrap();
-    let start = fixture::controls().iter().map(Vec::len).sum::<usize>();
-    // Replace the two persisted-column fields at the end with MultiSelect=1.
-    // Rebuild a separate original record; leave source/sites and exact original input intact.
-    let mut body = fixture::u32s(&[0x80202140, 0]);
-    body.extend([2, 0, 2, 0, 1, 0, 0, 0]); // List style, ColumnCount=2, MultiSelect=Multi, alignment
-    body.extend(fixture::u32s(&[6000, 1800]));
-    let mut unsupported = fixture::record(0x200, &body);
-    unsupported.extend(fixture::record(0x200, &[0; 4]));
-    assert_eq!(unsupported.len(), objects.len() - start);
-    objects[start..].copy_from_slice(&unsupported);
-    file.create_stream("/o")
-        .unwrap()
-        .write_all(&objects)
-        .unwrap();
-    let bytes = file.into_inner().into_inner();
-    let mut changed = (bytes.len() as u32).to_le_bytes().to_vec();
-    changed.extend(bytes);
-    assert!(decode(&changed).is_err());
-    assert!(decode(&companion).is_ok());
+    for mode in 0..=2 {
+        let bytes = fixture::list_selection_companion(mode);
+        let decoded = decode(&bytes).unwrap();
+        assert_eq!(
+            decoded.design.controls[3]
+                .list
+                .as_ref()
+                .unwrap()
+                .multi_select,
+            mode
+        );
+        assert!(decoded.resources.iter().any(|r| r.bytes == bytes));
+    }
+    assert!(decode(&fixture::list_selection_companion(3)).is_err());
     let mut extra = cfb::CompoundFile::open(Cursor::new(companion[4..].to_vec())).unwrap();
     extra
         .create_stream("/ExternalList")

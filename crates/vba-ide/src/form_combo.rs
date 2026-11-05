@@ -58,7 +58,7 @@ End If
 Else
 text=VBA.CStr(value)
 For row=0 To VbaCount-1
-If VbaItems(row*10+VbaBoundColumn-1)=text Then
+If VbaBoundValue(row)=text Then
 Me.ListIndex=row
 Exit Property
 End If
@@ -123,14 +123,20 @@ VbaEnterFieldBehavior=value
 End Property
 "#;
 const BEHAVIOR: &str = r#"
+Private Function VbaBoundValue(ByVal row As Long) As Variant
+Dim items() As Variant
+items=VbaItems
+VbaBoundValue=items(row*10+VbaBoundColumn-1)
+End Function
 Private Function VbaRowText(ByVal row As Long) As String
-Dim column As Long
+Dim column As Long,items() As Variant
+items=VbaItems
 column=VbaTextColumn
 If column=-1 Then column=1
 If column=0 Then
 VbaRowText=VBA.CStr(row)
 Else
-VbaRowText=VbaItems(row*10+column-1)
+VbaRowText=items(row*10+column-1)
 End If
 End Function
 Private Function VbaFindText(ByVal value As String) As Long
@@ -151,7 +157,7 @@ text=VbaRowText(VbaListIndex)
 If VbaBoundColumn=0 Then
 value=VbaListIndex
 Else
-value=VbaItems(VbaListIndex*10+VbaBoundColumn-1)
+value=VbaBoundValue(VbaListIndex)
 End If
 End If
 Dim length As Long
@@ -247,7 +253,7 @@ If found>=0 Then
 If VbaBoundColumn=0 Then
 bound=found
 Else
-bound=VbaItems(found*10+VbaBoundColumn-1)
+bound=VbaBoundValue(found)
 End If
 End If
 If value<>VbaText Then VbaDirty=True
@@ -286,7 +292,7 @@ If row>=0 Then
 If VbaBoundColumn=0 Then
 bound=row
 Else
-bound=VbaItems(row*10+VbaBoundColumn-1)
+bound=VbaBoundValue(row)
 End If
 End If
 VbaCommit row,bound,text,position,0,(row>=0)

@@ -39,7 +39,7 @@ Attribute Value.VB_UserMemId = 0
 Value=VbaValue
 End Property
 Public Property Let Value(ByVal value As Variant)
-Dim row As Long,text As String
+Dim row As Long,text As String,items() As Variant
 If VBA.IsNull(value) Then
 Me.ListIndex=-1
 Exit Property
@@ -49,8 +49,9 @@ Me.ListIndex=value
 Exit Property
 End If
 text=VBA.CStr(value)
+items=VbaItems
 For row=0 To VbaCount-1
-If VbaItems(row*10+VbaBoundColumn-1)=text Then
+If items(row*10+VbaBoundColumn-1)=text Then
 Me.ListIndex=row
 Exit Property
 End If
@@ -61,7 +62,8 @@ Public Property Get Text() As String
 Text=VbaText
 End Property
 Public Property Let Text(ByVal value As String)
-Dim row As Long,column As Long
+Dim row As Long,column As Long,items() As Variant
+items=VbaItems
 column=VbaTextColumn
 If column=-1 Then column=1
 For row=0 To VbaCount-1
@@ -70,7 +72,7 @@ If VBA.CStr(row)=value Then
 Me.ListIndex=row
 Exit Property
 End If
-ElseIf VbaItems(row*10+column-1)=value Then
+ElseIf items(row*10+column-1)=value Then
 Me.ListIndex=row
 Exit Property
 End If
@@ -112,11 +114,12 @@ If Not VBA.IsMissing(pvargColumn) Then Err.Raise 381
 List=VbaSnapshot(False)
 Exit Property
 End If
-Dim index As Long,col As Long
+Dim index As Long,col As Long,items() As Variant
+items=VbaItems
 index=VBA.CLng(pvargIndex)
 If Not VBA.IsMissing(pvargColumn) Then col=VBA.CLng(pvargColumn)
 If index<0 Or index>=VbaCount Or col<0 Or col>9 Then Err.Raise 381
-List=VbaItems(index*10+col)
+List=items(index*10+col)
 End Property
 Public Property Let List(Optional ByVal pvargIndex As Variant,Optional ByVal pvargColumn As Variant,ByVal value As Variant)
 If VBA.IsMissing(pvargIndex) Then
@@ -124,13 +127,15 @@ If Not VBA.IsMissing(pvargColumn) Then Err.Raise 381
 VbaLoad value,False
 Exit Property
 End If
-Dim index As Long,col As Long,text As String
+Dim index As Long,col As Long,text As String,items() As Variant
 index=VBA.CLng(pvargIndex)
 If Not VBA.IsMissing(pvargColumn) Then col=VBA.CLng(pvargColumn)
 If index<0 Or index>=VbaCount Or col<0 Or col>9 Then Err.Raise 381
 text=VBA.CStr(value)
 If VBA.Len(text)>16384 Then Err.Raise 7
-VbaItems(index*10+col)=text
+items=VbaItems
+items(index*10+col)=text
+VbaItems=items
 If index=VbaListIndex Then VbaRefresh
 End Property
 Public Property Get Column(Optional ByVal pvargColumn As Variant,Optional ByVal pvargIndex As Variant) As Variant
@@ -166,7 +171,7 @@ If Not VBA.IsMissing(pvargIndex) Then y=VBA.CLng(pvargIndex)
 Me.List(y,x)=value
 End Property
 Private Function VbaSnapshot(ByVal transpose As Boolean) As Variant
-Dim row As Long,column As Long,data() As Variant
+Dim row As Long,column As Long,data() As Variant,items() As Variant
 If VbaCount<0 Or VbaCount>1024 Then Err.Raise 7
 If VbaCount=0 Then
 VbaSnapshot=Null
@@ -177,12 +182,13 @@ ReDim data(0 To 9,0 To VbaCount-1)
 Else
 ReDim data(0 To VbaCount-1,0 To 9)
 End If
+items=VbaItems
 For row=0 To VbaCount-1
 For column=0 To 9
 If transpose Then
-data(column,row)=VbaItems(row*10+column)
+data(column,row)=items(row*10+column)
 Else
-data(row,column)=VbaItems(row*10+column)
+data(row,column)=items(row*10+column)
 End If
 Next column
 Next row
@@ -221,19 +227,6 @@ VbaCount=VBA.CLng(rows)
 VbaListIndex=-1
 VbaRefresh
 End Sub
-"#;
-pub(crate) const SELECTED: &str = r#"Public Property Get Selected(ByVal row As Long) As Boolean
-If row<0 Or row>=VbaCount Then Err.Raise 381
-Selected=(row=VbaListIndex)
-End Property
-Public Property Let Selected(ByVal row As Long,ByVal value As Boolean)
-If row<0 Or row>=VbaCount Then Err.Raise 381
-If value Then
-Me.ListIndex=row
-ElseIf row=VbaListIndex Then
-Me.ListIndex=-1
-End If
-End Property
 "#;
 pub(crate) const ROWS: &str = r#"Public Sub AddItem(Optional ByVal item As Variant,Optional ByVal varIndex As Variant)
 Dim index As Long,i As Long,text As String,data() As Variant
@@ -289,21 +282,22 @@ VbaRefresh
 End Sub
 "#;
 pub(crate) const REFRESH: &str = r#"Private Sub VbaRefresh()
-Dim previous As Variant,nextValue As Variant,nextText As String,column As Long,changed As Boolean
+Dim previous As Variant,nextValue As Variant,nextText As String,column As Long,changed As Boolean,items() As Variant
 previous=VbaValue
 nextValue=Null
 If VbaListIndex>=0 Then
+items=VbaItems
 If VbaBoundColumn=0 Then
 nextValue=VbaListIndex
 Else
-nextValue=VbaItems(VbaListIndex*10+VbaBoundColumn-1)
+nextValue=items(VbaListIndex*10+VbaBoundColumn-1)
 End If
 column=VbaTextColumn
 If column=-1 Then column=1
 If column=0 Then
 nextText=VBA.CStr(VbaListIndex)
 Else
-nextText=VbaItems(VbaListIndex*10+column-1)
+nextText=items(VbaListIndex*10+column-1)
 End If
 End If
 VbaValue=nextValue
@@ -332,10 +326,7 @@ Me.ListIndex=row
 End Sub
 "#;
 pub(crate) fn members() -> String {
-    [
-        STATE, INSTANCE, COLUMNS, CELLS, SELECTED, ROWS, REFRESH, CHOOSE,
-    ]
-    .concat()
+    crate::form_multiselect::members()
 }
 pub(crate) fn event(kind: crate::forms::ControlKind, name: &str) -> Option<&'static str> {
     if kind == crate::forms::ControlKind::ListBox && name.eq_ignore_ascii_case("DropButtonClick") {

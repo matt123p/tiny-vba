@@ -12,6 +12,7 @@ enum FormInput {
     Text { start: i32, length: i32 },
     Numeric(FormNumericInput),
     List(i32),
+    Selection(FormListInput),
     Navigate(i32),
     Drop(bool),
     Tab(i32),
@@ -21,6 +22,14 @@ enum FormInput {
 pub enum FormNumericInput {
     Step { up: bool, large: bool },
     Drag(i32),
+}
+/// Native ListBox input modifiers; canonical selection remains in the VBA object.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct FormListInput {
+    pub row: i32,
+    pub extend: bool,
+    pub toggle: bool,
+    pub navigate: bool,
 }
 const GATE_OBJECT: u64 = u64::MAX;
 fn tab_object(session: &Session, control: ObjectRef, index: i32) -> Result<ObjectRef> {
@@ -889,6 +898,9 @@ fn compiled_form(form: &Form, module: &Module, native: Option<&NativeForm>) -> R
                 }
             }
             if let Some(list) = &control.list {
+                if c.kind == ControlKind::ListBox {
+                    source.push_str(&format!("{temp}.VbaMultiSelect={}\n", list.multi_select));
+                }
                 source.push_str(&format!(
                     "{temp}.VbaColumnCount={}\n{temp}.VbaBoundColumn={}\n{temp}.VbaTextColumn={}\n",
                     list.column_count, list.bound_column, list.text_column
@@ -1939,6 +1951,7 @@ impl Ide {
             "listrows" => "VbaListRows",
             "listcount" => "VbaCount",
             "listindex" => "VbaListIndex",
+            "multiselect" => "VbaMultiSelect",
             "columncount" => "VbaColumnCount",
             "boundcolumn" => "VbaBoundColumn",
             "textcolumn" => "VbaTextColumn",
@@ -2100,6 +2113,25 @@ impl Ide {
             return Err(error("list input requires a native form"));
         }
         self.deliver_form_input(instance, Some(control), None, FormInput::List(row), host)
+    }
+    /// Select or focus a native ListBox row through authorized ordinary VBA frames.
+    pub fn form_instance_list_selection(
+        &mut self,
+        instance: FormInstance,
+        control: u32,
+        input: FormListInput,
+        host: &mut impl Host,
+    ) -> Result<()> {
+        if self.native_form(instance.source).is_none() {
+            return Err(error("list selection requires a native form"));
+        }
+        self.deliver_form_input(
+            instance,
+            Some(control),
+            None,
+            FormInput::Selection(input),
+            host,
+        )
     }
     pub fn form_instance_numeric(
         &mut self,
@@ -2284,9 +2316,15 @@ impl Ide {
             {
                 return Err(error("control is disabled or hidden"));
             }
-            if let FormInput::List(row) | FormInput::Navigate(row) = input {
+            if let FormInput::List(row)
+            | FormInput::Navigate(row)
+            | FormInput::Selection(FormListInput { row, .. }) = input
+            {
                 if !matches!(c.kind, ControlKind::ListBox | ControlKind::ComboBox) {
                     return Err(error("list input requires a ListBox"));
+                }
+                if matches!(input, FormInput::Selection(_)) && c.kind != ControlKind::ListBox {
+                    return Err(error("multiple selection requires a ListBox"));
                 }
                 if matches!(input, FormInput::Navigate(_)) && c.kind != ControlKind::ComboBox {
                     return Err(error("list navigation requires a ComboBox"));
@@ -2361,7 +2399,10 @@ impl Ide {
                     "VbaDropInput",
                     vec![Value::Long(index), Value::Boolean(opened)],
                 )
-            } else if let FormInput::List(row) | FormInput::Navigate(row) = input {
+            } else if let FormInput::List(row)
+            | FormInput::Navigate(row)
+            | FormInput::Selection(FormListInput { row, .. }) = input
+            {
                 let index = form
                     .controls
                     .iter()
@@ -2369,14 +2410,33 @@ impl Ide {
                     .and_then(|n| i32::try_from(n).ok())
                     .ok_or_else(|| error("list control index"))?;
                 object = instance.object;
-                (
-                    "VbaListInput",
-                    vec![
-                        Value::Long(index),
-                        Value::Long(row),
-                        Value::Boolean(!matches!(input, FormInput::Navigate(_))),
-                    ],
-                )
+                if let FormInput::Selection(selection) = input {
+                    (
+                        "VbaListInput",
+                        vec![
+                            Value::Long(index),
+                            Value::Long(row),
+                            Value::Boolean(true),
+                            Value::Boolean(selection.extend),
+                            Value::Boolean(selection.toggle),
+                            Value::Boolean(selection.navigate),
+                            Value::Boolean(true),
+                        ],
+                    )
+                } else {
+                    (
+                        "VbaListInput",
+                        vec![
+                            Value::Long(index),
+                            Value::Long(row),
+                            Value::Boolean(!matches!(input, FormInput::Navigate(_))),
+                            Value::Boolean(false),
+                            Value::Boolean(false),
+                            Value::Boolean(false),
+                            Value::Boolean(false),
+                        ],
+                    )
+                }
             } else if let FormInput::Numeric(action) = input {
                 let index = form
                     .controls

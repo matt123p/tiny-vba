@@ -74,15 +74,16 @@ Next i
 Err.Raise 7
 End Function
 Private Function VbaEligible(ByVal child As Object,Optional ByVal tabbing As Boolean=False,Optional ByVal scope As Long=0) As Boolean
-Dim current As Object,i As Long,kind As Integer
+Dim current As Object,i As Long,kind As Integer,parentKey As Long
 Set current=child
 For i=0 To 8
 If current.VbaDetached Then Exit Function
 If Not current.Enabled Or Not current.Visible Then Exit Function
 kind=current.VbaKind
+parentKey=current.VbaParentKey
 If kind=14 Then
 If Not current.VbaPosition.VbaAttached Then Exit Function
-If VbaLookup(current.VbaParentKey).Value<>current.Index Then Exit Function
+If VbaLookup(parentKey).Value<>current.Index Then Exit Function
 End If
 If current.VbaId=scope Then tabbing=False
 If tabbing Then
@@ -91,18 +92,19 @@ If kind<>14 Then
 If Not current.TabStop Then Exit Function
 End If
 End If
-If current.VbaParentKey=0 Then
+If parentKey=0 Then
 VbaEligible=True
 Exit Function
 End If
-Set current=VbaLookup(current.VbaParentKey)
+Set current=VbaLookup(parentKey)
 Next i
 Err.Raise 7
 End Function
 Private Function VbaFocusTarget(ByVal target As Object) As Object
-Dim scan As Long,kind As Integer
+Dim scan As Long,kind As Integer,targetId As Long
 Dim control As Object,best As Object
 kind=target.VbaKind
+targetId=target.VbaId
 If kind<>11 And kind<>14 Then
 Set VbaFocusTarget=target
 Exit Function
@@ -114,7 +116,7 @@ Set control=entries(scan)
 kind=control.VbaKind
 If kind<>1 And kind<>15 And kind<>11 And kind<>14 Then
 If control.TabStop Then
-If VbaWithin(control,target.VbaId) And VbaEligible(control,True,target.VbaId) Then
+If VbaWithin(control,targetId) And VbaEligible(control,True,targetId) Then
 If best Is Nothing Then
 Set best=control
 ElseIf control.VbaNavigationRank<best.VbaNavigationRank Then
@@ -128,22 +130,24 @@ If best Is Nothing Then Err.Raise 2110
 Set VbaFocusTarget=best
 End Function
 Private Sub VbaSetAncestorFocus(ByVal child As Object)
-Dim i As Long,scope As Object,current As Object
+Dim i As Long,scope As Object,current As Object,parentKey As Long
 Set current=child
 For i=0 To 7
-If current.VbaParentKey=0 Then Exit Sub
-Set scope=VbaLookup(current.VbaParentKey)
+parentKey=current.VbaParentKey
+If parentKey=0 Then Exit Sub
+Set scope=VbaLookup(parentKey)
 Set scope.VbaActiveControl=current
 Set current=scope
 Next i
 End Sub
 Private Function VbaPublicActive() As Object
-Dim current As Object,i As Long
+Dim current As Object,i As Long,parentKey As Long
 Set current=VbaActiveControl
 For i=0 To 8
 If current Is Nothing Then Exit For
-If current.VbaParentKey=0 Then Exit For
-Set current=VbaLookup(current.VbaParentKey)
+parentKey=current.VbaParentKey
+If parentKey=0 Then Exit For
+Set current=VbaLookup(parentKey)
 Next i
 Set VbaPublicActive=current
 End Function

@@ -27,6 +27,8 @@ pub struct CompileOptions {
     pub procedure_aliases: BTreeMap<String, (String, String)>,
     /// Class name -> external nominal interfaces supplied by the embedding.
     pub class_interfaces: BTreeMap<String, Vec<ir::ClassInterface>>,
+    /// Verified inert TypeName spellings for embedding-provided project classes.
+    pub class_runtime_names: BTreeMap<String, String>,
     pub references: vba_foreign::ReferenceSet,
     pub imports: Vec<vba_foreign::Import>,
     pub entry: String,
@@ -43,6 +45,7 @@ impl Default for CompileOptions {
         Self {
             procedure_aliases: BTreeMap::new(),
             class_interfaces: BTreeMap::new(),
+            class_runtime_names: BTreeMap::new(),
             references: vba_foreign::ReferenceSet::default(),
             imports: Vec::new(),
             entry: "Answer".into(),
@@ -80,6 +83,23 @@ pub fn compile_modules(
         &options.document_members,
         &options.procedure_aliases,
     )?;
+    if options.class_runtime_names.len() > 256 {
+        return Err(resource());
+    }
+    let mut runtime_owners = BTreeSet::new();
+    for (owner, name) in &options.class_runtime_names {
+        if owner.len() > 128
+            || name.len() > 128
+            || name.is_empty()
+            || !runtime_owners.insert(owner.to_ascii_lowercase())
+            || !program
+                .classes
+                .iter()
+                .any(|class| class.name.eq_ignore_ascii_case(owner))
+        {
+            return Err(error("invalid runtime class name owner/budget"));
+        }
+    }
     if options.class_interfaces.len() > 256 {
         return Err(resource());
     }
@@ -361,7 +381,16 @@ pub fn compile_modules(
         if !interfaces.is_empty() {
             features.insert("class-interfaces-v11".into());
         }
+        let runtime_name = options
+            .class_runtime_names
+            .iter()
+            .find(|(owner, _)| owner.eq_ignore_ascii_case(&class.name))
+            .map(|(_, name)| name.clone());
+        if runtime_name.is_some() {
+            features.insert("runtime-class-names-v12".into());
+        }
         classes.push(ir::Class {
+            runtime_name,
             interfaces,
             enumerator,
             events: program
@@ -428,7 +457,9 @@ pub fn compile_modules(
     let mut ir = ir::Program {
         classes,
         nominal_locals,
-        ir_version: if features.contains("class-interfaces-v11") {
+        ir_version: if features.contains("runtime-class-names-v12") {
+            ir::IR12_VERSION
+        } else if features.contains("class-interfaces-v11") {
             ir::IR11_VERSION
         } else if features.contains("auto-instancing-v10") {
             ir::IR10_VERSION

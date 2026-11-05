@@ -3278,3 +3278,208 @@ End Sub"#,
     assert_eq!(ide.native_form(f.source), Some(&original));
     Ok(())
 }
+
+#[test]
+fn native_multiselect_keeps_selected_rows_distinct_from_focus_and_preserves_row_identity() -> R {
+    let ide = list_setup(
+        r#"Sub Main()
+Dim l As MSForms.ListBox
+Set l=NativeForm.List1
+l.AddItem "a"
+l.AddItem "b"
+l.AddItem "c"
+l.MultiSelect=fmMultiSelectExtended
+l.Selected(0)=True
+l.Selected(2)=True
+l.ListIndex=1
+Debug.Print l.MultiSelect,l.ListIndex,l.Selected(0),l.Selected(1),l.Selected(2),IsNull(l.Value)
+l.AddItem "inserted",1
+Debug.Print l.ListIndex,l.Selected(0),l.Selected(1),l.Selected(2),l.Selected(3)
+l.RemoveItem 1
+Debug.Print l.ListIndex,l.Selected(0),l.Selected(1),l.Selected(2)
+On Error Resume Next
+l.MultiSelect=3
+Debug.Print Err.Number,l.MultiSelect
+Err.Clear
+l.Value="a"
+Debug.Print Err.Number,IsNull(l.Value)
+Err.Clear
+l.Selected(-1)=True
+l.Selected(100)=False
+Debug.Print Err.Number,l.Selected(0),l.Selected(2)
+l.Clear
+Debug.Print l.ListCount,l.ListIndex,IsNull(l.Value)
+l.AddItem "new"
+Debug.Print l.Selected(0)
+End Sub"#,
+        "",
+    )?;
+    assert_eq!(ide.mode(), Mode::Completed, "{:?}", ide.diagnostics);
+    assert_eq!(
+        ide.output(),
+        vec![
+            "initialized",
+            "2\t1\tTrue\tFalse\tTrue\tTrue",
+            "2\tTrue\tFalse\tFalse\tTrue",
+            "1\tTrue\tFalse\tTrue",
+            "380\t2",
+            "380\tTrue",
+            "0\tTrue\tTrue",
+            "0\t-1\tTrue",
+            "False"
+        ]
+    );
+    Ok(())
+}
+
+#[test]
+fn native_multiselect_input_commits_before_stop_and_focus_only_navigation_is_inert() -> R {
+    use vba_ide::FormListInput;
+    let mut ide = list_setup(
+        "Sub Main()\nNativeForm.List1.AddItem \"a\"\nNativeForm.List1.AddItem \"b\"\nNativeForm.List1.AddItem \"c\"\nNativeForm.List1.MultiSelect=2\nNativeForm.Show 0\nEnd Sub",
+        "\nPrivate Sub List1_Change()\nDebug.Print List1.ListIndex,List1.Selected(0),List1.Selected(1),List1.Selected(2),IsNull(List1.Value)\nStop\nDebug.Print \"continued\"\nEnd Sub\nPrivate Sub List1_Click()\nDebug.Print \"unexpected click\"\nEnd Sub\n",
+    )?;
+    let f = *ide.form_instances()?.first().ok_or("instance")?;
+    let original = ide.native_form(f.source).ok_or("native")?.clone();
+    ide.form_instance_list_selection(
+        f,
+        14,
+        FormListInput {
+            row: 0,
+            extend: false,
+            toggle: false,
+            navigate: false,
+        },
+        &mut NoHost,
+    )?;
+    settle(&mut ide)?;
+    assert_eq!(ide.mode(), Mode::Break);
+    assert_eq!(
+        ide.output().last().map(String::as_str),
+        Some("0\tTrue\tFalse\tFalse\tTrue")
+    );
+    ide.dispatch(Action::Run, &mut NoHost)?;
+    settle(&mut ide)?;
+    ide.form_instance_list_selection(
+        f,
+        14,
+        FormListInput {
+            row: 2,
+            extend: false,
+            toggle: true,
+            navigate: true,
+        },
+        &mut NoHost,
+    )?;
+    settle(&mut ide)?;
+    assert_eq!(ide.mode(), Mode::Completed);
+    assert_eq!(
+        ide.form_instance_field(f, Some(14), "ListIndex")?,
+        Value::Long(2)
+    );
+    assert_eq!(ide.output().last().map(String::as_str), Some("continued"));
+    ide.form_instance_list_selection(
+        f,
+        14,
+        FormListInput {
+            row: 2,
+            extend: true,
+            toggle: false,
+            navigate: true,
+        },
+        &mut NoHost,
+    )?;
+    settle(&mut ide)?;
+    assert_eq!(ide.mode(), Mode::Break);
+    assert_eq!(
+        ide.output().last().map(String::as_str),
+        Some("2\tTrue\tTrue\tTrue\tTrue")
+    );
+    ide.dispatch(Action::Run, &mut NoHost)?;
+    settle(&mut ide)?;
+    ide.form_instance_list_selection(
+        f,
+        14,
+        FormListInput {
+            row: 1,
+            extend: false,
+            toggle: true,
+            navigate: false,
+        },
+        &mut NoHost,
+    )?;
+    settle(&mut ide)?;
+    assert_eq!(
+        ide.output().last().map(String::as_str),
+        Some("1\tTrue\tFalse\tTrue\tTrue")
+    );
+    assert_eq!(ide.native_form(f.source), Some(&original));
+    assert!(!ide.output().iter().any(|s| s == "unexpected click"));
+    Ok(())
+}
+
+#[test]
+fn native_typename_preserves_form_identity_and_reports_actual_control_collection_types() -> R {
+    let ide = setup(
+        r#"Sub Main()
+Dim f As NativeForm,o As Object,c As MSForms.Control,v As Variant
+Set f=New NativeForm
+Set o=f
+Debug.Print TypeName(f),TypeName(o),TypeName(f.Controls),TypeName(f.Entry)
+Set c=f.Entry
+Set v=c
+Debug.Print TypeName(c),TypeName(v),TypeName(f.Heading),TypeName(f.Apply),TypeName(Nothing)
+Set o=f.Controls.Add("Forms.ListBox.1","RuntimeList")
+Debug.Print TypeName(o),TypeName(f.Controls("RuntimeList")),TypeName(f.Controls.Add("Forms.Frame.1","RuntimeFrame").Controls)
+End Sub"#,
+        None,
+    )?;
+    assert_eq!(ide.mode(), Mode::Completed, "{:?}", ide.diagnostics);
+    assert_eq!(
+        ide.output(),
+        vec![
+            "initialized",
+            "NativeForm\tNativeForm\tControls\tTextBox",
+            "TextBox\tTextBox\tLabel\tCommandButton\tNothing",
+            "ListBox\tListBox\tControls"
+        ]
+    );
+    Ok(())
+}
+
+#[test]
+fn native_multiselect_bulk_replacement_validates_before_clearing_selection() -> R {
+    let ide = list_setup(
+        r#"Sub Main()
+Dim l As MSForms.ListBox,a(0 To 0,0 To 0) As Variant,b(0 To 0,0 To 0) As String
+Set l=NativeForm.List1
+l.AddItem "kept"
+l.MultiSelect=1
+l.Selected(0)=True
+a(0,0)=Null
+On Error Resume Next
+l.List=a
+Debug.Print Err.Number,l.List(0),l.Selected(0),IsNull(l.Value)
+Err.Clear
+b(0,0)="replacement"
+l.List=b
+Debug.Print Err.Number,l.List(0),l.Selected(0),l.ListIndex,IsNull(l.Value)
+l.Selected(0)=True
+l.RemoveItem 0
+l.AddItem "fresh"
+Debug.Print l.Selected(0),l.ListIndex
+End Sub"#,
+        "",
+    )?;
+    assert_eq!(ide.mode(), Mode::Completed, "{:?}", ide.diagnostics);
+    assert_eq!(
+        ide.output(),
+        vec![
+            "initialized",
+            "94\tkept\tTrue\tTrue",
+            "0\treplacement\tFalse\t-1\tTrue",
+            "False\t-1"
+        ]
+    );
+    Ok(())
+}

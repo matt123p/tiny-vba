@@ -282,7 +282,7 @@ input from ordinary canonical objects; imported source/design/resources stay
 unchanged. Weak context requests avoid ownership cycles. Shared typed helpers,
 indexed verifier metadata and generic dispatch optimizations preserve all existing
 VM limits. Full M7A.4, native edited persistence/removal and M8.5 comparisons remain
-separate requirements; validation of this increment is in progress.
+separate requirements; CI/WASM/WASI validation of ADR 0062 passed.
 
 The generic VM avoids repeating instance-lifetime scans across scalar-only
 checkpoints. Reference-bearing stack/storage changes, frame changes, event
@@ -290,3 +290,10 @@ deliveries and enumeration-root removal invalidate the cached scan; every
 execution slice starts conservatively invalidated. Normal finalization still
 repeats to a fixed point before proceeding. Execution, allocation and host
 permission limits remain unchanged.
+
+[ADR 0063](../../../docs/decisions/0063-native-listbox-multiple-selection.md) adds native ListBox
+multiple selection, independent focus/selection, row mutation and authorized
+pointer/keyboard input. [ADR 0064](../../../docs/decisions/0064-native-runtime-type-names.md) adds
+IR 12 inert runtime class names and native TypeName through canonical aliases.
+State stays in ordinary classes, rendering stays inert, and budgets are unchanged.
+Bindings and the remaining M7A.4 ledger remain open; M7A.5/.6 and M8.5 are separate.

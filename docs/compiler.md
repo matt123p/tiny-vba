@@ -285,3 +285,12 @@ provider binds MSForms form/control/collection/return types and qualified
 VBA.UserForms through explicit source-function aliases; scope shadows and missing
 references remain authoritative. Ordinary canonical values/frames are retained.
 This is not full native lifecycle/event/control parity or edited persistence.
+
+## Runtime class names — IR 12
+
+`CompileOptions.class_runtime_names` optionally supplies a bounded display name
+for an existing project class. Owners must exist and be unique ignoring ASCII
+case; names are verified identifiers of at most 128 bytes. The compiler emits
+`runtime-class-names-v12` and IR 12 only when such metadata is supplied. Nominal
+identity and authored class names remain independent of TypeName presentation.
+Older consumers refuse IR 12. See [ADR 0064](decisions/0064-native-runtime-type-names.md).

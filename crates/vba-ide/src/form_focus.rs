@@ -151,7 +151,7 @@ Dim control As Object
 Set control=VbaAllControls.Item(index)
 VbaMoveFocus control
 If Not (VbaActiveControl Is control) Then Exit Sub
-If Not VbaVisible Or Not VbaLoaded Or Not control.Enabled Or Not control.Visible Then Exit Sub
+If Not VbaCanInput(control) Then Exit Sub
 If update Then
 control.VbaSetTextSelection text,start,length
 Else
@@ -165,7 +165,7 @@ If opened Then
 VbaMoveFocus control
 If Not (VbaActiveControl Is control) Then Exit Sub
 End If
-If Not VbaVisible Or Not VbaLoaded Or Not control.Enabled Or Not control.Visible Then Exit Sub
+If Not VbaCanInput(control) Then Exit Sub
 If opened And control.VbaKind=16 Then
 Dim entries() As Object,other As Object,i As Long
 entries=VbaAllControls.VbaEntries
@@ -181,13 +181,18 @@ If Not VbaVisible Or Not VbaLoaded Then Exit Sub
 End If
 control.VbaSetDrop opened
 End Sub
-Public Sub VbaListInput(ByVal index As Long,ByVal row As Long,ByVal commit As Boolean)
+Private Function VbaCanInput(ByVal control As Object) As Boolean
+VbaCanInput=(VbaVisible And VbaLoaded And control.Enabled And control.Visible)
+End Function
+Public Sub VbaListInput(ByVal index As Long,ByVal row As Long,ByVal commit As Boolean,Optional ByVal extend As Boolean=False,Optional ByVal toggle As Boolean=False,Optional ByVal navigate As Boolean=False,Optional ByVal selection As Boolean=False)
 Dim control As Object
 Set control=VbaAllControls.Item(index)
 VbaMoveFocus control
 If Not (VbaActiveControl Is control) Then Exit Sub
-If Not VbaVisible Or Not VbaLoaded Or Not control.Enabled Or Not control.Visible Then Exit Sub
-If commit Then
+If Not VbaCanInput(control) Then Exit Sub
+If selection Then
+control.VbaSelectInput row,extend,toggle,navigate
+ElseIf commit Then
 control.VbaChoose row
 Else
 control.VbaNavigate row
@@ -198,7 +203,7 @@ Dim control As Object
 Set control=VbaAllControls.Item(index)
 VbaMoveFocus control
 If Not (VbaActiveControl Is control) Then Exit Sub
-If Not VbaVisible Or Not VbaLoaded Or Not control.Enabled Or Not control.Visible Then Exit Sub
+If Not VbaCanInput(control) Then Exit Sub
 If mode=0 Then
 control.VbaStep up,large
 Else
@@ -216,7 +221,7 @@ If control.VbaKind<>1 Then
 VbaMoveFocus control
 If Not (VbaActiveControl Is control) Then Exit Sub
 End If
-If Not VbaVisible Or Not VbaLoaded Or Not control.Enabled Or Not control.Visible Then Exit Sub
+If Not VbaCanInput(control) Then Exit Sub
 If control.VbaKind=2 Or control.VbaKind=10 Or control.VbaKind=16 Then
 control.VbaSetText text
 Else

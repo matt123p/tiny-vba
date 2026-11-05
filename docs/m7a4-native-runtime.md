@@ -1,6 +1,6 @@
 # M7A.4 native runtime — current implementation and remaining work
 
-Updated 2026-11-04. **IN PROGRESS. M7A.4 is not complete.** This record extends
+Updated 2026-11-05. **IN PROGRESS. M7A.4 is not complete.** This record extends
 [the first instance increment](m7a4-userform-instances.md) under
 [ADR 0043](decisions/0043-native-controls-and-project-inspection.md).
 
@@ -141,7 +141,7 @@ Remaining M7A.4 requirements, without reducing the milestone's scope:
 - Further focus/validation edge cases across recursive redirection, window/container
   activation, boolean update timing and data binding; typed keyboard/mouse/accelerator ordering, further text/selection edge cases
   and remaining property/default/error/coercion contracts,
-  including native dynamic TypeName. ADR 0048 implements the selected flat native
+  including remaining foreign-object dynamic TypeName. ADR 0048 implements the selected flat native
   focus/typed cancellation path, without claiming the full event/property matrix.
 - ADR 0060 adds selected native RefEdit text/drop semantics and host picker integration; broader RefEdit/platform behavior remains open. ADR 0059 adds selected Image raster records,
   picture identity/assignment, layout and Click; further picture formats/metadata,
@@ -152,7 +152,7 @@ Remaining M7A.4 requirements, without reducing the milestone's scope:
   ADR 0061 adds tab structural mutation and writable Index/runtime Name; further
   mutation/error/locale and full event/presentation parity remain open. ADR 0056 implements selected native Frame parents; additional storage variants,
   properties, resource/presentation and full event parity remain open.
-  ComboBox and ListBox now have selected unbound packets; further array-shape/loading cases, multiple selection, bindings and further presentation remain open. The selected numeric packet does not close all
+  ComboBox and ListBox now have selected unbound packets; further array-shape/loading cases, bindings and further presentation remain open; ADR 0063 implements native multiple selection. The selected numeric packet does not close all
   ScrollBar/SpinButton property/resource/presentation cases.
 - Applicable Office-supplied worksheet ActiveX/platform packets; third-party
   controls and COM/OCX loading remain outside scope.
@@ -235,4 +235,11 @@ input from ordinary canonical objects; imported source/design/resources stay
 unchanged. Weak context requests avoid ownership cycles. Shared typed helpers,
 indexed verifier metadata and generic dispatch optimizations preserve all existing
 VM limits. Full M7A.4, native edited persistence/removal and M8.5 comparisons remain
-separate requirements; validation of this increment is in progress.
+separate requirements; CI/WASM/WASI validation of ADR 0062 passed.
+
+[ADR 0063](decisions/0063-native-listbox-multiple-selection.md) adds native ListBox
+multiple selection, independent focus/selection, row mutation and authorized
+pointer/keyboard input. [ADR 0064](decisions/0064-native-runtime-type-names.md) adds
+IR 12 inert runtime class names and native TypeName through canonical aliases.
+State stays in ordinary classes, rendering stays inert, and budgets are unchanged.
+Bindings and the remaining M7A.4 ledger remain open; M7A.5/.6 and M8.5 are separate.
