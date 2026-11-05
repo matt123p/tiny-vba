@@ -18,6 +18,7 @@ pub(super) struct Instance {
     pub fields: Vec<Location>,
     // Derived from verified field types; scalar-only fields cannot retain objects.
     pub reference_fields: Vec<Location>,
+    pub has_event_fields: bool,
 }
 #[derive(Clone, Copy)]
 pub(super) enum ClassReturn {
@@ -78,6 +79,7 @@ impl Session {
         procedure: ir::ProcedureId,
         arguments: Vec<Operand>,
     ) -> Result<()> {
+        self.reference_graph_dirty = true;
         let publisher = self
             .top()?
             .receiver
@@ -94,8 +96,12 @@ impl Session {
             .ok_or_else(|| invariant("event name"))?;
         let publisher_type = self.instance_object(publisher)?;
         let mut deliveries = Vec::new();
-        let mut work = 0u64;
-        for instance in self.instances.iter().filter(|i| i.alive && !i.terminating) {
+        let mut work = u64::try_from(self.instances.len()).map_err(|_| resource())?;
+        for instance in self
+            .instances
+            .iter()
+            .filter(|i| i.alive && !i.terminating && i.has_event_fields)
+        {
             work = work
                 .checked_add(
                     u64::try_from(self.program.program().classes.len()).map_err(|_| resource())?,
@@ -340,6 +346,7 @@ impl Session {
                 interfaces: class.interfaces.clone(),
                 fields: vec![],
                 reference_fields: vec![],
+                has_event_fields: class.fields.iter().any(|field| field.with_events),
             });
         }
         for (snapshot, instance) in saved.into_iter().zip(&instances) {
@@ -616,6 +623,7 @@ impl Session {
             interfaces: class.interfaces.clone(),
             fields,
             reference_fields,
+            has_event_fields: class.fields.iter().any(|field| field.with_events),
         });
         Ok(object)
     }
@@ -690,6 +698,7 @@ impl Session {
         site: ir::ForeignSite,
         args: Vec<foreign::Argument>,
     ) -> Result<()> {
+        self.class_lookup_work(self.program.program().classes.len())?;
         let instance = self.instance_object(object)?;
         let class = self
             .program
@@ -697,21 +706,7 @@ impl Session {
             .classes
             .iter()
             .find(|c| c.source == instance.source)
-            .cloned()
             .ok_or_else(|| invariant("instance class"))?;
-        let fields = instance.fields.clone();
-        self.counters.instance_work = self
-            .counters
-            .instance_work
-            .checked_add(
-                u64::try_from(class.fields.len() + class.methods.len() + 1)
-                    .map_err(|_| resource())?,
-            )
-            .ok_or_else(resource)?;
-        if self.counters.instance_work > self.limits.instructions {
-            return Err(resource());
-        }
-        self.charge((class.fields.len() + class.methods.len() + 1) * 256)?;
         let inside = self.proc()?.source == class.source;
         let kind = match site.kind {
             ir::ForeignKind::ValueGet
@@ -742,13 +737,23 @@ impl Session {
         } else {
             site.member.as_str()
         };
-        if let Some((index, field)) = class
+        let selected = class
             .fields
             .iter()
             .enumerate()
             .find(|(_, f)| f.name.eq_ignore_ascii_case(member) && (f.public || inside))
-        {
-            let location = *fields.get(index).ok_or_else(|| invariant("field index"))?;
+            .map(|(index, field)| (index, field.clone()));
+        if let Some((index, field)) = selected {
+            let location = *instance
+                .fields
+                .get(index)
+                .ok_or_else(|| invariant("field index"))?;
+            let work = index.saturating_add(1);
+            self.class_lookup_work(work)?;
+            let nominal = field.nominal.as_ref().map_or(0, |t| {
+                t.library().len() + t.version().len() + t.name().len()
+            });
+            self.charge(256 + field.name.len() + field.bounds.len() * 16 + nominal)?;
             if site.kind == ir::ForeignKind::ArgumentGet {
                 let scratch = site
                     .result_reference
@@ -811,10 +816,11 @@ impl Session {
                 value,
             );
         }
-        let method = class
+        let selected = class
             .methods
             .iter()
-            .find(|m| {
+            .enumerate()
+            .find(|(_, m)| {
                 m.name.eq_ignore_ascii_case(member)
                     && (enumerating
                         && matches!(m.kind, ir::ForeignKind::Get | ir::ForeignKind::Call)
@@ -822,13 +828,17 @@ impl Session {
                         || kind == ir::ForeignKind::Call && m.kind == ir::ForeignKind::Get)
                     && (m.public || inside)
             })
-            .ok_or_else(|| {
-                runtime_diagnostic(runtime::Error::Vba {
-                    number: 438,
-                    message: "class member is inaccessible or unsupported".into(),
-                })
-            })?;
-        let procedure = method.procedure;
+            .map(|(index, method)| (index, method.procedure));
+        let work = class.fields.len().saturating_add(
+            selected.map_or(class.methods.len(), |(index, _)| index.saturating_add(1)),
+        );
+        self.class_lookup_work(work)?;
+        let (_, procedure) = selected.ok_or_else(|| {
+            runtime_diagnostic(runtime::Error::Vba {
+                number: 438,
+                message: "class member is inaccessible or unsupported".into(),
+            })
+        })?;
         let params = self
             .program
             .program()
@@ -837,6 +847,7 @@ impl Session {
             .ok_or_else(|| invariant("class procedure"))?
             .parameters
             .clone();
+        self.charge(params.len().saturating_mul(256))?;
         let mut mapped = Vec::new();
         reserve(&mut mapped, params.len())?;
         mapped.resize_with(params.len(), || None);
@@ -917,6 +928,17 @@ impl Session {
         });
         Ok(())
     }
+    fn class_lookup_work(&mut self, work: usize) -> Result<()> {
+        self.counters.instance_work = self
+            .counters
+            .instance_work
+            .checked_add(u64::try_from(work).map_err(|_| resource())?)
+            .ok_or_else(resource)?;
+        if self.counters.instance_work > self.limits.instructions {
+            return Err(resource());
+        }
+        Ok(())
+    }
     fn class_argument(&self, arg: &foreign::ArgumentValue) -> Result<Value> {
         match arg {
             foreign::ArgumentValue::ByVal(value) => Ok(value.clone()),
@@ -945,6 +967,9 @@ impl Session {
     /// Reference-count behavior: fields of every live instance retain references,
     /// so cycles remain alive. No code runs during abnormal/reset cleanup.
     pub(super) fn settle_instances(&mut self) -> Result<bool> {
+        if !self.reference_graph_dirty {
+            return Ok(false);
+        }
         if self.instances.is_empty() {
             return Ok(false);
         }
@@ -1044,6 +1069,7 @@ impl Session {
                 })
                 .map(|i| (i.object, i.source));
             let Some((object, source)) = candidate else {
+                self.reference_graph_dirty = false;
                 return Ok(false);
             };
             let terminator = self

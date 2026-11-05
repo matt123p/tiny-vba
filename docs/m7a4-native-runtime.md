@@ -227,3 +227,12 @@ Page descendants cannot receive widget input. Added Pages are empty; dynamic
 Controls.Add and complete focus/lifecycle/detachment parity remain open alongside
 the unchanged broader ledger above. Detailed selection/error behavior is authored
 inference pending M8.5 Office traces, not fresh comparison evidence.
+
+[ADR 0062](decisions/0062-native-dynamic-controls.md) implements selected native
+Controls.Add/Remove/Clear, runtime names, scoped collections/notifications and
+WithEvents focus/validation. An inert runtime projection drives widgets and
+input from ordinary canonical objects; imported source/design/resources stay
+unchanged. Weak context requests avoid ownership cycles. Shared typed helpers,
+indexed verifier metadata and generic dispatch optimizations preserve all existing
+VM limits. Full M7A.4, native edited persistence/removal and M8.5 comparisons remain
+separate requirements; validation of this increment is in progress.

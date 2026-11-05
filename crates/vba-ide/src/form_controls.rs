@@ -2,7 +2,7 @@
 use crate::forms::ControlKind;
 
 pub(crate) fn collection_class() -> String {
-    String::from(
+    let mut s = String::from(
         r#"Option Explicit
 Public VbaEntries As Variant
 Public VbaTotal As Long
@@ -31,11 +31,12 @@ Count=VbaTotal
 End Property
 Public Property Get Item(ByVal index As Variant) As Object
 Attribute Item.VB_UserMemId = 0
-Dim i As Long
+Dim i As Long,data() As Object
+data=VbaEntries
 If VarType(index)=8 Then
 For i=0 To VbaTotal-1
-If VbaKey(VbaEntries(i).Name)=VbaKey(CStr(index)) Then
-Set Item=VbaEntries(i)
+If VbaKey(data(i).Name)=VbaKey(CStr(index)) Then
+Set Item=data(i)
 Exit Property
 End If
 Next i
@@ -43,7 +44,7 @@ Err.Raise -2147024809
 Else
 i=CLng(index)
 If i<0 Or i>=VbaTotal Then Err.Raise -2147024809
-Set Item=VbaEntries(i)
+Set Item=data(i)
 End If
 End Property
 Private Function VbaKey(ByVal value As String) As String
@@ -60,7 +61,9 @@ Next i
 VbaKey=result
 End Function
 "#,
-    )
+    );
+    s.push_str(crate::form_dynamic::COLLECTION);
+    s
 }
 
 pub(crate) fn control_class(kind: ControlKind) -> String {
@@ -93,9 +96,7 @@ pub(crate) fn control_class(kind: ControlKind) -> String {
         ControlKind::Image => 15,
         ControlKind::RefEdit => 16,
     };
-    s.push_str(&format!(
-        "Public Property Get VbaKind() As Integer\nVbaKind={kind_code}\nEnd Property\n"
-    ));
+    s.push_str("Public VbaKind As Integer\nPublic VbaRuntime As Boolean\nPublic VbaDetached As Boolean\nPublic VbaContext As VbaFormControlContext\n");
     if !matches!(
         kind,
         ControlKind::TextBox
@@ -183,6 +184,49 @@ pub(crate) fn control_class(kind: ControlKind) -> String {
             s.replace_range(start..end, "");
         }
     }
+    s.push_str("Public Property Let Name(ByVal value As String)\nIf VbaDetached Then Err.Raise 91\nIf Not VbaRuntime Then Err.Raise 382\nVbaControlRequest VbaContext,9,Me,value\nEnd Property\n");
+    s=s.replace("RaiseEvent VbaTabChanged(VbaTabIndex,value)","If VbaRuntime Then\nVbaControlRequest VbaContext,6,Me,value\nElse\nRaiseEvent VbaTabChanged(VbaTabIndex,value)\nEnd If");
+    s=s.replace("RaiseEvent VbaFocusRequested(Me)","If VbaRuntime Then\nVbaControlRequest VbaContext,5,Me,Empty\nElse\nRaiseEvent VbaFocusRequested(Me)\nEnd If");
+    s=s.replace("If value Then RaiseEvent VbaDefaultChanged(value)","If value Then\nIf VbaRuntime Then\nVbaControlRequest VbaContext,7,Me,0\nElse\nRaiseEvent VbaDefaultChanged(value)\nEnd If\nEnd If");
+    s=s.replace("If value Then RaiseEvent VbaCancelChanged(value)","If value Then\nIf VbaRuntime Then\nVbaControlRequest VbaContext,7,Me,1\nElse\nRaiseEvent VbaCancelChanged(value)\nEnd If\nEnd If");
+    s=s.replace("If VbaValue Then RaiseEvent VbaSelected", "If VbaValue Then\nIf VbaRuntime Then\nVbaControlRequest VbaContext,8,Me,Empty\nElse\nRaiseEvent VbaSelected\nEnd If\nEnd If");
+    for (event, cancel) in [
+        ("Enter", false),
+        ("Exit", true),
+        ("BeforeUpdate", true),
+        ("AfterUpdate", false),
+    ] {
+        if crate::form_focus::event(kind, event).is_some() {
+            let declared = if event == "Exit" {
+                "VbaControlExit"
+            } else {
+                event
+            };
+            let parameters = if cancel {
+                "ByVal cancel As MSForms.ReturnBoolean"
+            } else {
+                ""
+            };
+            let arguments = if cancel { "(cancel)" } else { "" };
+            s.push_str(&format!("Public Event {declared}({parameters})\nPublic Sub VbaRaise{event}({parameters})\nRaiseEvent {declared}{arguments}\nEnd Sub\n"));
+        }
+    }
+    if kind == ControlKind::Frame {
+        s.push_str("Public Event AddControl\nPublic Event RemoveControl(ByVal control As MSForms.Control)\nPublic Sub VbaNotifyControl(ByVal added As Boolean,ByVal control As MSForms.Control)\nIf added Then\nRaiseEvent AddControl\nElse\nRaiseEvent RemoveControl(control)\nEnd If\nEnd Sub\n");
+    }
+    if kind == ControlKind::MultiPage {
+        s.push_str("Public Event AddControl(ByVal index As Long,ByVal control As MSForms.Control)\nPublic Event RemoveControl(ByVal index As Long,ByVal control As MSForms.Control)\nPublic Sub VbaNotifyControl(ByVal added As Boolean,ByVal index As Long,ByVal control As MSForms.Control)\nIf added Then\nRaiseEvent AddControl(index,control)\nElse\nRaiseEvent RemoveControl(index,control)\nEnd If\nEnd Sub\n");
+    }
+    let init = format!("VbaKind={kind_code}\n");
+    if s.contains("Private Sub Class_Initialize()\n") {
+        s = s.replacen(
+            "Private Sub Class_Initialize()\n",
+            &format!("Private Sub Class_Initialize()\n{init}"),
+            1,
+        );
+    } else {
+        s.push_str(&format!("Private Sub Class_Initialize()\n{init}End Sub\n"));
+    }
     s
 }
 
@@ -200,7 +244,7 @@ pub(crate) fn userforms_class(components: &[String]) -> String {
     // Native component/control identifiers share the same bounded ASCII name profile.
     if let Some((_, key)) = collection_class().split_once("Private Function VbaKey") {
         source.push_str("Private Function VbaKey");
-        source.push_str(key);
+        source.push_str(key.split("Public VbaContext").next().unwrap_or(key));
     }
     source
 }

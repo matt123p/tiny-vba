@@ -13,6 +13,7 @@ pub use vba_project::forms::{NativeForm, Resource as NativeFormResource};
 mod form_combo;
 mod form_container;
 mod form_controls;
+mod form_dynamic;
 mod form_focus;
 mod form_image;
 mod form_list;

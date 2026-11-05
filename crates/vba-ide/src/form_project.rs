@@ -589,7 +589,31 @@ pub(crate) fn checked_handlers(
                 })
             })
             .flatten();
-        if let Some((_, cancel)) = focus {
+        if let Some((count, indexed)) = native
+            .then(|| crate::form_dynamic::collection_event(form, &key))
+            .flatten()
+        {
+            if p.kind != vba_syntax::ProcedureKind::Sub
+                || p.property.is_some()
+                || p.visibility != vba_syntax::Visibility::Private
+                || p.parameters.len() != count
+                || p.parameters.iter().enumerate().any(|(index, a)| {
+                    !a.by_val
+                        || a.array
+                        || a.optional
+                        || a.param_array
+                        || a.ty.as_ref().is_none_or(|t| {
+                            !t.spelling.eq_ignore_ascii_case(if indexed && index == 0 {
+                                "Long"
+                            } else {
+                                "MSForms.Control"
+                            })
+                        })
+                })
+            {
+                return Err(error("invalid native control collection event signature"));
+            }
+        } else if let Some((_, cancel)) = focus {
             if !crate::form_focus::valid_handler(p, cancel) {
                 return Err(error("invalid native focus/validation event signature"));
             }
@@ -644,6 +668,9 @@ fn compiled_form(form: &Form, module: &Module, native: Option<&NativeForm>) -> R
         }
     };
     let mut source = module.text.clone();
+    if native.is_some() {
+        source.push_str(&crate::form_dynamic::root(&handlers));
+    }
     let parsed = parse(&module.source()?, ModuleKind::Class)?;
     let has = |name: &str| {
         parsed.module.attributes.iter().any(|a| {
@@ -659,7 +686,7 @@ fn compiled_form(form: &Form, module: &Module, native: Option<&NativeForm>) -> R
         source.push_str("\nAttribute VB_PredeclaredId = True\n");
     }
     source.push_str(
-        "\nPublic VbaVisible As Boolean\nPublic VbaLoaded As Boolean\nPublic VbaCaption As String\nPublic Property Get Caption() As String\nIf Not VbaLoaded Then Class_Initialize\nCaption=VbaCaption\nEnd Property\nPublic Property Let Caption(ByVal value As String)\nIf Not VbaLoaded Then Class_Initialize\nVbaCaption=value\nEnd Property\nPrivate VbaAllControls As VbaFormControls\nPrivate VbaControls As VbaFormControls\nPublic Property Get Controls(Optional ByVal index As Variant) As Object\nIf Not VbaLoaded Then Class_Initialize\nIf IsMissing(index) Then\nSet Controls=VbaControls\nElse\nSet Controls=VbaControls.Item(index)\nEnd If\nEnd Property\n",
+        "\nPublic VbaVisible As Boolean\nPublic VbaLoaded As Boolean\nPublic VbaCaption As String\nPublic Property Get Caption() As String\nIf Not VbaLoaded Then Class_Initialize\nCaption=VbaCaption\nEnd Property\nPublic Property Let Caption(ByVal value As String)\nIf Not VbaLoaded Then Class_Initialize\nVbaCaption=value\nEnd Property\nPublic VbaAllControls As VbaFormControls\nPrivate VbaControls As VbaFormControls\nPublic Property Get Controls(Optional ByVal index As Variant) As Object\nIf Not VbaLoaded Then Class_Initialize\nIf IsMissing(index) Then\nSet Controls=VbaControls\nElse\nSet Controls=VbaControls.Item(index)\nEnd If\nEnd Property\n",
     );
     source.push_str(&format!(
         "Public Property Get Name() As String\nName={}\nEnd Property\n",
@@ -684,13 +711,19 @@ fn compiled_form(form: &Form, module: &Module, native: Option<&NativeForm>) -> R
     for c in form.controls.iter().filter(|c| c.kind != ControlKind::Page) {
         source.push_str(&format!("Public Property Get {0}() As {1}\nIf Not VbaLoaded Then Class_Initialize\nSet {0}=Vba{0}\nEnd Property\n",c.name,class_name(c.kind)));
     }
-    let containers = form.controls.iter().any(|c| {
-        matches!(
-            c.kind,
-            ControlKind::Frame | ControlKind::MultiPage | ControlKind::Page
-        )
-    });
+    let containers = native.is_some()
+        || form.controls.iter().any(|c| {
+            matches!(
+                c.kind,
+                ControlKind::Frame | ControlKind::MultiPage | ControlKind::Page
+            )
+        });
     source.push_str("Private Sub Class_Initialize()\nVbaLoaded=True\nVbaVisible=False\nSet VbaControls=New VbaFormControls\n");
+    if native.is_some() {
+        source.push_str(
+            "Set VbaContext=New VbaFormControlContext\nSet VbaControls.VbaContext=VbaContext\n",
+        );
+    }
     source.push_str(if containers {
         "Set VbaAllControls=New VbaFormControls\n"
     } else {
@@ -711,14 +744,15 @@ fn compiled_form(form: &Form, module: &Module, native: Option<&NativeForm>) -> R
     }
     for c in &form.controls {
         let temp = format!("VbaInit{}", c.id);
+        let metadata = native.and_then(|n| n.design.controls.iter().find(|n| n.id == c.id));
         let mut setup = format!(
-            "Dim {temp} As {}\nSet {temp}=New {}\n{temp}.Enabled={}\n{temp}.Visible={}\n{temp}.TabStop={}\n{temp}.VbaTabIndex={}\n{temp}.Left={}\n{temp}.Top={}\n{temp}.Width={}\n{temp}.Height={}\n",
-            class_name(c.kind),
-            class_name(c.kind),
-            boolean(c.enabled),
-            boolean(c.visible),
-            boolean(c.tab_stop),
-            form.tab_order
+            "Dim {temp} As {class}\nSet {temp}=New {class}\nVbaInitializeControl {temp},{enabled},{visible},{stop},{index},{left},{top},{width},{height},{name},{id},{parent},{rank},{tag},{tip},{help}\n",
+            class = class_name(c.kind),
+            enabled = boolean(c.enabled),
+            visible = boolean(c.visible),
+            stop = boolean(c.tab_stop),
+            index = form
+                .tab_order
                 .iter()
                 .filter(|id| form
                     .controls
@@ -726,10 +760,25 @@ fn compiled_form(form: &Form, module: &Module, native: Option<&NativeForm>) -> R
                     .any(|peer| peer.id == **id && peer.parent == c.parent))
                 .position(|id| *id == c.id)
                 .unwrap_or(0),
-            c.bounds.left,
-            c.bounds.top,
-            c.bounds.width,
-            c.bounds.height
+            left = c.bounds.left,
+            top = c.bounds.top,
+            width = c.bounds.width,
+            height = c.bounds.height,
+            name = vba_string(&c.name),
+            id = c.id,
+            parent = c.parent.unwrap_or(0),
+            rank = form
+                .tab_order
+                .iter()
+                .position(|id| *id == c.id)
+                .unwrap_or(0),
+            tag = metadata
+                .map(|n| vba_string(&n.tag))
+                .unwrap_or_else(|| "\"\"".into()),
+            tip = metadata
+                .map(|n| vba_string(&n.control_tip_text))
+                .unwrap_or_else(|| "\"\"".into()),
+            help = metadata.map_or(0, |n| n.help_context_id)
         );
         if c.kind == ControlKind::Image {
             setup = setup.replace(&format!("{temp}.TabStop="), &format!("{temp}.VbaTabStop="));
@@ -770,19 +819,20 @@ fn compiled_form(form: &Form, module: &Module, native: Option<&NativeForm>) -> R
             source.push_str(&format!("{temp}.VbaValue={initial}\n"));
         }
         source.push_str(&format!(
-            "{temp}.VbaName={}\nSet Vba{}={temp}\nVbaAllControls.VbaAdd {temp}\n",
-            vba_string(&c.name),
+            "Set Vba{}={temp}\nVbaAllControls.VbaAdd {temp}\n",
             c.name
         ));
-        source.push_str(&format!(
-            "{temp}.VbaId={}\n{temp}.VbaParentKey={}\n{temp}.VbaNavigationRank={}\n",
-            c.id,
-            c.parent.unwrap_or(0),
-            form.tab_order
-                .iter()
-                .position(|id| *id == c.id)
-                .unwrap_or(0)
-        ));
+        if native.is_some()
+            && matches!(
+                c.kind,
+                ControlKind::Frame | ControlKind::Page | ControlKind::MultiPage
+            )
+        {
+            source.push_str(&format!("Set {temp}.VbaContext=VbaContext\n"));
+            if matches!(c.kind, ControlKind::Frame | ControlKind::Page) {
+                source.push_str(&format!("{temp}.VbaConfigureChildren\n"));
+            }
+        }
         if let Some(parent) = c.parent {
             let owner = form
                 .controls
@@ -795,17 +845,6 @@ fn compiled_form(form: &Form, module: &Module, native: Option<&NativeForm>) -> R
         }
         if let Some(control) = native.and_then(|n| n.design.controls.iter().find(|n| n.id == c.id))
         {
-            let help = if c.kind == ControlKind::Page {
-                "VbaHelpContextID"
-            } else {
-                "HelpContextID"
-            };
-            source.push_str(&format!(
-                "{temp}.Tag={}\n{temp}.ControlTipText={}\n{temp}.{help}={}\n",
-                vba_string(&control.tag),
-                vba_string(&control.control_tip_text),
-                control.help_context_id
-            ));
             if matches!(
                 c.kind,
                 ControlKind::TextBox
@@ -938,16 +977,21 @@ fn compiled_form(form: &Form, module: &Module, native: Option<&NativeForm>) -> R
     source.push_str("End If\nEnd Sub\n");
     source.push_str(crate::form_container::ROOT);
     source.push_str("Private Function VbaLookup(ByVal key As Long) As Object\n");
+    source.push_str("If key>0 Then\n");
     for c in &form.controls {
         source.push_str(&format!(
             "If key={} Then\nSet VbaLookup=Vba{}\nExit Function\nEnd If\n",
             c.id, c.name
         ));
     }
+    source.push_str("End If\n");
     for c in &form.controls {
         if c.kind == ControlKind::MultiPage {
             source.push_str(&format!("Dim page{0} As Object\nSet page{0}=Vba{1}.VbaFindPage(key)\nIf Not (page{0} Is Nothing) Then\nSet VbaLookup=page{0}\nExit Function\nEnd If\n", c.id, c.name));
         }
+    }
+    if native.is_some() {
+        source.push_str("Dim entries As Variant,index As Long\nentries=VbaAllControls.VbaEntries\nFor index=0 To VbaAllControls.Count-1\nIf entries(index).VbaId=key Then\nSet VbaLookup=entries(index)\nExit Function\nEnd If\nNext index\n");
     }
     source.push_str("Err.Raise 91\nEnd Function\n");
     for control in &form.controls {
@@ -978,6 +1022,28 @@ fn compiled_form(form: &Form, module: &Module, native: Option<&NativeForm>) -> R
                 source.push_str(&format!(
                     "Private Sub Vba{}_{}({parameters})\n{handler}{arguments}\nEnd Sub\n",
                     c.name, event
+                ));
+            }
+        }
+        for event in ["AddControl", "RemoveControl"] {
+            let handler = format!("{}_{}", c.name, event);
+            if handlers.contains(&handler.to_ascii_lowercase())
+                && let Some((count, indexed)) =
+                    crate::form_dynamic::collection_event(form, &handler.to_ascii_lowercase())
+            {
+                let (params, args) = if indexed {
+                    (
+                        "ByVal index As Long,ByVal control As MSForms.Control",
+                        " index,control",
+                    )
+                } else if count == 1 {
+                    ("ByVal control As MSForms.Control", " control")
+                } else {
+                    ("", "")
+                };
+                source.push_str(&format!(
+                    "Private Sub Vba{}_{event}({params})\n{handler}{args}\nEnd Sub\n",
+                    c.name
                 ));
             }
         }
@@ -1587,16 +1653,23 @@ impl Ide {
                         }
                     }
                 }
-                modules.push(parse(
+                let mut parsed = parse(
                     &SourceFile::new(
                         SourceId(u64::MAX - 16 - i as u64),
                         format!("{}.cls", class_name(kind)),
                         source,
                     )?,
                     ModuleKind::Class,
-                )?);
+                )?;
+                crate::form_dynamic::native_events(&mut parsed);
+                modules.push(parsed);
             }
             for (id, name, source) in [
+                (
+                    u64::MAX - 46,
+                    "VbaFormControlContext",
+                    crate::form_dynamic::CONTEXT.to_owned(),
+                ),
                 (
                     u64::MAX - 44,
                     "VbaFormTabPosition",
@@ -1673,6 +1746,8 @@ impl Ide {
             )?);
             let mut support =
                 String::from("Public Const vbModal As Long=1\nPublic Const vbModeless As Long=0\n");
+            support.push_str(crate::form_dynamic::INITIALIZE);
+            support.push_str("Public Function VbaControlRequest(ByVal context As VbaFormControlContext,ByVal operation As Integer,ByVal target As Object,ByVal argument As Variant) As Object\nSet VbaControlRequest=context.VbaInvoke(operation,target,argument)\nEnd Function\n");
             support.push_str("Public Function VbaNextPageId() As Long\nStatic nextId As Long\nIf nextId= -2147483647 Then Err.Raise 7\nnextId=nextId-1\nVbaNextPageId=nextId\nEnd Function\n");
             support.push_str("Public Function VbaUserForms(Optional ByVal index As Variant) As Object\nIf IsMissing(index) Then\nSet VbaUserForms=VbaFormUserForms\nElse\nSet VbaUserForms=VbaFormUserForms.Item(index)\nEnd If\nEnd Function\n");
             for (id, designer) in &self.forms {
@@ -1792,19 +1867,12 @@ impl Ide {
             .ok_or_else(|| error("no form session"))?;
         let mut object = instance.object;
         if let Some(control) = control {
-            let control = designer
-                .form()
-                .controls
-                .iter()
-                .find(|c| c.id == control)
-                .ok_or_else(|| error("unknown form control"))?;
-            let Value::Object(child) =
-                session.read_instance_field(object, &format!("Vba{}", control.name))?
-            else {
-                return Err(error("control is unloaded"));
+            object = crate::form_dynamic::object(session, instance.object, control)?;
+            let Value::Integer(code) = session.read_instance_field(object, "VbaKind")? else {
+                return Err(error("control kind"));
             };
-            object = child;
-            if control.kind == ControlKind::Page
+            let kind = crate::form_dynamic::kind(code)?;
+            if kind == ControlKind::Page
                 && ["name", "vbaname", "index", "vbaindex"]
                     .contains(&field.to_ascii_lowercase().as_str())
             {
@@ -1821,7 +1889,7 @@ impl Ide {
                     },
                 );
             }
-            if matches!(control.kind, ControlKind::TabStrip | ControlKind::MultiPage)
+            if matches!(kind, ControlKind::TabStrip | ControlKind::MultiPage)
                 && ["value", "vbavalue"].contains(&field.to_ascii_lowercase().as_str())
             {
                 let Value::Object(state) = session.read_instance_field(object, "VbaTabState")?
@@ -2095,28 +2163,17 @@ impl Ide {
         field: &str,
     ) -> Result<Value> {
         self.validate_form_instance(instance)?;
-        let designer = self
-            .forms
-            .get(&instance.source)
-            .ok_or_else(|| error("form"))?;
-        let descriptor = designer
-            .form()
-            .controls
-            .iter()
-            .find(|c| {
-                c.id == control && matches!(c.kind, ControlKind::TabStrip | ControlKind::MultiPage)
-            })
-            .ok_or_else(|| error("TabStrip"))?;
-        let name = &descriptor.name;
         let session = self
             .session
             .as_ref()
             .ok_or_else(|| error("no form session"))?;
-        let Value::Object(control) =
-            session.read_instance_field(instance.object, &format!("Vba{name}"))?
-        else {
-            return Err(error("unloaded control"));
+        let control = crate::form_dynamic::object(session, instance.object, control)?;
+        let Value::Integer(code) = session.read_instance_field(control, "VbaKind")? else {
+            return Err(error("tab kind"));
         };
+        if code != 12 && code != 13 {
+            return Err(error("tab control"));
+        }
         let mut tab = tab_object(session, control, tab)?;
         if ["name", "index"].contains(&field.to_ascii_lowercase().as_str()) {
             let Value::Object(cell) = session.read_instance_field(tab, "VbaPosition")? else {
@@ -2126,7 +2183,7 @@ impl Ide {
         }
         let field = match field.to_ascii_lowercase().as_str() {
             "name" => "VbaName",
-            "caption" if descriptor.kind == ControlKind::TabStrip => "VbaCaption",
+            "caption" if code == 12 => "VbaCaption",
             "index" => "VbaIndex",
             _ => field,
         };
@@ -2160,15 +2217,14 @@ impl Ide {
                 "form is not visible or another invocation/modal form owns input",
             ));
         }
-        let designer = self.forms.get(&id).ok_or_else(|| error("unknown form"))?;
+        let form = self.form_instance_design(instance)?;
         let session = self
             .session
             .as_mut()
             .ok_or_else(|| error("no form session"))?;
         let mut object = instance.object;
         let (mut handler, mut arguments) = if let Some(id) = control {
-            let c = designer
-                .form()
+            let c = form
                 .controls
                 .iter()
                 .find(|c| c.id == id)
@@ -2181,17 +2237,12 @@ impl Ide {
             let mut parent = c.parent;
             for _ in 0..8 {
                 let Some(id) = parent else { break };
-                let owner = designer
-                    .form()
+                let owner = form
                     .controls
                     .iter()
                     .find(|c| c.id == id)
                     .ok_or_else(|| error("missing Frame parent"))?;
-                let Value::Object(owner_object) =
-                    session.read_instance_field(instance.object, &format!("Vba{}", owner.name))?
-                else {
-                    return Err(error("Frame is unloaded"));
-                };
+                let owner_object = crate::form_dynamic::object(session, instance.object, owner.id)?;
                 if session.read_instance_field(owner_object, "Enabled")? != Value::Boolean(true)
                     || session.read_instance_field(owner_object, "Visible")? != Value::Boolean(true)
                 {
@@ -2214,29 +2265,20 @@ impl Ide {
                     };
                     let page_index = Value::Long(i32::from(page_index));
                     let parent_id = owner.parent.ok_or_else(|| error("Page owner"))?;
-                    let multi = designer
-                        .form()
+                    let multi = form
                         .controls
                         .iter()
                         .find(|c| c.id == parent_id)
                         .ok_or_else(|| error("MultiPage owner"))?;
-                    let Value::Object(multi_object) = session
-                        .read_instance_field(instance.object, &format!("Vba{}", multi.name))?
-                    else {
-                        return Err(error("MultiPage unloaded"));
-                    };
+                    let multi_object =
+                        crate::form_dynamic::object(session, instance.object, multi.id)?;
                     if session.read_instance_field(multi_object, "VbaValue")? != page_index {
                         return Err(error("Page is not selected"));
                     }
                 }
                 parent = owner.parent;
             }
-            let Value::Object(child) =
-                session.read_instance_field(object, &format!("Vba{}", c.name))?
-            else {
-                return Err(error("control unloaded"));
-            };
-            object = child;
+            object = crate::form_dynamic::object(session, instance.object, c.id)?;
             if session.read_instance_field(object, "Enabled")? != Value::Boolean(true)
                 || session.read_instance_field(object, "Visible")? != Value::Boolean(true)
             {
@@ -2293,8 +2335,7 @@ impl Ide {
                         return Err(error("tab is disabled or hidden"));
                     }
                 }
-                let index = designer
-                    .form()
+                let index = form
                     .controls
                     .iter()
                     .position(|c| c.id == id)
@@ -2309,8 +2350,7 @@ impl Ide {
                 if !matches!(c.kind, ControlKind::ComboBox | ControlKind::RefEdit) {
                     return Err(error("drop input requires a ComboBox or RefEdit"));
                 }
-                let index = designer
-                    .form()
+                let index = form
                     .controls
                     .iter()
                     .position(|c| c.id == id)
@@ -2322,8 +2362,7 @@ impl Ide {
                     vec![Value::Long(index), Value::Boolean(opened)],
                 )
             } else if let FormInput::List(row) | FormInput::Navigate(row) = input {
-                let index = designer
-                    .form()
+                let index = form
                     .controls
                     .iter()
                     .position(|c| c.id == id)
@@ -2339,8 +2378,7 @@ impl Ide {
                     ],
                 )
             } else if let FormInput::Numeric(action) = input {
-                let index = designer
-                    .form()
+                let index = form
                     .controls
                     .iter()
                     .position(|c| c.id == id)
@@ -2365,8 +2403,7 @@ impl Ide {
                 if matches!(c.kind, ControlKind::Label | ControlKind::Image) {
                     return Err(error("this control cannot receive focus"));
                 }
-                let index = designer
-                    .form()
+                let index = form
                     .controls
                     .iter()
                     .position(|c| c.id == id)
@@ -2399,8 +2436,7 @@ impl Ide {
             && self.native_forms.contains_key(&id)
             && let Some(control) = control
         {
-            let index = designer
-                .form()
+            let index = form
                 .controls
                 .iter()
                 .position(|c| c.id == control)

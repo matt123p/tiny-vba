@@ -582,3 +582,75 @@ fn host_optional_defaults_require_ir8_capability_and_metadata_feature() -> Resul
     );
     Ok(())
 }
+
+#[test]
+fn nominal_event_signatures_share_the_bounded_verification_index() -> Result<(), Box<dyn Error>> {
+    use vba_syntax::{ModuleKind, parse};
+    let parameters = "ByVal a As Publisher,ByVal b As Publisher,ByVal c As Publisher,ByVal d As Publisher,ByVal e As Publisher";
+    let publisher = format!("Public Event Changed({parameters})\n");
+    let mut sink = String::new();
+    for n in 0..32 {
+        sink.push_str(&format!("Private WithEvents source{n} As Publisher\nPrivate Sub source{n}_Changed({parameters})\nEnd Sub\n"));
+    }
+    let mut main = String::from("Sub Main()\n");
+    for n in 0..1 {
+        main.push_str(&format!("Dim item{n} As Publisher\n"));
+    }
+    main.push_str("End Sub\n");
+    let mut modules = Vec::new();
+    for (n, (name, text, kind)) in [
+        ("Main.bas", main, ModuleKind::Standard),
+        ("Publisher.cls", publisher, ModuleKind::Class),
+        ("Sink.cls", sink, ModuleKind::Class),
+    ]
+    .into_iter()
+    .enumerate()
+    {
+        modules.push(parse(
+            &SourceFile::new(SourceId(n as u64 + 1), name.into(), text)?,
+            kind,
+        )?);
+    }
+    let options = CompileOptions {
+        entry: "Main".into(),
+        capabilities: ir::Capabilities::ir11_structural(),
+        ..Default::default()
+    };
+    let program = compile_modules(&modules, &options)?;
+    let mut expanded = program.program().clone();
+    let main = expanded
+        .procedures
+        .iter()
+        .position(|p| p.name == "Main")
+        .ok_or("Main")?;
+    let ty = expanded.nominal_locals.first().ok_or("nominal")?.ty.clone();
+    while expanded.nominal_locals.len() < 1000 {
+        let slot = expanded.procedures.get(main).ok_or("Main")?.locals.len();
+        expanded
+            .procedures
+            .get_mut(main)
+            .ok_or("Main")?
+            .locals
+            .push(ir::Local {
+                auto_new: None,
+                array: None,
+                name: format!("unusedNominal{slot}"),
+                kind: ScalarKind::Object,
+                role: ir::SlotRole::User,
+                span: None,
+                visible: false,
+            });
+        expanded.nominal_locals.push(ir::NominalLocal {
+            procedure: ir::ProcedureId(main as u32),
+            slot: ir::LocalSlot(slot as u32),
+            ty: ty.clone(),
+        });
+    }
+    let program = ir::verify(expanded, &options.capabilities, &options.limits)?;
+    let mut invalid = program.program().clone();
+    invalid
+        .nominal_locals
+        .push(invalid.nominal_locals.first().ok_or("nominal")?.clone());
+    assert!(ir::verify(invalid, &options.capabilities, &options.limits).is_err());
+    Ok(())
+}

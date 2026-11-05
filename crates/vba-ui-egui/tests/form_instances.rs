@@ -679,9 +679,24 @@ fn native_scroll_drag_does_not_replay_stationary_input_after_a_handler_resets_va
     });
     h.run_steps(1);
     h.event(egui::Event::PointerMoved(center + egui::vec2(20., 0.)));
-    h.run_steps(2);
+    // A physical move starts an ordinary VBA callback. Wait for its completed
+    // continuation before sending another move; frame counts are not VM quotas.
+    for _ in 0..100 {
+        h.run_steps(1);
+        if h.state().ide.mode() == Mode::Completed {
+            break;
+        }
+    }
+    assert_eq!(h.state().ide.mode(), Mode::Completed);
+    assert_eq!(h.state().ide.output(), vec!["initialized", "scroll"]);
     h.event(egui::Event::PointerMoved(center + egui::vec2(40., 0.)));
-    h.run_steps(5);
+    for _ in 0..100 {
+        h.run_steps(1);
+        if h.state().ide.mode() == Mode::Completed {
+            break;
+        }
+    }
+    assert_eq!(h.state().ide.mode(), Mode::Completed);
     assert_eq!(
         h.state().ide.output(),
         vec!["initialized", "scroll", "scroll"]
@@ -1567,5 +1582,95 @@ fn native_dynamic_tabs_and_pages_render_and_route_pointer_input_after_reordering
         assert!(h.state().errors.is_empty(), "{:?}", h.state().errors);
         assert_eq!(h.state().ide.native_form(f.source), Some(&original));
     }
+    Ok(())
+}
+
+#[test]
+fn runtime_added_native_button_renders_and_can_remove_itself_during_a_stopped_callback() -> R {
+    let mut ide = Ide::new();
+    let source = fixture::SOURCE.to_owned()
+        + r#"
+Private WithEvents action As MSForms.CommandButton
+Public Sub CreateAction()
+Set action=Controls.Add("Forms.CommandButton.1","DynamicButton")
+action.Caption="Dynamic action"
+action.Left=170
+action.Top=110
+End Sub
+Private Sub action_Click()
+Controls.Remove "DynamicButton"
+Debug.Print "removed"
+Stop
+Debug.Print "resumed"
+End Sub
+"#;
+    let export = String::from_utf8(fixture::export())?.replace(fixture::SOURCE, &source);
+    ide.import_native_form_export(
+        "NativeForm.frm",
+        export.as_bytes(),
+        1252,
+        &[NativeFormResource {
+            name: "NativeForm.frx".into(),
+            bytes: fixture::companion(),
+        }],
+    )?;
+    ide.add_module(
+        "Main.bas",
+        "Sub Main()\nNativeForm.CreateAction\nNativeForm.Show 0\nEnd Sub",
+    )?;
+    ide.dispatch(Action::Run, &mut NoHost)?;
+    for _ in 0..2000 {
+        if ide.mode() != Mode::Running {
+            break;
+        }
+        ide.tick(&mut NoHost)?;
+    }
+    assert_eq!(ide.mode(), Mode::Completed, "{:?}", ide.diagnostics);
+    let f = *ide.form_instances()?.first().ok_or("form")?;
+    let native = ide.native_form(f.source).ok_or("native")?.clone();
+    let mut h = Harness::builder()
+        .with_size(egui::vec2(1400., 1000.))
+        .build_ui_state(
+            |ui, s: &mut State| {
+                for c in s.view.show(ui, &s.ide, Theme::light()) {
+                    if let Err(e) = apply(&mut s.ide, c, &mut NoHost) {
+                        s.errors.push(e.to_string());
+                    }
+                }
+                if let Err(e) = s.ide.tick(&mut NoHost) {
+                    s.errors.push(e.to_string());
+                }
+            },
+            State {
+                ide,
+                view: EditorUi::default(),
+                errors: vec![],
+            },
+        );
+    h.run_steps(8);
+    h.get_by_label("DynamicButton").click();
+    h.run_steps(120);
+    assert_eq!(
+        h.state().ide.mode(),
+        Mode::Break,
+        "{:?}",
+        h.state().ide.diagnostics
+    );
+    assert!(h.query_by_label("DynamicButton").is_none());
+    assert_eq!(h.state().ide.output(), vec!["initialized", "removed"]);
+    h.state_mut().ide.dispatch(Action::Run, &mut NoHost)?;
+    h.run_steps(40);
+    assert_eq!(
+        h.state().ide.mode(),
+        Mode::Completed,
+        "{:?}",
+        h.state().ide.diagnostics
+    );
+    assert_eq!(
+        h.state().ide.output(),
+        vec!["initialized", "removed", "resumed"]
+    );
+    assert_eq!(h.state().ide.native_form(f.source), Some(&native));
+    assert!(h.state().errors.is_empty(), "{:?}", h.state().errors);
     Ok(())
 }

@@ -5,6 +5,10 @@ Public VbaParentKey As Long
 Public VbaNavigationRank As Long
 Public Event VbaParentRequested(ByVal child As Object,ByRef owner As Object)
 Public Property Get Parent() As Object
+If VbaRuntime Then
+Set Parent=VbaControlRequest(VbaContext,4,Me,Empty)
+Exit Property
+End If
 Dim owner As Object
 RaiseEvent VbaParentRequested(Me,owner)
 If owner Is Nothing Then Err.Raise 91
@@ -17,6 +21,10 @@ Public VbaActiveControl As Object
 Public Event Click
 Private Sub Class_Initialize()
 Set VbaChildren=New VbaFormControls
+End Sub
+Public Sub VbaConfigureChildren()
+Set VbaChildren.VbaContext=VbaContext
+VbaChildren.VbaParentKey=VbaId
 End Sub
 Public Property Get Controls(Optional ByVal index As Variant) As Object
 If VBA.IsMissing(index) Then
@@ -37,14 +45,17 @@ End Sub
 "#;
 pub(crate) const ROOT: &str = r#"
 Public VbaActiveControl As Object
-Private Function VbaScopeControls(ByVal key As Long) As Object
+Private Function VbaScopeControls(ByVal key As Long,Optional ByRef pages As Boolean=False) As Object
 If key=0 Then
 Set VbaScopeControls=VbaControls
 Else
-If VbaLookup(key).VbaKind=13 Then
-Set VbaScopeControls=VbaLookup(key).Pages
+Dim owner As Object
+Set owner=VbaLookup(key)
+pages=owner.VbaKind=13
+If pages Then
+Set VbaScopeControls=owner.Pages
 Else
-Set VbaScopeControls=VbaLookup(key).Controls
+Set VbaScopeControls=owner.Controls
 End If
 End If
 End Function
@@ -66,6 +77,7 @@ Private Function VbaEligible(ByVal child As Object,Optional ByVal tabbing As Boo
 Dim current As Object,i As Long,kind As Integer
 Set current=child
 For i=0 To 8
+If current.VbaDetached Then Exit Function
 If Not current.Enabled Or Not current.Visible Then Exit Function
 kind=current.VbaKind
 If kind=14 Then
@@ -95,7 +107,7 @@ If kind<>11 And kind<>14 Then
 Set VbaFocusTarget=target
 Exit Function
 End If
-Dim entries As Variant
+Dim entries() As Object
 entries=VbaAllControls.VbaEntries
 For scan=0 To VbaAllControls.VbaTotal-1
 Set control=entries(scan)
@@ -143,9 +155,8 @@ Private Sub VbaScopeOrder(ByVal parent As Long,ByRef position As Long)
 Dim scan As Long
 Dim i As Long,control As Object,children As Object,kind As Integer
 Dim pages As Boolean
-If parent<>0 Then pages=VbaLookup(parent).VbaKind=13
-Set children=VbaScopeControls(parent)
-Dim entries As Variant
+Set children=VbaScopeControls(parent,pages)
+Dim entries() As Object
 entries=children.VbaEntries
 If pages Then
 For i=0 To children.VbaTotal-1
@@ -172,7 +183,7 @@ Private Sub VbaTabChange(ByVal origin As Object,ByVal previous As Integer,ByVal 
 Dim scan As Long
 Dim peer As Object,children As Object
 Set children=VbaScopeControls(origin.VbaParentKey)
-Dim entries As Variant
+Dim entries() As Object
 entries=children.VbaEntries
 If requested>children.VbaTotal-1 Then requested=children.VbaTotal-1
 For scan=0 To children.VbaTotal-1
@@ -191,7 +202,7 @@ End Sub
 Private Sub VbaRoleChange(ByVal origin As Object,ByVal role As Integer)
 Dim scan As Long
 Dim peer As Object
-Dim entries As Variant
+Dim entries() As Object
 entries=VbaAllControls.VbaEntries
 For scan=0 To VbaAllControls.VbaTotal-1
 Set peer=entries(scan)
@@ -210,7 +221,7 @@ Private Sub VbaOptionSelected(ByVal origin As Object)
 Dim scan As Long
 Dim peer As Object,children As Object
 Set children=VbaScopeControls(origin.VbaParentKey)
-Dim entries As Variant
+Dim entries() As Object
 entries=children.VbaEntries
 For scan=0 To children.VbaTotal-1
 Set peer=entries(scan)
@@ -241,13 +252,14 @@ Public Tag As String
 Public ControlTipText As String
 Public Accelerator As String
 Public Event VbaTabChanged(ByVal previous As Integer,ByVal requested As Integer)
-Public Property Get VbaKind() As Integer
-VbaKind=14
-End Property
+Public VbaKind As Integer
+Public VbaRuntime As Boolean
+Public VbaDetached As Boolean
+Public VbaContext As VbaFormControlContext
 "#,
     );
     source.push_str(crate::form_tab_state::MEMBER);
-    source.push_str(COMMON);
+    source.push_str(&COMMON.replace("Public Property Get Parent() As Object\n", "Public Property Get Parent() As Object\nIf Not VbaPosition.VbaAttached Then Err.Raise 91\n"));
     source=source.replace("Dim owner As Object\nRaiseEvent VbaParentRequested(Me,owner)\nIf owner Is Nothing Then Err.Raise 91\nSet Parent=owner", "If Not VbaPosition.VbaAttached Then Err.Raise 91\nSet Parent=VbaState.VbaOwner()");
     source.push_str(
         &FRAME
@@ -256,7 +268,13 @@ End Property
     );
     source = source.replace(
         "Set VbaChildren=New VbaFormControls\n",
-        "Set VbaChildren=New VbaFormControls\nSet VbaPosition=New VbaFormTabPosition\n",
+        "Set VbaChildren=New VbaFormControls\nSet VbaPosition=New VbaFormTabPosition\nVbaKind=14\n",
     );
+    source.push_str("Public Sub VbaConfigureRuntime(ByVal owner As Object,ByVal model As Object)\nVbaParentKey=owner.VbaId\nSet VbaContext=owner.VbaContext\nVbaConfigureChildren\nIf model Is Nothing Then\nVbaTop=15\nVbaWidth=owner.Width\nVbaHeight=owner.Height-15\nIf VbaHeight<0 Then VbaHeight=0\nElse\nVbaLeft=model.VbaLeft\nVbaTop=model.VbaTop\nVbaWidth=model.VbaWidth\nVbaHeight=model.VbaHeight\nEnd If\nEnd Sub\n");
+    if let Some(start) = source.find("Public Property Get Parent() As Object")
+        && let Some(end) = source.get(start..).and_then(|s| s.find("End Property"))
+    {
+        source.replace_range(start..start+end+12,"Public Property Get Parent() As Object\nIf Not VbaPosition.VbaAttached Then Err.Raise 91\nSet Parent=VbaState.VbaOwner()\nEnd Property");
+    }
     source
 }

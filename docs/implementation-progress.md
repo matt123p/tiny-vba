@@ -1,5 +1,23 @@
 # Implementation progress
 
+## M7A.4 continued — native runtime Controls (2026-11-05)
+
+Implementation under [ADR 0062](decisions/0062-native-dynamic-controls.md): native
+Controls.Add/Remove/Clear and runtime names, nested collection/Parent identity,
+subtree detachment, scoped/indexed collection notifications and ordinary
+WithEvents focus/typed validation. The runtime renderer/input router derives a
+read-only live hierarchy without modifying designer/source/resources. Static
+permission, work and memory limits are unchanged; shared typed helpers, indexed
+verification and generic dispatch optimizations remove redundant metadata work.
+Validation PASS: full CI, WASM compilation and actual WASI execution. All 90
+form-instance and 21 form-widget cases pass, including runtime ownership/input,
+reentrant Stop/resume, self-removal and the nominal-index regression. The scrollbar
+drag regression waits for callback completion before delivering its next physical
+move, preserving the exact event-count and stationary-input assertions. Dedicated
+native/browser capture and updated fork integration have not run for this increment.
+Full M7A.4 remains open; its unchanged remaining ledger includes multiple
+selection/bindings and further default/property/event/lifecycle/platform semantics.
+
 ## M7A.4 continued — native Tabs/Pages mutation (2026-11-05)
 
 Implemented ordinary native Tabs/Pages Add/Remove/Clear, writable Integer Index

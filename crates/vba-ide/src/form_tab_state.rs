@@ -38,7 +38,7 @@ VbaInitialize index
 RaiseEvent VbaChanged
 End Sub
 Private Sub VbaCommit(ByVal previous As VbaFormTabPosition,ByVal value As Long,ByVal notify As Boolean)
-Dim i As Long,entries As Variant
+Dim i As Long,entries() As Object
 entries=VbaEntries
 For i=0 To VbaTotal-1
 entries(i).VbaIndex=CInt(i)
@@ -75,7 +75,7 @@ RaiseEvent VbaOrdered
 If Not (previous Is VbaSelected) Or value<>VbaValue Then RaiseEvent VbaChanged
 End Sub
 Public Function VbaFind(ByVal value As String) As Long
-Dim i As Long,entries As Variant
+Dim i As Long,entries() As Object
 entries=VbaEntries
 For i=0 To VbaTotal-1
 If VbaKey(entries(i).VbaName)=VbaKey(value) Then
@@ -156,7 +156,7 @@ VbaCommit previous,value,notify
 End Sub
 Public Sub VbaClear(Optional ByVal notify As Boolean=True)
 If VbaTotal=0 Then Exit Sub
-Dim i As Long,entries As Variant
+Dim i As Long,entries() As Object
 entries=VbaEntries
 For i=0 To VbaTotal-1
 entries(i).VbaAttached=False

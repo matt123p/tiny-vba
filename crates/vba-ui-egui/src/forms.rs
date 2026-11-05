@@ -916,7 +916,11 @@ impl EditorUi {
             else {
                 continue;
             };
-            let form = designer.form();
+            let Ok(runtime_form) = ide.form_instance_design(instance) else {
+                continue;
+            };
+            let form = &runtime_form;
+            let _ = designer;
             let idle = ide.form_instance_can_deliver(instance);
             let native = ide.native_form(id).is_some();
             if let Some((owner, control)) = ide
@@ -1001,12 +1005,9 @@ impl EditorUi {
                             *owner == instance
                                 && form.controls.iter().find(|c| c.id == *control).is_some_and(
                                     |c| {
-                                        ide.form_instance_field(
-                                            instance,
-                                            None,
-                                            &format!("Vba{}", c.name),
-                                        )
-                                        .ok()
+                                        ide.form_instance_control_object(instance, c.id)
+                                            .ok()
+                                            .map(vba_ide::Value::Object)
                                             == active.map(vba_ide::Value::Object)
                                     },
                                 )
@@ -1083,8 +1084,9 @@ impl EditorUi {
                             .iter()
                             .find(|c| c.id == *control)
                             .is_some_and(|c| {
-                                ide.form_instance_field(instance, None, &format!("Vba{}", c.name))
+                                ide.form_instance_control_object(instance, c.id)
                                     .ok()
+                                    .map(vba_ide::Value::Object)
                                     == ide
                                         .form_instance_field(instance, None, "VbaActiveControl")
                                         .ok()
@@ -1266,7 +1268,7 @@ impl EditorUi {
                         if native && idle && keyboard_owner==Some(instance)
                             && !previous_focus.iter().any(|(owner,_,_)|*owner==instance)
                             && matches!(c.kind,ControlKind::TextBox|ControlKind::SpinButton|ControlKind::ScrollBar|ControlKind::ListBox|ControlKind::ComboBox)
-                            && ide.form_instance_field(instance,None,&format!("Vba{}",c.name)).ok()==ide.form_instance_field(instance,None,"VbaActiveControl").ok() {
+                            && ide.form_instance_control_object(instance,c.id).ok().map(vba_ide::Value::Object)==ide.form_instance_field(instance,None,"VbaActiveControl").ok() {
                             ui.ctx().memory_mut(|m|m.request_focus(widget_id));
                         }
                         let tab_stop = ide
@@ -1443,7 +1445,7 @@ impl EditorUi {
                     if native && idle && keyboard_owner == Some(instance) {
                         let focused = ui.ctx().memory(|m| m.focused());
                         let active = ide.form_instance_field(instance, None, "VbaActiveControl").ok();
-                        let active_id = focus.iter().find(|(_, control, _)| form.controls.iter().find(|c| c.id == *control).is_some_and(|c| ide.form_instance_field(instance, None, &format!("Vba{}",c.name)).ok() == active));
+                        let active_id = focus.iter().find(|(_, control, _)| form.controls.iter().find(|c| c.id == *control).is_some_and(|c| ide.form_instance_control_object(instance,c.id).ok().map(vba_ide::Value::Object) == active));
                         let requested = focus.iter().find(|(_, _, target)| Some(*target) == focused);
                         let pending = commands.iter().any(|command| matches!(command, Command::Form(FormCommand::InstanceFocus(owner, _) | FormCommand::InstanceActivate(owner, _) | FormCommand::InstanceText(owner, _, _, _) | FormCommand::InstanceNumeric(owner, _, _) | FormCommand::InstanceList(owner, _, _) | FormCommand::InstanceTab(owner, _, _) | FormCommand::InstanceDrop(owner, _, _) | FormCommand::InstanceNavigate(owner, _, _) | FormCommand::InstanceEvent(owner, _, _)) if *owner == instance));
                         if let Some((_, control, _)) = requested && requested != active_id && !pending {

@@ -2985,3 +2985,296 @@ End Sub"#,
     assert_eq!(ide.native_form(f.source), Some(&original));
     Ok(())
 }
+
+#[test]
+fn native_runtime_controls_are_canonical_named_scoped_objects_with_safe_removal() -> R {
+    let ide = setup(
+        r#"Sub Main()
+Dim f As New NativeForm,t As MSForms.TextBox,box As MSForms.Frame,b As MSForms.CommandButton
+Set t=f.Controls.Add("Forms.TextBox.1","Runtime")
+t.Text="hello"
+t.Name="Renamed"
+Debug.Print f.Controls.Count,f.Controls("RENAMED") Is t,t.Parent Is f,t.Text
+Set box=f.Controls.Add("Forms.Frame.1","Group")
+Set b=box.Controls.Add("Forms.CommandButton.1","Run")
+Debug.Print box.Controls.Count,b.Parent Is box,f.Controls.Count
+b.TabIndex=0
+On Error Resume Next
+f.Controls.Remove "Entry"
+Debug.Print Err.Number
+Err.Clear
+f.Controls.Remove "Group"
+Debug.Print f.Controls.Count,box.Controls.Count
+Debug.Print b.Parent.Name
+Debug.Print Err.Number
+Err.Clear
+f.Controls.Add "ThirdParty.Unknown.1"
+Debug.Print Err.Number,f.Controls.Count
+f.Controls.Remove "Renamed"
+Debug.Print f.Controls.Count
+f.Show 0
+End Sub"#,
+        None,
+    )?;
+    assert_eq!(ide.mode(), Mode::Completed, "{:?}", ide.diagnostics);
+    assert_eq!(
+        ide.output(),
+        vec![
+            "initialized",
+            "4\tTrue\tTrue\thello",
+            "1\tTrue\t5",
+            "382",
+            "4\t0",
+            "91",
+            "429\t4",
+            "3"
+        ]
+    );
+    Ok(())
+}
+
+#[test]
+fn native_added_button_withevents_receives_real_input_and_survives_stop() -> R {
+    let source = fixture::SOURCE.to_owned()
+        + r#"
+Private WithEvents runtimeButton As MSForms.CommandButton
+Public Sub CreateButton()
+Set runtimeButton=Controls.Add("Forms.CommandButton.1","RuntimeButton")
+runtimeButton.Caption="Dynamic action"
+runtimeButton.Left=170
+runtimeButton.Top=110
+End Sub
+Private Sub runtimeButton_Click()
+Debug.Print "dynamic click"
+Stop
+Debug.Print "resumed"
+End Sub
+"#;
+    let mut ide = setup(
+        "Sub Main()\nNativeForm.CreateButton\nNativeForm.Show 0\nEnd Sub",
+        Some(&source),
+    )?;
+    assert_eq!(ide.mode(), Mode::Completed, "{:?}", ide.diagnostics);
+    let f = *ide.form_instances()?.first().ok_or("form")?;
+    let original = ide.native_form(f.source).ok_or("native")?.clone();
+    let design = ide.form_instance_design(f)?;
+    let button = design
+        .controls
+        .iter()
+        .find(|c| c.name == "RuntimeButton")
+        .ok_or("button")?;
+    ide.form_instance_activate(f, button.id, &mut NoHost)?;
+    settle(&mut ide)?;
+    assert_eq!(ide.mode(), Mode::Break, "{:?}", ide.diagnostics);
+    assert_eq!(ide.output(), vec!["initialized", "dynamic click"]);
+    ide.dispatch(Action::Run, &mut NoHost)?;
+    settle(&mut ide)?;
+    assert_eq!(ide.mode(), Mode::Completed, "{:?}", ide.diagnostics);
+    assert_eq!(
+        ide.output(),
+        vec!["initialized", "dynamic click", "resumed"]
+    );
+    assert_eq!(ide.native_form(f.source), Some(&original));
+    Ok(())
+}
+
+#[test]
+fn native_dynamic_textbox_withevents_validates_and_cancels_focus_without_replay() -> R {
+    let source = fixture::SOURCE.to_owned()
+        + r#"
+Private WithEvents edit As MSForms.TextBox
+Private WithEvents button As MSForms.CommandButton
+Private attempts As Long
+Public Sub CreateControls()
+Set edit=Controls.Add("Forms.TextBox.1","DynamicText")
+Set button=Controls.Add("Forms.CommandButton.1","DynamicButton")
+End Sub
+Private Sub edit_Enter()
+Debug.Print "enter"
+End Sub
+Private Sub edit_BeforeUpdate(ByVal Cancel As MSForms.ReturnBoolean)
+attempts=attempts+1
+Debug.Print attempts
+Stop
+If attempts=1 Then Cancel=True
+End Sub
+Private Sub edit_Exit(ByVal Cancel As MSForms.ReturnBoolean)
+Debug.Print "exit"
+End Sub
+Private Sub button_Click()
+Debug.Print "clicked"
+End Sub
+Public Sub FocusEdit()
+edit.SetFocus
+End Sub
+"#;
+    let mut ide = setup(
+        "Sub Main()\nNativeForm.CreateControls\nNativeForm.Show 0\nNativeForm.FocusEdit\nEnd Sub",
+        Some(&source),
+    )?;
+    assert_eq!(ide.mode(), Mode::Completed, "{:?}", ide.diagnostics);
+    let f = *ide.form_instances()?.first().ok_or("form")?;
+    let view = ide.form_instance_design(f)?;
+    let text = view
+        .controls
+        .iter()
+        .find(|c| c.name == "DynamicText")
+        .ok_or("text")?
+        .id;
+    let button = view
+        .controls
+        .iter()
+        .find(|c| c.name == "DynamicButton")
+        .ok_or("button")?
+        .id;
+    let object = ide.form_instance_control_object(f, text)?;
+    ide.form_instance_text(
+        f,
+        text,
+        VbaString::from_utf8("changed")?,
+        (7, 0),
+        &mut NoHost,
+    )?;
+    settle(&mut ide)?;
+    for cancelled in [true, false] {
+        ide.form_instance_event(f, Some(button), None, &mut NoHost)?;
+        settle(&mut ide)?;
+        assert_eq!(ide.mode(), Mode::Break, "{:?}", ide.diagnostics);
+        ide.dispatch(Action::Run, &mut NoHost)?;
+        settle(&mut ide)?;
+        assert_eq!(ide.mode(), Mode::Completed, "{:?}", ide.diagnostics);
+        assert_eq!(
+            ide.form_instance_field(f, None, "VbaActiveControl")? == Value::Object(object),
+            cancelled
+        );
+    }
+    assert_eq!(
+        ide.output(),
+        vec!["initialized", "enter", "1", "2", "exit", "clicked"]
+    );
+    Ok(())
+}
+
+#[test]
+fn native_addcontrol_event_observes_committed_state_before_stop_and_clear_is_scoped() -> R {
+    let source = fixture::SOURCE.to_owned()
+        + r#"
+Private Sub UserForm_AddControl(ByVal Control As MSForms.Control)
+Debug.Print Controls(Control.Name) Is Control,Controls.Count
+Stop
+End Sub
+"#;
+    let mut ide = setup(
+        "Sub Main()\nDim t As MSForms.TextBox\nSet t=NativeForm.Controls.Add(\"Forms.TextBox.1\")\nDebug.Print t.Name\nOn Error Resume Next\nNativeForm.Controls.Clear\nDebug.Print Err.Number,NativeForm.Controls.Count\nEnd Sub",
+        Some(&source),
+    )?;
+    assert_eq!(ide.mode(), Mode::Break, "{:?}", ide.diagnostics);
+    let f = *ide.form_instances()?.first().ok_or("form")?;
+    assert!(
+        ide.form_instance_design(f)?
+            .controls
+            .iter()
+            .any(|c| c.name == "TextBox1")
+    );
+    let native = ide.native_form(f.source).ok_or("native")?.clone();
+    ide.dispatch(Action::Run, &mut NoHost)?;
+    settle(&mut ide)?;
+    assert_eq!(ide.mode(), Mode::Completed, "{:?}", ide.diagnostics);
+    assert_eq!(
+        ide.output(),
+        vec!["initialized", "True\t4", "TextBox1", "382\t4"]
+    );
+    assert_eq!(ide.native_form(f.source), Some(&native));
+    Ok(())
+}
+
+#[test]
+fn native_container_collection_notifications_are_scoped_and_indexed() -> R {
+    let ide = frame_setup(
+        "Sub Main()\nNativeForm.Frame1.Controls.Add \"Forms.CommandButton.1\",\"Child\"\nNativeForm.Frame1.Controls.Remove \"Child\"\nEnd Sub",
+        r#"
+Private Sub Frame1_AddControl()
+Debug.Print "frame added"
+End Sub
+Private Sub Frame1_RemoveControl(ByVal Control As MSForms.Control)
+Debug.Print Control.Name
+End Sub
+Private Sub UserForm_AddControl(ByVal Control As MSForms.Control)
+Debug.Print "wrong scope"
+End Sub
+"#,
+    )?;
+    assert_eq!(ide.mode(), Mode::Completed, "{:?}", ide.diagnostics);
+    assert_eq!(ide.output(), vec!["initialized", "frame added", "Child"]);
+    let ide = multipage_setup(
+        "Sub Main()\nNativeForm.Multi1.Pages(1).Controls.Add \"Forms.TextBox.1\",\"Child\"\nNativeForm.Multi1.Pages(1).Controls.Remove \"Child\"\nEnd Sub",
+        r#"
+Private Sub Multi1_AddControl(ByVal Index As Long,ByVal Control As MSForms.Control)
+Debug.Print Index,Control.Name
+End Sub
+Private Sub Multi1_RemoveControl(ByVal Index As Long,ByVal Control As MSForms.Control)
+Debug.Print Index,Control.Name
+End Sub
+"#,
+    )?;
+    assert_eq!(ide.mode(), Mode::Completed, "{:?}", ide.diagnostics);
+    assert_eq!(ide.output(), vec!["initialized", "1\tChild", "1\tChild"]);
+    Ok(())
+}
+
+#[test]
+fn native_runtime_page_controls_join_the_live_hierarchy_and_keep_inactive_input_blocked() -> R {
+    let mut ide = multipage_setup(
+        r#"Sub Main()
+Dim page As MSForms.Page,text As MSForms.TextBox
+Set page=NativeForm.Multi1.Pages.Add("RuntimePage")
+Set text=page.Controls.Add("Forms.TextBox.1","RuntimeText")
+text.Text="runtime"
+NativeForm.Multi1.Value=page.Index
+NativeForm.Show 0
+End Sub"#,
+        "",
+    )?;
+    assert_eq!(ide.mode(), Mode::Completed, "{:?}", ide.diagnostics);
+    let f = *ide.form_instances()?.first().ok_or("form")?;
+    let original = ide.native_form(f.source).ok_or("native")?.clone();
+    let view = ide.form_instance_design(f)?;
+    let page = view
+        .controls
+        .iter()
+        .find(|c| c.name == "RuntimePage")
+        .ok_or("page")?;
+    let text = view
+        .controls
+        .iter()
+        .find(|c| c.name == "RuntimeText")
+        .ok_or("text")?;
+    assert_eq!(text.parent, Some(page.id));
+    ide.form_instance_text(
+        f,
+        text.id,
+        VbaString::from_utf8("edited")?,
+        (6, 0),
+        &mut NoHost,
+    )?;
+    settle(&mut ide)?;
+    assert_eq!(
+        ide.form_instance_field(f, Some(text.id), "VbaText")?,
+        Value::String(VbaString::from_utf8("edited")?)
+    );
+    ide.form_instance_tab(f, 20, 0, &mut NoHost)?;
+    settle(&mut ide)?;
+    assert_eq!(ide.mode(), Mode::Completed, "{:?}", ide.diagnostics);
+    assert!(
+        ide.form_instance_text(
+            f,
+            text.id,
+            VbaString::from_utf8("hidden")?,
+            (6, 0),
+            &mut NoHost
+        )
+        .is_err()
+    );
+    assert_eq!(ide.native_form(f.source), Some(&original));
+    Ok(())
+}

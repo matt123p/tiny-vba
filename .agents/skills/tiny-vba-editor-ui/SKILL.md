@@ -241,3 +241,12 @@ page input/rendering follow canonical ordering. Generic VM reference-scan metada
 keeps primitive slots out of object lifetime scans under unchanged budgets.
 Dynamic Controls, bindings/multiple selection and the broader M7A.4 ledger remain
 open; native edited saving/removal remain M7A.5/.6. Fresh Office traces are NOT_RUN.
+
+[ADR 0062](../../../docs/decisions/0062-native-dynamic-controls.md) implements selected native
+Controls.Add/Remove/Clear, runtime names, scoped collections/notifications and
+WithEvents focus/validation. An inert runtime projection drives widgets and
+input from ordinary canonical objects; imported source/design/resources stay
+unchanged. Weak context requests avoid ownership cycles. Shared typed helpers,
+indexed verifier metadata and generic dispatch optimizations preserve all existing
+VM limits. Full M7A.4, native edited persistence/removal and M8.5 comparisons remain
+separate requirements; validation of this increment is in progress.

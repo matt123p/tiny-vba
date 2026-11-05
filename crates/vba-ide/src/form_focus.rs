@@ -129,7 +129,7 @@ End Sub
 Private Sub VbaInitialFocus()
 Dim control As Object,best As Object,scan As Long,kind As Integer
 If Not (VbaActiveControl Is Nothing) Then Exit Sub
-Dim entries As Variant
+Dim entries() As Object
 entries=VbaAllControls.VbaEntries
 For scan=0 To VbaAllControls.VbaTotal-1
 Set control=entries(scan)
@@ -167,7 +167,7 @@ If Not (VbaActiveControl Is control) Then Exit Sub
 End If
 If Not VbaVisible Or Not VbaLoaded Or Not control.Enabled Or Not control.Visible Then Exit Sub
 If opened And control.VbaKind=16 Then
-Dim entries As Variant,other As Object,i As Long
+Dim entries() As Object,other As Object,i As Long
 entries=VbaAllControls.VbaEntries
 For i=0 To VbaAllControls.VbaTotal-1
 Set other=entries(i)
@@ -239,17 +239,36 @@ End Sub
                 ""
             }
         ));
-        for control in &form.controls {
+        if event == "Enter" || event == "Exit" {
+            source.push_str("If control.VbaKind=14 Then Exit Sub\n");
+        }
+        source.push_str(&format!(
+            "control.VbaRaise{event}{}\n",
+            if cancel { " cancel" } else { "" }
+        ));
+        source.push_str("End Sub\n");
+    }
+    for control in &form.controls {
+        for (event, cancel) in [
+            ("Enter", false),
+            ("Exit", true),
+            ("BeforeUpdate", true),
+            ("AfterUpdate", false),
+        ] {
             let handler = format!("{}_{event}", control.name);
             if handlers.contains(&handler.to_ascii_lowercase()) {
                 source.push_str(&format!(
-                    "If control Is Vba{} Then {handler}{}\n",
+                    "Private Sub Vba{}_{event}({})\n{handler}{}\nEnd Sub\n",
                     control.name,
+                    if cancel {
+                        "ByVal cancel As MSForms.ReturnBoolean"
+                    } else {
+                        ""
+                    },
                     if cancel { " cancel" } else { "" }
                 ));
             }
         }
-        source.push_str("End Sub\n");
     }
     for control in form.controls.iter().filter(|c| {
         !matches!(

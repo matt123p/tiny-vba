@@ -321,6 +321,18 @@ impl Ide {
                 }
                 _ => vec!["Click".into()],
             });
+            if let Some(events) = &mut specific.event_names {
+                for event in ["Enter", "Exit", "BeforeUpdate", "AfterUpdate"] {
+                    if crate::form_focus::event(kind, event).is_some() {
+                        events.push(event.into());
+                    }
+                }
+            }
+            if matches!(kind, ControlKind::Frame | ControlKind::MultiPage)
+                && let Some(events) = &mut specific.event_names
+            {
+                events.extend(["AddControl".into(), "RemoveControl".into()]);
+            }
             if kind == ControlKind::Page {
                 specific.event_names = None;
             }

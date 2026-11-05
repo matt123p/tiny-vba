@@ -161,6 +161,45 @@ fn validate(
     budget.table(p.sources.len() + p.procedures.len() + p.constants.len())?;
     budget.text(&p.profile)?;
     budget.text(&p.revision)?;
+    bound(p.nominal_locals.len(), 4096)?;
+    if !p.nominal_locals.is_empty() {
+        if p.ir_version < IR5_VERSION {
+            return Err(incompatible("nominal metadata requires IR 5"));
+        }
+        feature(p, caps, "nominal-objects-v5")?;
+    }
+    let mut nominal_seen = BTreeSet::new();
+    let mut nominal_slots = BTreeMap::new();
+    let mut persistent_nominal = std::collections::BTreeMap::new();
+    for nominal in &p.nominal_locals {
+        nominal_slots.insert(
+            (nominal.procedure.0 as usize, nominal.slot.0 as usize),
+            &nominal.ty,
+        );
+        budget.table(1)?;
+        budget.text(nominal.ty.library())?;
+        budget.text(nominal.ty.version())?;
+        budget.text(nominal.ty.name())?;
+        let local = p
+            .procedures
+            .get(nominal.procedure.0 as usize)
+            .and_then(|proc| proc.locals.get(nominal.slot.0 as usize))
+            .ok_or_else(|| invalid("invalid nominal local"))?;
+        if !nominal_seen.insert((nominal.procedure, nominal.slot))
+            || !(local.kind == ScalarKind::Object && local.array.is_none()
+                || local.kind == ScalarKind::Variant && local.array == Some(ScalarKind::Object))
+            || matches!(local.role, SlotRole::ScratchReference | SlotRole::HostRoot)
+        {
+            return Err(invalid("invalid nominal local shape"));
+        }
+        if let SlotRole::Persistent(key) = local.role
+            && persistent_nominal
+                .insert(key, &nominal.ty)
+                .is_some_and(|old| old != &nominal.ty)
+        {
+            return Err(invalid("inconsistent persistent nominal identity"));
+        }
+    }
     bound(p.classes.len(), 256)?;
     let mut class_sources = BTreeSet::new();
     let mut class_names = BTreeSet::new();
@@ -337,14 +376,13 @@ fn validate(
                                 .zip(&handler_proc.parameters)
                                 .enumerate()
                             {
-                                budget.table(
-                                    p.nominal_locals.len().checked_mul(2).ok_or_else(resource)?,
-                                )?;
-                                let nominal = |procedure, slot| {
-                                    p.nominal_locals
-                                        .iter()
-                                        .find(|n| n.procedure == procedure && n.slot == slot)
-                                        .map(|n| &n.ty)
+                                // At most 4,096 nominal entries: bounded tree lookup,
+                                // without rescanning/reallocating the same metadata table.
+                                budget.charge(32, 0)?;
+                                let nominal = |procedure: ProcedureId, slot: LocalSlot| {
+                                    nominal_slots
+                                        .get(&(procedure.0 as usize, slot.0 as usize))
+                                        .copied()
                                 };
                                 if a.kind != b.kind
                                     || a.mode != b.mode
@@ -461,45 +499,6 @@ fn validate(
             {
                 return Err(invalid("class accessor signature"));
             }
-        }
-    }
-    bound(p.nominal_locals.len(), 4096)?;
-    if !p.nominal_locals.is_empty() {
-        if p.ir_version < IR5_VERSION {
-            return Err(incompatible("nominal metadata requires IR 5"));
-        }
-        feature(p, caps, "nominal-objects-v5")?;
-    }
-    let mut nominal_seen = BTreeSet::new();
-    let mut nominal_slots = BTreeMap::new();
-    let mut persistent_nominal = std::collections::BTreeMap::new();
-    for nominal in &p.nominal_locals {
-        nominal_slots.insert(
-            (nominal.procedure.0 as usize, nominal.slot.0 as usize),
-            &nominal.ty,
-        );
-        budget.table(1)?;
-        budget.text(nominal.ty.library())?;
-        budget.text(nominal.ty.version())?;
-        budget.text(nominal.ty.name())?;
-        let local = p
-            .procedures
-            .get(nominal.procedure.0 as usize)
-            .and_then(|proc| proc.locals.get(nominal.slot.0 as usize))
-            .ok_or_else(|| invalid("invalid nominal local"))?;
-        if !nominal_seen.insert((nominal.procedure, nominal.slot))
-            || !(local.kind == ScalarKind::Object && local.array.is_none()
-                || local.kind == ScalarKind::Variant && local.array == Some(ScalarKind::Object))
-            || matches!(local.role, SlotRole::ScratchReference | SlotRole::HostRoot)
-        {
-            return Err(invalid("invalid nominal local shape"));
-        }
-        if let SlotRole::Persistent(key) = local.role
-            && persistent_nominal
-                .insert(key, &nominal.ty)
-                .is_some_and(|old| old != &nominal.ty)
-        {
-            return Err(invalid("inconsistent persistent nominal identity"));
         }
     }
     for (procedure, proc) in p.procedures.iter().enumerate() {

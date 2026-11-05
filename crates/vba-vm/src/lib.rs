@@ -331,6 +331,7 @@ pub struct Session {
     callback_outputs: VecDeque<Vec<(usize, Value)>>,
     closed: bool,
     entry_arguments: Vec<Value>,
+    reference_graph_dirty: bool,
 }
 fn command(message: &str) -> Diagnostic {
     Diagnostic::new("VBA0034", message)
@@ -671,6 +672,7 @@ impl Session {
             frames: Vec::new(),
             state: Outcome::Yielded,
             counters: Counters::default(),
+            reference_graph_dirty: true,
             generation: 0,
             next_frame: 0,
             visit_serial: 0,
@@ -1290,6 +1292,7 @@ impl Session {
             .ok_or_else(|| command("project class/default owner mismatch"))?;
         let source = class.source;
         if self.default_instances.get(&source) == Some(&object) {
+            self.reference_graph_dirty = true;
             self.default_instances.remove(&source);
             Ok(true)
         } else {
@@ -1393,6 +1396,7 @@ impl Session {
         quota: u32,
         predicate: &mut impl FnMut(&CheckpointView) -> Result<bool>,
     ) -> Result<Outcome> {
+        self.reference_graph_dirty = true;
         if quota == 0 || quota > self.limits.slice {
             return Err(command("invalid slice allowance"));
         }
@@ -1608,7 +1612,27 @@ impl Session {
             .get(self.top()?.procedure.0 as usize)
             .ok_or_else(|| invariant("procedure missing"))
     }
+    fn reference_location(&self, location: Location) -> bool {
+        self.array_types
+            .get(&location)
+            .or_else(|| self.kinds.get(&location))
+            .is_none_or(|kind| matches!(kind, ScalarKind::Object | ScalarKind::Variant))
+    }
+    fn reference_value(value: &Value) -> bool {
+        match value {
+            Value::Object(object) => object.host == 0,
+            Value::Array(array) => matches!(array.kind(), ScalarKind::Object | ScalarKind::Variant),
+            _ => false,
+        }
+    }
+    fn reference_operand(&self, operand: &Operand) -> bool {
+        match operand {
+            Operand::Reference(location) => self.reference_location(*location),
+            Operand::Value(value) => Self::reference_value(value),
+        }
+    }
     fn push(&mut self, value: Operand) -> Result<()> {
+        self.reference_graph_dirty |= self.reference_operand(&value);
         if let Operand::Value(v) = &value {
             self.charge(value_bytes(v))?;
         }
@@ -1621,6 +1645,7 @@ impl Session {
         Ok(())
     }
     fn push_prepaid(&mut self, value: Value) -> Result<()> {
+        self.reference_graph_dirty |= Self::reference_value(&value);
         let max = self.proc()?.max_stack as usize;
         let frame = self.top_mut()?;
         if frame.stack.len() >= max {
@@ -1630,10 +1655,13 @@ impl Session {
         Ok(())
     }
     fn pop(&mut self) -> Result<Operand> {
-        self.top_mut()?
+        let value = self
+            .top_mut()?
             .stack
             .pop()
-            .ok_or_else(|| invariant("stack underflow"))
+            .ok_or_else(|| invariant("stack underflow"))?;
+        self.reference_graph_dirty |= self.reference_operand(&value);
+        Ok(value)
     }
     fn pop_value(&mut self) -> Result<Value> {
         match self.pop()? {
@@ -1679,6 +1707,7 @@ impl Session {
         )
     }
     fn write_value(&mut self, location: Location, value: Value) -> Result<()> {
+        self.reference_graph_dirty |= self.reference_location(location);
         let values = if let Value::Array(array) = &value {
             array.elements()
         } else {
@@ -1754,6 +1783,7 @@ impl Session {
         Ok(())
     }
     fn push_frame(&mut self, id: ir::ProcedureId, args: Vec<Operand>) -> Result<()> {
+        self.reference_graph_dirty = true;
         let source = self
             .program
             .program()
@@ -2657,6 +2687,7 @@ impl Session {
                 while self.frames.len() > index + 1 {
                     self.unwind_frame()?;
                 }
+                self.reference_graph_dirty = true;
                 let frame = self.top_mut()?;
                 frame.stack.clear();
                 frame.events.clear();
@@ -2676,6 +2707,7 @@ impl Session {
         Ok(())
     }
     fn unwind_frame(&mut self) -> Result<()> {
+        self.reference_graph_dirty = true;
         let frame = self.frames.pop().ok_or_else(|| invariant("unwind frame"))?;
         let maximum = self
             .program
@@ -2804,10 +2836,13 @@ impl Session {
                     .ok_or_else(|| invariant("checkpoint"))?
                     .span;
                 if self.top()?.handler.fault.is_none() {
+                    let previous = self.top()?.enumerations.len();
                     self.top_mut()?
                         .enumerations
                         .retain(|_, e| span.start() >= e.start && span.end() <= e.end);
+                    self.reference_graph_dirty |= self.top()?.enumerations.len() != previous;
                 }
+                self.reference_graph_dirty |= !self.top()?.enumerator_owners.is_empty();
                 self.top_mut()?.enumerator_owners.clear();
                 self.top_mut()?.checkpoint = Some(site);
                 if self.visit.is_none() {
@@ -2930,6 +2965,7 @@ impl Session {
                 self.advance()?;
             }
             I::EnumerationEnd(state) => {
+                self.reference_graph_dirty = true;
                 self.top_mut()?.enumerations.remove(&state);
                 self.advance()?;
             }
@@ -3086,6 +3122,7 @@ impl Session {
                     cp.enter_pc
                 };
                 self.top_mut()?.handler.fault = None;
+                self.reference_graph_dirty = true;
                 self.top_mut()?.stack.clear();
                 self.top_mut()?.pc = pc;
                 self.error = ErrorState::default();
@@ -3158,6 +3195,7 @@ impl Session {
             }
             I::Checkpoint(site) => {
                 self.top_mut()?.captured.fill(None);
+                self.reference_graph_dirty |= !self.top()?.enumerator_owners.is_empty();
                 self.top_mut()?.enumerator_owners.clear();
                 self.top_mut()?.checkpoint = Some(site);
                 self.visit = None;
@@ -3547,6 +3585,7 @@ impl Session {
                     }
                     self.callback_output_frame = None;
                 }
+                self.reference_graph_dirty = true;
                 let frame = self.frames.pop().ok_or_else(|| invariant("return frame"))?;
                 self.stack_capacity = self
                     .stack_capacity

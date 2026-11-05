@@ -14,7 +14,7 @@ Dim members() As Object
 VbaMembers=members
 End Sub
 Public Property Get VbaEntries() As Variant
-Dim result() As Object,i As Long,entries As Variant
+Dim result() As Object,i As Long,entries() As Object
 entries=VbaState.VbaEntries
 If VbaState.VbaTotal>0 Then ReDim result(0 To VbaState.VbaTotal-1)
 For i=0 To VbaState.VbaTotal-1
@@ -37,7 +37,7 @@ Set VbaNewEnum=enumerator
 End Property
 Public Property Get Item(ByVal index As Variant) As Object
 Attribute Item.VB_UserMemId = 0
-Dim i As Long,entries As Variant
+Dim i As Long,entries() As Object
 entries=VbaState.VbaEntries
 If VarType(index)=8 Then
 i=VbaFind(CStr(index))
@@ -173,7 +173,10 @@ Public Function Add(Optional ByVal name As Variant,Optional ByVal caption As Var
 Dim member As VbaFormPage
 Set member=New VbaFormPage
 member.VbaId=VbaNextPageId()
-member.VbaParentKey=VbaState.VbaOwner().VbaId
+Dim owner As Object,model As Object
+Set owner=VbaState.VbaOwner()
+If Count>0 Then Set model=Me.Item(0)
+member.VbaConfigureRuntime owner,model
 Set Add=VbaStorage.VbaCreate(member,"Page",name,caption,index)
 End Function
 Public Sub Remove(ByVal collectionindex As Variant)
