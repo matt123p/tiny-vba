@@ -332,3 +332,8 @@ completion receipts. Selected shared pointer capture/default paths preserve
 Stop/Continue, Reset, identity and keyboard focus; remaining text/list/numeric/
 indexed-tab/platform defaults and full event ordering keep M01 PARTIAL. M7A.4
 remains incomplete and fresh Office observations remain M8.5 NOT_RUN.
+
+[ADR 0074](decisions/0074-native-text-pointer-selection.md) adds selected native
+TextBox pointer caret/drag/word selection and AutoWordSelect metadata, preserving
+ordinary callbacks, authorization, focus redirects, UTF-16 and Stop/Reset.
+The full M7A.4 completion checklist remains open.

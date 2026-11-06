@@ -10,7 +10,15 @@ Seven shared model cases pass natively and under WASI; all 24 decoder cases and
 13 actual egui pointer cases pass. Full shared CI, strict final UI/app Clippy,
 WASM/WASI, UI/native/web and Chromium pointer/editor/modal-form checks pass.
 Native and browser live/paused/selected/completed output and all five native
-themes/scales were inspected. Consumer integration is pending below.
+themes/scales were inspected. Both consumers pin shared product
+`3e8676cc754f59e06df64d2677c1f64af0216432`. GridCraft full CI (10 steps), strict
+optional VBA/UI Clippy, four form UI cases, web and all 25 native/25 Node-WASM
+cases pass (integration `36390786`). WordCraft full CI (8 steps, isolated serial
+tests), strict optional VBA/UI Clippy, 13 VBA UI cases, the hidden-editor form,
+web and all 20 native/20 Node-WASM cases pass (integration `0dd87c5a`). Host cases
+preserve authority, one-shot stopped callbacks, canonical selection and original
+resources; Word verifies one undo step. All three repositories are committed and
+pushed.
 M01 and M7A.4 remain partial; the complete checklist remains authoritative.
 Next: remaining editable ComboBox/RefEdit and list/numeric/drop/picker/indexed-tab
 pointer defaults, plus the unchanged lifecycle, keyboard and property checklist.
