@@ -11,8 +11,15 @@ and array tags, constructor/getter Stop continuations, target evaluation once,
 optional defaults, getter errors and authorized foreign waits. Local host validation
 passes GridCraft's 12 identity/value cases on native and Node/WASM, WordCraft's
 28 native workflows and two selected Node/WASM cases, both strict optional
-VBA/UI Clippy checks, form UI checks and optional web builds. Pinned fork full CI
-is pending. M7A.4 remains open for the remaining runtime ledger.
+VBA/UI Clippy checks, form UI checks and optional web builds.
+Pinned fork validation PASS at shared product revision
+`5f93e8140b457de6645327b885b263ab6b472e13`: GridCraft full CI (10 steps) and
+WordCraft full CI (8 steps, isolated serial test execution). An existing collection
+regression caught and verified preservation of error 449 for explicit empty
+indexed calls; VarType correctly skips incompatible indexed defaults. Host reads
+preserve document contents and undo. The final pinned GridCraft Node/WASM run
+passes all six collection and 12 identity/value cases after the dispatch fix.
+Integration commits are GridCraft `57078fe0` and WordCraft `22d6aeb0`. M7A.4 remains open for the remaining runtime ledger.
 
 ## M7A.4 continued — foreign runtime type names (2026-11-06)
 

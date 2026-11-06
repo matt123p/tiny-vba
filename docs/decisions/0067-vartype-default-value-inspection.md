@@ -1,6 +1,6 @@
 # ADR 0067 — VarType and default value inspection
 
-Date: 2026-11-06. Status: adopted; shared validation passed.
+Date: 2026-11-06. Status: adopted; shared and pinned consumer validation passed.
 
 The Office VBA function reference specifies that VarType inspects an object's
 default property. MS-VBAL's VarType table describes an object-reference data value
@@ -15,7 +15,8 @@ inspection-defaults-v13. Binding inserts it for VarType operands that can be
 objects, retaining source-order evaluation and named argument mapping. It is not
 ordinary ValueGet: it permits the opaque-object result and consumes one getter.
 Verifier checks the IR/capability, empty member/arguments and ordinary result mode.
-Older consumers reject the new operation. Programs without it retain prior IRs.
+Older consumers reject the new operation. Programs using neither this operation
+nor default functions retain prior IR selection.
 All existing work, host-call, location, permission and memory limits remain.
 
 Project objects use existing verified class/member metadata. Public zero-argument
@@ -51,6 +52,8 @@ Primary references:
 
 - [Office VarType](https://learn.microsoft.com/en-us/office/vba/language/reference/user-interface-help/vartype-function)
 - [MS-VBAL VarType table](https://learn.microsoft.com/en-us/openspecs/microsoft_general_purpose_programming_languages/ms-vbal/2deec703-c2ef-4bf1-a246-1d51c60895da)
+- [MS-VBAL member resolution](https://learn.microsoft.com/en-us/openspecs/microsoft_general_purpose_programming_languages/ms-vbal/5ef0cb6d-7cb3-4806-8edf-926a530b4b89)
+- [MS-VBAL simple value evaluation](https://learn.microsoft.com/en-us/openspecs/microsoft_general_purpose_programming_languages/ms-vbal/f1cc9a8d-e681-4e20-9c5e-e3385545440e)
 - [MS-VBAL data-value evaluation](https://learn.microsoft.com/en-us/openspecs/microsoft_general_purpose_programming_languages/ms-vbal/ff101375-b301-4cba-80b9-e1ab59f7a8be)
 - [Word Range default Text](https://learn.microsoft.com/en-us/office/vba/word/concepts/customizing-word/assigning-ranges)
 - [Word Selection default Text](https://learn.microsoft.com/en-us/office/vba/api/word.selection)
@@ -60,4 +63,11 @@ The final generic class suite has 41 cases, the nominal suite 18, and the native
 form-instance suite 97. Host local integration passes GridCraft's 12 native and
 12 Node/WASM identity cases and WordCraft's 28 native workflows and two selected
 Node/WASM workflows. Both strict optional VBA/UI Clippy checks, form UI checks
-and optional web builds pass. Pinned consumer full CI remains pending.
+and optional web builds pass. Pinned consumer full CI passes at shared product
+revision `5f93e8140b457de6645327b885b263ab6b472e13`: GridCraft 10 steps,
+WordCraft 8 steps. Explicit empty indexed collection calls retain their existing
+missing-argument error 449; metadata only advertises compatible zero-argument
+reads. Integration commits are GridCraft `57078fe0` and WordCraft `22d6aeb0`.
+
+Final pinned GridCraft Node/WASM execution additionally passes all six collection
+and 12 identity/value cases after the explicit-empty-call regression fix.
