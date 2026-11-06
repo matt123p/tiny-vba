@@ -1,5 +1,17 @@
 # Implementation progress
 
+## M7A.4 continued — nested modal input (2026-11-06)
+
+ADR 0076 fixes child mouse callbacks while a parent mouse/key callback is parked,
+shared raw queue bounds, latest-owner keyboard/mouse barriers, held parent release,
+three nested levels, parent unload and Reset/fresh-run identity. Canonical state,
+receipts and authorization stay unchanged. Eight new actual-input regressions
+bring the pointer suite to 34 cases. Full shared CI, strict Clippy, WASM/WASI,
+UI/native/web and actual Chromium nested/composite/editor/modal-form checks pass.
+Native/browser live, paused and completed captures and five native theme/scale
+views were inspected. Consumer integration is being finalized. L02 and M7A.4
+remain partial; the unchanged checklist is authoritative.
+
 ## M7A.4 continued — composite pointer defaults (2026-11-06)
 
 ADR 0075 implements selected ComboBox/RefEdit text/drop/picker, list/popup row,

@@ -810,6 +810,402 @@ fn nested_modal_display_follows_wait_order_and_child_close_resumes_the_parent_po
     assert!(!h.state().ide.form_instance_visible(child));
     Ok(())
 }
+fn nested_mouse_harness() -> R<Harness<'static, State>> {
+    harness(
+        "Private Sub Apply_MouseDown(ByVal b As Integer,ByVal s As Integer,ByVal x As Single,ByVal y As Single)\nIf Me.Caption=\"Parent\" Then\nNativeForm.Show\nElse\nDebug.Print \"child down\"\nStop\nEnd If\nEnd Sub",
+        "Sub Main()\nDim parent As NativeForm\nNativeForm.Caption=\"Child\"\nSet parent=New NativeForm\nparent.Caption=\"Parent\"\nparent.Show\nEnd Sub",
+        false,
+    )
+}
+#[test]
+fn nested_modal_child_mouse_callback_pauses_and_resumes_before_the_parent_pointer() -> R {
+    let mut h = nested_mouse_harness()?;
+    let p = point(&h, "Apply");
+    button(&mut h, p, true);
+    button(&mut h, p, false);
+    h.run_steps(25);
+    assert_eq!(h.state().ide.mode(), Mode::Waiting);
+    let child_button = h
+        .get_all_by_label("Apply")
+        .last()
+        .ok_or("child button")?
+        .rect()
+        .center();
+    button(&mut h, child_button, true);
+    button(&mut h, child_button, false);
+    h.run_steps(25);
+    assert_eq!(h.state().ide.mode(), Mode::Break, "{:?}", h.state().errors);
+    assert_eq!(
+        h.state().ide.output(),
+        vec!["initialized", "initialized", "child down"]
+    );
+    h.state_mut().ide.dispatch(Action::Run, &mut NoHost)?;
+    h.run_steps(100);
+    assert_eq!(
+        h.state().ide.mode(),
+        Mode::Completed,
+        "{:?}",
+        h.state().errors
+    );
+    assert!(h.state().errors.is_empty(), "{:?}", h.state().errors);
+    assert_eq!(
+        h.state().ide.output(),
+        vec![
+            "initialized",
+            "initialized",
+            "child down",
+            "initial",
+            "initial"
+        ]
+    );
+    Ok(())
+}
+#[test]
+fn three_modal_mouse_callbacks_resume_in_wait_order_once() -> R {
+    let mut h = harness(
+        "Private Sub Apply_MouseDown(ByVal b As Integer,ByVal s As Integer,ByVal x As Single,ByVal y As Single)\nDim other As NativeForm\nIf Me.Caption=\"Parent\" Then\nNativeForm.Show\nElseIf Me.Caption=\"Child\" Then\nSet other=New NativeForm\nother.Caption=\"Grandchild\"\nother.Show\nElse\nDebug.Print \"grandchild down\"\nStop\nEnd If\nEnd Sub",
+        "Sub Main()\nDim parent As NativeForm\nNativeForm.Caption=\"Child\"\nSet parent=New NativeForm\nparent.Caption=\"Parent\"\nparent.Show\nEnd Sub",
+        false,
+    )?;
+    for _ in 0..3 {
+        let p = h
+            .get_all_by_label("Apply")
+            .last()
+            .ok_or("top button")?
+            .rect()
+            .center();
+        button(&mut h, p, true);
+        button(&mut h, p, false);
+        h.run_steps(25);
+    }
+    assert_eq!(h.state().ide.mode(), Mode::Break, "{:?}", h.state().errors);
+    assert_eq!(
+        h.state().ide.output(),
+        vec![
+            "initialized",
+            "initialized",
+            "initialized",
+            "grandchild down"
+        ]
+    );
+    h.state_mut().ide.dispatch(Action::Run, &mut NoHost)?;
+    h.run_steps(150);
+    assert_eq!(
+        h.state().ide.mode(),
+        Mode::Completed,
+        "{:?}",
+        h.state().errors
+    );
+    assert!(h.state().errors.is_empty(), "{:?}", h.state().errors);
+    assert_eq!(
+        h.state().ide.output(),
+        vec![
+            "initialized",
+            "initialized",
+            "initialized",
+            "grandchild down",
+            "initial",
+            "initial",
+            "initial"
+        ]
+    );
+    Ok(())
+}
+#[test]
+fn child_mouse_callback_can_unload_its_parent_without_replaying_the_parent_release() -> R {
+    let mut h = harness(
+        "Private Sub Apply_MouseDown(ByVal b As Integer,ByVal s As Integer,ByVal x As Single,ByVal y As Single)\nDim other As NativeForm\nIf Me.Caption=\"Parent\" Then\nSet other=New NativeForm\nother.Caption=\"Child\"\nother.Show\nElse\nUnload NativeForm\nDebug.Print \"parent unloaded\"\nStop\nEnd If\nEnd Sub",
+        "Sub Main()\nNativeForm.Caption=\"Parent\"\nNativeForm.Show\nEnd Sub",
+        false,
+    )?;
+    for _ in 0..2 {
+        let p = h
+            .get_all_by_label("Apply")
+            .last()
+            .ok_or("top button")?
+            .rect()
+            .center();
+        button(&mut h, p, true);
+        button(&mut h, p, false);
+        h.run_steps(25);
+    }
+    assert_eq!(h.state().ide.mode(), Mode::Break, "{:?}", h.state().errors);
+    assert_eq!(
+        h.state().ide.output(),
+        vec!["initialized", "initialized", "parent unloaded"]
+    );
+    h.state_mut().ide.dispatch(Action::Run, &mut NoHost)?;
+    h.run_steps(120);
+    assert_eq!(
+        h.state().ide.mode(),
+        Mode::Completed,
+        "{:?}",
+        h.state().errors
+    );
+    assert!(h.state().errors.is_empty(), "{:?}", h.state().errors);
+    assert_eq!(
+        h.state().ide.output(),
+        vec!["initialized", "initialized", "parent unloaded", "initial"]
+    );
+    Ok(())
+}
+#[test]
+fn child_mouse_callback_can_run_while_a_parent_keyboard_callback_is_suspended() -> R {
+    let mut h = harness(
+        "Private Sub Entry_KeyDown(ByVal code As MSForms.ReturnInteger,ByVal shift As Integer)\nIf Me.Caption=\"Parent\" Then\nNativeForm.Show\nDebug.Print \"parent returned\"\nMe.Hide\nEnd If\nEnd Sub\nPrivate Sub Apply_MouseDown(ByVal b As Integer,ByVal s As Integer,ByVal x As Single,ByVal y As Single)\nDebug.Print \"child down\"\nStop\nEnd Sub",
+        "Sub Main()\nDim parent As NativeForm\nNativeForm.Caption=\"Child\"\nSet parent=New NativeForm\nparent.Caption=\"Parent\"\nparent.Show\nEnd Sub",
+        false,
+    )?;
+    for pressed in [true, false] {
+        h.event(egui::Event::Key {
+            key: egui::Key::A,
+            physical_key: Some(egui::Key::A),
+            pressed,
+            repeat: false,
+            modifiers: egui::Modifiers::NONE,
+        });
+    }
+    h.run_steps(25);
+    assert_eq!(h.state().ide.mode(), Mode::Waiting);
+    assert_eq!(h.state().ide.output(), vec!["initialized", "initialized"]);
+    let p = h
+        .get_all_by_label("Apply")
+        .last()
+        .ok_or("child button")?
+        .rect()
+        .center();
+    button(&mut h, p, true);
+    button(&mut h, p, false);
+    h.run_steps(25);
+    assert_eq!(h.state().ide.mode(), Mode::Break, "{:?}", h.state().errors);
+    h.state_mut().ide.dispatch(Action::Run, &mut NoHost)?;
+    h.run_steps(120);
+    assert_eq!(
+        h.state().ide.mode(),
+        Mode::Completed,
+        "{:?}",
+        h.state().errors
+    );
+    assert!(h.state().errors.is_empty(), "{:?}", h.state().errors);
+    assert_eq!(
+        h.state().ide.output(),
+        vec![
+            "initialized",
+            "initialized",
+            "child down",
+            "initial",
+            "parent returned"
+        ]
+    );
+    Ok(())
+}
+#[test]
+fn reset_discards_all_parked_mouse_scopes_and_a_fresh_run_has_no_stale_release() -> R {
+    let mut h = nested_mouse_harness()?;
+    let source = h.state().ide.modules.clone();
+    for _ in 0..2 {
+        let p = h
+            .get_all_by_label("Apply")
+            .last()
+            .ok_or("top button")?
+            .rect()
+            .center();
+        button(&mut h, p, true);
+        button(&mut h, p, false);
+        h.run_steps(25);
+    }
+    assert_eq!(h.state().ide.mode(), Mode::Break);
+    h.state_mut().ide.dispatch(Action::Reset, &mut NoHost)?;
+    h.run_steps(10);
+    assert_eq!(h.state().ide.mode(), Mode::Design);
+    assert!(h.state().ide.output().is_empty());
+    for (before, after) in source.iter().zip(&h.state().ide.modules) {
+        assert_eq!(before.source()?.text(), after.source()?.text());
+    }
+    h.state_mut().ide.dispatch(Action::Run, &mut NoHost)?;
+    h.run_steps(50);
+    for _ in 0..2 {
+        let p = h
+            .get_all_by_label("Apply")
+            .last()
+            .ok_or("top button")?
+            .rect()
+            .center();
+        button(&mut h, p, true);
+        button(&mut h, p, false);
+        h.run_steps(25);
+    }
+    assert_eq!(h.state().ide.mode(), Mode::Break);
+    h.state_mut().ide.dispatch(Action::Run, &mut NoHost)?;
+    h.run_steps(100);
+    assert_eq!(
+        h.state().ide.mode(),
+        Mode::Completed,
+        "{:?}",
+        h.state().errors
+    );
+    assert!(h.state().errors.is_empty(), "{:?}", h.state().errors);
+    assert_eq!(
+        h.state().ide.output(),
+        vec![
+            "initialized",
+            "initialized",
+            "child down",
+            "initial",
+            "initial"
+        ]
+    );
+    Ok(())
+}
+#[test]
+fn active_child_keyboard_callback_keeps_its_mouse_barrier_above_the_parked_parent_key() -> R {
+    let mut h = harness(
+        "Private Sub Entry_KeyDown(ByVal code As MSForms.ReturnInteger,ByVal shift As Integer)\nDim i As Long\nIf Me.Caption=\"Parent\" Then\nNativeForm.Show\nMe.Hide\nElse\nFor i=1 To 3000\nNext i\nDebug.Print \"child key done\"\nEnd If\nEnd Sub\nPrivate Sub Apply_MouseDown(ByVal b As Integer,ByVal s As Integer,ByVal x As Single,ByVal y As Single)\nDebug.Print \"child mouse\"\nStop\nEnd Sub",
+        "Sub Main()\nDim parent As NativeForm\nNativeForm.Caption=\"Child\"\nSet parent=New NativeForm\nparent.Caption=\"Parent\"\nparent.Show\nEnd Sub",
+        false,
+    )?;
+    for pressed in [true, false] {
+        h.event(egui::Event::Key {
+            key: egui::Key::A,
+            physical_key: Some(egui::Key::A),
+            pressed,
+            repeat: false,
+            modifiers: egui::Modifiers::NONE,
+        });
+    }
+    h.run_steps(25);
+    assert_eq!(h.state().ide.mode(), Mode::Waiting);
+    let p = h
+        .get_all_by_label("Apply")
+        .last()
+        .ok_or("child button")?
+        .rect()
+        .center();
+    for pressed in [true, false] {
+        h.event(egui::Event::Key {
+            key: egui::Key::B,
+            physical_key: Some(egui::Key::B),
+            pressed,
+            repeat: false,
+            modifiers: egui::Modifiers::NONE,
+        });
+    }
+    h.run_steps(4);
+    assert_eq!(h.state().ide.mode(), Mode::Running);
+    button(&mut h, p, true);
+    button(&mut h, p, false);
+    h.run_steps(250);
+    assert_eq!(h.state().ide.mode(), Mode::Break, "{:?}", h.state().errors);
+    assert_eq!(
+        h.state().ide.output(),
+        vec![
+            "initialized",
+            "initialized",
+            "child key done",
+            "child mouse"
+        ]
+    );
+    h.state_mut().ide.dispatch(Action::Run, &mut NoHost)?;
+    h.run_steps(150);
+    assert_eq!(
+        h.state().ide.mode(),
+        Mode::Completed,
+        "{:?}",
+        h.state().errors
+    );
+    assert!(h.state().errors.is_empty(), "{:?}", h.state().errors);
+    assert_eq!(
+        h.state().ide.output(),
+        vec![
+            "initialized",
+            "initialized",
+            "child key done",
+            "child mouse",
+            "initial"
+        ]
+    );
+    Ok(())
+}
+#[test]
+fn release_after_a_child_opens_finishes_the_original_parent_capture() -> R {
+    let mut h = nested_mouse_harness()?;
+    let parent_layer = h
+        .ctx
+        .memory(|memory| memory.top_modal_layer())
+        .ok_or("parent modal")?;
+    let p = point(&h, "Apply");
+    button(&mut h, p, true);
+    h.run_steps(25);
+    assert_eq!(h.state().ide.mode(), Mode::Waiting);
+    assert_ne!(
+        h.ctx.memory(|memory| memory.top_modal_layer()),
+        Some(parent_layer),
+        "child must be the top modal layer while parent press is held"
+    );
+    button(&mut h, p, false);
+    h.run_steps(5);
+    button(&mut h, p, true);
+    button(&mut h, p, false);
+    h.run_steps(25);
+    assert_eq!(h.state().ide.mode(), Mode::Break);
+    h.state_mut().ide.dispatch(Action::Run, &mut NoHost)?;
+    h.run_steps(120);
+    assert_eq!(
+        h.state().ide.mode(),
+        Mode::Completed,
+        "{:?}",
+        h.state().errors
+    );
+    assert!(h.state().errors.is_empty(), "{:?}", h.state().errors);
+    assert_eq!(
+        h.state().ide.output(),
+        vec![
+            "initialized",
+            "initialized",
+            "child down",
+            "initial",
+            "initial"
+        ]
+    );
+    Ok(())
+}
+#[test]
+fn modal_child_uses_the_remaining_shared_raw_queue_allowance() -> R {
+    let mut h = nested_mouse_harness()?;
+    let p = point(&h, "Apply");
+    button(&mut h, p, true);
+    button(&mut h, p, false);
+    h.run_steps(25);
+    assert_eq!(h.state().ide.mode(), Mode::Waiting);
+    // The parent's release is parked. The child cannot acquire a fresh 64 slots.
+    for _ in 0..32 {
+        for pressed in [true, false] {
+            h.input_mut().events.push(egui::Event::PointerButton {
+                pos: p,
+                button: egui::PointerButton::Primary,
+                pressed,
+                modifiers: egui::Modifiers::NONE,
+            });
+        }
+    }
+    h.run_steps(5);
+    assert_eq!(h.state().ide.mode(), Mode::Waiting);
+    assert_eq!(h.state().ide.output(), vec!["initialized", "initialized"]);
+    assert!(
+        h.state()
+            .ide
+            .messages
+            .iter()
+            .any(|error| error.contains("native mouse input budget exceeded")),
+        "{:?}",
+        h.state().ide.messages
+    );
+    h.state_mut().ide.dispatch(Action::Reset, &mut NoHost)?;
+    h.run_steps(5);
+    assert_eq!(h.state().ide.mode(), Mode::Design);
+    assert!(h.state().ide.output().is_empty());
+    Ok(())
+}
 #[test]
 fn refedit_picker_and_compact_text_keep_the_same_authorized_input_path() -> R {
     let mut h = harness_resource(
@@ -908,7 +1304,7 @@ fn native_double_click_cancellation_prevents_second_toggle_and_keeps_mouseup() -
         )
         .rect()
         .center();
-    // Both physical clicks arrive together; callback delays must not change the double-click classification.
+    // Callback delays must not change the double-click classification of queued physical clicks.
     button(&mut h, p, true);
     button(&mut h, p, false);
     button(&mut h, p, true);

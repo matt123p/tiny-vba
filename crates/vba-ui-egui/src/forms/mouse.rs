@@ -2,6 +2,16 @@
 use super::*;
 use std::collections::VecDeque;
 use vba_ide::{FormInstance, FormMouseEvent as Phase, FormMouseInput, ObjectRef, Value};
+const MAX_SCOPES: usize = 8;
+const MAX_QUEUED: usize = 64;
+fn button_mask(button: egui::PointerButton) -> Option<u8> {
+    match button {
+        egui::PointerButton::Primary => Some(1),
+        egui::PointerButton::Secondary => Some(2),
+        egui::PointerButton::Middle => Some(4),
+        _ => None,
+    }
+}
 #[derive(Clone)]
 pub(super) enum Part {
     Body,
@@ -100,8 +110,204 @@ struct NumericAnchor {
     grab: f32,
     last: egui::Pos2,
 }
+// Each parked modal callback keeps its bounded raw input until its caller resumes.
+// Canonical control values and event completion remain in ordinary VBA objects.
 #[derive(Default)]
 pub(crate) struct Mouse {
+    active: MouseScope,
+    parked: Vec<MouseScope>,
+    generation: Option<u64>,
+}
+impl std::ops::Deref for Mouse {
+    type Target = MouseScope;
+    fn deref(&self) -> &MouseScope {
+        &self.active
+    }
+}
+impl std::ops::DerefMut for Mouse {
+    fn deref_mut(&mut self) -> &mut MouseScope {
+        &mut self.active
+    }
+}
+impl Mouse {
+    pub(super) fn clear(&mut self) {
+        *self = Self::default();
+    }
+    pub(super) fn blocks(&self, owner: FormInstance) -> bool {
+        self.active.blocks(owner) || self.parked.iter().any(|lane| lane.blocks(owner))
+    }
+    pub(super) fn step(
+        &mut self,
+        ctx: &egui::Context,
+        ide: &Ide,
+        commands: &mut Vec<Command>,
+        key_owner: Option<FormInstance>,
+    ) {
+        let instances = ide.form_instances().unwrap_or_default();
+        let generation = instances.first().map(|instance| instance.object.generation);
+        if generation != self.generation
+            || matches!(ide.mode(), Mode::Design | Mode::Failed | Mode::Stale)
+        {
+            self.clear();
+            self.generation = generation;
+        }
+        let top = instances
+            .iter()
+            .filter(|instance| ide.form_instance_visible(**instance))
+            .filter_map(|instance| {
+                ide.form_instance_modal_rank(*instance)
+                    .map(|rank| (rank, *instance))
+            })
+            .max_by_key(|(rank, _)| *rank)
+            .map(|(_, instance)| instance);
+        let owner = self.active.owner();
+        if top != owner {
+            let restore = top
+                .and_then(|top| {
+                    self.parked
+                        .iter()
+                        .position(|lane| lane.owner() == Some(top))
+                })
+                .or_else(|| {
+                    (top.is_none() && owner.is_none_or(|owner| !ide.form_instance_visible(owner)))
+                        .then(|| self.parked.len().checked_sub(1))
+                        .flatten()
+                });
+            if let Some(index) = restore {
+                let hits = std::mem::take(&mut self.active.hits);
+                self.active = self.parked.remove(index);
+                self.parked.truncate(index);
+                self.active.hits = hits;
+            } else if let Some(top) = top {
+                let deeper = owner.is_none_or(|owner| {
+                    ide.form_instance_modal_rank(owner).is_none_or(|rank| {
+                        ide.form_instance_modal_rank(top)
+                            .is_some_and(|next| next > rank)
+                    })
+                });
+                if deeper {
+                    if self.parked.len() >= MAX_SCOPES {
+                        self.clear();
+                        commands.push(Command::Report(
+                            "native mouse modal input budget exceeded".into(),
+                        ));
+                        return;
+                    }
+                    let hits = std::mem::take(&mut self.active.hits);
+                    let lane = std::mem::take(&mut self.active);
+                    if !lane.idle() {
+                        self.parked.push(lane);
+                    }
+                    self.active.hits = hits;
+                    self.active.generation = generation;
+                    self.active.scope = Some(top);
+                }
+            }
+        }
+        // A physical release still belongs to the parked capture that began it.
+        // Queue it without running the parent while its modal child owns execution.
+        let mut queued = self.active.queue.len()
+            + self
+                .parked
+                .iter()
+                .map(|scope| scope.queue.len())
+                .sum::<usize>();
+        let mut exceeded = false;
+        ctx.input_mut(|input| {
+            let time = input.time;
+            input.events.retain(|event| {
+                let egui::Event::PointerButton {
+                    pos,
+                    button,
+                    pressed: false,
+                    modifiers,
+                } = event
+                else {
+                    return true;
+                };
+                let Some(button) = button_mask(*button) else {
+                    return true;
+                };
+                if !pos.is_finite()
+                    || self
+                        .active
+                        .capture
+                        .as_ref()
+                        .is_some_and(|(_, mask, _, _)| mask & button != 0)
+                {
+                    return true;
+                }
+                let Some(scope) = self.parked.iter_mut().rev().find(|scope| {
+                    scope
+                        .capture
+                        .as_ref()
+                        .is_some_and(|(hit, mask, _, _)| mask & button != 0 && hit.current(ide))
+                }) else {
+                    return true;
+                };
+                if queued >= MAX_QUEUED {
+                    exceeded = true;
+                    return false;
+                }
+                let Some((hit, mask, gesture, double)) = &mut scope.capture else {
+                    return true;
+                };
+                *mask &= !button;
+                let click = button == 1 && hit.rect.contains(*pos);
+                let last = *mask == 0;
+                let raw = Raw {
+                    hit: hit.clone(),
+                    phase: Phase::Up,
+                    button,
+                    shift: u8::from(modifiers.shift)
+                        | (u8::from(modifiers.ctrl) * 2)
+                        | (u8::from(modifiers.alt) * 4),
+                    pos: *pos,
+                    gesture: *gesture,
+                    click,
+                    last,
+                };
+                if click && !*double {
+                    scope.last = Some((hit.clone(), time, *pos));
+                }
+                if last {
+                    scope.capture = None;
+                    scope.numeric_repeat = None;
+                }
+                scope.queue.push_back(raw);
+                queued += 1;
+                false
+            });
+        });
+        if exceeded {
+            self.clear();
+            commands.push(Command::Report("native mouse input budget exceeded".into()));
+            return;
+        }
+        // A suspended parent's keyboard event cannot block its active child dialog.
+        let key_owner = key_owner.filter(|owner| top.is_none_or(|top| top == *owner));
+        let queue_limit = MAX_QUEUED.saturating_sub(
+            self.parked
+                .iter()
+                .map(|lane| lane.queue.len())
+                .sum::<usize>(),
+        );
+        self.active.step(ctx, ide, commands, key_owner, queue_limit);
+        let queued = self.active.queue.len()
+            + self
+                .parked
+                .iter()
+                .map(|lane| lane.queue.len())
+                .sum::<usize>();
+        if queued > MAX_QUEUED {
+            self.clear();
+            commands.push(Command::Report("native mouse input budget exceeded".into()));
+        }
+    }
+}
+#[derive(Default)]
+pub(crate) struct MouseScope {
+    scope: Option<FormInstance>,
     pub(super) hits: Vec<Hit>,
     pub(super) keyboard_focus: Option<egui::Id>,
     pub(super) focus_owner: Option<FormInstance>,
@@ -120,7 +326,18 @@ pub(crate) struct Mouse {
     overflow: bool,
     suppressed: Vec<u64>,
 }
-impl Mouse {
+impl MouseScope {
+    fn owner(&self) -> Option<FormInstance> {
+        self.pending
+            .as_ref()
+            .map(|pending| pending.raw.hit.owner)
+            .or_else(|| self.default.as_ref().map(|raw| raw.hit.owner))
+            .or_else(|| self.action_wait.as_ref().map(|hit| hit.owner))
+            .or_else(|| self.capture.as_ref().map(|(hit, _, _, _)| hit.owner))
+            .or_else(|| self.queue.front().map(|raw| raw.hit.owner))
+            .or(self.focus_owner)
+            .or(self.scope)
+    }
     pub(super) fn clear(&mut self) {
         *self = Self::default();
     }
@@ -208,6 +425,7 @@ impl Mouse {
         ide: &Ide,
         commands: &mut Vec<Command>,
         key_owner: Option<FormInstance>,
+        queue_limit: usize,
     ) {
         let allow_dispatch = key_owner.is_none();
         let generation = ide
@@ -280,11 +498,9 @@ impl Mouse {
                     modifiers: _,
                 } => (
                     pos,
-                    match button {
-                        egui::PointerButton::Primary => 1,
-                        egui::PointerButton::Secondary => 2,
-                        egui::PointerButton::Middle => 4,
-                        _ => continue,
+                    match button_mask(button) {
+                        Some(mask) => mask,
+                        None => continue,
                     },
                     Some(pressed),
                 ),
@@ -437,7 +653,7 @@ impl Mouse {
                 prior.pos = pos;
                 continue;
             }
-            if self.queue.len() >= 64 {
+            if self.queue.len() >= queue_limit {
                 self.queue.clear();
                 self.pending = None;
                 self.default = None;

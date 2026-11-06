@@ -15,6 +15,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let tabs = option.as_deref() == Some("--tab-controls");
     let frames = option.as_deref() == Some("--frame-controls");
     let metadata = option.as_deref() == Some("--metadata");
+    let nested_mouse = option.as_deref() == Some("--nested-mouse");
     let composite_mouse = option.as_deref() == Some("--composite-mouse");
     let combo = option.as_deref() == Some("--combo-controls") || composite_mouse;
     let multiple = option.as_deref() == Some("--multi-select");
@@ -36,7 +37,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             | "--list-controls" | "--multi-select" | "--combo-controls" | "--metadata"
             | "--frame-controls" | "--tab-controls" | "--page-controls" | "--image-controls"
             | "--refedit-controls" | "--keyboard-events" | "--keyboard-routing" | "--accelerators"
-            | "--mouse-events" | "--text-mouse" | "--composite-mouse",
+            | "--mouse-events" | "--text-mouse" | "--composite-mouse" | "--nested-mouse",
         ) => false,
         Some(_) => return Err("unknown fixture option".into()),
     };
@@ -58,6 +59,8 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         "Stop\r\nDebug.Print Check1.Value\r\nDebug.Print ChoiceA.Value\r\nDebug.Print ChoiceB.Value\r\nDebug.Print Toggle1.Value"
     } else if text_controls {
         "Stop\r\nDebug.Print Len(Entry.Text)\r\nDebug.Print Entry.SelStart\r\nDebug.Print Entry.SelLength"
+    } else if nested_mouse {
+        "Debug.Print Me.Caption"
     } else if text_mouse {
         "Debug.Print Entry.Text\r\nDebug.Print Entry.SelLength"
     } else if focus || mouse {
@@ -66,6 +69,13 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         "Stop\r\nDebug.Print Entry.Text"
     };
     let mut text = String::from_utf8(fixture::export())?.replace("Debug.Print Entry.Text", body);
+    if nested_mouse {
+        text = text.replace(
+            "Debug.Print \"initialized\"",
+            "Me.Caption=\"Parent\"\r\nDebug.Print \"initialized\"",
+        );
+        text.push_str("\r\nPrivate Sub Apply_MouseDown(ByVal Button As Integer,ByVal Shift As Integer,ByVal X As Single,ByVal Y As Single)\r\nDim child As NativeForm\r\nIf Me.Caption=\"Parent\" Then\r\nSet child=New NativeForm\r\nchild.Caption=\"Child\"\r\nchild.Show\r\nElse\r\nDebug.Print \"child down\"\r\nStop\r\nEnd If\r\nEnd Sub\r\n");
+    }
     if composite_mouse {
         text.push_str("\r\nPrivate Sub Combo1_MouseUp(ByVal Button As Integer,ByVal Shift As Integer,ByVal X As Single,ByVal Y As Single)\r\nDebug.Print \"up\"\r\nStop\r\nEnd Sub\r\nPrivate Sub Combo1_DropButtonClick()\r\nDebug.Print \"drop\"\r\nEnd Sub\r\n");
     }

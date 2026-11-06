@@ -316,3 +316,11 @@ modal-display metadata is separate from input ownership; popup input inherits th
 execution barrier and tab identity is revalidated after mutation. ComboBox native
 AutoWordSelect uses its inverse file bit. Canonical state and existing executable
 command authorization remain authoritative. Full M01/M7A.4 acceptance stays open.
+
+[ADR 0076](decisions/0076-native-modal-input-continuations.md) parks bounded raw
+mouse input by modal caller, so child callbacks can run while their parent waits.
+Physical release stays with its original capture, keyboard barriers use the
+current callback owner, and Reset/unload discard stale defaults. The shared raw
+queue stays at 64, modal scope depth stays bounded by eight existing waits, and
+canonical state/receipts remain ordinary VBA. Selected nested lifecycle/input
+cases are covered; L02 and the full M7A.4 checklist remain partial.

@@ -121,8 +121,12 @@ fn shift(modifiers: egui::Modifiers) -> u8 {
     u8::from(modifiers.shift) | (u8::from(modifiers.ctrl) * 2) | (u8::from(modifiers.alt) * 4)
 }
 impl Keyboard {
-    pub(super) fn pending_owner(&self) -> Option<FormInstance> {
-        self.pending.first().map(|p| p.owner)
+    pub(super) fn pending_owner(&self, ide: &Ide) -> Option<FormInstance> {
+        self.pending
+            .iter()
+            .rev()
+            .find(|pending| ide.form_instance_visible(pending.owner))
+            .map(|pending| pending.owner)
     }
     pub(super) fn busy(&self) -> bool {
         !self.queue.is_empty() || !self.pending.is_empty()
@@ -433,7 +437,9 @@ impl Keyboard {
         if !self.queue.is_empty() || !self.pending.is_empty() {
             ctx.request_repaint();
         }
-        if (!allow_dispatch && self.pending.is_empty()) || !ide.form_instance_can_deliver(owner) {
+        if (!allow_dispatch && !self.pending.iter().any(|pending| pending.owner == owner))
+            || !ide.form_instance_can_deliver(owner)
+        {
             return self.pending.iter().any(|pending| pending.owner == owner);
         }
         if let Some(index) = self

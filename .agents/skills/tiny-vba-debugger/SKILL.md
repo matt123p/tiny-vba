@@ -221,5 +221,9 @@ and reject detached members. Retained modal-display metadata never authorizes
 input. Keep the complete M7A.4 checklist open for remaining acceptance.
 
 Retained native modal presentation follows parked Show order, independent of
-object creation, and never grants executable input permission. Nested child raw
-mouse callback reentrancy remains an open L02 requirement.
+object creation, and never grants executable input permission. Selected nested modal input follows ADR 0076; the broader L02 checklist stays open.
+
+ADR 0076 parks raw input scopes for modal callers (at most eight existing waits)
+and keeps a shared 64-event queue. Preserve original capture release, owner-local
+keyboard/mouse barriers, canonical receipts, normal authorization and full Reset
+invalidation. Selected nested Stop/unload/Reset cases do not finish L02/M7A.4.

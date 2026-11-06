@@ -148,7 +148,7 @@ impl ComboBox<'_> {
         }
         let mut show = opened;
         let enabled = ui.is_enabled();
-        egui::Popup::from_response(&response)
+        let popup = egui::Popup::from_response(&response)
             .anchor(self.bounds)
             .frame(
                 egui::Frame::popup(ui.style())
@@ -159,32 +159,36 @@ impl ComboBox<'_> {
             )
             .open_bool(&mut show)
             .close_behavior(egui::PopupCloseBehavior::CloseOnClickOutside)
-            .width(self.bounds.width())
-            .show(|ui| {
-                if !enabled {
-                    ui.disable();
-                }
-                let rows = self.long("ListRows", 8).clamp(1, 32);
-                let count = self.long("ListCount", 0).clamp(1, 1024);
-                let height = (rows.min(count) as f32
-                    * (ui.text_style_height(&egui::TextStyle::Body).max(16.) + 6.)
-                    + 6.)
-                    .min(400.);
-                let (bounds, _) = ui.allocate_exact_size(
-                    egui::vec2(self.bounds.width(), height),
-                    egui::Sense::hover(),
-                );
-                let rows = list::ListBox {
-                    ide: self.ide,
-                    instance: self.instance,
-                    control: self.control,
-                    bounds,
-                    widget: self.widget.with("list"),
-                    theme: self.theme,
-                }
-                .show(ui, commands);
-                regions.extend(rows);
-            });
+            .width(self.bounds.width());
+        if opened {
+            ui.ctx()
+                .move_to_top(egui::LayerId::new(egui::Order::Foreground, popup.get_id()));
+        }
+        popup.show(|ui| {
+            if !enabled {
+                ui.disable();
+            }
+            let rows = self.long("ListRows", 8).clamp(1, 32);
+            let count = self.long("ListCount", 0).clamp(1, 1024);
+            let height = (rows.min(count) as f32
+                * (ui.text_style_height(&egui::TextStyle::Body).max(16.) + 6.)
+                + 6.)
+                .min(400.);
+            let (bounds, _) = ui.allocate_exact_size(
+                egui::vec2(self.bounds.width(), height),
+                egui::Sense::hover(),
+            );
+            let rows = list::ListBox {
+                ide: self.ide,
+                instance: self.instance,
+                control: self.control,
+                bounds,
+                widget: self.widget.with("list"),
+                theme: self.theme,
+            }
+            .show(ui, commands);
+            regions.extend(rows);
+        });
         if ui.is_enabled() && opened && !show && !commands.iter().any(|c|matches!(c,Command::Form(FormCommand::InstanceDrop(owner,_,_)|FormCommand::InstanceList(owner,_,_)|FormCommand::InstanceEvent(owner,_,_)|FormCommand::InstanceFocus(owner,_)|FormCommand::InstanceActivate(owner,_)) if *owner==self.instance)) {
             commands.push(Command::Form(FormCommand::InstanceDrop(self.instance,self.control.id,false)));
         }

@@ -57,8 +57,9 @@ Retained modal display order follows the parked Show waits, independent of objec
 creation order. A child created before its parent still renders above it; closing
 that child resumes the suspended parent pointer once. The keyboard display owner
 uses the same retained order without bypassing executable input authorization.
-The actual egui mouse suite now contains 26 cases. Nested child raw mouse callback
-reentrancy remains in L02.
+At ADR 0075 acceptance the actual egui mouse suite contained 26 cases. Selected
+nested child raw-input continuations subsequently follow ADR 0076; the broader
+L02 lifecycle checklist remains open.
 
 
 Manually positioned runtime controls render in child UIs bounded by their native

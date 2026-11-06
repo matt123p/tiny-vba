@@ -917,7 +917,7 @@ impl EditorUi {
         commands: &mut Vec<Command>,
     ) -> KeyboardFrame {
         self.form_mouse
-            .step(ctx, ide, commands, self.form_keys.pending_owner());
+            .step(ctx, ide, commands, self.form_keys.pending_owner(ide));
         // A completed pointer callback may redirect focus. Restore the canonical
         // decision before egui can turn its pre-callback focus into another input.
         if let Some(owner) = self
@@ -1704,6 +1704,8 @@ impl EditorUi {
                 instance.object.generation,
             ));
             if ide.form_instance_has_modal_window(instance) {
+                // Match retained Show order even if a held parent pointer raised its area.
+                ctx.move_to_top(egui::LayerId::new(egui::Order::Foreground, scope));
                 egui::Modal::new(scope)
                     .frame(
                         egui::Frame::new()
