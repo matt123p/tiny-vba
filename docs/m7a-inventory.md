@@ -274,3 +274,12 @@ M7A.4 checklist remain partial; mouse and accelerators remain open.
 Both hosts pin corrected shared revision `9fde04ce9ed8eab15b7f0609160617c774c2fc1b`.
 Full shared/host gates and 21 GridCraft/16 WordCraft native and Node-WASM
 package cases pass; ADR 0070 records the integration commits and exact evidence.
+
+[ADR 0071](decisions/0071-native-keyboard-focus-and-default-order.md) adds
+selected root keyboard focus, canonical Tab/SetFocus/Space order and debugger
+shortcut isolation. Native/browser raw ordering is normalized only for a matching
+adjacent single ASCII text/key pair within one input batch. Full shared gates,
+nine runtime keyboard cases, eleven new UI cases, 24 existing form UI cases and
+Chromium pass. Both hosts pin shared revision
+`38578095ba1fc1ae3695f92a6c2e89cdb29d42f6`; full host gates and 22 GridCraft/
+17 WordCraft native and Node-WASM package cases pass. Broader M7A.4 stays open.

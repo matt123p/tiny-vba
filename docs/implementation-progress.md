@@ -8,8 +8,16 @@ input survives a stopped key handler, while repeats and debugger shortcut releas
 are kept from becoming extra form callbacks. Eleven UI regressions and nine shared
 keyboard runtime cases pass, alongside full shared CI/WASM/WASI, existing 24 form
 UI cases, UI/native/web gates and actual Chromium Tab/Space acceptance. Paused and
-cancelled form captures were inspected. Host validation is in progress. M7A.4
-remains incomplete; no Office observation or scope reduction is claimed.
+cancelled form captures were inspected. Both consumers pin shared product
+revision `38578095ba1fc1ae3695f92a6c2e89cdb29d42f6`. GridCraft full CI (10 steps),
+strict optional VBA/UI Clippy, four form UI cases, web and all 22 native/22 Node-
+WASM package cases pass (integration `86aabbd4`). WordCraft full CI (8 steps,
+isolated serial tests), strict optional VBA/UI Clippy, 13 VBA UI cases, hidden-
+editor form, web and all 17 native/17 Node-WASM package cases pass (integration
+`eb50f8e1`). Root eligibility, debugger continuation, authority and original
+resources are verified; Word also proves text mutation and one undo step.
+All three repositories are committed and pushed. M7A.4 remains incomplete;
+no Office observation or scope reduction is claimed.
 
 ## M7A.4 continued — native keyboard callbacks (2026-11-06)
 

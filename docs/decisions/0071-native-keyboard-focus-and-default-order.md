@@ -59,4 +59,13 @@ Shared validation PASS: full CI, WASM compilation, actual WASI, all nine runtime
 keyboard cases, 11 new UI keyboard cases and all 24 existing native form UI cases.
 UI/native/web gates pass. Chromium proves stopped Tab routing and cancelled
 button Space without duplicate KeyPress or a leaked debugger KeyUp. Paused and
-cancelled form captures were inspected. Host integration is being validated.
+cancelled form captures were inspected.
+
+Both consumers pin shared product revision
+`38578095ba1fc1ae3695f92a6c2e89cdb29d42f6`. GridCraft full CI (10 steps), strict
+optional VBA/UI Clippy, four form UI cases, web and 22 native/22 Node-WASM package
+cases pass (integration `86aabbd4`). WordCraft full CI (8 steps, isolated serial
+tests), strict optional VBA/UI Clippy, 13 VBA UI cases, hidden-editor form, web
+and 17 native/17 Node-WASM package cases pass (integration `eb50f8e1`). The new
+host cases distinguish omitted tab stops from disabled controls and verify
+authority, Stop/Continue, exact original resources and Word text/undo.
