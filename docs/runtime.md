@@ -519,3 +519,10 @@ range import. Import and rendering remain inert; GridCraft owns cell commands,
 trust and revision-driven callbacks. The owner approved 4,096 static permission
 entries on 2026-11-05; per-site authorization and executed-call/work/memory limits
 remain in force. Further binding timing/types and the broader M7A.4 ledger remain open.
+
+
+[ADR 0066](decisions/0066-foreign-runtime-type-names.md) extends existing read-only
+host type resolution with bounded native TypeName metadata. Identity/lifetime,
+no-getter/no-activation rules, lookup/allocation budgets and generic Object fallback
+are retained. TypeName/VarType/IsArray named varname binding matches their documented
+signatures. Validation is in progress; the remaining M7A.4 ledger stays open.

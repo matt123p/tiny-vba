@@ -216,3 +216,10 @@ range import. Import and rendering remain inert; GridCraft owns cell commands,
 trust and revision-driven callbacks. The owner approved 4,096 static permission
 entries on 2026-11-05; per-site authorization and executed-call/work/memory limits
 remain in force. Further binding timing/types and the broader M7A.4 ledger remain open.
+
+
+[ADR 0066](../../../docs/decisions/0066-foreign-runtime-type-names.md) adds optional
+read-only runtime type names through the existing object resolver. Check full
+identity/lifetime, bound names/work/allocation and preserve errors/fallback; never
+invoke getters, host calls or activation. Forks own native names. No IR or budget
+increase is implied. Broader M7A.4 and fresh M8.5 comparisons remain separate.

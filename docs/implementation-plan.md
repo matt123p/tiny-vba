@@ -1,6 +1,6 @@
 # Remaining implementation plan
 
-Updated 2026-11-05. This plan contains **remaining work only**: M7A followed by stable M8 IDs,
+Updated 2026-11-06. This plan contains **remaining work only**: M7A followed by stable M8 IDs,
 after completed M1–M6, M6A and M7 for their declared profiles.
 [M7 acceptance](m7-acceptance.md) records the authored unchanged-document/package
 profile and [ADR 0037](decisions/0037-m7-package-preservation-and-writeback.md)
@@ -79,6 +79,7 @@ and native save/reopen. See [ADR 0041](decisions/0041-worksheet-form-controls.md
   ADR 0062 adds selected dynamic Controls and WithEvents focus/validation.
   ADR 0063 adds native multiple selection; ADR 0064 adds native runtime TypeName.
   ADR 0065 adds selected native cell/row bindings and the approved static permission cap.
+  ADR 0066 extends read-only runtime type names to embedding-owned objects.
   Remaining requirements and integration are recorded there. Reuse the shared runtime
   behind native forms and close Office compatibility gaps for the inventoried
   standard controls. Match instance/default-instance behavior, lifecycle, modal/

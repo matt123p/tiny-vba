@@ -445,12 +445,48 @@ impl Session {
         self.instances = restored.instances;
         Ok(())
     }
-    pub(super) fn project_type_name(&mut self, value: Option<&Value>) -> Result<Option<Value>> {
+    pub(super) fn object_type_name(&mut self, value: Option<&Value>) -> Result<Option<Value>> {
         let Some(Value::Object(object)) = value else {
             return Ok(None);
         };
         if object.host != 0 {
-            return Ok(None);
+            self.class_lookup_work(1)?;
+            let Some(resolver) = self.type_resolver.as_deref() else {
+                return Ok(None);
+            };
+            if self
+                .binding
+                .as_ref()
+                .is_none_or(|binding| binding.identity != object.host)
+                || resolver.identity() != object.host
+            {
+                return Err(runtime_diagnostic(runtime::Error::Vba {
+                    number: 91,
+                    message: "foreign or disconnected object".into(),
+                }));
+            }
+            let Some(name) = resolver.runtime_type_name(*object).map_err(|error| {
+                runtime_diagnostic(runtime::Error::Vba {
+                    number: error.number,
+                    message: error.description,
+                })
+            })?
+            else {
+                return Ok(None);
+            };
+            if name.len() > 1020 || name.encode_utf16().count() > 255 {
+                return Err(resource());
+            }
+            self.class_lookup_work(name.len())?;
+            if name.is_empty() || name.chars().any(char::is_control) {
+                return Err(runtime_diagnostic(runtime::Error::Vba {
+                    number: 5,
+                    message: "invalid host runtime type name".into(),
+                }));
+            }
+            let value = Value::String(vba_values::VbaString::from_utf8(&name)?);
+            self.charge(value_bytes(&value))?;
+            return Ok(Some(value));
         }
         self.class_lookup_work(self.program.program().classes.len())?;
         let instance = self.instance_object(*object)?;

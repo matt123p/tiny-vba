@@ -23,6 +23,18 @@ struct Resolver {
     dead: AtomicBool,
 }
 impl ObjectTypeResolver for Resolver {
+    fn runtime_type_name(&self, object: ObjectRef) -> Result<Option<String>, ForeignError> {
+        let _ = self.supports_type(
+            object,
+            &NominalType::new("HostLib", "1", "Base").map_err(|e| ForeignError {
+                number: 5,
+                description: e.message,
+            })?,
+        )?;
+        Ok(Some(
+            if object.object == 1 { "Node" } else { "Other" }.into(),
+        ))
+    }
     fn identity(&self) -> u64 {
         GOOD.host
     }
@@ -536,5 +548,205 @@ fn foreign_array_writeback_preserves_nominal_identity_and_patch_atomicity() -> R
         array.nominal_type(),
         Some(&NominalType::new("HostLib", "1", "Node")?)
     );
+    Ok(())
+}
+
+#[test]
+fn foreign_typename_uses_live_identity_without_getters_and_survives_stop() -> R {
+    let (mut session, mut host) = setup(
+        "Function Answer() As String\nDim n As HostLib.Base,v As Variant\nSet n=root\nSet v=n\nDebug.Print TypeName(n),VBA.TypeName(varname:=v),VarType(varname:=v),IsArray(varname:=v)\nStop\nAnswer=TypeName(v)\nEnd Function",
+    )?;
+    assert!(matches!(
+        drive(&mut session, &mut host)?,
+        Outcome::Paused(_)
+    ));
+    assert_eq!(
+        session.output(),
+        &[vba_values::VbaString::from_utf8("Node\tNode\t9\tFalse")?]
+    );
+    assert_eq!(host.calls, 0);
+    session.continue_execution()?;
+    assert_eq!(
+        drive(&mut session, &mut host)?,
+        Outcome::Completed(ReturnValue::Function(Value::String(
+            vba_values::VbaString::from_utf8("Node")?
+        )))
+    );
+    assert_eq!(host.calls, 0);
+    Ok(())
+}
+#[test]
+fn foreign_typename_revalidates_a_saved_handle_after_revocation() -> R {
+    let (mut session, mut host) = setup(
+        "Function Answer() As Long\nDim n As Object\nSet n=root\nStop\nOn Error Resume Next\nDebug.Print TypeName(n)\nAnswer=Err.Number\nEnd Function",
+    )?;
+    assert!(matches!(
+        drive(&mut session, &mut host)?,
+        Outcome::Paused(_)
+    ));
+    host.resolver.dead.store(true, Ordering::Relaxed);
+    session.continue_execution()?;
+    assert_eq!(
+        drive(&mut session, &mut host)?,
+        Outcome::Completed(ReturnValue::Function(Value::Long(91)))
+    );
+    assert_eq!(host.calls, 0);
+    Ok(())
+}
+
+#[test]
+fn foreign_typename_optional_metadata_checks_bounds_and_foreign_identity() -> R {
+    #[derive(Debug)]
+    struct Names(Option<String>);
+    impl ObjectTypeResolver for Names {
+        fn identity(&self) -> u64 {
+            GOOD.host
+        }
+        fn supports_type(&self, _: ObjectRef, _: &NominalType) -> Result<bool, ForeignError> {
+            Ok(false)
+        }
+        fn runtime_type_name(&self, object: ObjectRef) -> Result<Option<String>, ForeignError> {
+            assert_eq!(
+                object.host, GOOD.host,
+                "foreign identity must be refused before querying metadata"
+            );
+            if object != GOOD {
+                return Err(ForeignError {
+                    number: 91,
+                    description: "stale metadata handle".into(),
+                });
+            }
+            Ok(self.0.clone())
+        }
+    }
+    let program = compile(
+        &file(
+            "Function Answer(ByVal target As Object) As String\nOn Error Resume Next\nAnswer=TypeName(target)\nIf Err.Number<>0 Then Answer=CStr(Err.Number)\nEnd Function",
+        )?,
+        &options()?,
+    )?;
+    for (name, object, expected) in [
+        (None, GOOD, "Object"),
+        (Some("FixtureClass".into()), GOOD, "FixtureClass"),
+        (Some("x".repeat(255)), GOOD, "long"),
+        (Some("😀".repeat(127)), GOOD, "emoji"),
+        (Some("😀".repeat(128)), GOOD, "limit"),
+        (
+            Some("stale".into()),
+            ObjectRef {
+                generation: GOOD.generation + 1,
+                ..GOOD
+            },
+            "91",
+        ),
+        (Some("x".repeat(256)), GOOD, "limit"),
+        (Some("".into()), GOOD, "5"),
+        (Some("invalid\nname".into()), GOOD, "5"),
+        (
+            Some("unreachable".into()),
+            ObjectRef {
+                host: GOOD.host + 1,
+                ..GOOD
+            },
+            "91",
+        ),
+    ] {
+        let binding = HostBinding::for_program(&program, GOOD.host, Default::default())?;
+        let mut session = Session::new_with_type_resolver(
+            program.clone(),
+            1,
+            vec![Value::Object(object)],
+            Some(binding),
+            Limits::default(),
+            Some(Arc::new(Names(name))),
+        )?;
+        let mut host = TestHost {
+            resolver: Arc::new(Resolver::default()),
+            wrong_patch: false,
+            wait: false,
+            calls: 0,
+        };
+        if expected == "limit" {
+            assert!(
+                matches!(drive(&mut session,&mut host)?,Outcome::Failed(failure) if failure.kind==vba_vm::FailureKind::ResourceLimit)
+            );
+            assert_eq!(host.calls, 0);
+            continue;
+        }
+        let expected = if expected == "long" {
+            "x".repeat(255)
+        } else if expected == "emoji" {
+            "😀".repeat(127)
+        } else {
+            expected.into()
+        };
+        assert_eq!(
+            drive(&mut session, &mut host)?,
+            Outcome::Completed(ReturnValue::Function(Value::String(
+                vba_values::VbaString::from_utf8(&expected)?
+            )))
+        );
+        assert_eq!(host.calls, 0);
+    }
+    Ok(())
+}
+
+#[test]
+fn foreign_typename_cannot_follow_a_resolver_identity_change_to_an_unbound_host() -> R {
+    use std::sync::atomic::AtomicU64;
+    #[derive(Debug)]
+    struct Switched {
+        identity: Arc<AtomicU64>,
+        queried: Arc<AtomicBool>,
+    }
+    impl ObjectTypeResolver for Switched {
+        fn identity(&self) -> u64 {
+            self.identity.load(Ordering::Relaxed)
+        }
+        fn supports_type(&self, _: ObjectRef, _: &NominalType) -> Result<bool, ForeignError> {
+            Ok(false)
+        }
+        fn runtime_type_name(&self, _: ObjectRef) -> Result<Option<String>, ForeignError> {
+            self.queried.store(true, Ordering::Relaxed);
+            Ok(Some("UnboundOwner".into()))
+        }
+    }
+    let p = compile(
+        &file(
+            "Function Answer(ByVal target As Object) As Long\nOn Error Resume Next\nDebug.Print TypeName(target)\nAnswer=Err.Number\nEnd Function",
+        )?,
+        &options()?,
+    )?;
+    let binding = HostBinding::for_program(&p, GOOD.host, Default::default())?;
+    let identity = Arc::new(AtomicU64::new(GOOD.host));
+    let queried = Arc::new(AtomicBool::new(false));
+    let resolver = Arc::new(Switched {
+        identity: identity.clone(),
+        queried: queried.clone(),
+    });
+    let mut session = Session::new_with_type_resolver(
+        p,
+        1,
+        vec![Value::Object(ObjectRef {
+            host: GOOD.host + 1,
+            ..GOOD
+        })],
+        Some(binding),
+        Limits::default(),
+        Some(resolver),
+    )?;
+    identity.store(GOOD.host + 1, Ordering::Relaxed);
+    let mut host = TestHost {
+        resolver: Arc::new(Resolver::default()),
+        wrong_patch: false,
+        wait: false,
+        calls: 0,
+    };
+    assert_eq!(
+        drive(&mut session, &mut host)?,
+        Outcome::Completed(ReturnValue::Function(Value::Long(91)))
+    );
+    assert!(!queried.load(Ordering::Relaxed));
+    assert_eq!(host.calls, 0);
     Ok(())
 }

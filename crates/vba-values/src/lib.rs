@@ -719,6 +719,7 @@ const fn with_default(
 const ONE_VALUE: &[IntrinsicParameter] = &[parameter("expression", true)];
 const STRING_VALUE: &[IntrinsicParameter] = &[parameter("string", true)];
 const CHARCODE_VALUE: &[IntrinsicParameter] = &[parameter("charcode", true)];
+const ONE_VARNAME_RAW: &[IntrinsicParameter] = &[raw_parameter("varname", true)];
 const ONE_RAW: &[IntrinsicParameter] = &[raw_parameter("expression", true)];
 const ONE_OBJECT: &[IntrinsicParameter] = &[object_parameter("expression", true)];
 const INSTR_PARAMS: &[IntrinsicParameter] = &[
@@ -2233,7 +2234,7 @@ pub const INTRINSIC_DESCRIPTORS: &[IntrinsicDescriptor] = &[
     descriptor(
         Intrinsic::IsArray,
         "IsArray",
-        ONE_RAW,
+        ONE_VARNAME_RAW,
         false,
         "IsArray(varname)",
     ),
@@ -2275,14 +2276,14 @@ pub const INTRINSIC_DESCRIPTORS: &[IntrinsicDescriptor] = &[
     descriptor(
         Intrinsic::VarType,
         "VarType",
-        ONE_RAW,
+        ONE_VARNAME_RAW,
         false,
         "VarType(varname)",
     ),
     descriptor(
         Intrinsic::TypeName,
         "TypeName",
-        ONE_RAW,
+        ONE_VARNAME_RAW,
         false,
         "TypeName(varname)",
     ),

@@ -3305,7 +3305,7 @@ impl Session {
                     self.output.push(vba_values::VbaString::from_units(units)?);
                     Value::Empty
                 } else if function == vba_values::Intrinsic::TypeName {
-                    match self.project_type_name(values.first())? {
+                    match self.object_type_name(values.first())? {
                         Some(value) => value,
                         None => {
                             runtime::intrinsic(function, &values).map_err(runtime_diagnostic)?
@@ -3347,7 +3347,7 @@ impl Session {
                 }
                 self.charge(supplied.saturating_add(1))?;
                 let project_name = if function == vba_values::Intrinsic::TypeName {
-                    self.project_type_name(arguments.first().and_then(Option::as_ref))?
+                    self.object_type_name(arguments.first().and_then(Option::as_ref))?
                 } else {
                     None
                 };

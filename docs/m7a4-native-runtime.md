@@ -149,7 +149,8 @@ Remaining M7A.4 requirements, without reducing the milestone's scope:
 - Further focus/validation edge cases across recursive redirection, window/container
   activation, boolean update timing and data binding; typed keyboard/mouse/accelerator ordering, further text/selection edge cases
   and remaining property/default/error/coercion contracts,
-  including remaining foreign-object dynamic TypeName. ADR 0048 implements the selected flat native
+  including VarType default-member evaluation for object arguments. ADR 0066 adds
+  foreign-object dynamic TypeName through existing host metadata. ADR 0048 implements the selected flat native
   focus/typed cancellation path, without claiming the full event/property matrix.
 - ADR 0060 adds selected native RefEdit text/drop semantics and host picker integration; broader RefEdit/platform behavior remains open. ADR 0059 adds selected Image raster records,
   picture identity/assignment, layout and Click; further picture formats/metadata,
@@ -258,3 +259,10 @@ range import. Import and rendering remain inert; GridCraft owns cell commands,
 trust and revision-driven callbacks. The owner approved 4,096 static permission
 entries on 2026-11-05; per-site authorization and executed-call/work/memory limits
 remain in force. Further binding timing/types and the broader M7A.4 ledger remain open.
+
+
+[ADR 0066](decisions/0066-foreign-runtime-type-names.md) extends existing read-only
+host type resolution with bounded native TypeName metadata. Identity/lifetime,
+no-getter/no-activation rules, lookup/allocation budgets and generic Object fallback
+are retained. TypeName/VarType/IsArray named varname binding matches their documented
+signatures. Validation is in progress; the remaining M7A.4 ledger stays open.

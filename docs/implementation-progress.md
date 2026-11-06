@@ -1,5 +1,17 @@
 # Implementation progress
 
+## M7A.4 continued — foreign runtime type names (2026-11-06)
+
+Shared implementation and validation PASS under ADR 0066: bounded optional
+metadata queries over existing host objects, shared with nominal type projection.
+All four new generic cases pass: aliases/no getter or host invocation, Stop/resume,
+revocation, stale/foreign/switched host identity, fallback and UTF-16 name bounds.
+Full CI, WASM compilation, full actual WASI execution and the final 17-case WASI
+nominal suite pass. TypeName/VarType/IsArray accept their documented named varname
+argument; VarType object-default evaluation remains a separate compatibility gap.
+GridCraft/WordCraft local object-alias and document/undo preservation tests pass;
+final pinned fork integration is in progress. The full M7A.4 ledger remains open.
+
 ## M7A.4 continued — native cell/row bindings (2026-11-05)
 
 Implemented shared packet under ADR 0065: inert native source metadata,

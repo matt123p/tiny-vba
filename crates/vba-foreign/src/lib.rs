@@ -121,6 +121,13 @@ pub trait ObjectTypeResolver: std::fmt::Debug + Send + Sync {
         object: ObjectRef,
         expected: &vba_values::NominalType,
     ) -> Result<bool, ForeignError>;
+    /// Optional runtime type spelling from the existing object store. Overrides must
+    /// validate the full handle even when returning None. Names must be nonempty, at most 255
+    /// UTF-16 units, and contain no control characters. Never invoke properties,
+    /// VBA, IO or object activation. None preserves the generic Object result.
+    fn runtime_type_name(&self, _object: ObjectRef) -> Result<Option<String>, ForeignError> {
+        Ok(None)
+    }
 }
 #[derive(Clone, Debug, PartialEq)]
 pub enum Outcome {
