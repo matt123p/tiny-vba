@@ -236,3 +236,11 @@ stay inert and all existing budgets remain. Full M7A.4/M8.5 are separate gates.
 ## Lazy project-class array elements
 
 ADR 0068 array evidence is authored/reference-based, not fresh Office output. Cover fixed/dynamic arrays, ByRef order, element identity, stale/forged bytecode, private/static restore and constructor/For Each pauses natively and under WASI; native form identity also needs shared/fork regressions. See [ADR 0068](../../../docs/decisions/0068-lazy-project-class-array-elements.md). Existing budgets remain unchanged; full M7A.4 remains open.
+
+
+[ADR 0069](../../../docs/decisions/0069-userforms-without-form-components.md)
+selects minimal ordinary UserForms support without form components via bounded
+code tokens; normal binding resolves shadows. Runtime selection uses verified
+class/source identity, never mutable source during ticks. Preserve Reset, inert
+inspection, wrapped callback waits/identity, existing budgets and no extra object
+registry. Fresh comparisons remain M8.5; use the M7A.4 completion checklist.

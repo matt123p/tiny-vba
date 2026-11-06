@@ -986,7 +986,7 @@ impl Ide {
     fn launch(&mut self, host: &mut impl Host, step: bool) -> Result<()> {
         let program = self.compile()?;
         let mut roots = self.roots.clone();
-        if !self.forms.is_empty() {
+        if self.form_services_requested() {
             roots.insert(
                 "VbaFormsGate".into(),
                 ObjectRef {
@@ -1047,7 +1047,7 @@ impl Ide {
         Ok(())
     }
     pub fn dispatch(&mut self, action: Action, host: &mut impl Host) -> Result<()> {
-        if self.forms.is_empty() {
+        if !self.form_services_requested() && !self.form_services_active() {
             return self.dispatch_unwrapped(action, host);
         }
         self.form_gate.components = self
@@ -1178,7 +1178,7 @@ impl Ide {
         Ok(())
     }
     pub fn close(&mut self, host: &mut impl Host, discard_modified: bool) -> Result<()> {
-        if self.forms.is_empty() {
+        if !self.form_services_requested() && !self.form_services_active() {
             return self.close_unwrapped(host, discard_modified);
         }
         self.form_gate.components = self
@@ -1313,7 +1313,7 @@ impl Ide {
         if self.session.is_none() {
             let program = self.compile_idle_document_callback()?;
             let mut roots = self.roots.clone();
-            if !self.forms.is_empty() {
+            if self.form_services_requested() {
                 roots.insert(
                     "VbaFormsGate".into(),
                     ObjectRef {
@@ -1389,7 +1389,7 @@ impl Ide {
         self.tick(host)
     }
     pub fn tick(&mut self, host: &mut impl Host) -> Result<()> {
-        if self.forms.is_empty() {
+        if !self.form_services_active() {
             self.tick_core(host)?;
             return self.tick_document_event(host);
         }
@@ -1410,13 +1410,16 @@ impl Ide {
             .map(|designer| designer.form().name.clone())
             .collect();
         let mut gate = std::mem::take(&mut self.form_gate);
-        let result = self.tick_core(&mut form_project::FormHost {
+        let mut wrapped = form_project::FormHost {
             host,
             gate: &mut gate,
-        });
+        };
+        let result = (|| {
+            self.tick_core(&mut wrapped)?;
+            self.tick_document_event(&mut wrapped)
+        })();
         self.form_gate = gate;
-        result?;
-        self.tick_document_event(host)
+        result
     }
     fn tick_document_event(&mut self, host: &mut impl Host) -> Result<()> {
         if !self.document_event_delivery || !matches!(self.mode(), Mode::Completed) {

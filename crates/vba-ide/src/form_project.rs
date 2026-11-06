@@ -32,6 +32,7 @@ pub struct FormListInput {
     pub toggle: bool,
     pub navigate: bool,
 }
+const USERFORMS_SUPPORT: &str = "Public Function VbaUserForms(Optional ByVal index As Variant) As Object\nIf IsMissing(index) Then\nSet VbaUserForms=VbaFormUserForms\nElse\nSet VbaUserForms=VbaFormUserForms.Item(index)\nEnd If\nEnd Function\n";
 const GATE_OBJECT: u64 = u64::MAX;
 fn tab_object(session: &Session, control: ObjectRef, index: i32) -> Result<ObjectRef> {
     let collection = session
@@ -96,7 +97,11 @@ impl<H: Host> FormHost<'_, H> {
                 return Err(error(91, "missing collection owner"));
             };
             let mut values = Vec::new();
-            if objects.instances("VbaFormControls")?.contains(&owner) {
+            if self.gate.components.is_empty() {
+                if !objects.instances("VbaFormUserForms")?.contains(&owner) {
+                    return Err(error(91, "stale collection enumerator"));
+                }
+            } else if objects.instances("VbaFormControls")?.contains(&owner) {
                 let Value::Long(total) = objects.public_field(owner, "VbaTotal")? else {
                     return Err(error(13, "invalid collection count"));
                 };
@@ -1582,8 +1587,36 @@ impl Ide {
             .ok_or_else(|| error("generated handler not found"))?;
         self.navigate(id, target)
     }
+    /// Conservative lexical selection only; ordinary binding still resolves shadows.
+    /// Comments and strings never request executable collection support.
+    pub(crate) fn form_services_requested(&self) -> bool {
+        !self.forms.is_empty()
+            || self.modules.iter().any(|module| {
+                module.source().is_ok_and(|source| {
+                    vba_syntax::lex(&source).tokens.iter().any(|token| {
+                        token.kind == vba_syntax::TokenKind::Word
+                            && token
+                                .text(&source)
+                                .is_ok_and(|text| text.eq_ignore_ascii_case("UserForms"))
+                    })
+                })
+            })
+    }
+    pub(crate) fn form_services_active(&self) -> bool {
+        self.session.as_ref().is_some_and(|session| {
+            let program = session.program().program();
+            program.classes.iter().any(|class| {
+                class.name.eq_ignore_ascii_case("VbaFormUserForms")
+                    && program
+                        .sources
+                        .get(class.source.0 as usize)
+                        .is_some_and(|source| source.file.id() == SourceId(u64::MAX - 6))
+            })
+        })
+    }
     pub(crate) fn form_modules(&self) -> Result<Vec<vba_syntax::ParseResult>> {
         let mut modules = Vec::new();
+        let services = self.form_services_requested();
         for m in &self.modules {
             if let Some(designer) = self.forms.get(&m.id) {
                 modules.push(parse(
@@ -1600,7 +1633,7 @@ impl Ide {
                     ModuleKind::Class,
                 )?);
             } else {
-                if !self.forms.is_empty() && m.name.to_ascii_lowercase().starts_with("vbaform") {
+                if services && m.name.to_ascii_lowercase().starts_with("vbaform") {
                     return Err(error("reserved form support module name"));
                 }
                 modules.push(parse(&m.source()?, m.kind)?);
@@ -1791,7 +1824,7 @@ impl Ide {
             }
             support.push_str("Public Function VbaControlRequest(ByVal context As VbaFormControlContext,ByVal operation As Integer,ByVal target As Object,ByVal argument As Variant) As Object\nSet VbaControlRequest=context.VbaInvoke(operation,target,argument)\nEnd Function\n");
             support.push_str("Public Function VbaNextPageId() As Long\nStatic nextId As Long\nIf nextId= -2147483647 Then Err.Raise 7\nnextId=nextId-1\nVbaNextPageId=nextId\nEnd Function\n");
-            support.push_str("Public Function VbaUserForms(Optional ByVal index As Variant) As Object\nIf IsMissing(index) Then\nSet VbaUserForms=VbaFormUserForms\nElse\nSet VbaUserForms=VbaFormUserForms.Item(index)\nEnd If\nEnd Function\n");
+            support.push_str(USERFORMS_SUPPORT);
             for (id, designer) in &self.forms {
                 let module = self
                     .modules
@@ -1825,6 +1858,33 @@ impl Ide {
                 )?,
                 ModuleKind::Standard,
             )?);
+        }
+        if self.forms.is_empty() && services {
+            for (offset, name, kind, source) in [
+                (
+                    6,
+                    "VbaFormUserForms.cls",
+                    ModuleKind::Class,
+                    crate::form_controls::userforms_class(&[]),
+                ),
+                (
+                    7,
+                    "VbaFormEnumerator.cls",
+                    ModuleKind::Class,
+                    crate::form_controls::enumerator_class(),
+                ),
+                (
+                    3,
+                    "VbaFormsSupport.bas",
+                    ModuleKind::Standard,
+                    String::from(USERFORMS_SUPPORT),
+                ),
+            ] {
+                modules.push(parse(
+                    &SourceFile::new(SourceId(u64::MAX - offset), name.into(), source)?,
+                    kind,
+                )?);
+            }
         }
         Ok(modules)
     }
@@ -1880,6 +1940,19 @@ impl Ide {
                 root: "VbaFormsGate".into(),
                 member: Some("Wait".into()),
             });
+        }
+        if self.forms.is_empty() && self.form_services_requested() {
+            for (name, member) in [
+                ("VbaFormQuery", "Query"),
+                ("VbaFormEnumInterface", "Enumerator"),
+            ] {
+                imports.push(Import {
+                    name: name.into(),
+                    root: "VbaFormsGate".into(),
+                    member: Some(member.into()),
+                    kind: vba_foreign::InvokeKind::Call,
+                });
+            }
         }
         imports
     }

@@ -466,3 +466,12 @@ source-order capture and constructor/For Each Stop continuations reuse existing
 locations, classes and budgets. Whole-array reads and safe inspection stay inert;
 external activation and object-module Public arrays remain refused. Shared CI,
 WASM and actual WASI pass; the broader M7A.4 ledger and M8.5 comparisons remain open.
+
+
+[ADR 0069](decisions/0069-userforms-without-form-components.md) enables the
+existing UserForms collection in projects without form components. A bounded
+code-token hint selects only the minimal ordinary collection/enumerator support;
+semantic shadowing, compiled identity, inert inspection, host ownership and
+existing budgets remain authoritative. Shared/host acceptance is tracked in
+progress; [the completion checklist](m7a4-completion-checklist.md) retains the
+full remaining M7A.4 scope. No new IR, format or control library is introduced.

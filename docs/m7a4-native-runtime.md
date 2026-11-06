@@ -6,6 +6,10 @@ Updated 2026-11-06. **IN PROGRESS. M7A.4 is not complete.** This record extends
 
 Implemented in shared tiny-vba:
 
+- [ADR 0069](decisions/0069-userforms-without-form-components.md): minimal built-in
+  UserForms support without a form component; Count, Item, Add errors, aliases,
+  empty enumeration, shadowing, Reset/Stop and document callbacks.
+
 - [ADR 0068](decisions/0068-lazy-project-class-array-elements.md): lazy fixed/dynamic project-class/native-form arrays,
   independent elements, Preserve/Erase, static/private storage, canonical ByRef,
   constructor and For Each continuations, inert inspection and unchanged budgets.
@@ -147,13 +151,14 @@ is included or executed:
 Validation and consumer integration status are recorded in
 [implementation progress](implementation-progress.md).
 
-Remaining M7A.4 requirements, without reducing the milestone's scope:
+Remaining M7A.4 requirements, without reducing the milestone's scope, are made
+concrete in [the completion checklist](m7a4-completion-checklist.md):
 
 - Additional default/control-reference alias and reload edge cases against Office;
   full Activate/Deactivate ordering and modeless focus ownership. The selected
   replacement/code-lifetime cases are implemented under ADR 0044.
-- Additional implicit/alias behavior beyond ADR 0068 array instancing, empty-project/dynamic
-  collection cases, direct enumerator cursor interfaces and structural-mutation
+- Additional implicit/alias behavior beyond ADR 0068 array instancing, additional dynamic
+  collection cases beyond ADR 0069 empty-project support, direct enumerator cursor interfaces and structural-mutation
   parity. External class activation remains outside the project-only path.
   For Each uses the existing bounded snapshot profile.
 - Further focus/validation edge cases across recursive redirection, window/container

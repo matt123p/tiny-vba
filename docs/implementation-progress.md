@@ -1,5 +1,14 @@
 # Implementation progress
 
+## M7A.4 continued — UserForms without form components (2026-11-06)
+
+Shared implementation and validation PASS under ADR 0069. All six authored
+collection, error, shadowing, source-edit/Reset, Stop and idle document callback
+cases pass, alongside all 99 native form cases. Full CI, WASM compilation and
+actual WASI execution pass. Pinned host validation is in progress. A concrete completion checklist records remaining
+keyboard/mouse, lifecycle/focus, collection, property/binding and platform cases
+without reducing M7A.4 scope.
+
 ## M7A.4 continued — lazy class/form array elements (2026-11-06)
 
 Shared implementation and validation PASS under ADR 0068/IR 14. Fixed/dynamic

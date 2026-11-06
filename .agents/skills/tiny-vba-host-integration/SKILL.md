@@ -333,3 +333,11 @@ normal class frames/authorized host calls, getter errors and one-shot Stop/wait
 continuations. Resolver presence metadata is inert and identity checked; actual
 getters remain executable. Older IR consumers refuse this capability. Watches
 stay inert and all existing budgets remain. Full M7A.4/M8.5 are separate gates.
+
+
+[ADR 0069](../../../docs/decisions/0069-userforms-without-form-components.md)
+selects minimal ordinary UserForms support without form components via bounded
+code tokens; normal binding resolves shadows. Runtime selection uses verified
+class/source identity, never mutable source during ticks. Preserve Reset, inert
+inspection, wrapped callback waits/identity, existing budgets and no extra object
+registry. Fresh comparisons remain M8.5; use the M7A.4 completion checklist.

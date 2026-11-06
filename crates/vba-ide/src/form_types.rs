@@ -29,7 +29,7 @@ const TYPES: &[&str] = &[
 ];
 impl Ide {
     pub(crate) fn form_procedure_aliases(&self) -> BTreeMap<String, (String, String)> {
-        if self.forms.is_empty() {
+        if !self.form_services_requested() {
             return BTreeMap::new();
         }
         ["UserForms", "VBA.UserForms"]
@@ -283,7 +283,7 @@ impl Ide {
                 names.insert(name.clone(), spelling.into());
             }
         }
-        if !self.forms.is_empty() {
+        if self.form_services_requested() {
             names.insert("VbaFormUserForms".into(), "UserForms".into());
         }
         names

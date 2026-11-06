@@ -298,3 +298,12 @@ Shared CI, WASM and actual WASI validation pass; the full M7A.4 ledger stays ope
 
 [ADR 0068](decisions/0068-lazy-project-class-array-elements.md) defines lazy project-class/native-form array elements, capability-gated
 IR 14 TouchElement, ordinary constructor frames and inert inspection.
+
+
+[ADR 0069](decisions/0069-userforms-without-form-components.md) enables the
+existing UserForms collection in projects without form components. A bounded
+code-token hint selects only the minimal ordinary collection/enumerator support;
+semantic shadowing, compiled identity, inert inspection, host ownership and
+existing budgets remain authoritative. Shared/host acceptance is tracked in
+progress; [the completion checklist](m7a4-completion-checklist.md) retains the
+full remaining M7A.4 scope. No new IR, format or control library is introduced.
