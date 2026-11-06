@@ -2,21 +2,36 @@
 
 ## M7A.4 continued — native mouse callbacks (2026-11-06)
 
-ADR 0073 adds typed native MouseDown/MouseMove/MouseUp/DblClick, indexed tab/page
-arguments, mutable cancellation and canonical completion receipts. Selected simple
-control/background pointer capture/defaults, stopped/outside release, Reset and
-keyboard focus preservation pass six model and five real egui cases. Full shared
-CI/Clippy, WASM/WASI, the six-case WASI mouse target, UI/native/web and actual
-Chromium stopped MouseDown/captured MouseUp/one Click pass. Live/paused/resumed
-views were inspected. Host validation found redundant field aliases in event
-signature metadata; binding now omits those aliases while retaining typed event
-arguments, real method fields and all existing limits. A generic compiler
-regression, corrected full CI/WASM/WASI, all 17 compiler cases under WASI,
-UI/native/web and Chromium mouse/smoke/modal-form regressions pass. Consumer
-pinning and final host validation are in progress. Final integration review also
-corrected InstanceMouse executable classification, with a per-command UI
-regression, to preserve embedding consent and snapshot preparation. M01 and M7A.4 remain partial; remaining pointer
-defaults, lifecycle, keyboard and other checklist rows are unchanged.
+ADR 0073 adds typed MouseDown/MouseMove/MouseUp/DblClick, indexed arguments,
+mutable cancellation and canonical completion receipts. Selected simple-control/
+background capture and default actions preserve stopped/outside release, Reset,
+source and keyboard focus. Six model and five actual egui cases pass. The shared
+command classifier requires host preparation unless a form operation is known
+inert; every emitted mouse command is checked by the UI regression. Word also
+verifies that revoked trust rejects mouse dispatch before execution.
+
+Event declarations omit unused field aliases while retaining nominal arguments,
+receivers, canonical class fields and executable method aliases. A generic
+256-field/20-event compiler regression and the affected GridCraft MultiPage cases
+pass without raising the 4,096 nominal-local cap or any other budget. All public
+mouse declarations remain available.
+
+Corrected full CI/Clippy, WASM/WASI, six mouse cases and all 17 compiler cases
+under WASI, UI/native/web and Chromium mouse/smoke/modal-form regressions pass.
+Live/paused/resumed views were inspected. Both consumers pin shared product
+`c9f829824c56397c101ac9228c89db289b788458`. GridCraft full CI (10 steps), strict
+optional VBA/UI Clippy, four form UI cases, web and 24 native/24 Node-WASM cases
+pass (integration `681e8d35`), including indexed MultiPage mouse input. WordCraft
+full CI (8 steps, isolated serial tests), strict optional VBA/UI Clippy, 13 VBA
+UI cases, hidden-editor form, web and 19 native/19 Node-WASM cases pass
+(integration `fe4d320b`). Host checks preserve authority, one-shot effects and
+original resources; Word verifies one undo step. All three repositories are
+committed and pushed.
+
+M01 and M7A.4 remain partial. Next: raw pointer defaults for text selection,
+list/numeric/drop/picker input and indexed Tab/Page hits, alongside the remaining
+lifecycle, keyboard, control/property and platform checklist rows. Fresh Office
+comparisons remain M8.5 NOT_RUN; no scope reduction or full acceptance is claimed.
 
 ## M7A.4 continued — native accelerators (2026-11-06)
 
