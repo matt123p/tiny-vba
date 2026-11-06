@@ -283,3 +283,12 @@ nine runtime keyboard cases, eleven new UI cases, 24 existing form UI cases and
 Chromium pass. Both hosts pin shared revision
 `38578095ba1fc1ae3695f92a6c2e89cdb29d42f6`; full host gates and 22 GridCraft/
 17 WordCraft native and Node-WASM package cases pass. Broader M7A.4 stays open.
+
+
+[ADR 0072](decisions/0072-native-form-accelerators.md) adds native persisted
+accelerators and canonical Accelerator properties, selected eligible Alt actions
+for Label/buttons/booleans/Tab/Page, validation/callback continuations and inert
+caption underlines. Duplicate routing explicitly refuses; non-ASCII/platform and
+further ordering cases remain open. Checklist K03 is PARTIAL; M7A.4 remains in
+progress, edited persistence/removal remain M7A.5/.6 and Office observations remain
+M8.5 NOT_RUN.

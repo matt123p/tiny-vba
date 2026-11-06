@@ -143,17 +143,15 @@ impl Tabs<'_> {
                 egui::Stroke::new(1., self.theme.border),
                 egui::StrokeKind::Inside,
             );
-            ui.painter().text(
-                rect.center(),
-                egui::Align2::CENTER_CENTER,
-                caption,
-                font,
-                if enabled {
-                    self.theme.text
-                } else {
-                    self.theme.muted
-                },
-            );
+            let color = if enabled {
+                self.theme.text
+            } else {
+                self.theme.muted
+            };
+            let job = super::accelerator::job(&caption, self.tab(i, "Accelerator"), font, color);
+            let galley = ui.fonts_mut(|fonts| fonts.layout_job(job));
+            ui.painter()
+                .galley(rect.center() - galley.size() / 2., galley, color);
             if selected == i && response.has_focus() {
                 ui.painter().rect_stroke(
                     rect.shrink(3.),

@@ -1,5 +1,19 @@
 # Implementation progress
 
+## M7A.4 continued — native accelerators (2026-11-06)
+
+ADR 0072 implements persisted Label/button/boolean accelerator records, canonical
+Accelerator properties and selected Alt routing for these controls and Tab/Page.
+Label focus, button/boolean actions, focus cancellation, dynamic WithEvents and
+Stop/Reset are covered by eight shared cases; three additional UI cases verify
+no-handler dispatch and web text/key pairing. Decoder tests (24), model tests (8),
+keyboard UI tests (14), full shared CI/strict Clippy, WASM/WASI and the final
+eight-case accelerator target under WASI pass. Shared UI/native/web gates and
+actual Chromium Alt/text/Stop/Continue pass; light/dark/narrow/scaled/host and
+paused browser captures were inspected. Consumer validation is in progress.
+Duplicate routing explicitly refuses; non-ASCII/platform ordering remains open.
+K03 is PARTIAL and M7A.4 remains incomplete, with its full checklist unchanged.
+
 ## M7A.4 continued — keyboard focus and default order (2026-11-06)
 
 ADR 0071 adds root-window input focus, pre-editor keyboard arbitration, canonical

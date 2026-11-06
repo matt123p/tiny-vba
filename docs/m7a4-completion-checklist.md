@@ -15,7 +15,7 @@ reference-based expectations and fresh Office observations remain distinct.
 | F01 | Recursive SetFocus and cancellation, nested containers/page switches, dirty validation and binding callbacks, boolean update timing | PARTIAL: selected focus/validation implemented; edge cases open |
 | K01 | KeyDown/KeyPress/KeyUp with mutable ByVal MSForms.ReturnInteger and typed Shift; cancellation/default processing in ordinary frames | PARTIAL: ADR 0070 evidence plus ADR 0071 root/Tab/SetFocus/Space cases PASS (nine runtime, 11 new UI, Chromium, both hosts); remaining cases open |
 | K02 | Held-key repeat; modifiers; Tab/navigation focus transitions; Default/Cancel Enter/Escape exceptions; ANSI input versus Unicode/IME/paste | PARTIAL: raw-input barrier and ADR 0071 focus/default ordering; remaining platform/shortcut/focus/IME cases open |
-| K03 | Accelerators select/focus/activate the appropriate eligible control and preserve keyboard/event ordering | OPEN |
+| K03 | Accelerators select/focus/activate the appropriate eligible control and preserve keyboard/event ordering | PARTIAL: ADR 0072 selected Label/button/boolean/Tab/Page actions; duplicate, non-ASCII/platform and further ordering cases open |
 | M01 | Applicable MouseDown/MouseMove/MouseUp/Click/DblClick, typed button/modifier/coordinate/cancellation arguments, event order and container-relative coordinates | OPEN |
 | P01 | Remaining common properties, defaults, exact errors/coercions, text/selection edge cases | PARTIAL: remaining contract/member audit open |
 | B01 | List/Column array shape/loading, binding value types and update timing, protected failures and reentrant handlers | PARTIAL: current selected array/binding packets implemented |

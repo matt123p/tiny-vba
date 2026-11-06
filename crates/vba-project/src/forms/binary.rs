@@ -334,6 +334,7 @@ fn container(
             children.push(child_root);
             let frame_id = site.id;
             controls.push(Control {
+                accelerator: String::new(),
                 id: site.id,
                 parent: None,
                 name: site.name,
@@ -561,6 +562,7 @@ fn control(bytes: &[u8], site: Site) -> Result<Control> {
     let mut max_length = 0;
     let mut group_name = String::new();
     let mut locked = false;
+    let accelerator;
     let mut text_behavior = super::TextBehavior::default();
     let (caption, text, width, height, enabled) = if matches!(
         site.kind,
@@ -573,6 +575,14 @@ fn control(bytes: &[u8], site: Site) -> Result<Control> {
             | Kind::ComboBox
     ) {
         let allowed = 0x86c0_03ff
+            | if matches!(
+                site.kind,
+                Kind::CheckBox | Kind::OptionButton | Kind::ToggleButton
+            ) {
+                1 << 29
+            } else {
+                0
+            }
             | if listbox {
                 0x0022_3800
             } else if refedit {
@@ -705,7 +715,13 @@ fn control(bytes: &[u8], site: Site) -> Result<Control> {
         let caption = field(&mut b, m, 23, 4, 0)?;
         field(&mut b, m, 25, 4, 0)?;
         field(&mut b, m, 26, 4, 0)?;
-        let group = if high & 1 != 0 { b.u32()? } else { 0 };
+        accelerator = accelerator_character(field(&mut b, m, 29, 2, 0)?)?;
+        let group = if high & 1 != 0 {
+            align(&mut b, 4)?;
+            b.u32()?
+        } else {
+            0
+        };
         align(&mut b, 4)?;
         let (w, h) = size(&mut b)?;
         let value = string(&mut b, value)?;
@@ -720,9 +736,9 @@ fn control(bytes: &[u8], site: Site) -> Result<Control> {
         (caption, value, w, h, flags & 2 != 0)
     } else {
         let allowed = if site.kind == Kind::Label {
-            0x3ff
+            0xbff
         } else {
-            0x7f
+            0x17f
         };
         let m = mask(&mut b, allowed, 1 << 5)? as u64;
         field(&mut b, m, 0, 4, 0)?;
@@ -745,6 +761,9 @@ fn control(bytes: &[u8], site: Site) -> Result<Control> {
             field(&mut b, m, 7, 4, 0)?;
             field(&mut b, m, 8, 2, 0)?;
             field(&mut b, m, 9, 2, 0)?;
+            accelerator = accelerator_character(field(&mut b, m, 11, 2, 0)?)?;
+        } else {
+            accelerator = accelerator_character(field(&mut b, m, 8, 2, 0)?)?;
         }
         align(&mut b, 4)?;
         let caption = string(&mut b, caption)?;
@@ -755,6 +774,7 @@ fn control(bytes: &[u8], site: Site) -> Result<Control> {
     text_props(&mut r)?;
     r.end()?;
     Ok(Control {
+        accelerator,
         id: site.id,
         parent: None,
         name: site.name,
@@ -836,6 +856,7 @@ fn numeric_control(r: Reader<'_>, mut b: Reader<'_>, site: Site) -> Result<Contr
     b.end()?;
     r.end()?;
     Ok(Control {
+        accelerator: String::new(),
         id: site.id,
         parent: None,
         name: site.name,
@@ -875,4 +896,13 @@ fn numeric_control(r: Reader<'_>, mut b: Reader<'_>, site: Site) -> Result<Contr
             delay,
         }),
     })
+}
+
+fn accelerator_character(value: u32) -> Result<String> {
+    if value == 0 {
+        return Ok(String::new());
+    }
+    char::from_u32(value)
+        .map(|character| character.to_string())
+        .ok_or_else(|| corrupt("invalid native accelerator character"))
 }

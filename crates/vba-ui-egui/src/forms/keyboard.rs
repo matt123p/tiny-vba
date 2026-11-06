@@ -297,8 +297,10 @@ impl Keyboard {
                     || self.queue.iter().any(|(instance, _)| *instance == owner)
                     || self.suppressed.contains(&owner)
                     || self.held.iter().any(|(instance, _)| *instance == owner));
+        let accelerator_input=ctx.input(|input|input.events.iter().any(|event|matches!(event,egui::Event::Key{pressed:true,modifiers,..} if modifiers.alt && !modifiers.ctrl)));
         if owns_focus
-            && (self.observes
+            && (accelerator_input
+                || self.observes
                 || listens
                 || self.pending.iter().any(|pending| pending.owner == owner)
                 || self.queue.iter().any(|(instance, _)| *instance == owner)
@@ -657,7 +659,7 @@ fn paired_text_key(text: &str, event: &egui::Event) -> bool {
     else {
         return false;
     };
-    if modifiers.ctrl || modifiers.alt || modifiers.command {
+    if modifiers.ctrl || modifiers.command {
         return false;
     }
     let mut chars = text.chars();

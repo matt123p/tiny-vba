@@ -45,6 +45,7 @@ pub struct Control {
     pub width: i32,
     pub height: i32,
     pub caption: String,
+    pub accelerator: String,
     pub tag: String,
     pub control_tip_text: String,
     pub control_source: String,

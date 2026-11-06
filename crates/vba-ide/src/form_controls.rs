@@ -96,6 +96,9 @@ pub(crate) fn control_class(kind: ControlKind, ranges: bool) -> String {
         ControlKind::Image => 15,
         ControlKind::RefEdit => 16,
     };
+    if crate::form_accelerator::supported(kind) {
+        s.push_str(crate::form_accelerator::PROPERTY);
+    }
     s.push_str("Public VbaKind As Integer\nPublic VbaRuntime As Boolean\nPublic VbaDetached As Boolean\nPublic VbaContext As VbaFormControlContext\n");
     if !matches!(
         kind,
@@ -153,7 +156,7 @@ pub(crate) fn control_class(kind: ControlKind, ranges: bool) -> String {
         s.push_str(&crate::form_tabs::multipage());
     } else if kind == ControlKind::Page {
         s.push_str(crate::form_container::FRAME);
-        s.push_str("Public VbaIndex As Long\nPublic Accelerator As String\nPublic Property Get Index() As Long\nIndex=VbaIndex\nEnd Property\n");
+        s.push_str("Public VbaIndex As Long\nPublic Property Get Index() As Long\nIndex=VbaIndex\nEnd Property\n");
     } else if kind == ControlKind::Frame {
         s.push_str(crate::form_container::FRAME);
     } else if kind == ControlKind::ComboBox {

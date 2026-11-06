@@ -21,6 +21,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let numeric = option.as_deref() == Some("--numeric-controls");
     let focus = option.as_deref() == Some("--focus-events");
     let keyboard = option.as_deref() == Some("--keyboard-events");
+    let accelerators = option.as_deref() == Some("--accelerators");
     let routing = option.as_deref() == Some("--keyboard-routing");
     let text_controls = option.as_deref() == Some("--text-controls");
     let password = option.as_deref() == Some("--password-text");
@@ -31,7 +32,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             "--focus-events" | "--text-controls" | "--password-text" | "--numeric-controls"
             | "--list-controls" | "--multi-select" | "--combo-controls" | "--metadata"
             | "--frame-controls" | "--tab-controls" | "--page-controls" | "--image-controls"
-            | "--refedit-controls" | "--keyboard-events" | "--keyboard-routing",
+            | "--refedit-controls" | "--keyboard-events" | "--keyboard-routing" | "--accelerators",
         ) => false,
         Some(_) => return Err("unknown fixture option".into()),
     };
@@ -59,6 +60,12 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         "Stop\r\nDebug.Print Entry.Text"
     };
     let mut text = String::from_utf8(fixture::export())?.replace("Debug.Print Entry.Text", body);
+    if accelerators {
+        text = text.replace(
+            "Debug.Print \"initialized\"",
+            "Heading.Accelerator=\"N\"\r\nApply.Accelerator=\"A\"\r\nDebug.Print \"initialized\"",
+        );
+    }
     if routing {
         text.push_str("\r\nPrivate Sub Entry_KeyDown(ByVal KeyCode As MSForms.ReturnInteger,ByVal Shift As Integer)\r\nIf KeyCode.Value=9 Then\r\nDebug.Print \"down\"\r\nStop\r\nEnd If\r\nEnd Sub\r\nPrivate Sub Apply_KeyUp(ByVal KeyCode As MSForms.ReturnInteger,ByVal Shift As Integer)\r\nIf KeyCode.Value=9 Then\r\nDebug.Print \"up\"\r\nElse\r\nDebug.Print \"button up\"\r\nEnd If\r\nEnd Sub\r\nPrivate Sub Apply_KeyDown(ByVal KeyCode As MSForms.ReturnInteger,ByVal Shift As Integer)\r\nDebug.Print \"button down\"\r\nEnd Sub\r\nPrivate Sub Apply_KeyPress(ByVal KeyANSI As MSForms.ReturnInteger)\r\nDebug.Print \"button press\"\r\nKeyANSI.Value=0\r\nEnd Sub\r\n");
     }

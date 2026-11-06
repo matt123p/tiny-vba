@@ -119,6 +119,7 @@ pub(super) fn control(bytes: &[u8], site: Site) -> Result<Control> {
     };
     r.end()?;
     Ok(Control {
+        accelerator: String::new(),
         id: site.id,
         parent: None,
         name: site.name,

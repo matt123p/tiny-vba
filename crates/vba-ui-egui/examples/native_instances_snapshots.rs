@@ -15,6 +15,9 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         .nth(1)
         .unwrap_or_else(|| "reports/ui".into());
     std::fs::create_dir_all(&folder)?;
+    let accelerators = std::env::args()
+        .nth(2)
+        .is_some_and(|o| o == "--accelerators");
     let multiple = std::env::args()
         .nth(2)
         .is_some_and(|o| o == "--multi-select");
@@ -118,6 +121,11 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                 .replace("b.Show 0\nEnd Sub", "b.Show 0\na.Combo1.DropDown\nEnd Sub")
         } else {
             main.into()
+        };
+        let main = if accelerators {
+            main.replace("a.Show 0", "a.Heading.Accelerator=\"N\"\na.Apply.Accelerator=\"A\"\na.Check1.Accelerator=\"C\"\na.Toggle1.Accelerator=\"T\"\na.Show 0").replace("b.Show 0", "b.Heading.Accelerator=\"N\"\nb.Apply.Accelerator=\"A\"\nb.Check1.Accelerator=\"C\"\nb.Toggle1.Accelerator=\"T\"\nb.Show 0")
+        } else {
+            main
         };
         ide.add_module("Main.bas", &main)?;
         ide.dispatch(Action::Run, &mut NoHost)?;

@@ -118,6 +118,9 @@ impl Ide {
         let mut total_tabs = 0usize;
         let mut image_bytes = 0usize;
         for c in &native.design.controls {
+            if c.accelerator.encode_utf16().count() > 1 {
+                return Err(error("invalid native accelerator character"));
+            }
             if c.id == 0
                 || c.id > i32::MAX as u32
                 || (matches!(c.kind, Kind::TabStrip | Kind::MultiPage)) != c.tabs.is_some()

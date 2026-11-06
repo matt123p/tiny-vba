@@ -85,12 +85,14 @@ pub(crate) fn members(form: &Form, handlers: &BTreeSet<String>) -> String {
     let mut s = String::from(
         r#"
 Public VbaKeyEpoch As Long
+Public VbaKeyUnsupported As Boolean
 Public VbaKeyDone As Boolean
 Public VbaKeyCode As Integer
 Public VbaKeyText As String
 Public Sub VbaKeyInput(ByVal index As Long,ByVal phase As Integer,ByVal value As Integer,ByVal shift As Integer,ByVal text As String,ByVal interpret As Boolean)
 VbaKeyEpoch=VbaKeyEpoch+1
 VbaKeyDone=False
+VbaKeyUnsupported=False
 VbaKeyCode=0
 VbaKeyText=""
 Dim control As Object,key As MSForms.ReturnInteger
@@ -130,6 +132,9 @@ If control.VbaDetached Or Not control.Enabled Or Not control.Visible Then GoTo f
 If index>=VbaAllControls.Count Then GoTo finished
 If Not (VbaAllControls.Item(index) Is control) Then GoTo finished
 End If
+If phase=0 And key.Value<>0 And (shift And 4)<>0 And (shift And 2)=0 Then
+If VbaUseAccelerator(ChrW(key.Value)) Then GoTo finished
+End If
 VbaKeyCode=key.Value
 If phase=1 And key.Value<>0 Then VbaKeyText=Chr(key.Value)
 finished:
@@ -147,6 +152,7 @@ Private Sub VbaFormKey(ByVal phase As Integer,ByVal key As MSForms.ReturnInteger
         }
     }
     s.push_str("End Sub\n");
+    s.push_str(crate::form_accelerator::INPUT);
     for control in form
         .controls
         .iter()
@@ -232,6 +238,9 @@ impl Ide {
         }
         if self.form_instance_field(instance, None, "VbaKeyDone")? != Value::Boolean(true) {
             return Ok(None);
+        }
+        if self.form_instance_field(instance, None, "VbaKeyUnsupported")? == Value::Boolean(true) {
+            return Err(error("duplicate accelerator routing is unsupported"));
         }
         let Value::Integer(code) = self.form_instance_field(instance, None, "VbaKeyCode")? else {
             return Err(error("keyboard receipt code"));

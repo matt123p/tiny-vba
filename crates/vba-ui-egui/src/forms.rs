@@ -1,5 +1,6 @@
 //! Reusable form designer and real runtime controls. All edits/events are explicit IDE commands.
 use super::*;
+mod accelerator;
 mod combo;
 mod images;
 pub(super) mod keyboard;
@@ -1489,18 +1490,18 @@ impl EditorUi {
                                             match c.kind {
                                                 ControlKind::CheckBox => ui.put(
                                                     bounds,
-                                                    egui::Checkbox::new(&mut selected, caption)
+                                                    egui::Checkbox::new(&mut selected, accelerator::job(&caption,ide.form_instance_field(instance,Some(c.id),"Accelerator").ok(),egui::TextStyle::Body.resolve(ui.style()),theme.text))
                                                         .indeterminate(
                                                             value == vba_ide::Value::Null,
                                                         ),
                                                 ),
                                                 ControlKind::OptionButton => ui.put(
                                                     bounds,
-                                                    egui::RadioButton::new(selected, caption),
+                                                    egui::RadioButton::new(selected, accelerator::job(&caption,ide.form_instance_field(instance,Some(c.id),"Accelerator").ok(),egui::TextStyle::Body.resolve(ui.style()),theme.text)),
                                                 ),
                                                 _ => ui.put(
                                                     bounds,
-                                                    egui::Button::new(caption).selected(selected),
+                                                    egui::Button::new(accelerator::job(&caption,ide.form_instance_field(instance,Some(c.id),"Accelerator").ok(),egui::TextStyle::Button.resolve(ui.style()),theme.text)).selected(selected),
                                                 ),
                                             }
                                         })
@@ -1521,7 +1522,7 @@ impl EditorUi {
                                 ControlKind::Label | ControlKind::CommandButton => {
                                     let response = ui.put(
                                         bounds,
-                                        egui::Button::new(caption)
+                                        egui::Button::new(accelerator::job(&caption,ide.form_instance_field(instance,Some(c.id),"Accelerator").ok(),egui::TextStyle::Button.resolve(ui.style()),theme.text))
                                             .frame(c.kind == ControlKind::CommandButton),
                                     );
                                     if let Some(target) =

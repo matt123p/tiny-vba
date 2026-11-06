@@ -281,3 +281,12 @@ semantic shadowing, compiled identity, inert inspection, host ownership and
 existing budgets remain authoritative. Shared/host acceptance is tracked in
 progress; [the completion checklist](m7a4-completion-checklist.md) retains the
 full remaining M7A.4 scope. No new IR, format or control library is introduced.
+
+
+[ADR 0072](decisions/0072-native-form-accelerators.md) adds native persisted
+accelerators and canonical Accelerator properties, selected eligible Alt actions
+for Label/buttons/booleans/Tab/Page, validation/callback continuations and inert
+caption underlines. Duplicate routing explicitly refuses; non-ASCII/platform and
+further ordering cases remain open. Checklist K03 is PARTIAL; M7A.4 remains in
+progress, edited persistence/removal remain M7A.5/.6 and Office observations remain
+M8.5 NOT_RUN.

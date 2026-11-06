@@ -67,7 +67,13 @@ pub fn streams() -> Vec<(String, Vec<u8>)> {
     streams_with_properties(0, false, false)
 }
 fn streams_with_properties(max_length: u32, default: bool, cancel: bool) -> Vec<(String, Vec<u8>)> {
-    let controls = controls_with_properties(max_length);
+    streams_with_controls(controls_with_properties(max_length), default, cancel)
+}
+fn streams_with_controls(
+    controls: Vec<Vec<u8>>,
+    default: bool,
+    cancel: bool,
+) -> Vec<(String, Vec<u8>)> {
     let mut b = u32s(&[
         (1 << 10) | (1 << 11) | (1 << 19) | (1 << 27),
         0x80000000 | 11,
@@ -132,6 +138,9 @@ pub fn add_designer(project: Vec<u8>) -> Vec<u8> {
 
 /// Original six-family form; native cached MorphData classes, never Office output.
 pub fn boolean_companion() -> Vec<u8> {
+    boolean_accelerator_companion(false)
+}
+pub fn boolean_accelerator_companion(accelerators: bool) -> Vec<u8> {
     let mut all = controls();
     for (display, caption, group) in [
         (4u8, "Check", ""),
@@ -139,9 +148,22 @@ pub fn boolean_companion() -> Vec<u8> {
         (5, "Choice B", "choices"),
         (6, "Toggle", ""),
     ] {
-        let mut body = u32s(&[0x80c00140, u32::from(!group.is_empty())]);
+        let mut body = u32s(&[
+            0x80c00140 | if accelerators { 1 << 29 } else { 0 },
+            u32::from(!group.is_empty()),
+        ]);
         body.extend([display, 0, 0, 0]);
         body.extend(u32s(&[0x80000001, 0x80000000 | caption.len() as u32]));
+        if accelerators {
+            let key = match caption {
+                "Check" => b'C',
+                "Choice A" => b'R',
+                "Choice B" => b'B',
+                _ => b'T',
+            };
+            body.extend(u16::from(key).to_le_bytes());
+            body.extend([0, 0]);
+        }
         if !group.is_empty() {
             body.extend(u32s(&[0x80000000 | group.len() as u32]));
         }
@@ -953,4 +975,32 @@ pub fn binding_companion() -> Vec<u8> {
     let mut bytes = (data.len() as u32).to_le_bytes().to_vec();
     bytes.extend(data);
     bytes
+}
+
+/// Independently authored persisted Label and CommandButton accelerator fields.
+pub fn accelerator_companion() -> Vec<u8> {
+    let mut data = controls();
+    for (index, mask, caption, character) in
+        [(0, 0x828u32, "Name", b'N'), (2, 0x128u32, "Apply", b'A')]
+    {
+        let mut body = u32s(&[mask, 0x8000_0000 | caption.len() as u32]);
+        body.extend(u16::from(character).to_le_bytes());
+        body.extend([0, 0]);
+        body.extend(string(caption));
+        body.extend(u32s(&[2540, 635]));
+        let mut encoded = record(0x200, &body);
+        encoded.extend(record(0x200, &[0; 4]));
+        data[index] = encoded;
+    }
+    let mut file = cfb::CompoundFile::create(Cursor::new(Vec::new())).unwrap();
+    for (name, bytes) in streams_with_controls(data, false, false) {
+        file.create_stream(format!("/{name}"))
+            .unwrap()
+            .write_all(&bytes)
+            .unwrap();
+    }
+    let bytes = file.into_inner().into_inner();
+    let mut result = (bytes.len() as u32).to_le_bytes().to_vec();
+    result.extend(bytes);
+    result
 }

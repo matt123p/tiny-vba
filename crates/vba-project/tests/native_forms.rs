@@ -624,3 +624,42 @@ fn native_binding_site_strings_are_decoded_inertly_with_exact_resources() {
     assert!(form.design.controls[0].control_source.is_empty());
     assert!(form.resources.iter().any(|r| r.bytes == bytes));
 }
+
+#[test]
+fn native_accelerator_fields_decode_as_unicode_without_changing_resources() {
+    let original = fixture::accelerator_companion();
+    let native = decode(&original).unwrap();
+    assert_eq!(native.design.controls[0].accelerator, "N");
+    assert_eq!(native.design.controls[2].accelerator, "A");
+    assert_eq!(native.resources[1].bytes, original);
+    assert!(native.design.controls[1].accelerator.is_empty());
+}
+
+#[test]
+fn native_boolean_accelerator_fields_decode_before_group_name_data() {
+    let native = decode(&fixture::boolean_accelerator_companion(true)).unwrap();
+    assert_eq!(native.design.controls[3].accelerator, "C");
+    assert_eq!(native.design.controls[4].accelerator, "R");
+    assert_eq!(native.design.controls[4].group_name, "choices");
+    assert_eq!(native.design.controls[6].accelerator, "T");
+}
+#[test]
+fn malformed_native_accelerator_character_is_rejected() {
+    use std::io::{Cursor, Read, Write};
+    let data = fixture::accelerator_companion();
+    let mut file = cfb::CompoundFile::open(Cursor::new(data[4..].to_vec())).unwrap();
+    let mut objects = Vec::new();
+    file.open_stream("/o")
+        .unwrap()
+        .read_to_end(&mut objects)
+        .unwrap();
+    objects[12..14].copy_from_slice(&0xd800u16.to_le_bytes());
+    file.create_stream("/o")
+        .unwrap()
+        .write_all(&objects)
+        .unwrap();
+    let bytes = file.into_inner().into_inner();
+    let mut result = (bytes.len() as u32).to_le_bytes().to_vec();
+    result.extend(bytes);
+    assert!(decode(&result).is_err());
+}

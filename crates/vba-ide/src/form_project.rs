@@ -883,6 +883,14 @@ fn compiled_form(
             }
         }
         source.push_str(&setup);
+        if let Some(metadata) =
+            metadata.filter(|_| native.is_some() && crate::form_accelerator::supported(c.kind))
+        {
+            source.push_str(&format!(
+                "{temp}.Accelerator={}\n",
+                vba_string(&metadata.accelerator)
+            ));
+        }
         source.push_str(&format!(
             "Set Vba{}={temp}\nVbaAllControls.VbaAdd {temp}\n",
             c.name
@@ -2126,6 +2134,7 @@ impl Ide {
             "tabfixedwidth" => "VbaTabFixedWidth",
             "tabfixedheight" => "VbaTabFixedHeight",
             "taborientation" => "VbaTabOrientation",
+            "accelerator" => "VbaAccelerator",
             "default" => "VbaDefault",
             "cancel" => "VbaCancel",
             "smallchange" => "VbaSmallChange",
@@ -2449,6 +2458,7 @@ impl Ide {
         }
         let field = match field.to_ascii_lowercase().as_str() {
             "name" => "VbaName",
+            "accelerator" => "VbaAccelerator",
             "caption" if code == 12 => "VbaCaption",
             "index" => "VbaIndex",
             _ => field,

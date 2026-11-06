@@ -277,3 +277,9 @@ VBA focus and callbacks, bounded raw held-key ownership, root widget identities,
 paused character/release continuation and non-text Space ordering. Debugger
 F5/F8 releases must not become form KeyUp callbacks. Root input eligibility
 requires more than a missing TabStop. Full M7A.4 remains in progress.
+
+ADR 0072 adds native accelerators. Inspect canonical fields for caption decoration;
+queue raw Alt even without keyboard listeners and preserve web text/key pairing.
+Actions use ordinary VBA focus/validation/event frames and existing authorization.
+Duplicate routing refuses explicitly; keep K03 partial and do not claim full
+platform/Unicode/event-order or milestone parity.

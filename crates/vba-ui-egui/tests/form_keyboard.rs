@@ -372,3 +372,75 @@ fn web_style_text_before_physical_space_is_one_down_press_up_sequence() -> R {
     );
     Ok(())
 }
+
+#[test]
+fn persisted_accelerator_activates_without_authored_key_handlers() -> R {
+    let mut h = harness_resource(
+        "",
+        "Sub Main()\nNativeForm.Show 0\nEnd Sub",
+        false,
+        Some(fixture::accelerator_companion()),
+    )?;
+    h.key_press_modifiers(egui::Modifiers::ALT, egui::Key::A);
+    h.run_steps(25);
+    assert_clean(&h);
+    assert_eq!(h.state().ide.output(), vec!["initialized", "initial"]);
+    Ok(())
+}
+#[test]
+fn label_accelerator_moves_focus_without_clicking_and_checkbox_accelerator_changes_value() -> R {
+    let mut h = harness_resource(
+        "",
+        "Sub Main()\nNativeForm.Show 0\nNativeForm.Apply.SetFocus\nEnd Sub",
+        false,
+        Some(fixture::accelerator_companion()),
+    )?;
+    h.key_press_modifiers(egui::Modifiers::ALT, egui::Key::N);
+    h.run_steps(25);
+    assert_clean(&h);
+    assert_eq!(h.state().ide.form_keyboard_target(instance(&h)?)?, Some(12));
+    assert_eq!(h.state().ide.output(), vec!["initialized"]);
+    let mut h = harness_resource(
+        "\nPrivate Sub Check1_Change()\nDebug.Print \"changed\"\nEnd Sub",
+        "Sub Main()\nNativeForm.Show 0\nEnd Sub",
+        false,
+        Some(fixture::boolean_accelerator_companion(true)),
+    )?;
+    h.key_press_modifiers(egui::Modifiers::ALT, egui::Key::C);
+    h.run_steps(25);
+    assert_clean(&h);
+    assert_eq!(
+        h.state()
+            .ide
+            .form_instance_field(instance(&h)?, Some(14), "Value")?,
+        Value::Boolean(true)
+    );
+    assert_eq!(h.state().ide.output(), vec!["initialized", "changed"]);
+    Ok(())
+}
+#[test]
+fn web_style_text_before_alt_accelerator_does_not_deliver_spurious_keypress() -> R {
+    let mut h = harness_resource(
+        "\nPrivate Sub Apply_KeyDown(ByVal k As MSForms.ReturnInteger,ByVal s As Integer)\nDebug.Print \"down\"\nEnd Sub\nPrivate Sub Apply_KeyPress(ByVal k As MSForms.ReturnInteger)\nDebug.Print \"unexpected press\"\nEnd Sub",
+        "Sub Main()\nNativeForm.Show 0\nNativeForm.Apply.SetFocus\nEnd Sub",
+        false,
+        Some(fixture::accelerator_companion()),
+    )?;
+    let mut down = key(egui::Key::A, true);
+    let mut up = key(egui::Key::A, false);
+    for event in [&mut down, &mut up] {
+        if let egui::Event::Key { modifiers, .. } = event {
+            *modifiers = egui::Modifiers::ALT;
+        }
+    }
+    h.input_mut()
+        .events
+        .extend([egui::Event::Text("a".into()), down, up]);
+    h.run_steps(25);
+    assert_clean(&h);
+    assert_eq!(
+        h.state().ide.output(),
+        vec!["initialized", "down", "initial"]
+    );
+    Ok(())
+}

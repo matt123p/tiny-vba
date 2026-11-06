@@ -14,7 +14,13 @@ pub(crate) const TAB: &str = r#"Option Explicit
 Public VbaCaption As String
 Public Tag As String
 Public ControlTipText As String
-Public Accelerator As String
+Public VbaAccelerator As String
+Public Property Get Accelerator() As String
+Accelerator=VbaAccelerator
+End Property
+Public Property Let Accelerator(ByVal value As String)
+VbaAccelerator=Left$(value,1)
+End Property
 Public Enabled As Boolean
 Public Visible As Boolean
 Public Property Get Caption() As String
