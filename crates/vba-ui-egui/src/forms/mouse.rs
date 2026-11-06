@@ -11,6 +11,7 @@ pub(super) struct Hit {
     pub origin: egui::Pos2,
     pub parent: egui::Pos2,
     pub kind: Option<ControlKind>,
+    pub text: Option<text::Geometry>,
 }
 impl Hit {
     fn same(&self, other: &Self) -> bool {
@@ -36,6 +37,12 @@ impl Hit {
             )
         })
     }
+    fn text(&self) -> bool {
+        self.kind == Some(ControlKind::TextBox)
+    }
+    fn supported(&self) -> bool {
+        self.simple() || self.text()
+    }
 }
 #[derive(Clone)]
 struct Raw {
@@ -52,13 +59,23 @@ struct Pending {
     raw: Raw,
     epoch: i32,
 }
+struct TextAnchor {
+    gesture: u64,
+    start: usize,
+    end: usize,
+    words: bool,
+}
 #[derive(Default)]
 pub(crate) struct Mouse {
     pub(super) hits: Vec<Hit>,
     pub(super) keyboard_focus: Option<egui::Id>,
+    pub(super) focus_owner: Option<FormInstance>,
     generation: Option<u64>,
     queue: VecDeque<Raw>,
     pending: Option<Pending>,
+    default: Option<Raw>,
+    text_wait: Option<Hit>,
+    text_anchor: Option<TextAnchor>,
     capture: Option<(Hit, u8, u64, bool)>,
     last: Option<(Hit, f64, egui::Pos2)>,
     serial: u64,
@@ -77,14 +94,31 @@ impl Mouse {
             self.overflow = true;
         }
     }
+    pub(super) fn text_geometry(
+        &mut self,
+        owner: FormInstance,
+        control: u32,
+        geometry: text::Geometry,
+    ) {
+        if let Some(hit) = self
+            .hits
+            .iter_mut()
+            .rev()
+            .find(|h| h.owner == owner && h.control == Some(control))
+        {
+            hit.text = Some(geometry);
+        }
+    }
     pub(super) fn idle(&self) -> bool {
-        self.pending.is_none() && self.queue.is_empty() && self.capture.is_none()
+        !self.pending() && self.queue.is_empty() && self.capture.is_none()
     }
     pub(super) fn pending(&self) -> bool {
-        self.pending.is_some()
+        self.pending.is_some() || self.default.is_some() || self.text_wait.is_some()
     }
     pub(super) fn blocks(&self, owner: FormInstance) -> bool {
         self.faulted == Some(owner)
+            || self.default.as_ref().is_some_and(|r| r.hit.owner == owner)
+            || self.text_wait.as_ref().is_some_and(|h| h.owner == owner)
             || self
                 .pending
                 .as_ref()
@@ -96,21 +130,23 @@ impl Mouse {
                 .is_some_and(|(h, _, _, _)| h.owner == owner)
     }
     fn listens(ide: &Ide, hit: &Hit) -> bool {
-        [Phase::Down, Phase::Move, Phase::Up, Phase::DoubleClick]
-            .into_iter()
-            .chain(hit.control.is_none().then_some(Phase::Click))
-            .any(|p| {
-                ide.form_mouse_listens(hit.owner, hit.control, p)
-                    .unwrap_or(false)
-            })
+        hit.text()
+            || [Phase::Down, Phase::Move, Phase::Up, Phase::DoubleClick]
+                .into_iter()
+                .chain(hit.control.is_none().then_some(Phase::Click))
+                .any(|p| {
+                    ide.form_mouse_listens(hit.owner, hit.control, p)
+                        .unwrap_or(false)
+                })
     }
     pub(super) fn step(
         &mut self,
         ctx: &egui::Context,
         ide: &Ide,
         commands: &mut Vec<Command>,
-        allow_dispatch: bool,
+        key_owner: Option<FormInstance>,
     ) {
+        let allow_dispatch = key_owner.is_none();
         let generation = ide
             .form_instances()
             .ok()
@@ -202,6 +238,12 @@ impl Mouse {
                         .find(|h| {
                             h.rect.contains(pos)
                                 && (ide.form_instance_can_deliver(h.owner)
+                                    || key_owner == Some(h.owner)
+                                    || self
+                                        .default
+                                        .as_ref()
+                                        .is_some_and(|r| r.hit.owner == h.owner)
+                                    || self.text_wait.as_ref().is_some_and(|r| r.owner == h.owner)
                                     || self
                                         .pending
                                         .as_ref()
@@ -213,7 +255,10 @@ impl Mouse {
             if ide.mode() == Mode::Break && self.capture.is_none() {
                 continue;
             }
-            let Some(hit) = hit.take().filter(|h| Self::listens(ide, h)) else {
+            let Some(hit) = hit.take().filter(|h| {
+                Self::listens(ide, h)
+                    || h.simple() && (key_owner == Some(h.owner) || self.blocks(h.owner))
+            }) else {
                 continue;
             };
             let shift = match event {
@@ -224,7 +269,7 @@ impl Mouse {
                 u8::from(shift.shift) | (u8::from(shift.ctrl) * 2) | (u8::from(shift.alt) * 4);
             let mut gesture = self.capture.as_ref().map_or(0, |(_, _, serial, _)| *serial);
             let phase = if pressed == Some(true) {
-                if !hit.simple() {
+                if !hit.supported() {
                     commands.push(Command::Report(
                         "native mouse pointer defaults for this control remain unsupported".into(),
                     ));
@@ -237,7 +282,7 @@ impl Mouse {
                     };
                     self.serial = serial;
                     gesture = serial;
-                    if !hit.simple() {
+                    if !hit.supported() {
                         self.suppressed.push(serial);
                     }
                     let double = button == 1
@@ -271,9 +316,14 @@ impl Mouse {
                 }
                 Phase::Up
             } else {
-                if !ide
-                    .form_mouse_listens(hit.owner, hit.control, Phase::Move)
-                    .unwrap_or(false)
+                if !(hit.text()
+                    && self
+                        .capture
+                        .as_ref()
+                        .is_some_and(|(_, mask, _, _)| mask & 1 != 0))
+                    && !ide
+                        .form_mouse_listens(hit.owner, hit.control, Phase::Move)
+                        .unwrap_or(false)
                 {
                     continue;
                 }
@@ -314,6 +364,9 @@ impl Mouse {
             if self.queue.len() >= 64 {
                 self.queue.clear();
                 self.pending = None;
+                self.default = None;
+                self.text_wait = None;
+                self.text_anchor = None;
                 self.capture = None;
                 self.faulted = Some(hit.owner);
                 commands.push(Command::Report("native mouse input budget exceeded".into()));
@@ -330,8 +383,30 @@ impl Mouse {
                 last,
             });
         }
-        if !allow_dispatch && self.pending.is_none() {
+        if !allow_dispatch && !self.pending() {
             return;
+        }
+        if let Some(hit) = self.text_wait.take()
+            && hit.current(ide)
+            && !ide.form_instance_can_deliver(hit.owner)
+        {
+            self.text_wait = Some(hit);
+            ctx.request_repaint();
+            return;
+        }
+        if let Some(raw) = self.default.take() {
+            if !allow_dispatch
+                || raw.hit.current(ide) && !ide.form_instance_can_deliver(raw.hit.owner)
+            {
+                self.default = Some(raw);
+                ctx.request_repaint();
+                return;
+            }
+            if raw.hit.current(ide) && self.text_default(ctx, ide, commands, &raw) {
+                self.text_wait = Some(raw.hit);
+                ctx.request_repaint();
+                return;
+            }
         }
         if let Some(p) = self.pending.take() {
             match ide.form_instance_mouse_result(p.raw.hit.owner, p.epoch) {
@@ -350,7 +425,18 @@ impl Mouse {
                     if !allow && !self.suppressed.contains(&p.raw.gesture) {
                         self.suppressed.push(p.raw.gesture);
                     }
+                    if allow
+                        && p.raw.hit.text()
+                        && p.raw.button & 1 != 0
+                        && matches!(p.raw.phase, Phase::Down | Phase::Move | Phase::DoubleClick)
+                        && !self.suppressed.contains(&p.raw.gesture)
+                    {
+                        self.default = Some(p.raw);
+                        ctx.request_repaint();
+                        return;
+                    }
                     if p.raw.phase == Phase::Up
+                        && p.raw.hit.simple()
                         && p.raw.click
                         && allow
                         && !self.suppressed.contains(&p.raw.gesture)
@@ -361,6 +447,7 @@ impl Mouse {
                         self.queue.push_front(raw);
                     } else if p.raw.last {
                         self.suppressed.retain(|s| *s != p.raw.gesture);
+                        self.text_anchor = None;
                     }
                 }
             }
@@ -403,10 +490,125 @@ impl Mouse {
                 index: -1,
             },
         )));
+        if matches!(raw.phase, Phase::Down | Phase::DoubleClick) {
+            self.focus_owner = Some(raw.hit.owner);
+        }
         if self.keyboard_focus.is_none() {
             self.keyboard_focus = ctx.memory(|memory| memory.focused());
         }
         self.pending = Some(Pending { raw, epoch });
         ctx.request_repaint();
+    }
+    fn text_default(
+        &mut self,
+        ctx: &egui::Context,
+        ide: &Ide,
+        commands: &mut Vec<Command>,
+        raw: &Raw,
+    ) -> bool {
+        use egui::text::CCursor;
+        use egui::text_selection::text_cursor_state::{ccursor_next_word, ccursor_previous_word};
+        let Some(control) = raw.hit.control else {
+            return false;
+        };
+        if ide
+            .form_instance_field(raw.hit.owner, None, "VbaActiveControl")
+            .ok()
+            != Some(Value::Object(raw.hit.object))
+        {
+            self.text_anchor = None;
+            return false;
+        }
+        let Some(geometry) = self
+            .hits
+            .iter()
+            .find(|h| h.same(&raw.hit))
+            .and_then(|h| h.text.as_ref())
+        else {
+            return false;
+        };
+        let Some((value, normalized, cursor)) =
+            geometry.cursor(ctx, ide, raw.hit.owner, control, raw.pos)
+        else {
+            return false;
+        };
+        let original = String::from_utf16_lossy(value.units());
+        let field = |name| {
+            ide.form_instance_field(raw.hit.owner, Some(control), name)
+                .ok()
+        };
+        let canonical = |name| match field(name) {
+            Some(Value::Long(n)) => usize::try_from(n).unwrap_or(0),
+            _ => 0,
+        };
+        let existing_start = canonical("VbaSelStart");
+        let existing_length = canonical("VbaSelLength");
+        let count = normalized.chars().count();
+        let mut start = cursor.index.0.min(count);
+        let mut end = start;
+        if raw.phase == Phase::DoubleClick {
+            start = ccursor_previous_word(&normalized, cursor).index.0;
+            end = ccursor_next_word(&normalized, cursor).index.0;
+        } else if raw.phase == Phase::Down {
+            if raw.shift & 1 != 0 {
+                start = text::chars_before(&original, existing_start);
+            }
+        } else {
+            let Some(anchor) = &self.text_anchor else {
+                return false;
+            };
+            if anchor.gesture != raw.gesture {
+                return false;
+            }
+            start = anchor.start.min(count);
+            if anchor.words {
+                start = start.min(ccursor_previous_word(&normalized, cursor).index.0);
+                end = anchor
+                    .end
+                    .min(count)
+                    .max(ccursor_next_word(&normalized, cursor).index.0);
+            }
+        }
+        if raw.phase != Phase::Move {
+            self.text_anchor = Some(TextAnchor {
+                gesture: raw.gesture,
+                start,
+                end: if raw.phase == Phase::DoubleClick {
+                    end
+                } else {
+                    start
+                },
+                words: raw.phase == Phase::DoubleClick,
+            });
+        }
+        if start != end && field("AutoWordSelect") == Some(Value::Boolean(true)) {
+            let low = start.min(end);
+            let high = start.max(end);
+            start =
+                ccursor_previous_word(&normalized, CCursor::new(low.saturating_add(1).min(count)))
+                    .index
+                    .0;
+            end = ccursor_next_word(&normalized, CCursor::new(high.saturating_sub(1)))
+                .index
+                .0;
+        }
+        let (start, end) = (start.min(end), start.max(end));
+        let start = text::units_before(&original, start);
+        let length = text::units_before(&original, end).saturating_sub(start);
+        self.keyboard_focus = Some(geometry.widget);
+        ctx.memory_mut(|m| m.request_focus(geometry.widget));
+        if start == existing_start && length == existing_length {
+            return false;
+        }
+        let (Ok(start), Ok(length)) = (u32::try_from(start), u32::try_from(length)) else {
+            return false;
+        };
+        commands.push(Command::Form(FormCommand::InstanceText(
+            raw.hit.owner,
+            control,
+            value,
+            (start, length),
+        )));
+        true
     }
 }

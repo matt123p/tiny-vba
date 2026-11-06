@@ -917,7 +917,31 @@ impl EditorUi {
         commands: &mut Vec<Command>,
     ) -> KeyboardFrame {
         self.form_mouse
-            .step(ctx, ide, commands, !self.form_keys.pending());
+            .step(ctx, ide, commands, self.form_keys.pending_owner());
+        // A completed pointer callback may redirect focus. Restore the canonical
+        // decision before egui can turn its pre-callback focus into another input.
+        if let Some(owner) = self
+            .form_mouse
+            .focus_owner
+            .filter(|owner| ide.form_instance_can_deliver(*owner))
+        {
+            let active = ide
+                .form_instance_field(owner, None, "VbaActiveControl")
+                .ok();
+            if let Some((_, _, widget)) =
+                self.form_runtime_focus.iter().find(|(form, control, _)| {
+                    *form == owner
+                        && ide
+                            .form_instance_control_object(owner, *control)
+                            .ok()
+                            .map(vba_ide::Value::Object)
+                            == active
+                })
+            {
+                ctx.memory_mut(|m| m.request_focus(*widget));
+                self.form_mouse.keyboard_focus = Some(*widget);
+            }
+        }
         if ctx.memory(|memory| memory.focused()).is_none()
             && let Some(widget) = self.form_mouse.keyboard_focus.filter(|widget| {
                 self.form_runtime_focus
@@ -930,6 +954,7 @@ impl EditorUi {
         }
         if self.form_mouse.idle() {
             self.form_mouse.keyboard_focus = None;
+            self.form_mouse.focus_owner = None;
         }
         if matches!(ide.mode(), Mode::Design | Mode::Failed | Mode::Stale) {
             self.form_keys.clear();
@@ -1371,7 +1396,7 @@ impl EditorUi {
                         egui::Sense::hover(),
                     );
                     if native {
-                        self.form_mouse.hit(mouse::Hit{owner:instance,control:None,object:instance.object,rect:rect.intersect(ui.clip_rect()),origin:rect.min,parent:rect.min,kind:None});
+                        self.form_mouse.hit(mouse::Hit{owner:instance,control:None,object:instance.object,rect:rect.intersect(ui.clip_rect()),origin:rect.min,parent:rect.min,kind:None,text:None});
                     }
                     let mut focus = Vec::new();
                     let root_eligible = native
@@ -1427,7 +1452,7 @@ impl EditorUi {
                             ) * scale,
                         );
                         if native && enabled && let Ok(object)=ide.form_instance_control_object(instance,c.id) {
-                            self.form_mouse.hit(mouse::Hit{owner:instance,control:Some(c.id),object,rect:bounds.intersect(parent_clip).intersect(ui.clip_rect()),origin:bounds.min,parent:rect.min+offset,kind:Some(c.kind)});
+                            self.form_mouse.hit(mouse::Hit{owner:instance,control:Some(c.id),object,rect:bounds.intersect(parent_clip).intersect(ui.clip_rect()),origin:bounds.min,parent:rect.min+offset,kind:Some(c.kind),text:None});
                         }
                         let widget_id = ui.scope_id().with(("runtime.control", c.id));
                         if native && idle && keyboard_owner==Some(instance)
@@ -1470,7 +1495,7 @@ impl EditorUi {
                                 ControlKind::ComboBox=> {combo::ComboBox{ide,instance,control:c,bounds,widget:widget_id,theme}.show(ui,commands);}
                                 ControlKind::ListBox => {list::ListBox{ide,instance,control:c,bounds,widget:widget_id,theme}.show(ui,commands);}
                                 ControlKind::SpinButton|ControlKind::ScrollBar=> {numeric::Numeric{ide,instance,control:c,bounds,widget:widget_id,theme}.show(ui,commands);}
-                                ControlKind::TextBox if native => { text::TextBox {ide,instance,control:c,bounds,widget:widget_id,enabled,theme}.show(ui,commands); }
+                                ControlKind::TextBox if native => { if let Some(geometry)= (text::TextBox {ide,instance,control:c,bounds,widget:widget_id,enabled,theme}).show(ui,commands) {self.form_mouse.text_geometry(instance,c.id,geometry);} }
                                 ControlKind::TextBox => {
                                     let mut text = ide
                                         .form_instance_field(instance, Some(c.id), "VbaText")
@@ -1629,11 +1654,6 @@ impl EditorUi {
                             .map(|(_, control, target)| (instance, control, target)),
                     );
                 });
-                if !idle {
-                    ui.label(
-                        theme.label("Execution paused or running — use the debugger to continue."),
-                    );
-                }
                 if ui.button(theme.label("Reset Form Execution")).clicked() {
                     commands.push(Command::Action(Action::Reset));
                 }

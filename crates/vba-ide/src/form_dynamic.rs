@@ -434,10 +434,11 @@ control.VbaCancel=isCancel
 End If
 If kind=5 Then control.GroupName=group
 End Sub
-Public Sub VbaInitializeText(ByVal control As Object,ByVal maxLength As Long,ByVal multiLine As Boolean,ByVal wordWrap As Boolean,ByVal enterKey As Boolean,ByVal tabKey As Boolean,ByVal behavior As Long,ByVal password As Long)
+Public Sub VbaInitializeText(ByVal control As Object,ByVal maxLength As Long,ByVal multiLine As Boolean,ByVal wordWrap As Boolean,ByVal enterKey As Boolean,ByVal tabKey As Boolean,ByVal behavior As Long,ByVal password As Long,ByVal autoWord As Boolean)
 control.MaxLength=maxLength
 control.MultiLine=multiLine
 control.WordWrap=wordWrap
+control.AutoWordSelect=autoWord
 control.EnterKeyBehavior=enterKey
 control.TabKeyBehavior=tabKey
 control.EnterFieldBehavior=behavior

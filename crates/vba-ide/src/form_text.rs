@@ -6,6 +6,7 @@ Public VbaMaxLength As Long
 Public Locked As Boolean
 Public MultiLine As Boolean
 Public WordWrap As Boolean
+Public AutoWordSelect As Boolean
 Public EnterKeyBehavior As Boolean
 Public TabKeyBehavior As Boolean
 Private VbaEnterFieldBehavior As Long

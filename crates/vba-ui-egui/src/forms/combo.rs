@@ -37,7 +37,7 @@ impl ComboBox<'_> {
         );
         let mut toggle = false;
         if self.long("Style", 0) == 0 {
-            text::TextBox {
+            let _ = text::TextBox {
                 ide: self.ide,
                 instance: self.instance,
                 control: self.control,

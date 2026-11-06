@@ -22,6 +22,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let focus = option.as_deref() == Some("--focus-events");
     let keyboard = option.as_deref() == Some("--keyboard-events");
     let mouse = option.as_deref() == Some("--mouse-events");
+    let text_mouse = option.as_deref() == Some("--text-mouse");
     let accelerators = option.as_deref() == Some("--accelerators");
     let routing = option.as_deref() == Some("--keyboard-routing");
     let text_controls = option.as_deref() == Some("--text-controls");
@@ -34,7 +35,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             | "--list-controls" | "--multi-select" | "--combo-controls" | "--metadata"
             | "--frame-controls" | "--tab-controls" | "--page-controls" | "--image-controls"
             | "--refedit-controls" | "--keyboard-events" | "--keyboard-routing" | "--accelerators"
-            | "--mouse-events",
+            | "--mouse-events" | "--text-mouse",
         ) => false,
         Some(_) => return Err("unknown fixture option".into()),
     };
@@ -56,12 +57,17 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         "Stop\r\nDebug.Print Check1.Value\r\nDebug.Print ChoiceA.Value\r\nDebug.Print ChoiceB.Value\r\nDebug.Print Toggle1.Value"
     } else if text_controls {
         "Stop\r\nDebug.Print Len(Entry.Text)\r\nDebug.Print Entry.SelStart\r\nDebug.Print Entry.SelLength"
+    } else if text_mouse {
+        "Debug.Print Entry.Text\r\nDebug.Print Entry.SelLength"
     } else if focus || mouse {
         "Debug.Print Entry.Text"
     } else {
         "Stop\r\nDebug.Print Entry.Text"
     };
     let mut text = String::from_utf8(fixture::export())?.replace("Debug.Print Entry.Text", body);
+    if text_mouse {
+        text.push_str("\r\nPrivate Sub Entry_MouseDown(ByVal Button As Integer,ByVal Shift As Integer,ByVal X As Single,ByVal Y As Single)\r\nDebug.Print \"down\"\r\nStop\r\nEnd Sub\r\nPrivate Sub Entry_MouseUp(ByVal Button As Integer,ByVal Shift As Integer,ByVal X As Single,ByVal Y As Single)\r\nDebug.Print Entry.SelLength\r\nEnd Sub\r\n");
+    }
     if mouse {
         text.push_str("\r\nPrivate Sub Apply_MouseDown(ByVal Button As Integer,ByVal Shift As Integer,ByVal X As Single,ByVal Y As Single)\r\nDebug.Print \"down\"\r\nStop\r\nEnd Sub\r\nPrivate Sub Apply_MouseUp(ByVal Button As Integer,ByVal Shift As Integer,ByVal X As Single,ByVal Y As Single)\r\nDebug.Print \"up\"\r\nEnd Sub\r\n");
     }

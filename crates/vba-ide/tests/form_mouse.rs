@@ -52,6 +52,22 @@ fn mouse(ide: &mut Ide, f: FormInstance, control: Option<u32>, event: FormMouseE
     Ok(epoch)
 }
 #[test]
+fn native_text_word_selection_bit_and_dynamic_default_are_canonical() -> R {
+    for (flags, expected) in [(0x2c80081b, false), (0x2480081b, true)] {
+        let (ide, f) = setup(
+            "Sub Main()\nNativeForm.Show 0\nDim t As MSForms.TextBox\nSet t=NativeForm.Controls.Add(\"Forms.TextBox.1\",\"Extra\")\nDebug.Print t.AutoWordSelect\nt.AutoWordSelect=False\nDebug.Print t.AutoWordSelect\nEnd Sub",
+            None,
+            fixture::text_companion(flags, 0),
+        )?;
+        assert_eq!(
+            ide.form_instance_field(f, Some(12), "AutoWordSelect")?,
+            vba_ide::Value::Boolean(expected)
+        );
+        assert_eq!(ide.output(), vec!["initialized", "True", "False"]);
+    }
+    Ok(())
+}
+#[test]
 fn typed_mouse_events_and_double_click_cancellation_use_ordinary_frames() -> R {
     let source = fixture::SOURCE.to_owned()
         + "\nPrivate Sub Apply_MouseDown(ByVal b As MSForms.fmButton,ByVal s As MSForms.fmShiftState,ByVal x As Single,ByVal y As Single)\nDebug.Print TypeName(b),VarType(x),b,s,x,y\nEnd Sub\nPrivate Sub Apply_MouseUp(ByVal b As Integer,ByVal s As Integer,ByVal x As Single,ByVal y As Single)\nDebug.Print \"up\"\nEnd Sub\nPrivate Sub Apply_DblClick(ByVal Cancel As MSForms.ReturnBoolean)\nDebug.Print \"double\"\nCancel=True\nEnd Sub";

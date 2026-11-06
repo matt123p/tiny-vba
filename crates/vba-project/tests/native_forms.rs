@@ -149,10 +149,13 @@ fn native_text_behavior_packet_decodes_exact_flags_password_and_preserves_origin
     assert!(text.text_behavior.enter_key);
     assert!(text.text_behavior.tab_key);
     assert!(text.text_behavior.recall_selection);
+    assert!(!text.text_behavior.auto_word_select);
     assert_eq!(text.text_behavior.password_char, 42);
     assert_eq!(text.text, "initial");
     assert_eq!(form.resources[1].bytes, bytes);
     assert!(decode(&fixture::text_companion(flags | (1 << 24), 42)).is_err());
+    let word = decode(&fixture::text_companion(flags & !(1 << 27), 42)).unwrap();
+    assert!(word.design.controls[1].text_behavior.auto_word_select);
 }
 
 #[test]

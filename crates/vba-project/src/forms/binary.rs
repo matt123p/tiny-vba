@@ -614,7 +614,7 @@ fn control(bytes: &[u8], site: Site) -> Result<Control> {
         let flags = field(&mut b, m, 0, 4, 0x2c80_081b)?;
         locked = flags & 4 != 0;
         let text_flags = if textbox {
-            0x80f0_4000
+            0x88f0_4000
         } else if combobox {
             0x0020_5000
         } else {
@@ -624,6 +624,7 @@ fn control(bytes: &[u8], site: Site) -> Result<Control> {
             return Err(unsupported("TextBox behavior flags"));
         }
         if textbox {
+            text_behavior.auto_word_select = flags & (1 << 27) == 0;
             text_behavior.multi_line = flags & (1 << 31) != 0;
             text_behavior.word_wrap = flags & (1 << 23) != 0;
             text_behavior.enter_key = flags & (1 << 20) != 0;

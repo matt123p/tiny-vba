@@ -505,3 +505,11 @@ ADR 0073's event-signature metadata refinement omits unused instance-field
 aliases from Event declarations. Declared argument types, receivers, canonical
 class fields and every executable method's field aliases remain verified under
 the existing nominal metadata and runtime limits. No IR change is needed.
+
+[ADR 0074](decisions/0074-native-text-pointer-selection.md) adds selected native
+TextBox pointer caret/drag/word selection after mouse callbacks, cancellation and
+focus redirects, with ordinary authorized selection commits. Canonical UTF-16,
+CRLF, Stop/Reset and source/resource identity are preserved. Native AutoWordSelect
+bit 27 is the inverse of the Boolean property; imported defaults and new dynamic
+controls are distinguished. ComboBox/RefEdit pointer defaults, further platform/
+word/selection cases and the full M7A.4 checklist remain open.

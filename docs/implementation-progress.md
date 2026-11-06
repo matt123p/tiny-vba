@@ -1,5 +1,20 @@
 # Implementation progress
 
+## M7A.4 continued — native TextBox pointer defaults (2026-11-06)
+
+ADR 0074 adds selected caret, captured drag, double-click cancellation/word
+selection, shift extension and native AutoWordSelect metadata. The adapter uses
+current canonical UTF-16 after callbacks and ordinary authorized text commands;
+focus redirects, CRLF, isolated surrogates and Reset/source identity are covered.
+Seven shared model cases pass natively and under WASI; all 24 decoder cases and
+13 actual egui pointer cases pass. Full shared CI, strict final UI/app Clippy,
+WASM/WASI, UI/native/web and Chromium pointer/editor/modal-form checks pass.
+Native and browser live/paused/selected/completed output and all five native
+themes/scales were inspected. Consumer integration is pending below.
+M01 and M7A.4 remain partial; the complete checklist remains authoritative.
+Next: remaining editable ComboBox/RefEdit and list/numeric/drop/picker/indexed-tab
+pointer defaults, plus the unchanged lifecycle, keyboard and property checklist.
+
 ## M7A.4 continued — native mouse callbacks (2026-11-06)
 
 ADR 0073 adds typed MouseDown/MouseMove/MouseUp/DblClick, indexed arguments,

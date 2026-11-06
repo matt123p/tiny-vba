@@ -17,10 +17,10 @@ fn positions(text: &str) -> impl Iterator<Item = usize> + '_ {
         Some(units)
     })
 }
-fn units_before(text: &str, chars: usize) -> usize {
+pub(super) fn units_before(text: &str, chars: usize) -> usize {
     positions(text).take(chars).sum()
 }
-fn chars_before(text: &str, units: usize) -> usize {
+pub(super) fn chars_before(text: &str, units: usize) -> usize {
     let mut consumed = 0usize;
     positions(text)
         .take_while(|width| {
@@ -33,6 +33,63 @@ fn chars_before(text: &str, units: usize) -> usize {
             }
         })
         .count()
+}
+/// Immutable layout parameters, never a second copy of the control's value.
+#[derive(Clone)]
+pub(super) struct Geometry {
+    pub widget: egui::Id,
+    pub origin: egui::Pos2,
+    pub width: f32,
+    pub font: egui::FontId,
+}
+impl Geometry {
+    pub(super) fn cursor(
+        &self,
+        ctx: &egui::Context,
+        ide: &Ide,
+        owner: vba_ide::FormInstance,
+        control: u32,
+        pos: egui::Pos2,
+    ) -> Option<(vba_ide::VbaString, String, CCursor)> {
+        let field = |name| ide.form_instance_field(owner, Some(control), name).ok();
+        let vba_ide::Value::String(raw) = field("VbaText")? else {
+            return None;
+        };
+        let text = String::from_utf16_lossy(raw.units()).replace("\r\n", "\n");
+        let multi = field("MultiLine") == Some(vba_ide::Value::Boolean(true));
+        let wrap = multi && field("WordWrap") == Some(vba_ide::Value::Boolean(true));
+        let mask = field("PasswordChar")
+            .map(control_text)
+            .unwrap_or_default()
+            .chars()
+            .next();
+        let display = text
+            .chars()
+            .map(|c| {
+                if c == '\n' {
+                    if multi { '\n' } else { ' ' }
+                } else {
+                    mask.unwrap_or(c)
+                }
+            })
+            .collect();
+        let galley = ctx.fonts_mut(|fonts| {
+            fonts.layout(
+                display,
+                self.font.clone(),
+                egui::Color32::WHITE,
+                if wrap { self.width } else { f32::INFINITY },
+            )
+        });
+        let mut point = pos - self.origin;
+        // Single-line editors select horizontally even when capture leaves the
+        // row vertically; Galley's multiline hit testing otherwise picks an end.
+        if !multi {
+            point.y = galley.rect.center().y;
+        }
+        let cursor = galley.cursor_from_pos(point);
+        Some((raw, text, cursor))
+    }
 }
 fn selection(text: &str, range: CCursorRange) -> (u32, u32) {
     let [start, end] = range.sorted_cursors();
@@ -106,9 +163,9 @@ impl TextBox<'_> {
             _ => 0,
         }
     }
-    pub(super) fn show(&self, ui: &mut egui::Ui, commands: &mut Vec<Command>) {
+    pub(super) fn show(&self, ui: &mut egui::Ui, commands: &mut Vec<Command>) -> Option<Geometry> {
         let Some(vba_ide::Value::String(raw)) = self.field("VbaText") else {
-            return;
+            return None;
         };
         let original = String::from_utf16_lossy(raw.units());
         let mut text = original.replace("\r\n", "\n");
@@ -204,7 +261,7 @@ impl TextBox<'_> {
                     Ok(value) => value,
                     Err(e) => {
                         commands.push(Command::Report(e.to_string()));
-                        return;
+                        return None;
                     }
                 }
             } else {
@@ -220,6 +277,12 @@ impl TextBox<'_> {
                 )));
             }
         }
+        Some(Geometry {
+            widget: self.widget,
+            origin: output.galley_pos,
+            width: output.galley.job.wrap.max_width,
+            font,
+        })
     }
 }
 /// Adapt the documented control key policy before the ordinary Tab/default-button routing.

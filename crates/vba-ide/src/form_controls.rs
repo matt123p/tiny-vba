@@ -226,7 +226,10 @@ pub(crate) fn control_class(kind: ControlKind, ranges: bool) -> String {
     if kind == ControlKind::MultiPage {
         s.push_str("Public Event AddControl(ByVal index As Long,ByVal control As MSForms.Control)\nPublic Event RemoveControl(ByVal index As Long,ByVal control As MSForms.Control)\nPublic Sub VbaNotifyControl(ByVal added As Boolean,ByVal index As Long,ByVal control As MSForms.Control)\nIf added Then\nRaiseEvent AddControl(index,control)\nElse\nRaiseEvent RemoveControl(index,control)\nEnd If\nEnd Sub\n");
     }
-    let init = format!("VbaKind={kind_code}\n");
+    let mut init = format!("VbaKind={kind_code}\n");
+    if matches!(kind, ControlKind::TextBox | ControlKind::RefEdit) {
+        init.push_str("AutoWordSelect=True\n");
+    }
     if s.contains("Private Sub Class_Initialize()\n") {
         s = s.replacen(
             "Private Sub Class_Initialize()\n",

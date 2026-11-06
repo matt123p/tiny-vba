@@ -19,7 +19,7 @@ impl RefEdit<'_> {
             egui::pos2(edit.right(), bounds.top()),
             bounds.right_bottom(),
         );
-        text::TextBox {
+        let _ = text::TextBox {
             bounds: edit,
             ..self.text
         }

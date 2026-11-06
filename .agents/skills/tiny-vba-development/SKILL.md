@@ -330,3 +330,10 @@ range import. Import and rendering remain inert; GridCraft owns cell commands,
 trust and revision-driven callbacks. The owner approved 4,096 static permission
 entries on 2026-11-05; per-site authorization and executed-call/work/memory limits
 remain in force. Further binding timing/types and the broader M7A.4 ledger remain open.
+
+ADR 0074 adds selected TextBox pointer selection after ordinary mouse callbacks.
+Keep text/selection canonical and retain only immutable layout parameters/raw
+anchors. Re-read values after callbacks, preserve cancelled/redirected focus and
+Stop/Reset, and authorize InstanceText like other executable form commands.
+Native AutoWordSelect bit 27 is inverted relative to its VBA property; do not
+confuse persisted defaults with new dynamic controls. Full M01/M7A.4 remains open.

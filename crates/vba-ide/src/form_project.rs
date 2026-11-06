@@ -980,14 +980,15 @@ fn compiled_form(
             }
             if matches!(c.kind, ControlKind::TextBox | ControlKind::RefEdit) {
                 source.push_str(&format!(
-                    "VbaInitializeText {temp},{},{},{},{},{},{},{}\n",
+                    "VbaInitializeText {temp},{},{},{},{},{},{},{},{}\n",
                     control.max_length,
                     boolean(control.text_behavior.multi_line),
                     boolean(control.text_behavior.word_wrap),
                     boolean(control.text_behavior.enter_key),
                     boolean(control.text_behavior.tab_key),
                     u8::from(control.text_behavior.recall_selection),
-                    control.text_behavior.password_char
+                    control.text_behavior.password_char,
+                    boolean(control.text_behavior.auto_word_select)
                 ));
             }
         }

@@ -290,3 +290,10 @@ values remain in ordinary classes. Capture survives callback Stop and coordinate
 retain their declared basis. Keep keyboard focus through a bookmark, validate
 receivers before dispatch and suppress cancelled/stale defaults. Text/list/numeric/
 indexed-tab defaults, mixed/platform ordering and full M7A.4 remain open.
+
+ADR 0074 adds selected TextBox pointer selection after ordinary mouse callbacks.
+Keep text/selection canonical and retain only immutable layout parameters/raw
+anchors. Re-read values after callbacks, preserve cancelled/redirected focus and
+Stop/Reset, and authorize InstanceText like other executable form commands.
+Native AutoWordSelect bit 27 is inverted relative to its VBA property; do not
+confuse persisted defaults with new dynamic controls. Full M01/M7A.4 remains open.

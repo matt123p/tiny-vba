@@ -292,6 +292,7 @@ impl eframe::App for App {
             self.confirm_close = true;
             self.close_window = true;
         }
+        let rendered_mode = self.ide.mode();
         let commands = self.view.show(ui, &self.ide, self.theme);
         for command in commands {
             if let Err(d) = apply(&mut self.ide, command, &mut NoHost) {
@@ -303,6 +304,9 @@ impl eframe::App for App {
         }
         self.requests();
         self.file_ui(ui.ctx());
+        if self.ide.mode() != rendered_mode {
+            ui.ctx().request_repaint();
+        }
         #[cfg(target_arch = "wasm32")]
         if let Some(document) = web_sys::window().and_then(|w| w.document()) {
             if let Some(status) = document.get_element_by_id("vba-status") {

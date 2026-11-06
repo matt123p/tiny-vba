@@ -121,8 +121,8 @@ fn shift(modifiers: egui::Modifiers) -> u8 {
     u8::from(modifiers.shift) | (u8::from(modifiers.ctrl) * 2) | (u8::from(modifiers.alt) * 4)
 }
 impl Keyboard {
-    pub(super) fn pending(&self) -> bool {
-        !self.pending.is_empty()
+    pub(super) fn pending_owner(&self) -> Option<FormInstance> {
+        self.pending.first().map(|p| p.owner)
     }
     pub(super) fn busy(&self) -> bool {
         !self.queue.is_empty() || !self.pending.is_empty()

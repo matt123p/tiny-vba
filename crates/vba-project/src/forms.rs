@@ -119,6 +119,8 @@ pub struct NumericBehavior {
 /// Selected native MorphData behavior; original resources remain separate.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct TextBehavior {
+    /// MS-OFORMS stores the inverse of the public AutoWordSelect property.
+    pub auto_word_select: bool,
     pub multi_line: bool,
     pub word_wrap: bool,
     pub enter_key: bool,
@@ -129,6 +131,7 @@ pub struct TextBehavior {
 impl Default for TextBehavior {
     fn default() -> Self {
         Self {
+            auto_word_select: false,
             multi_line: false,
             word_wrap: true,
             enter_key: false,
