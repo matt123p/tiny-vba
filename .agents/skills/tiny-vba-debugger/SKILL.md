@@ -171,3 +171,11 @@ enumeration/default selection and authorized widget input. Canonical state stays
 in ordinary classes; inert queries/rendering do not instantiate or execute VBA.
 MultiPage, dynamic tab mutation/index/name semantics and the remaining M7A.4
 ledger stay open. Native edited persistence and .tvform removal remain separate.
+
+
+[ADR 0067](../../../docs/decisions/0067-vartype-default-value-inspection.md) adds
+IR 13 optional default inspection for VarType. Preserve source-order evaluation,
+normal class frames/authorized host calls, getter errors and one-shot Stop/wait
+continuations. Resolver presence metadata is inert and identity checked; actual
+getters remain executable. Older IR consumers refuse this capability. Watches
+stay inert and all existing budgets remain. Full M7A.4/M8.5 are separate gates.

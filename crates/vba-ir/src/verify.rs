@@ -134,6 +134,7 @@ fn validate(
             | IR10_VERSION
             | IR11_VERSION
             | IR12_VERSION
+            | IR13_VERSION
     ) || p.profile != caps.profile
         || !caps.ir_versions.contains(&p.ir_version)
     {
@@ -466,12 +467,26 @@ fn validate(
         if let Some(member) = &class.default_member {
             name(member)?;
             budget.text(member)?;
-            if !class
+            let method = class
                 .methods
                 .iter()
-                .any(|m| m.name.eq_ignore_ascii_case(member) && m.kind == ForeignKind::Get)
-            {
-                return Err(invalid("class default member"));
+                .find(|method| {
+                    method.public
+                        && method.name.eq_ignore_ascii_case(member)
+                        && matches!(method.kind, ForeignKind::Get | ForeignKind::Call)
+                })
+                .ok_or_else(|| invalid("class default member"))?;
+            if method.kind == ForeignKind::Call {
+                if p.ir_version < IR13_VERSION {
+                    return Err(invalid("default function requires IR 13"));
+                }
+                feature(p, caps, "inspection-defaults-v13")?;
+                if p.procedures
+                    .get(method.procedure.0 as usize)
+                    .is_none_or(|procedure| procedure.kind != ProcedureKind::Function)
+                {
+                    return Err(invalid("default function signature"));
+                }
             }
         }
         for method in &class.methods {
@@ -910,6 +925,12 @@ fn validate(
             feature(p, caps, "direct-calls")?;
         }
         for site in &proc.foreign {
+            if site.kind == ForeignKind::InspectGet {
+                if p.ir_version < IR13_VERSION {
+                    return Err(invalid("inspection defaults require IR 13"));
+                }
+                feature(p, caps, "inspection-defaults-v13")?;
+            }
             feature(p, caps, "foreign-snapshot-v1")?;
             let implicit = matches!(
                 site.kind,
@@ -919,6 +940,7 @@ fn validate(
                     | ForeignKind::AssignValue
                     | ForeignKind::ArgumentGet
                     | ForeignKind::ValueGet
+                    | ForeignKind::InspectGet
                     | ForeignKind::Enumerate
                     | ForeignKind::EnumerateObjects
             );
@@ -947,7 +969,10 @@ fn validate(
                 )?;
                 if matches!(
                     site.kind,
-                    ForeignKind::ValueGet | ForeignKind::Enumerate | ForeignKind::EnumerateObjects
+                    ForeignKind::ValueGet
+                        | ForeignKind::InspectGet
+                        | ForeignKind::Enumerate
+                        | ForeignKind::EnumerateObjects
                 ) && !site.arguments.is_empty()
                 {
                     return Err(invalid("implicit operation takes no arguments"));

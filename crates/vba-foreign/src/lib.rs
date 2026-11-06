@@ -128,6 +128,13 @@ pub trait ObjectTypeResolver: std::fmt::Debug + Send + Sync {
     fn runtime_type_name(&self, _object: ObjectRef) -> Result<Option<String>, ForeignError> {
         Ok(None)
     }
+    /// Whether a public default value getter accepts zero arguments. Overrides
+    /// validate full identity/lifetime, including when returning false, and never
+    /// execute a getter, VBA, IO or activation. Actual reads use normal host calls.
+    /// The default preserves opaque-object inspection for unadapted hosts.
+    fn has_default_value(&self, _object: ObjectRef) -> Result<bool, ForeignError> {
+        Ok(false)
+    }
 }
 #[derive(Clone, Debug, PartialEq)]
 pub enum Outcome {

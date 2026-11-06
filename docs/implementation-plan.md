@@ -80,6 +80,7 @@ and native save/reopen. See [ADR 0041](decisions/0041-worksheet-form-controls.md
   ADR 0063 adds native multiple selection; ADR 0064 adds native runtime TypeName.
   ADR 0065 adds selected native cell/row bindings and the approved static permission cap.
   ADR 0066 extends read-only runtime type names to embedding-owned objects.
+  ADR 0067 adds VarType default value inspection and public default functions.
   Remaining requirements and integration are recorded there. Reuse the shared runtime
   behind native forms and close Office compatibility gaps for the inventoried
   standard controls. Match instance/default-instance behavior, lifecycle, modal/

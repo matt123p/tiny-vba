@@ -6,6 +6,12 @@ Updated 2026-11-06. **IN PROGRESS. M7A.4 is not complete.** This record extends
 
 Implemented in shared tiny-vba:
 
+- [VarType default values](decisions/0067-vartype-default-value-inspection.md):
+  one compatible public default getter/function through normal frames or authorized
+  host calls, preserving getter errors, Variant/array tags and Stop/wait continuations.
+  TypeName/IsObject and safe watches retain inert reference inspection. Additional
+  default/arity comparisons remain M8.5 NOT_RUN.
+
 - [Native cell/row bindings](decisions/0065-native-cell-and-row-bindings.md): inert
   ControlSource/RowSource site metadata, ordinary single-cell value links and
   bounded contiguous list sources through an explicit existing host Range import.
@@ -149,7 +155,7 @@ Remaining M7A.4 requirements, without reducing the milestone's scope:
 - Further focus/validation edge cases across recursive redirection, window/container
   activation, boolean update timing and data binding; typed keyboard/mouse/accelerator ordering, further text/selection edge cases
   and remaining property/default/error/coercion contracts,
-  including VarType default-member evaluation for object arguments. ADR 0066 adds
+  beyond the compatible default-value inspection added by ADR 0067. ADR 0066 adds
   foreign-object dynamic TypeName through existing host metadata. ADR 0048 implements the selected flat native
   focus/typed cancellation path, without claiming the full event/property matrix.
 - ADR 0060 adds selected native RefEdit text/drop semantics and host picker integration; broader RefEdit/platform behavior remains open. ADR 0059 adds selected Image raster records,
@@ -266,3 +272,11 @@ host type resolution with bounded native TypeName metadata. Identity/lifetime,
 no-getter/no-activation rules, lookup/allocation budgets and generic Object fallback
 are retained. TypeName/VarType/IsArray named varname binding matches their documented
 signatures. Shared and pinned fork validation passed; the remaining M7A.4 ledger stays open.
+
+
+[ADR 0067](decisions/0067-vartype-default-value-inspection.md) adds IR 13
+inspection-defaults-v13: VarType resolves one compatible public default value
+through normal project frames or authorized host calls, preserving errors and
+Stop/wait continuations. Public default functions and New value contexts use
+ordinary binding. Inert watches, host ownership and existing budgets are retained.
+Shared CI, WASM and actual WASI validation pass; the full M7A.4 ledger stays open.

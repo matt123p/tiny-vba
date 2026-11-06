@@ -372,6 +372,25 @@ pub fn compile_modules(
         if enumerator.is_some() {
             features.insert("class-enumerators-v9".into());
         }
+        if program.modules.get(class.module).is_some_and(|module| {
+            module.attributes.iter().any(|attribute| {
+                ast::attribute_integer(attribute) == Some(0)
+                    && attribute
+                        .path
+                        .get(1)
+                        .is_some_and(|name| name.spelling.eq_ignore_ascii_case("VB_UserMemId"))
+                    && attribute.path.first().is_some_and(|name| {
+                        module.procedures.iter().any(|procedure| {
+                            procedure.name.key() == name.key()
+                                && procedure.property.is_none()
+                                && procedure.kind == ast::ProcedureKind::Function
+                        })
+                    })
+            })
+        }) {
+            features.insert("inspection-defaults-v13".into());
+        }
+
         let interfaces = options
             .class_interfaces
             .iter()
@@ -457,7 +476,9 @@ pub fn compile_modules(
     let mut ir = ir::Program {
         classes,
         nominal_locals,
-        ir_version: if features.contains("runtime-class-names-v12") {
+        ir_version: if features.contains("inspection-defaults-v13") {
+            ir::IR13_VERSION
+        } else if features.contains("runtime-class-names-v12") {
             ir::IR12_VERSION
         } else if features.contains("class-interfaces-v11") {
             ir::IR11_VERSION
@@ -987,6 +1008,9 @@ impl Builder<'_> {
         args: &[bound::ForeignArgument],
     ) -> Result<()> {
         self.feature("foreign-snapshot-v1");
+        if matches!(kind, bound::ForeignKind::InspectGet) {
+            self.feature("inspection-defaults-v13");
+        }
         if matches!(
             kind,
             bound::ForeignKind::Enumerate | bound::ForeignKind::EnumerateObjects
@@ -1000,6 +1024,7 @@ impl Builder<'_> {
                 | bound::ForeignKind::AssignValue
                 | bound::ForeignKind::ArgumentGet
                 | bound::ForeignKind::ValueGet
+                | bound::ForeignKind::InspectGet
         ) {
             self.feature("default-members-v6");
         }
@@ -1084,6 +1109,7 @@ impl Builder<'_> {
             bound::ForeignKind::ArgumentGet => ir::ForeignKind::ArgumentGet,
             bound::ForeignKind::AssignValue => ir::ForeignKind::AssignValue,
             bound::ForeignKind::ValueGet => ir::ForeignKind::ValueGet,
+            bound::ForeignKind::InspectGet => ir::ForeignKind::InspectGet,
             bound::ForeignKind::Enumerate => ir::ForeignKind::Enumerate,
             bound::ForeignKind::EnumerateObjects => ir::ForeignKind::EnumerateObjects,
             bound::ForeignKind::Call => ir::ForeignKind::Call,

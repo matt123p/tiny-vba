@@ -223,3 +223,11 @@ read-only runtime type names through the existing object resolver. Check full
 identity/lifetime, bound names/work/allocation and preserve errors/fallback; never
 invoke getters, host calls or activation. Forks own native names. No IR or budget
 increase is implied. Broader M7A.4 and fresh M8.5 comparisons remain separate.
+
+
+[ADR 0067](../../../docs/decisions/0067-vartype-default-value-inspection.md) adds
+IR 13 optional default inspection for VarType. Preserve source-order evaluation,
+normal class frames/authorized host calls, getter errors and one-shot Stop/wait
+continuations. Resolver presence metadata is inert and identity checked; actual
+getters remain executable. Older IR consumers refuse this capability. Watches
+stay inert and all existing budgets remain. Full M7A.4/M8.5 are separate gates.

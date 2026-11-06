@@ -251,6 +251,15 @@ no-getter/no-activation rules, lookup/allocation budgets and generic Object fall
 are retained. TypeName/VarType/IsArray named varname binding matches their documented
 signatures. Shared and pinned fork validation passed; the remaining M7A.4 ledger stays open.
 
-VarType's named argument now follows the documented varname spelling; this does
-not close its existing object-default-member evaluation gap. TypeName preserves
-object identity and must not adopt VarType's default-value behavior.
+VarType's named argument follows the documented varname spelling. ADR 0067 adds
+its compatible zero-argument default-value evaluation; additional default/arity
+comparisons remain M8.5 NOT_RUN. TypeName preserves object identity and never
+adopts VarType's getter execution.
+
+
+[ADR 0067](decisions/0067-vartype-default-value-inspection.md) adds IR 13
+inspection-defaults-v13: VarType resolves one compatible public default value
+through normal project frames or authorized host calls, preserving errors and
+Stop/wait continuations. Public default functions and New value contexts use
+ordinary binding. Inert watches, host ownership and existing budgets are retained.
+Shared CI, WASM and actual WASI validation pass; the full M7A.4 ledger stays open.

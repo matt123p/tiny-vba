@@ -1,5 +1,19 @@
 # Implementation progress
 
+## M7A.4 continued — VarType default values (2026-11-06)
+
+Shared implementation and validation PASS under ADR 0067/IR 13: one compatible
+public default getter/function before subtype classification, normal class frames
+and authorized host reads, no swallowed getter errors, unchanged budgets and
+inert safe watches. Full CI, WASM compilation and actual WASI execution pass;
+41 generic class, 18 nominal and 97 native form cases pass, including exact subtype
+and array tags, constructor/getter Stop continuations, target evaluation once,
+optional defaults, getter errors and authorized foreign waits. Local host validation
+passes GridCraft's 12 identity/value cases on native and Node/WASM, WordCraft's
+28 native workflows and two selected Node/WASM cases, both strict optional
+VBA/UI Clippy checks, form UI checks and optional web builds. Pinned fork full CI
+is pending. M7A.4 remains open for the remaining runtime ledger.
+
 ## M7A.4 continued — foreign runtime type names (2026-11-06)
 
 Shared implementation and validation PASS under ADR 0066: bounded optional

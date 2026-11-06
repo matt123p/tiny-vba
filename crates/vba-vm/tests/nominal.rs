@@ -20,9 +20,14 @@ const GOOD: ObjectRef = ObjectRef {
 const WRONG: ObjectRef = ObjectRef { object: 2, ..GOOD };
 #[derive(Debug, Default)]
 struct Resolver {
+    default_value: AtomicBool,
     dead: AtomicBool,
 }
 impl ObjectTypeResolver for Resolver {
+    fn has_default_value(&self, object: ObjectRef) -> Result<bool, ForeignError> {
+        self.runtime_type_name(object)?;
+        Ok(self.default_value.load(Ordering::Relaxed))
+    }
     fn runtime_type_name(&self, object: ObjectRef) -> Result<Option<String>, ForeignError> {
         let _ = self.supports_type(
             object,
@@ -65,6 +70,18 @@ struct TestHost {
     calls: usize,
 }
 impl TestHost {
+    fn default_reply(&self) -> Reply {
+        match vba_values::VbaString::from_utf8("default value") {
+            Ok(value) => Reply::Complete(Completion {
+                value: Value::String(value),
+                writes: vec![],
+            }),
+            Err(error) => Reply::Error(ForeignError {
+                number: 7,
+                description: error.message,
+            }),
+        }
+    }
     fn patch(&self) -> Reply {
         Reply::Complete(Completion {
             value: Value::Empty,
@@ -84,6 +101,15 @@ impl Host for TestHost {
     }
     fn invoke(&mut self, call: HostCall) -> Reply {
         self.calls += 1;
+        if call.kind == InvokeKind::DefaultGet
+            && self.resolver.default_value.load(Ordering::Relaxed)
+        {
+            return if self.wait {
+                Reply::Wait(99)
+            } else {
+                self.default_reply()
+            };
+        }
         if call.member.eq_ignore_ascii_case("ArrayPatch") {
             let array = (|| -> Result<Value, vba_diagnostics::Diagnostic> {
                 Ok(Value::Array(
@@ -122,8 +148,12 @@ impl Host for TestHost {
             writes: vec![],
         })
     }
-    fn resume(&mut self, _: u64) -> Reply {
-        self.patch()
+    fn resume(&mut self, token: u64) -> Reply {
+        if token == 99 {
+            self.default_reply()
+        } else {
+            self.patch()
+        }
     }
     fn cancel(&mut self, _: u64) {}
 }
@@ -747,6 +777,54 @@ fn foreign_typename_cannot_follow_a_resolver_identity_change_to_an_unbound_host(
         Outcome::Completed(ReturnValue::Function(Value::Long(91)))
     );
     assert!(!queried.load(Ordering::Relaxed));
+    assert_eq!(host.calls, 0);
+    Ok(())
+}
+
+#[test]
+fn vartype_foreign_defaults_use_authorized_calls_and_do_not_replay_waits() -> R {
+    for wait in [false, true] {
+        let (mut session, mut host) = setup(
+            "Function Answer() As Integer\nDim o As Object\nSet o=root\nAnswer=VarType(varname:=o)\nEnd Function",
+        )?;
+        host.resolver.default_value.store(true, Ordering::Relaxed);
+        host.wait = wait;
+        let outcome = drive(&mut session, &mut host)?;
+        if wait {
+            assert_eq!(outcome, Outcome::Waiting);
+            assert_eq!(host.calls, 1);
+            session.resume_host(&mut host)?;
+            assert_eq!(
+                drive(&mut session, &mut host)?,
+                Outcome::Completed(ReturnValue::Function(Value::Integer(8)))
+            );
+        } else {
+            assert_eq!(
+                outcome,
+                Outcome::Completed(ReturnValue::Function(Value::Integer(8)))
+            );
+        }
+        assert_eq!(host.calls, 1);
+    }
+    let (mut session, mut host) = setup(
+        "Function Answer() As Integer\nDim o As Object\nSet o=root\nAnswer=VarType(o)\nEnd Function",
+    )?;
+    host.resolver.default_value.store(true, Ordering::Relaxed);
+    let p = session.program().clone();
+    let mut binding = HostBinding::for_program(&p, GOOD.host, [("Document".into(), GOOD)].into())?;
+    binding.permitted.clear();
+    session = Session::new_with_type_resolver(
+        p,
+        1,
+        vec![],
+        Some(binding),
+        Limits::default(),
+        Some(host.resolver.clone()),
+    )?;
+    assert!(matches!(
+        drive(&mut session, &mut host)?,
+        Outcome::Failed(_)
+    ));
     assert_eq!(host.calls, 0);
     Ok(())
 }

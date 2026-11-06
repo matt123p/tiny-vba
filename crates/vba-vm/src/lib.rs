@@ -21,7 +21,7 @@ use vba_values::{Location, Locations, ScalarKind, Value};
 type Result<T> = std::result::Result<T, Diagnostic>;
 pub const PROFILE: &str = runtime::PROFILE;
 pub fn capabilities() -> ir::Capabilities {
-    let mut c = ir::Capabilities::ir12_structural();
+    let mut c = ir::Capabilities::ir13_structural();
     c.profile = PROFILE.into();
 
     c
@@ -3784,6 +3784,10 @@ impl Session {
             self.push_prepaid(Value::Empty)?;
             return self.advance();
         }
+        if site.kind == ir::ForeignKind::InspectGet && !self.has_inspection_default(&target)? {
+            self.push_prepaid(target)?;
+            return self.advance();
+        }
         if matches!(site.kind, ir::ForeignKind::ValueGet)
             && !matches!(target, Value::Object(_) | Value::Nothing)
         {
@@ -3916,7 +3920,8 @@ impl Session {
         let kind = match site.kind {
             ir::ForeignKind::DefaultGet
             | ir::ForeignKind::ArgumentGet
-            | ir::ForeignKind::ValueGet => foreign::InvokeKind::DefaultGet,
+            | ir::ForeignKind::ValueGet
+            | ir::ForeignKind::InspectGet => foreign::InvokeKind::DefaultGet,
             ir::ForeignKind::DefaultLet | ir::ForeignKind::AssignValue => {
                 foreign::InvokeKind::DefaultLet
             }

@@ -3570,3 +3570,31 @@ fn native_range_capability_keeps_unbound_queries_inert_and_compiles_binding_help
     assert_eq!(ide.output(), expected);
     Ok(())
 }
+
+#[test]
+fn native_vartype_reads_control_defaults_but_preserves_collection_and_form_identity() -> R {
+    let ide = setup(
+        "Sub Main()\nDim f As New NativeForm,c As MSForms.Control\nDebug.Print VarType(f),VarType(f.Entry),TypeName(f.Entry),VarType(f.Controls)\nSet c=f.Controls.Add(\"Forms.CheckBox.1\",\"Check\")\nDebug.Print VarType(c),IsObject(c),TypeName(c)\nSet c=f.Controls.Add(\"Forms.SpinButton.1\",\"Spin\")\nDebug.Print VarType(c)\nSet c=f.Controls.Add(\"Forms.ListBox.1\",\"List\")\nDebug.Print VarType(c),VarType(c.Parent),VarType(VBA.UserForms)\nf.Show 0\nEnd Sub",
+        None,
+    )?;
+    assert_eq!(ide.mode(), Mode::Completed, "{:?}", ide.diagnostics);
+    assert_eq!(
+        ide.output(),
+        vec![
+            "initialized",
+            "9\t8\tTextBox\t9",
+            "11\tTrue\tCheckBox",
+            "3",
+            "1\t9\t9"
+        ]
+    );
+    assert_eq!(
+        ide.modules
+            .iter()
+            .find(|module| module.name == "NativeForm.frm")
+            .ok_or("native source")?
+            .text,
+        fixture::SOURCE
+    );
+    Ok(())
+}

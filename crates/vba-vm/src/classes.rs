@@ -445,6 +445,76 @@ impl Session {
         self.instances = restored.instances;
         Ok(())
     }
+    pub(super) fn has_inspection_default(&mut self, value: &Value) -> Result<bool> {
+        let Value::Object(object) = value else {
+            return Ok(false);
+        };
+        if object.host != 0 {
+            self.class_lookup_work(1)?;
+            let Some(resolver) = self.type_resolver.as_deref() else {
+                return Ok(false);
+            };
+            if self
+                .binding
+                .as_ref()
+                .is_none_or(|b| b.identity != object.host)
+                || resolver.identity() != object.host
+            {
+                return Err(runtime_diagnostic(runtime::Error::Vba {
+                    number: 91,
+                    message: "foreign or disconnected object".into(),
+                }));
+            }
+            return resolver.has_default_value(*object).map_err(|e| {
+                runtime_diagnostic(runtime::Error::Vba {
+                    number: e.number,
+                    message: e.description,
+                })
+            });
+        }
+        self.class_lookup_work(self.program.program().classes.len())?;
+        let instance = self.instance_object(*object)?;
+        let class = self
+            .program
+            .program()
+            .classes
+            .iter()
+            .find(|class| class.source == instance.source)
+            .ok_or_else(|| invariant("inspection class"))?;
+        let Some(name) = class.default_member.as_deref() else {
+            return Ok(false);
+        };
+        let work = class.fields.len().saturating_add(class.methods.len());
+        let field = class
+            .fields
+            .iter()
+            .any(|field| field.public && field.name.eq_ignore_ascii_case(name));
+        let method = class.methods.iter().find(|method| {
+            method.public
+                && method.name.eq_ignore_ascii_case(name)
+                && matches!(method.kind, ir::ForeignKind::Get | ir::ForeignKind::Call)
+        });
+        let (callable, parameters) = if let Some(method) = method {
+            let procedure = self
+                .program
+                .program()
+                .procedures
+                .get(method.procedure.0 as usize)
+                .ok_or_else(|| invariant("inspection getter"))?;
+            (
+                procedure.kind == ir::ProcedureKind::Function
+                    && procedure
+                        .parameters
+                        .iter()
+                        .all(|parameter| !parameter.required),
+                procedure.parameters.len(),
+            )
+        } else {
+            (false, 0)
+        };
+        self.class_lookup_work(work.saturating_add(parameters))?;
+        Ok(field || callable)
+    }
     pub(super) fn object_type_name(&mut self, value: Option<&Value>) -> Result<Option<Value>> {
         let Some(Value::Object(object)) = value else {
             return Ok(None);
@@ -767,6 +837,7 @@ impl Session {
         let inside = self.proc()?.source == class.source;
         let kind = match site.kind {
             ir::ForeignKind::ValueGet
+            | ir::ForeignKind::InspectGet
             | ir::ForeignKind::ArgumentGet
             | ir::ForeignKind::DefaultGet => ir::ForeignKind::Get,
             ir::ForeignKind::DefaultLet | ir::ForeignKind::AssignValue => ir::ForeignKind::Let,
@@ -882,6 +953,9 @@ impl Session {
                     && (enumerating
                         && matches!(m.kind, ir::ForeignKind::Get | ir::ForeignKind::Call)
                         || m.kind == kind
+                        || site.member.is_empty()
+                            && kind == ir::ForeignKind::Get
+                            && m.kind == ir::ForeignKind::Call
                         || kind == ir::ForeignKind::Call && m.kind == ir::ForeignKind::Get)
                     && (m.public || inside)
             })

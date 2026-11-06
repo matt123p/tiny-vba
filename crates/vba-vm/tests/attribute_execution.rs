@@ -47,8 +47,10 @@ fn recorded_macro_attribute_has_no_executable_checkpoint() -> R {
 #[test]
 fn procedure_and_field_default_member_metadata_execute_or_refuse_explicitly() -> R {
     use vba_syntax::{ModuleKind, parse};
-    {
-        let class = "Public Property Get Item() As Long\nAttribute Item.VB_UserMemId = +0\nItem=42\nEnd Property\n";
+    for class in [
+        "Public Property Get Item() As Long\nAttribute Item.VB_UserMemId = +0\nItem=42\nEnd Property\n",
+        "Public Function Item() As Long\nAttribute Item.VB_UserMemId = 0\nItem=42\nEnd Function\n",
+    ] {
         let main =
             "Function Answer() As Long\nDim box As Box\nSet box=New Box\nAnswer=box\nEnd Function";
         let modules = [
@@ -84,7 +86,11 @@ fn procedure_and_field_default_member_metadata_execute_or_refuse_explicitly() ->
             "default",
         ),
         (
-            "Public Function Item() As Long\nAttribute Item.VB_UserMemId = 0\nItem=42\nEnd Function",
+            "Private Property Get Item() As Long\nAttribute Item.VB_UserMemId = 0\nItem=42\nEnd Property",
+            "default",
+        ),
+        (
+            "Public Sub Item()\nAttribute Item.VB_UserMemId = 0\nEnd Sub",
             "default",
         ),
     ] {

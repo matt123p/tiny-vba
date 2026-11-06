@@ -1105,3 +1105,179 @@ fn object_for_each_over_a_variant_array_keeps_project_identity_without_a_host_di
     );
     Ok(())
 }
+
+#[test]
+fn vartype_default_getter_uses_normal_frames_and_resumes_once() -> R {
+    let mut s = session(
+        "Function Answer() As String\nDim c As New Counter,n As Integer\nDebug.Print TypeName(c),IsObject(c),VarType(Nothing),IsArray(c)\nn=VarType(varname:=c)\nAnswer=CStr(n) & \":\" & c.calls\nEnd Function",
+        "Public calls As Long\nPublic Property Get Value() As Variant\nAttribute Value.VB_UserMemId = 0\ncalls=calls+1\nStop\nValue=\"text\"\nEnd Property",
+    )?;
+    assert!(matches!(drive(&mut s)?, Outcome::Paused(_)));
+    assert_eq!(
+        s.output(),
+        &[vba_values::VbaString::from_utf8("Counter\tTrue\t9\tFalse")?]
+    );
+    s.continue_execution()?;
+    assert_eq!(
+        drive(&mut s)?,
+        Outcome::Completed(ReturnValue::Function(Value::String(
+            vba_values::VbaString::from_utf8("8:1")?
+        )))
+    );
+    Ok(())
+}
+#[test]
+fn vartype_preserves_objects_without_zero_argument_defaults_and_getter_errors() -> R {
+    for (class, expected) in [
+        ("Public calls As Long", "9:0:0"),
+        (
+            "Public calls As Long\nPublic Property Get Item(ByVal index As Long) As Variant\nAttribute Item.VB_UserMemId = 0\ncalls=calls+1\nItem=1\nEnd Property",
+            "9:0:0",
+        ),
+        (
+            "Public calls As Long\nPublic Property Get Value() As Variant\nAttribute Value.VB_UserMemId = 0\ncalls=calls+1\nErr.Raise 438\nEnd Property",
+            "-1:438:1",
+        ),
+        (
+            "Public calls As Long\nPublic Property Get Value() As Object\nAttribute Value.VB_UserMemId = 0\ncalls=calls+1\nSet Value=Me\nEnd Property",
+            "9:0:1",
+        ),
+    ] {
+        let mut s = session(
+            "Function Answer() As String\nDim c As New Counter,n As Integer\nn=-1\nOn Error Resume Next\nn=VarType(c)\nAnswer=CStr(n) & \":\" & Err.Number & \":\" & c.calls\nEnd Function",
+            class,
+        )?;
+        assert_eq!(
+            drive(&mut s)?,
+            Outcome::Completed(ReturnValue::Function(Value::String(
+                vba_values::VbaString::from_utf8(expected)?
+            )))
+        );
+    }
+    Ok(())
+}
+#[test]
+fn vartype_default_functions_and_optional_getters_preserve_runtime_subtypes() -> R {
+    for (class, expected) in [
+        (
+            "Public calls As Long\nPublic Function Item() As String\nAttribute Item.VB_UserMemId = 0\ncalls=calls+1\nItem=\"function\"\nEnd Function",
+            "8:2:function",
+        ),
+        (
+            "Public calls As Long\nPublic Property Get Value(Optional ByVal index As Variant) As Variant\nAttribute Value.VB_UserMemId = 0\ncalls=calls+1\nIf IsMissing(index) Then Value=Null Else Value=42\nEnd Property",
+            "1:2:True",
+        ),
+    ] {
+        let main = if expected.ends_with("function") {
+            "Function Answer() As String\nDim c As New Counter,n As Integer,text As String\nn=VarType(c)\ntext=CStr(c)\nAnswer=CStr(n) & \":\" & c.calls & \":\" & text\nEnd Function"
+        } else {
+            "Function Answer() As String\nDim c As New Counter,n As Integer,v As Variant\nn=VarType(c)\nv=c\nAnswer=CStr(n) & \":\" & c.calls & \":\" & IsNull(v)\nEnd Function"
+        };
+        let mut s = session(main, class)?;
+        assert_eq!(
+            drive(&mut s)?,
+            Outcome::Completed(ReturnValue::Function(Value::String(
+                vba_values::VbaString::from_utf8(expected)?
+            )))
+        );
+    }
+    Ok(())
+}
+#[test]
+fn inspection_defaults_require_ir13_and_reject_forged_operation_shapes() -> R {
+    let s = session(
+        "Function Answer() As Integer\nDim c As New Counter\nAnswer=VarType(c)\nEnd Function",
+        "Public Property Get Value() As Long\nAttribute Value.VB_UserMemId = 0\nValue=42\nEnd Property",
+    )?;
+    assert_eq!(s.program().program().ir_version, vba_ir::IR13_VERSION);
+    let mut old = vba_ir::Capabilities::ir12_structural();
+    old.profile = vba_vm::PROFILE.into();
+    assert!(vba_ir::recheck(s.program(), &old, &vba_ir::VerifyLimits::default()).is_err());
+    for forged in [false, true] {
+        let mut p = s.program().program().clone();
+        if forged {
+            let site = p
+                .procedures
+                .iter_mut()
+                .flat_map(|p| p.foreign.iter_mut())
+                .find(|site| site.kind == vba_ir::ForeignKind::InspectGet)
+                .ok_or("inspection site")?;
+            site.member = "arbitrary".into();
+        } else {
+            p.ir_version = vba_ir::IR12_VERSION;
+        }
+        assert!(
+            vba_ir::verify(p, &vba_vm::capabilities(), &vba_ir::VerifyLimits::default()).is_err()
+        );
+    }
+    Ok(())
+}
+
+#[test]
+fn vartype_default_values_keep_variant_subtypes_and_array_element_tags() -> R {
+    for (body, expected) in [
+        ("Value=Empty", 0),
+        ("Value=Null", 1),
+        ("Value=CInt(1)", 2),
+        ("Value=CLng(1)", 3),
+        ("Value=CSng(1)", 4),
+        ("Value=CDbl(1)", 5),
+        ("Value=CCur(1.25)", 6),
+        ("Value=CDate(1)", 7),
+        ("Value=\"text\"", 8),
+        ("Set Value=Nothing", 9),
+        ("Value=CVErr(2042)", 10),
+        ("Value=True", 11),
+        ("Value=CDec(1)", 14),
+        ("Value=CByte(1)", 17),
+        ("Dim data(1 To 2) As Long\ndata(1)=42\nValue=data", 8195),
+    ] {
+        let class = format!(
+            "Public Property Get Value() As Variant\nAttribute Value.VB_UserMemId = 0\n{body}\nEnd Property"
+        );
+        let mut s = session(
+            "Function Answer() As Integer\nDim c As New Counter\nAnswer=VarType(c)\nEnd Function",
+            &class,
+        )?;
+        assert_eq!(
+            drive(&mut s)?,
+            Outcome::Completed(ReturnValue::Function(Value::Integer(expected))),
+            "{body}"
+        );
+    }
+    Ok(())
+}
+
+#[test]
+fn vartype_target_expression_is_not_replayed_after_a_default_getter_stop() -> R {
+    let mut s = session(
+        "Private targets As Long\nFunction Answer() As String\nDim n As Integer\nn=VarType(Make())\nAnswer=CStr(n) & \":\" & targets\nEnd Function\nFunction Make() As Counter\ntargets=targets+1\nSet Make=New Counter\nEnd Function",
+        "Public Property Get Value() As Variant\nAttribute Value.VB_UserMemId = 0\nStop\nValue=CLng(42)\nEnd Property",
+    )?;
+    assert!(matches!(drive(&mut s)?, Outcome::Paused(_)));
+    s.continue_execution()?;
+    assert_eq!(
+        drive(&mut s)?,
+        Outcome::Completed(ReturnValue::Function(Value::String(
+            vba_values::VbaString::from_utf8("3:1")?
+        )))
+    );
+    Ok(())
+}
+
+#[test]
+fn vartype_new_expression_preserves_constructor_then_getter_continuations() -> R {
+    let mut s = session(
+        "Function Answer() As Integer\nAnswer=VarType(New Counter)\nEnd Function",
+        "Private Sub Class_Initialize()\nStop\nEnd Sub\nPublic Property Get Value() As Long\nAttribute Value.VB_UserMemId = 0\nStop\nValue=42\nEnd Property",
+    )?;
+    assert!(matches!(drive(&mut s)?, Outcome::Paused(_)));
+    s.continue_execution()?;
+    assert!(matches!(drive(&mut s)?, Outcome::Paused(_)));
+    s.continue_execution()?;
+    assert_eq!(
+        drive(&mut s)?,
+        Outcome::Completed(ReturnValue::Function(Value::Integer(3)))
+    );
+    Ok(())
+}

@@ -94,6 +94,7 @@ pub enum ForeignKind {
     DefaultSet,
     Enumerate,
     ValueGet,
+    InspectGet,
     AssignValue,
     ArgumentGet,
     EnumerateObjects,
@@ -591,11 +592,14 @@ pub fn bind_with_procedure_aliases(
                     if key == "vb_varusermemid"
                         || !parsed.module.procedures.iter().any(|procedure| {
                             procedure.name.spelling.eq_ignore_ascii_case(owner)
-                                && matches!(procedure.property, Some(ast::PropertyKind::Get))
+                                && procedure.visibility != ast::Visibility::Private
+                                && (matches!(procedure.property, Some(ast::PropertyKind::Get))
+                                    || procedure.property.is_none()
+                                        && procedure.kind == ast::ProcedureKind::Function)
                         })
                     {
                         return Err(unsupported(
-                            "default-member attributes require a supported Property Get",
+                            "default-member attributes require a public Property Get or function",
                             attribute.span,
                         ));
                     }
@@ -2436,9 +2440,10 @@ impl Binder<'_> {
             ExprKind::Local(slot) => self.locals.get(*slot).is_some_and(|l| {
                 l.array.is_none() && matches!(l.kind, ScalarKind::Object | ScalarKind::Variant)
             }),
-            ExprKind::Foreign { .. } | ExprKind::Element { .. } | ExprKind::DefaultInstance(_) => {
-                true
-            }
+            ExprKind::Foreign { .. }
+            | ExprKind::Element { .. }
+            | ExprKind::DefaultInstance(_)
+            | ExprKind::New(_) => true,
             ExprKind::Call { procedure, .. } => self.signatures.get(*procedure).is_some_and(|s| {
                 matches!(s.result, Some(ScalarKind::Object | ScalarKind::Variant))
             }),
@@ -2563,6 +2568,15 @@ impl Binder<'_> {
             },
         })
     }
+    fn inspection_context(&self, value: Expr) -> Expr {
+        let mut value = self.value_context(value);
+        if let ExprKind::Foreign { kind, .. } = &mut value.kind
+            && matches!(*kind, ForeignKind::ValueGet)
+        {
+            *kind = ForeignKind::InspectGet;
+        }
+        value
+    }
     fn intrinsic_call(
         &mut self,
         function: vba_values::Intrinsic,
@@ -2616,6 +2630,11 @@ impl Binder<'_> {
                     vba_values::IntrinsicArgumentMode::Value => self.value_expr(value)?,
                     vba_values::IntrinsicArgumentMode::RawVariant
                     | vba_values::IntrinsicArgumentMode::Object => self.expr(value)?,
+                };
+                let value = if function == vba_values::Intrinsic::VarType {
+                    self.inspection_context(value)
+                } else {
+                    value
                 };
                 push(&mut values, value, argument.span)?;
             }
@@ -2703,6 +2722,11 @@ impl Binder<'_> {
                     vba_values::IntrinsicArgumentMode::Value => self.value_expr(source)?,
                     vba_values::IntrinsicArgumentMode::RawVariant
                     | vba_values::IntrinsicArgumentMode::Object => self.expr(source)?,
+                };
+                let expression = if function == vba_values::Intrinsic::VarType {
+                    self.inspection_context(expression)
+                } else {
+                    expression
                 };
                 push(&mut values, expression, argument.span)?;
                 push(&mut modes, mode, argument.span)?;
@@ -2837,6 +2861,11 @@ impl Binder<'_> {
                     vba_values::IntrinsicArgumentMode::Value => self.value_expr(source)?,
                     vba_values::IntrinsicArgumentMode::RawVariant
                     | vba_values::IntrinsicArgumentMode::Object => self.expr(source)?,
+                };
+                let expression = if function == vba_values::Intrinsic::VarType {
+                    self.inspection_context(expression)
+                } else {
+                    expression
                 };
                 push(&mut values, expression, argument.span)?;
             }

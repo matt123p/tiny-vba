@@ -286,3 +286,11 @@ host type resolution with bounded native TypeName metadata. Identity/lifetime,
 no-getter/no-activation rules, lookup/allocation budgets and generic Object fallback
 are retained. TypeName/VarType/IsArray named varname binding matches their documented
 signatures. Shared and pinned fork validation passed; the remaining M7A.4 ledger stays open.
+
+
+[ADR 0067](decisions/0067-vartype-default-value-inspection.md) adds IR 13
+inspection-defaults-v13: VarType resolves one compatible public default value
+through normal project frames or authorized host calls, preserving errors and
+Stop/wait continuations. Public default functions and New value contexts use
+ordinary binding. Inert watches, host ownership and existing budgets are retained.
+Shared CI, WASM and actual WASI validation pass; the full M7A.4 ledger stays open.
