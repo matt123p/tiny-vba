@@ -103,6 +103,10 @@ If Not (VbaActiveControl Is control) Then GoTo finished
 If Not VbaCanInput(control) Then GoTo finished
 Else
 If Not (VbaActiveControl Is Nothing) Then GoTo finished
+Dim candidate As Object
+For Each candidate In VbaAllControls
+If VbaCanInput(candidate) Then GoTo finished
+Next candidate
 End If
 If phase=1 And Not interpret Then
 VbaKeyText=text

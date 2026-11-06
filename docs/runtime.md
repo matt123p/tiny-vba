@@ -559,3 +559,7 @@ completion is still partial pending the remaining K01/K02 acceptance cases.
 UTF-16 storage contexts do not supply an ANSI code page to Asc/Chr. ASCII works;
 non-ASCII ANSI conversion refuses without a configured ANSI encoding. The byte
 variants and Unicode AscW/ChrW contracts are unchanged (ADR 0070).
+
+[ADR 0071](decisions/0071-native-keyboard-focus-and-default-order.md) adds
+root-window keyboard focus, input arbitration before editor shortcuts and
+canonical Tab/SetFocus/Space default ordering. Full M7A.4 remains in progress.

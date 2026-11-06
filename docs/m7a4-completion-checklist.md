@@ -13,8 +13,8 @@ reference-based expectations and fresh Office observations remain distinct.
 | L01 | Activate/Deactivate across Show/Hide, multiple modeless windows, document focus, repeated activation and unloading | PARTIAL: full ordering/focus ownership open |
 | L02 | Lifecycle handlers redirect focus, show/hide/unload another form, Stop/resume or Reset without stale ownership or replay | OPEN |
 | F01 | Recursive SetFocus and cancellation, nested containers/page switches, dirty validation and binding callbacks, boolean update timing | PARTIAL: selected focus/validation implemented; edge cases open |
-| K01 | KeyDown/KeyPress/KeyUp with mutable ByVal MSForms.ReturnInteger and typed Shift; cancellation/default processing in ordinary frames | PARTIAL: ADR 0070; eight runtime/WASI and 24 UI cases plus Chromium PASS; remaining cases open |
-| K02 | Held-key repeat; modifiers; Tab/navigation focus transitions; Default/Cancel Enter/Escape exceptions; ANSI input versus Unicode/IME/paste | PARTIAL: raw-input barrier; remaining platform/shortcut/focus/IME cases open |
+| K01 | KeyDown/KeyPress/KeyUp with mutable ByVal MSForms.ReturnInteger and typed Shift; cancellation/default processing in ordinary frames | PARTIAL: ADR 0070 evidence plus ADR 0071 root/Tab/SetFocus/Space cases in validation; remaining cases open |
+| K02 | Held-key repeat; modifiers; Tab/navigation focus transitions; Default/Cancel Enter/Escape exceptions; ANSI input versus Unicode/IME/paste | PARTIAL: raw-input barrier and ADR 0071 focus/default ordering; remaining platform/shortcut/focus/IME cases open |
 | K03 | Accelerators select/focus/activate the appropriate eligible control and preserve keyboard/event ordering | OPEN |
 | M01 | Applicable MouseDown/MouseMove/MouseUp/Click/DblClick, typed button/modifier/coordinate/cancellation arguments, event order and container-relative coordinates | OPEN |
 | P01 | Remaining common properties, defaults, exact errors/coercions, text/selection edge cases | PARTIAL: remaining contract/member audit open |
@@ -52,8 +52,7 @@ References and owning records:
 - [MSForms physical key events](https://learn.microsoft.com/en-us/office/vba/language/reference/user-interface-help/keydown-keyup-events)
 - [MSForms KeyPress](https://learn.microsoft.com/en-us/office/vba/language/reference/user-interface-help/keypress-event)
 
-Next keyboard acceptance packet: root-window focus ownership and cross-control
-Tab/SetFocus delivery, including nested waits and debugger continuation, plus
-non-text control key defaults (especially Space). Retain unknown platform
-key/shortcut/IME and DBCS replacement cases until implemented;
-no refusal counts as a completed inventoried behavior.
+Next keyboard acceptance packet: remaining platform/shortcut/IME and DBCS
+replacement cases, cross-window lifecycle/focus changes and remaining non-text
+control defaults. Root focus and selected Tab/SetFocus/Space cases follow ADR 0071.
+No refusal counts as a completed inventoried behavior.

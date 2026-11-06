@@ -271,3 +271,32 @@ fn invalid_keyboard_signatures_are_refused_before_execution() -> R {
     }
     Ok(())
 }
+
+#[test]
+fn root_keyboard_input_requires_no_eligible_visible_enabled_control() -> R {
+    let source = "\nPrivate Sub UserForm_KeyDown(ByVal k As MSForms.ReturnInteger,ByVal s As Integer)\nDebug.Print \"root\"\nEnd Sub";
+    let (mut ide, f) = setup(
+        source,
+        "Sub Main()\nNativeForm.Entry.TabStop=False\nNativeForm.Apply.TabStop=False\nNativeForm.Show 0\nEnd Sub",
+    )?;
+    assert_eq!(ide.form_keyboard_target(f)?, None);
+    let e = ide.form_instance_key(f, None, code(FormKeyEvent::Down, 65, 0), &mut NoHost)?;
+    settle(&mut ide)?;
+    assert_eq!(
+        ide.form_instance_key_result(f, e)?.ok_or("receipt")?.code,
+        0
+    );
+    assert_eq!(ide.output(), vec!["initialized"]);
+    let (mut ide, f) = setup(
+        source,
+        "Sub Main()\nDim c As MSForms.Control\nFor Each c In NativeForm.Controls\nc.Enabled=False\nNext c\nNativeForm.Show 0\nEnd Sub",
+    )?;
+    let e = ide.form_instance_key(f, None, code(FormKeyEvent::Down, 65, 0), &mut NoHost)?;
+    settle(&mut ide)?;
+    assert_eq!(
+        ide.form_instance_key_result(f, e)?.ok_or("receipt")?.code,
+        65
+    );
+    assert_eq!(ide.output(), vec!["initialized", "root"]);
+    Ok(())
+}

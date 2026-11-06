@@ -299,3 +299,7 @@ Shared CI, WASM and actual WASI validation pass; the full M7A.4 ledger stays ope
 Native typed keyboard callbacks and the raw-input/default-processing barrier are
 implemented under [ADR 0070](decisions/0070-native-keyboard-events.md). Keyboard
 completion is still partial pending the remaining K01/K02 acceptance cases.
+
+[ADR 0071](decisions/0071-native-keyboard-focus-and-default-order.md) adds
+root-window keyboard focus, input arbitration before editor shortcuts and
+canonical Tab/SetFocus/Space default ordering. Full M7A.4 remains in progress.

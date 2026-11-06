@@ -253,6 +253,7 @@ pub struct EditorUi {
     form_active_control: Vec<(vba_ide::FormInstance, Option<vba_ide::ObjectRef>)>,
     form_picture_textures: Vec<(std::sync::Weak<[u8]>, egui::TextureHandle)>,
     form_runtime_focus: Vec<(vba_ide::FormInstance, u32, egui::Id)>,
+    form_runtime_roots: Vec<(vba_ide::FormInstance, egui::Id)>,
     form_drag: Option<(SourceId, u32, bool, egui::Vec2)>,
     pub project_visible: bool,
     pub properties_visible: bool,
@@ -330,6 +331,7 @@ impl Default for EditorUi {
             form_keys: Default::default(),
             form_drag: None,
             form_runtime_focus: vec![],
+            form_runtime_roots: vec![],
             form_picture_textures: vec![],
             form_last_focus: None,
             form_active_control: vec![],
@@ -452,11 +454,12 @@ impl EditorUi {
         if self.last_source != ide.active_module().map(|m| m.id) {
             self.completion = false;
         }
+        let form_input = self.form_keyboard_input(ui.ctx(), ide, &mut commands);
         ui.push_id(self.instance,|ui|{
             let visuals=if theme.dark{egui::Visuals::dark()}else{egui::Visuals::light()};
             *ui.visuals_mut()=visuals;ui.visuals_mut().panel_fill=theme.chrome;ui.visuals_mut().window_fill=theme.chrome;ui.visuals_mut().override_text_color=Some(theme.text);ui.visuals_mut().extreme_bg_color=theme.editor;ui.visuals_mut().widgets.noninteractive.bg_stroke.color=theme.border;
             ui.spacing_mut().item_spacing=egui::vec2(6.0,5.0);
-            self.shortcuts(ui.ctx(),ide,&mut commands);
+            if !form_input.owns_keys { self.shortcuts(ui.ctx(),ide,&mut commands); }
             egui::Panel::top("vba.menu").frame(egui::Frame::new().fill(theme.chrome).inner_margin(5)).show(ui,|ui|{
                 egui::MenuBar::new().ui(ui,|ui|self.menus(ui,ide,&mut commands, theme));
                 ui.separator();ui.horizontal_wrapped(|ui|{
@@ -526,13 +529,13 @@ if let Some(instancing)=m.instancing(){ui.label(theme.label("Instancing"));ui.la
             self.report=Some(LayoutReport{editor:editor.response.rect,project:project_rect,debugger:debug.response.rect,source:ide.active_module().map(|m|m.id),editor_scope:self.scope.unwrap_or(ui.scope_id())});
         });
         self.windows(ui, ide, &mut commands, theme);
-        self.form_windows(ui.ctx(), ide, &mut commands, theme);
+        self.form_windows(ui.ctx(), ide, &mut commands, theme, Some(form_input));
         commands
     }
     /// Render native form windows without mounting the editor panels.
     pub fn show_forms(&mut self, ctx: &egui::Context, ide: &Ide, theme: Theme) -> Vec<Command> {
         let mut commands = Vec::new();
-        self.form_windows(ctx, ide, &mut commands, theme);
+        self.form_windows(ctx, ide, &mut commands, theme, None);
         commands
     }
     fn find_occurrence(&mut self, ide: &Ide, commands: &mut Vec<Command>, backwards: bool) {

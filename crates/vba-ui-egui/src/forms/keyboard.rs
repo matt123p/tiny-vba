@@ -8,13 +8,19 @@ struct Pending {
     event: egui::Event,
     epoch: i32,
     phase: Phase,
+    text_open: bool,
+    drop_repeat_text: bool,
 }
 #[derive(Default)]
 pub(crate) struct Keyboard {
     generation: Option<u64>,
+    observes: bool,
     queue: VecDeque<(FormInstance, egui::Event)>,
     pending: Vec<Pending>,
     suppressed: Vec<FormInstance>,
+    spaces: Vec<FormInstance>,
+    held: Vec<(FormInstance, egui::Key)>,
+    debugger_keys: Vec<egui::Key>,
 }
 fn key_code(key: egui::Key) -> Option<i16> {
     use egui::Key::*;
@@ -151,11 +157,14 @@ impl Keyboard {
                 return true;
             }
         };
+        let text_open = phase != Phase::Up && matches!(event, egui::Event::Key { .. });
         self.pending.push(Pending {
             owner,
             event,
             phase,
             epoch,
+            text_open,
+            drop_repeat_text: false,
         });
         commands.push(Command::Form(FormCommand::InstanceKey(
             owner, target, input,
@@ -185,6 +194,7 @@ impl Keyboard {
         ide: &Ide,
         owner: Option<FormInstance>,
         focus: &[(FormInstance, u32, egui::Id)],
+        roots: &[(FormInstance, egui::Id)],
         commands: &mut Vec<Command>,
     ) -> bool {
         let Some(owner) = owner.filter(|owner| ide.native_form(owner.source).is_some()) else {
@@ -194,6 +204,16 @@ impl Keyboard {
         if self.generation != Some(owner.object.generation) {
             self.clear();
             self.generation = Some(owner.object.generation);
+            self.observes = ide.modules.iter().any(|module| {
+                module.procedures.iter().any(|procedure| {
+                    ["_KeyDown", "_KeyPress", "_KeyUp"].iter().any(|suffix| {
+                        procedure
+                            .name
+                            .get(procedure.name.len().saturating_sub(suffix.len())..)
+                            .is_some_and(|name| name.eq_ignore_ascii_case(suffix))
+                    })
+                })
+            });
         }
         self.queue
             .retain(|(instance, _)| ide.form_instance_visible(*instance));
@@ -201,6 +221,52 @@ impl Keyboard {
             .retain(|pending| ide.form_instance_visible(pending.owner));
         self.suppressed
             .retain(|instance| ide.form_instance_visible(*instance));
+        self.spaces
+            .retain(|instance| ide.form_instance_visible(*instance));
+        self.held
+            .retain(|(instance, _)| ide.form_instance_visible(*instance));
+        if ctx.input(|input| input.pointer.any_pressed()) {
+            self.held.clear();
+        }
+        // A debugger shortcut retains ownership through its physical release.
+        ctx.input_mut(|input| {
+            for event in &input.events {
+                if ide.mode() == Mode::Break
+                    && let egui::Event::Key {
+                        key,
+                        pressed: true,
+                        repeat: false,
+                        ..
+                    } = event
+                    && matches!(key, egui::Key::F5 | egui::Key::F8)
+                    && !self.debugger_keys.contains(key)
+                {
+                    self.debugger_keys.push(*key);
+                }
+            }
+            input.events.retain(|event| {
+                if let egui::Event::Key {
+                    key,
+                    pressed,
+                    repeat,
+                    ..
+                } = event
+                    && self.debugger_keys.contains(key)
+                {
+                    if !pressed {
+                        self.debugger_keys.retain(|held| held != key);
+                        return false;
+                    }
+                    if *repeat {
+                        return false;
+                    }
+                    if ide.mode() != Mode::Break {
+                        self.debugger_keys.retain(|held| held != key);
+                    }
+                }
+                true
+            });
+        });
         let target = match ide.form_keyboard_target(owner) {
             Ok(target) => target,
             Err(error) => {
@@ -223,25 +289,95 @@ impl Keyboard {
             || focus
                 .iter()
                 .any(|(instance, _, widget)| *instance == owner && Some(*widget) == focused)
+            || roots
+                .iter()
+                .any(|(instance, widget)| *instance == owner && Some(*widget) == focused)
             || focused.is_none()
                 && (self.pending.iter().any(|pending| pending.owner == owner)
                     || self.queue.iter().any(|(instance, _)| *instance == owner)
-                    || self.suppressed.contains(&owner));
+                    || self.suppressed.contains(&owner)
+                    || self.held.iter().any(|(instance, _)| *instance == owner));
         if owns_focus
-            && (listens
+            && (self.observes
+                || listens
                 || self.pending.iter().any(|pending| pending.owner == owner)
-                || self.queue.iter().any(|(instance, _)| *instance == owner))
+                || self.queue.iter().any(|(instance, _)| *instance == owner)
+                || self.held.iter().any(|(instance, _)| *instance == owner))
         {
             let mut exceeded = false;
+            let mut cancel_focus_navigation = false;
+            let mut previous_single_text = false;
             let mut units = self.units();
             ctx.input_mut(|input| {
                 input.events.retain(|event| {
                     if !raw(event) {
+                        previous_single_text=false;
                         return true;
+                    }
+                    if ide.mode() == Mode::Break {
+                        let pending = self
+                            .pending
+                            .iter_mut()
+                            .find(|pending| pending.owner == owner);
+                        let Some(pending) = pending else {
+                            return true;
+                        };
+                        let original = if let egui::Event::Key { key, .. } = pending.event {
+                            Some(key)
+                        } else {
+                            None
+                        };
+                        if matches!(event,egui::Event::Key{key,pressed:true,repeat:true,..} if Some(*key)==original) {
+                            pending.drop_repeat_text=true;
+                            return false;
+                        }
+                        if matches!(event,egui::Event::Text(_)) && pending.drop_repeat_text {
+                            pending.drop_repeat_text=false;
+                            return false;
+                        }
+                        let capture = match event {
+                            egui::Event::Key {
+                                key,
+                                pressed: false,
+                                ..
+                            } => original == Some(*key),
+                            egui::Event::Text(_) => pending.text_open,
+                            egui::Event::Key {
+                                key, pressed: true, ..
+                            } => {
+                                if !matches!(key, egui::Key::F5 | egui::Key::F8) {
+                                    pending.text_open = false;
+                                }
+                                false
+                            }
+                            _ => false,
+                        };
+                        if !capture {
+                            return true;
+                        }
                     }
                     if exceeded {
                         return false;
                     }
+                    if let egui::Event::Key { key, pressed, .. } = event {
+                        cancel_focus_navigation |= *pressed;
+                        if *pressed && !self.held.contains(&(owner, *key)) {
+                            if self.held.len() >= 64 {
+                                exceeded = true;
+                                return false;
+                            }
+                            self.held.push((owner, *key));
+                        } else if !pressed {
+                            self.held.retain(|(_, held)| held != key);
+                        }
+                    }
+                    // eframe-web emits an adjacent Text, Key pair when its text
+                    // agent is unfocused. Normalize only a matching single ASCII
+                    // character within this input batch, never unrelated IME text.
+                    let text_first=previous_single_text && self.queue.back().is_some_and(|(_,prior)| {
+                        matches!(prior,egui::Event::Text(text) if paired_text_key(text,event))
+                    });
+                    previous_single_text=matches!(event,egui::Event::Text(text) if !text.is_empty() && text.chars().nth(1).is_none());
                     let mut enqueue = |event: egui::Event| {
                         units = units.saturating_add(event_units(&event));
                         if self.queue.len() + self.pending.len() >= 64 || units > 32768 {
@@ -262,9 +398,16 @@ impl Keyboard {
                     } else {
                         enqueue(event.clone());
                     }
+                    if text_first && !exceeded && self.queue.len()>=2 {
+                        let last=self.queue.len().saturating_sub(1);
+                        self.queue.swap(last.saturating_sub(1),last);
+                    }
                     false
                 });
             });
+            if cancel_focus_navigation {
+                ctx.memory_mut(|memory| memory.move_focus(egui::FocusDirection::None));
+            }
             if exceeded {
                 self.clear();
                 commands.push(Command::Report(
@@ -307,6 +450,7 @@ impl Keyboard {
                                 owner,
                                 target,
                                 focus,
+                                roots,
                                 egui::Event::Text(String::from_utf16_lossy(result.text.units())),
                             );
                         }
@@ -319,8 +463,20 @@ impl Keyboard {
                         return true;
                     }
                     let mut event = pending.event;
-                    if pending.phase == Phase::Press && !matches!(result.code, 8 | 27) {
-                        if result.code < 32 {
+                    let space_default = pending.phase == Phase::Press
+                        && result.code == 32
+                        && matches!(
+                            event,
+                            egui::Event::Key {
+                                key: egui::Key::Space,
+                                ..
+                            }
+                        );
+                    if pending.phase == Phase::Press
+                        && !matches!(result.code, 8 | 27)
+                        && !space_default
+                    {
+                        if (0..32).contains(&result.code) {
                             commands.push(Command::Report(
                                 "native keyboard replacement character is unsupported".into(),
                             ));
@@ -331,6 +487,7 @@ impl Keyboard {
                             owner,
                             target,
                             focus,
+                            roots,
                             egui::Event::Text(String::from_utf16_lossy(result.text.units())),
                         );
                     }
@@ -345,8 +502,16 @@ impl Keyboard {
                     }
                     if pending.phase == Phase::Down
                         && let egui::Event::Key { key, modifiers, .. } = event
-                        && matches!(key, egui::Key::Backspace | egui::Key::Escape)
+                        && (matches!(key, egui::Key::Backspace | egui::Key::Escape)
+                            || key == egui::Key::Space
+                                && !text_target(ide, owner, target)
+                                && !modifiers.ctrl
+                                && !modifiers.alt
+                                && !modifiers.command)
                     {
+                        if key == egui::Key::Space && !self.spaces.contains(&owner) {
+                            self.spaces.push(owner);
+                        }
                         return self.command(
                             ide,
                             owner,
@@ -360,7 +525,7 @@ impl Keyboard {
                             commands,
                         );
                     }
-                    return self.replay(ctx, owner, target, focus, event);
+                    return self.replay(ctx, owner, target, focus, roots, event);
                 }
             }
         }
@@ -382,7 +547,7 @@ impl Keyboard {
                 ..
             } => {
                 if Self::default_role(ide, owner, *key) {
-                    return self.replay(ctx, owner, target, focus, event);
+                    return self.replay(ctx, owner, target, focus, roots, event);
                 }
                 let Some(code) = key_code(*key) else {
                     commands.push(Command::Report(
@@ -391,6 +556,7 @@ impl Keyboard {
                     return true;
                 };
                 if *pressed {
+                    self.spaces.retain(|instance| *instance != owner);
                     self.suppressed.retain(|instance| *instance != owner);
                 }
                 let phase = if *pressed { Phase::Down } else { Phase::Up };
@@ -409,6 +575,12 @@ impl Keyboard {
                 )
             }
             egui::Event::Text(text) => {
+                if self.spaces.contains(&owner) {
+                    self.spaces.retain(|instance| *instance != owner);
+                    if text == " " {
+                        return true;
+                    }
+                }
                 if self.suppressed.contains(&owner) {
                     return true;
                 }
@@ -421,7 +593,7 @@ impl Keyboard {
                 };
                 self.command(ide, owner, event, Phase::Press, input, commands)
             }
-            _ => self.replay(ctx, owner, target, focus, event),
+            _ => self.replay(ctx, owner, target, focus, roots, event),
         }
     }
     fn replay(
@@ -430,6 +602,7 @@ impl Keyboard {
         owner: FormInstance,
         target: Option<u32>,
         focus: &[(FormInstance, u32, egui::Id)],
+        roots: &[(FormInstance, egui::Id)],
         event: egui::Event,
     ) -> bool {
         if let Some((_, _, widget)) = focus
@@ -437,6 +610,11 @@ impl Keyboard {
             .find(|(instance, control, _)| *instance == owner && Some(*control) == target)
         {
             ctx.memory_mut(|memory| memory.request_focus(*widget));
+        }
+        if target.is_none()
+            && let Some((_, root)) = roots.iter().find(|(instance, _)| *instance == owner)
+        {
+            ctx.memory_mut(|memory| memory.request_focus(*root));
         }
         ctx.input_mut(|input| input.events.push(event));
         // Only this approved event reaches the ordinary widget on this frame.
@@ -453,4 +631,41 @@ fn event_units(event: &egui::Event) -> usize {
         }
         _ => 0,
     }
+}
+
+fn text_target(ide: &Ide, owner: FormInstance, target: Option<u32>) -> bool {
+    ide.form_instance_design(owner).is_ok_and(|form| {
+        form.controls
+            .iter()
+            .find(|control| Some(control.id) == target)
+            .is_some_and(|control| {
+                matches!(control.kind, ControlKind::TextBox | ControlKind::RefEdit)
+                    || control.kind == ControlKind::ComboBox
+                        && ide.form_instance_field(owner, target, "Style").ok()
+                            != Some(vba_ide::Value::Long(2))
+            })
+    })
+}
+
+fn paired_text_key(text: &str, event: &egui::Event) -> bool {
+    let egui::Event::Key {
+        key,
+        pressed: true,
+        modifiers,
+        ..
+    } = event
+    else {
+        return false;
+    };
+    if modifiers.ctrl || modifiers.alt || modifiers.command {
+        return false;
+    }
+    let mut chars = text.chars();
+    let Some(character) = chars.next() else {
+        return false;
+    };
+    if chars.next().is_some() || !(character.is_ascii_alphanumeric() || character == ' ') {
+        return false;
+    }
+    key_code(*key) == i16::try_from(u32::from(character.to_ascii_uppercase())).ok()
 }

@@ -311,3 +311,7 @@ full remaining M7A.4 scope. No new IR, format or control library is introduced.
 [ADR 0070 — native keyboard events](decisions/0070-native-keyboard-events.md)
 records typed callbacks, canonical completion receipts and the bounded UI input
 barrier. Full M7A.4 remains in progress.
+
+[ADR 0071](decisions/0071-native-keyboard-focus-and-default-order.md) adds
+root-window keyboard focus, input arbitration before editor shortcuts and
+canonical Tab/SetFocus/Space default ordering. Full M7A.4 remains in progress.

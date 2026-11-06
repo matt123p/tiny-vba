@@ -1,5 +1,16 @@
 # Implementation progress
 
+## M7A.4 continued — keyboard focus and default order (2026-11-06)
+
+ADR 0071 adds root-window input focus, pre-editor keyboard arbitration, canonical
+Tab/SetFocus key routing and non-text Space ordering/cancellation. Raw triggering
+input survives a stopped key handler, while repeats and debugger shortcut releases
+are kept from becoming extra form callbacks. Eleven UI regressions and nine shared
+keyboard runtime cases pass, alongside full shared CI/WASM/WASI, existing 24 form
+UI cases, UI/native/web gates and actual Chromium Tab/Space acceptance. Paused and
+cancelled form captures were inspected. Host validation is in progress. M7A.4
+remains incomplete; no Office observation or scope reduction is claimed.
+
 ## M7A.4 continued — native keyboard callbacks (2026-11-06)
 
 ADR 0070 adds ordinary typed KeyDown/KeyPress/KeyUp callbacks, mutable

@@ -271,3 +271,9 @@ input and waits before default widget processing. Inspection must not execute
 getters. Preserve Stop/Continue/Reset, injected ANSI services, distinct paste/IME
 input and existing host trust checks. Keyboard/platform and the full M7A.4
 completion checklist remain partial until their executable acceptance passes.
+
+ADR 0071 arbitrates native raw input before editor shortcuts. Preserve canonical
+VBA focus and callbacks, bounded raw held-key ownership, root widget identities,
+paused character/release continuation and non-text Space ordering. Debugger
+F5/F8 releases must not become form KeyUp callbacks. Root input eligibility
+requires more than a missing TabStop. Full M7A.4 remains in progress.

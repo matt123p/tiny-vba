@@ -9,6 +9,13 @@ mod refedit;
 mod tabs;
 mod text;
 use vba_ide::forms::{Align, Bounds, ControlKind, DesignEdit, SameSize};
+#[derive(Clone, Copy)]
+pub(super) struct KeyboardFrame {
+    pub(super) owner: Option<vba_ide::FormInstance>,
+    pub(super) blocked: bool,
+    pub(super) owns_keys: bool,
+}
+
 #[derive(Clone, Debug)]
 pub enum FormCommand {
     Add,
@@ -880,41 +887,65 @@ impl EditorUi {
             }
         }
     }
-    pub(super) fn form_windows(
+    pub(super) fn form_keyboard_input(
         &mut self,
         ctx: &egui::Context,
         ide: &Ide,
         commands: &mut Vec<Command>,
-        theme: Theme,
-    ) {
-        if matches!(ide.mode(), Mode::Break | Mode::Stale) {
-            // Paused controls do not execute, but their stable IDs restore focus before input.
-            if ide.mode() == Mode::Stale {
-                self.form_keys.clear();
-                self.form_runtime_focus.clear();
-            }
-            self.form_last_focus = None;
-            self.form_active_control.clear();
-            return;
-        }
-        if matches!(ide.mode(), Mode::Design | Mode::Failed) {
+    ) -> KeyboardFrame {
+        if matches!(ide.mode(), Mode::Design | Mode::Failed | Mode::Stale) {
             self.form_keys.clear();
+            self.form_runtime_roots.clear();
+            return KeyboardFrame {
+                owner: None,
+                blocked: false,
+                owns_keys: false,
+            };
         }
-        let previous_active = std::mem::take(&mut self.form_active_control);
-        let last_focus = self.form_last_focus.take();
-        let previous_focus = std::mem::take(&mut self.form_runtime_focus);
-        let Ok(instances) = ide.form_instances() else {
-            return;
-        };
-        let keyboard_owner = instances
+        // egui clears focus for Escape at the start of the pass. Recover only a
+        // previously focused native widget, so its VBA event can decide the action.
+        if ctx.memory(|memory| memory.focused()).is_none()
+            && ctx.input(|input| {
+                input.events.iter().any(|event| {
+                    matches!(
+                        event,
+                        egui::Event::Key {
+                            key: egui::Key::Escape,
+                            pressed: true,
+                            ..
+                        }
+                    )
+                })
+            })
+            && let Some(previous) = self.form_last_focus.filter(|id| {
+                self.form_runtime_focus
+                    .iter()
+                    .any(|(_, _, widget)| widget == id)
+                    || self
+                        .form_runtime_roots
+                        .iter()
+                        .any(|(_, widget)| widget == id)
+            })
+        {
+            ctx.memory_mut(|memory| memory.request_focus(previous));
+        }
+        let focused = ctx.memory(|memory| memory.focused());
+        let instances = ide.form_instances().unwrap_or_default();
+        let owner = instances
             .iter()
             .copied()
             .find(|instance| ide.form_instance_is_modal(*instance))
             .or_else(|| {
-                previous_focus
+                self.form_runtime_focus
                     .iter()
-                    .find(|(_, _, target)| Some(*target) == last_focus)
-                    .map(|(instance, _, _)| *instance)
+                    .find(|(_, _, id)| Some(*id) == focused)
+                    .map(|(owner, _, _)| *owner)
+            })
+            .or_else(|| {
+                self.form_runtime_roots
+                    .iter()
+                    .find(|(_, id)| Some(*id) == focused)
+                    .map(|(owner, _)| *owner)
             })
             .or_else(|| {
                 instances
@@ -923,9 +954,64 @@ impl EditorUi {
                     .copied()
                     .find(|instance| ide.form_instance_visible(*instance))
             });
-        let key_blocked = self
-            .form_keys
-            .step(ctx, ide, keyboard_owner, &previous_focus, commands);
+        let blocked = self.form_keys.step(
+            ctx,
+            ide,
+            owner,
+            &self.form_runtime_focus,
+            &self.form_runtime_roots,
+            commands,
+        );
+        let focused = ctx.memory(|memory| memory.focused());
+        let owns_keys = ide.mode() != Mode::Break
+            && owner.is_some_and(|owner| {
+                ide.native_form(owner.source).is_some()
+                    && (blocked
+                        || ide.form_instance_is_modal(owner)
+                        || self
+                            .form_runtime_focus
+                            .iter()
+                            .any(|(instance, _, id)| *instance == owner && Some(*id) == focused)
+                        || self
+                            .form_runtime_roots
+                            .iter()
+                            .any(|(instance, id)| *instance == owner && Some(*id) == focused))
+            });
+        KeyboardFrame {
+            owner,
+            blocked,
+            owns_keys,
+        }
+    }
+    pub(super) fn form_windows(
+        &mut self,
+        ctx: &egui::Context,
+        ide: &Ide,
+        commands: &mut Vec<Command>,
+        theme: Theme,
+        input: Option<KeyboardFrame>,
+    ) {
+        let input = input.unwrap_or_else(|| self.form_keyboard_input(ctx, ide, commands));
+        if matches!(ide.mode(), Mode::Break | Mode::Stale) {
+            if ide.mode() == Mode::Stale {
+                self.form_runtime_focus.clear();
+                self.form_runtime_roots.clear();
+                self.form_active_control.clear();
+                self.form_last_focus = None;
+            }
+            return;
+        }
+        let previous_active = std::mem::take(&mut self.form_active_control);
+        let previous_focus = std::mem::take(&mut self.form_runtime_focus);
+        let previous_roots = std::mem::take(&mut self.form_runtime_roots);
+        let last_focus = ctx
+            .memory(|memory| memory.focused())
+            .or(self.form_last_focus.take());
+        let Ok(instances) = ide.form_instances() else {
+            return;
+        };
+        let keyboard_owner = input.owner;
+        let key_blocked = input.blocked;
         for instance in instances {
             let id = instance.source;
             let Some(designer) = ide.form(id).filter(|_| ide.form_instance_visible(instance))
@@ -1207,6 +1293,7 @@ impl EditorUi {
                 }
             }
             let mut rendered_focus = Vec::new();
+            let mut rendered_root = None;
             let show = |ui: &mut egui::Ui| {
                 window_theme(ui, theme);
                 ui.horizontal(|ui| {
@@ -1240,6 +1327,17 @@ impl EditorUi {
                         egui::Sense::hover(),
                     );
                     let mut focus = Vec::new();
+                    let root_eligible = native
+                        && ide.form_keyboard_target(instance).ok() == Some(None)
+                        && !form.controls.iter().any(|control| native_eligible(ide,instance,form,control,false));
+                    if root_eligible {
+                        let response=ui.interact(rect,ui.scope_id().with("runtime.form.keyboard"),egui::Sense::click());
+                        response.widget_info(|| egui::WidgetInfo::labeled(egui::accesskit::Role::Pane,idle,&form.name));
+                        if idle && (response.clicked() || keyboard_owner==Some(instance) && !previous_roots.iter().any(|(owner,_)| *owner==instance)) {
+                            response.request_focus();
+                        }
+                        rendered_root=Some(response.id);
+                    }
                     for c in &form.controls {
                         if native && !native_page_visible(ide,instance,form,c) {continue;}
                         let Some((offset,parent_clip))=parent_geometry(ide,instance,form,c,rect) else {continue;};
@@ -1525,6 +1623,9 @@ impl EditorUi {
                 .show(ctx, show);
             }
             self.form_runtime_focus.extend(rendered_focus);
+            if let Some(root) = rendered_root {
+                self.form_runtime_roots.push((instance, root));
+            }
         }
         self.form_last_focus = ctx.memory(|m| m.focused());
     }
