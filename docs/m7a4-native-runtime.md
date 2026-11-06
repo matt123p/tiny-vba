@@ -6,6 +6,12 @@ Updated 2026-11-06. **IN PROGRESS. M7A.4 is not complete.** This record extends
 
 Implemented in shared tiny-vba:
 
+- [ADR 0070](decisions/0070-native-keyboard-events.md): selected typed keyboard
+  callbacks, mutable key arguments and Shift masks, static/dynamic control event
+  sinks, canonical completion receipts and the bounded pre-widget input barrier.
+  Stop/Continue/cancellation/replacement/Reset and repeat ordering have authored
+  tests; full keyboard/platform/focus/IME behavior remains partial.
+
 - [ADR 0069](decisions/0069-userforms-without-form-components.md): minimal built-in
   UserForms support without a form component; Count, Item, Add errors, aliases,
   empty enumeration, shadowing, Reset/Stop and document callbacks.

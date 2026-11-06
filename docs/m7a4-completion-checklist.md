@@ -51,3 +51,9 @@ References and owning records:
 - [Native inventory](m7a-inventory.md)
 - [MSForms physical key events](https://learn.microsoft.com/en-us/office/vba/language/reference/user-interface-help/keydown-keyup-events)
 - [MSForms KeyPress](https://learn.microsoft.com/en-us/office/vba/language/reference/user-interface-help/keypress-event)
+
+Next keyboard acceptance packet: root-window focus ownership and cross-control
+Tab/SetFocus delivery, including nested waits and debugger continuation, plus
+non-text control key defaults (especially Space). Retain unknown platform
+key/shortcut/IME and DBCS replacement cases until implemented;
+no refusal counts as a completed inventoried behavior.

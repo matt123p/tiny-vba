@@ -56,3 +56,14 @@ Windows-1252 and Shift-JIS behavior stays covered by the runtime suite. This
 shared intrinsic correction applies equally inside and outside keyboard handlers.
 See the primary [Asc](https://learn.microsoft.com/en-us/office/vba/language/reference/user-interface-help/asc-function)
 and [Chr](https://learn.microsoft.com/en-us/office/vba/language/reference/user-interface-help/chr-function) references.
+
+Final corrected-product acceptance PASS at shared revision
+`9fde04ce9ed8eab15b7f0609160617c774c2fc1b`: shared CI/WASM/WASI, all 28 runtime
+character/string and eight keyboard cases in actual WASI, and the rebuilt
+Chromium workflow. GridCraft full CI (10 steps), strict optional VBA/UI Clippy,
+four form UI, web and 21 native/21 Node-WASM package cases pass (integration
+`068c7b0a`). WordCraft full CI (8 steps, isolated serial tests), strict optional
+VBA/UI Clippy, 13 VBA UI, hidden-editor form, web and 16 native/16 Node-WASM
+package cases pass (integration `0fb3dfa5`). Source/resource identity, trust and
+debugger continuation are preserved; Word also proves one undo step. K01/K02
+and full M7A.4 remain partial, as recorded in the completion checklist.

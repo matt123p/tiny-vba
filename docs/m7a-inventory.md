@@ -260,3 +260,17 @@ semantic shadowing, compiled identity, inert inspection, host ownership and
 existing budgets remain authoritative. Shared/host acceptance is tracked in
 progress; [the completion checklist](m7a4-completion-checklist.md) retains the
 full remaining M7A.4 scope. No new IR, format or control library is introduced.
+
+[ADR 0070](decisions/0070-native-keyboard-events.md) adds selected native
+KeyDown/KeyPress/KeyUp with mutable ByVal ReturnInteger, Shift flags, ordinary
+static/dynamic WithEvents callbacks and canonical completion receipts. A bounded
+raw-input UI barrier waits before default edits and preserves Stop/Continue/Reset.
+UTF-16 storage is kept separate from ANSI Asc/Chr conversion; ASCII is stable,
+while non-ASCII ANSI conversion needs a configured code page. Shared full CI,
+WASM/WASI, eight keyboard runtime cases, 24 native form UI cases and Chromium
+acceptance pass. Keyboard/platform/shortcut/root-window focus/IME and the full
+M7A.4 checklist remain partial; mouse and accelerators remain open.
+
+Both hosts pin corrected shared revision `9fde04ce9ed8eab15b7f0609160617c774c2fc1b`.
+Full shared/host gates and 21 GridCraft/16 WordCraft native and Node-WASM
+package cases pass; ADR 0070 records the integration commits and exact evidence.

@@ -7,10 +7,22 @@ ReturnInteger arguments, canonical completion receipts and a bounded raw-input
 barrier before egui widget edits. Shared full CI/WASM/WASI, the final eight-case
 keyboard target natively and in WASI, all 24 native form UI cases and UI/native/
 web gates PASS. An actual Chromium Stop/Continue/replacement workflow passes;
-paused/resumed renders were inspected. Host integration additionally found and corrected UTF-16 storage being used
-as an ANSI Asc/Chr code page; ASCII is stable and non-ASCII ANSI requires an
-explicit code page. Host acceptance is being integrated;
-no full M7A.4 completion or new Office observation is claimed. Remaining keyboard
+paused/resumed renders were inspected. Host integration additionally corrected
+UTF-16 storage being used as an ANSI Asc/Chr code page; ASCII is stable and
+non-ASCII ANSI requires an explicit code page. The corrected runtime passes all
+28 character/string cases natively and in actual WASI, full CI/WASM/WASI and
+the rebuilt Chromium workflow.
+
+Both consumers pin shared product revision
+`9fde04ce9ed8eab15b7f0609160617c774c2fc1b`. GridCraft full CI (10 steps), strict
+optional VBA/UI Clippy, four form UI cases, web and all 21 native/21 Node-WASM
+package cases PASS (integration `068c7b0a`). WordCraft full CI (8 steps, isolated
+serial tests), strict optional VBA/UI Clippy, 13 VBA UI cases, hidden-editor form,
+web and all 16 native/16 Node-WASM package cases PASS (integration `0fb3dfa5`).
+Both integrations preserve trust, debugger continuations and original resources;
+Word additionally checks text mutation and one undo step. All three repositories
+are committed and pushed. No full M7A.4 completion or new Office observation is
+claimed. Remaining keyboard
 platform/shortcut/focus/IME cases, accelerators, mouse, lifecycle and other
 acceptance rows stay open in the completion checklist.
 
