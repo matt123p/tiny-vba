@@ -939,6 +939,10 @@ fn compiled_form(
                 }
             }
             if let Some(combo) = &control.combo {
+                source.push_str(&format!(
+                    "{temp}.AutoWordSelect={}\n",
+                    boolean(control.text_behavior.auto_word_select)
+                ));
                 source.push_str(&format!("{temp}.VbaStyle={}\n{temp}.VbaMatchEntry={}\n{temp}.MatchRequired={}\n{temp}.VbaListRows={}\n{temp}.VbaMaxLength={}\n{temp}.VbaEnterFieldBehavior={}\n{temp}.VbaText={}\n",combo.style,combo.match_entry,boolean(combo.match_required),combo.list_rows,control.max_length,u8::from(control.text_behavior.recall_selection),vba_string(&control.text)));
                 if !control.text.is_empty() {
                     source.push_str(&format!("{temp}.VbaValue={}\n", vba_string(&control.text)));
@@ -2201,6 +2205,16 @@ impl Ide {
                 .and_then(|token| self.form_gate.waits.get(&token))
                 == Some(&instance.object)
     }
+    /// Display modality survives a callback while its modal caller remains parked.
+    /// This is inert window metadata, not permission to deliver another input.
+    pub fn form_instance_has_modal_window(&self, instance: FormInstance) -> bool {
+        self.validate_form_instance(instance).is_ok()
+            && self
+                .form_gate
+                .waits
+                .values()
+                .any(|object| *object == instance.object)
+    }
     pub fn form_can_deliver(&self, id: SourceId) -> bool {
         self.default_form_instance(id)
             .is_ok_and(|instance| self.form_instance_can_deliver(instance))
@@ -2455,6 +2469,54 @@ impl Ide {
             return Err(error("tab count budget"));
         }
         Ok(count)
+    }
+    /// Inert identity used to retain the actual tab/page across queued callbacks.
+    pub fn form_instance_tab_object(
+        &self,
+        instance: FormInstance,
+        control: u32,
+        index: i32,
+    ) -> Result<ObjectRef> {
+        self.validate_form_instance(instance)?;
+        let object = self.form_instance_control_object(instance, control)?;
+        let session = self
+            .session
+            .as_ref()
+            .ok_or_else(|| error("no form session"))?;
+        if !matches!(
+            session.read_instance_field(object, "VbaKind")?,
+            Value::Integer(12 | 13)
+        ) {
+            return Err(error("tab control"));
+        }
+        tab_object(session, object, index)
+    }
+    /// Check membership and read the current position without executing getters.
+    pub fn form_instance_tab_index(
+        &self,
+        instance: FormInstance,
+        control: u32,
+        tab: ObjectRef,
+    ) -> Result<i32> {
+        self.validate_form_instance(instance)?;
+        let session = self
+            .session
+            .as_ref()
+            .ok_or_else(|| error("no form session"))?;
+        let Value::Object(position) = session.read_instance_field(tab, "VbaPosition")? else {
+            return Err(error("tab position"));
+        };
+        if session.read_instance_field(position, "VbaAttached")? != Value::Boolean(true) {
+            return Err(error("detached tab"));
+        }
+        let Value::Integer(index) = session.read_instance_field(position, "VbaIndex")? else {
+            return Err(error("tab index"));
+        };
+        let index = i32::from(index);
+        if self.form_instance_tab_object(instance, control, index)? != tab {
+            return Err(error("tab ownership"));
+        }
+        Ok(index)
     }
     pub fn form_instance_tab_field(
         &self,

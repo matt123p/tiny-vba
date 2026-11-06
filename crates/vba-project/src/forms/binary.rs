@@ -616,15 +616,17 @@ fn control(bytes: &[u8], site: Site) -> Result<Control> {
         let text_flags = if textbox {
             0x88f0_4000
         } else if combobox {
-            0x0020_5000
+            0x0820_5000
         } else {
             0
         };
         if flags & !(6 | text_flags) != 0x2c80_0819 & !text_flags {
             return Err(unsupported("TextBox behavior flags"));
         }
-        if textbox {
+        if textbox || combobox {
             text_behavior.auto_word_select = flags & (1 << 27) == 0;
+        }
+        if textbox {
             text_behavior.multi_line = flags & (1 << 31) != 0;
             text_behavior.word_wrap = flags & (1 << 23) != 0;
             text_behavior.enter_key = flags & (1 << 20) != 0;

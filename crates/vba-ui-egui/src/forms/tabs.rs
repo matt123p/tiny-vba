@@ -26,7 +26,12 @@ impl Tabs<'_> {
             _ => default,
         }
     }
-    pub(super) fn show(&self, ui: &mut egui::Ui, commands: &mut Vec<Command>) {
+    pub(super) fn show(
+        &self,
+        ui: &mut egui::Ui,
+        commands: &mut Vec<Command>,
+    ) -> Vec<(egui::Rect, mouse::Part)> {
+        let mut regions = Vec::new();
         let previous_clip = ui.clip_rect();
         ui.set_clip_rect(previous_clip.intersect(self.bounds));
         let response = ui.interact(
@@ -72,7 +77,8 @@ impl Tabs<'_> {
             if self.tab(i, "Visible") != Some(Value::Boolean(true)) {
                 continue;
             }
-            let enabled = ui.is_enabled() && self.tab(i, "Enabled") == Some(Value::Boolean(true));
+            let tab_enabled = self.tab(i, "Enabled") == Some(Value::Boolean(true));
+            let enabled = ui.is_enabled() && tab_enabled;
             if enabled {
                 eligible.push(i);
             }
@@ -113,6 +119,13 @@ impl Tabs<'_> {
                 _ => self.bounds.min + egui::vec2(offset, row),
             };
             let rect = egui::Rect::from_min_size(min, egui::vec2(width, row_height));
+            if tab_enabled
+                && let Ok(tab) =
+                    self.ide
+                        .form_instance_tab_object(self.instance, self.control.id, i)
+            {
+                regions.push((rect.intersect(ui.clip_rect()), mouse::Part::Tab(tab)));
+            }
             offset += extent;
             let tab_response = ui
                 .scope_builder(
@@ -214,5 +227,6 @@ impl Tabs<'_> {
             }
         }
         ui.set_clip_rect(previous_clip);
+        regions
     }
 }

@@ -1,5 +1,19 @@
 # Implementation progress
 
+## M7A.4 continued — composite pointer defaults (2026-11-06)
+
+ADR 0075 implements selected ComboBox/RefEdit text/drop/picker, list/popup row,
+numeric step/repeat/drag and indexed tab/page-header defaults after callbacks.
+Retained modal-display metadata does not grant input permission; tabs preserve
+identity through reorder and reject removal. ComboBox AutoWordSelect preserves
+the native inverse bit and separate dynamic default. All 25 decoder cases, ten
+shared model cases (native and WASI) and 25 actual egui pointer cases pass. Full
+shared CI/strict Clippy, WASM, UI/native/web and Chromium composite/editor/modal
+checks and full WASI pass. Consumer integration is being finalized. Native
+light/dark/narrow/scaled/host-theme and browser paused/popup/selected/completed
+views were inspected. M01 and M7A.4 remain partial; next are the unchanged
+lifecycle, keyboard, property/member, platform and reentrant input checklist.
+
 ## M7A.4 continued — native TextBox pointer defaults (2026-11-06)
 
 ADR 0074 adds selected caret, captured drag, double-click cancellation/word

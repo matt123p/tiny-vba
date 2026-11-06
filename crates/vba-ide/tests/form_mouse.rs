@@ -15,6 +15,14 @@ fn settle(ide: &mut Ide) -> R {
     Err("mouse timeout".into())
 }
 fn setup(main: &str, source: Option<&str>, resource: Vec<u8>) -> R<(Ide, FormInstance)> {
+    setup_mode(main, source, resource, Mode::Completed)
+}
+fn setup_mode(
+    main: &str,
+    source: Option<&str>,
+    resource: Vec<u8>,
+    mode: Mode,
+) -> R<(Ide, FormInstance)> {
     let mut ide = Ide::new();
     let export = String::from_utf8(fixture::export())?
         .replace(fixture::SOURCE, source.unwrap_or(fixture::SOURCE));
@@ -30,7 +38,7 @@ fn setup(main: &str, source: Option<&str>, resource: Vec<u8>) -> R<(Ide, FormIns
     ide.add_module("Main.bas", main)?;
     ide.dispatch(Action::Run, &mut NoHost)?;
     settle(&mut ide)?;
-    assert_eq!(ide.mode(), Mode::Completed, "{:?}", ide.diagnostics);
+    assert_eq!(ide.mode(), mode, "{:?}", ide.diagnostics);
     let form = *ide.form_instances()?.first().ok_or("form")?;
     Ok((ide, form))
 }
@@ -65,6 +73,101 @@ fn native_text_word_selection_bit_and_dynamic_default_are_canonical() -> R {
         );
         assert_eq!(ide.output(), vec!["initialized", "True", "False"]);
     }
+    Ok(())
+}
+#[test]
+fn native_combo_word_selection_bit_and_dynamic_default_are_canonical() -> R {
+    for (flags, expected) in [(0x2c80481b, false), (0x2480481b, true)] {
+        let (ide, f) = setup(
+            "Sub Main()\nNativeForm.Show 0\nDim c As MSForms.ComboBox\nSet c=NativeForm.Controls.Add(\"Forms.ComboBox.1\",\"Extra\")\nDebug.Print c.AutoWordSelect\nc.AutoWordSelect=False\nDebug.Print c.AutoWordSelect\nEnd Sub",
+            None,
+            fixture::combo_companion_flags(3, 2, flags),
+        )?;
+        assert_eq!(
+            ide.form_instance_field(f, Some(14), "AutoWordSelect")?,
+            vba_ide::Value::Boolean(expected)
+        );
+        assert_eq!(ide.output(), vec!["initialized", "True", "False"]);
+    }
+    Ok(())
+}
+#[test]
+fn modal_window_metadata_survives_callbacks_without_granting_input() -> R {
+    let source = fixture::SOURCE.to_owned()
+        + "\nPrivate Sub Entry_MouseDown(ByVal b As Integer,ByVal s As Integer,ByVal x As Single,ByVal y As Single)\nStop\nEnd Sub";
+    let (mut ide, f) = setup_mode(
+        "Sub Main()\nNativeForm.Show\nEnd Sub",
+        Some(&source),
+        fixture::companion(),
+        Mode::Waiting,
+    )?;
+    assert!(ide.form_instance_has_modal_window(f));
+    let epoch = mouse(&mut ide, f, Some(12), FormMouseEvent::Down)?;
+    assert_eq!(ide.mode(), Mode::Break);
+    assert!(ide.form_instance_has_modal_window(f));
+    assert!(!ide.form_instance_can_deliver(f));
+    assert!(ide.form_instance_mouse_result(f, epoch)?.is_none());
+    assert!(
+        ide.form_instance_text(
+            f,
+            12,
+            vba_ide::VbaString::from_utf8("forbidden")?,
+            (0, 0),
+            &mut NoHost
+        )
+        .is_err()
+    );
+    ide.dispatch(Action::Run, &mut NoHost)?;
+    settle(&mut ide)?;
+    assert!(ide.form_instance_has_modal_window(f));
+    assert!(ide.form_instance_can_deliver(f));
+    ide.dispatch(Action::Reset, &mut NoHost)?;
+    assert!(!ide.form_instance_has_modal_window(f));
+    Ok(())
+}
+#[test]
+fn tab_identity_inspection_tracks_reorder_and_rejects_detached_or_foreign_members() -> R {
+    let source = fixture::SOURCE.replace(
+        "Option Explicit",
+        "Option Explicit\r\nPublic changes As Long",
+    ) + "\nPrivate Sub Tabs1_MouseDown(Index As Long,ByVal b As Integer,ByVal s As Integer,ByVal x As Single,ByVal y As Single)\nchanges=changes+1\nTabs1.Tabs(Index).Index=0\nStop\nTabs1.Tabs.Remove 0\nEnd Sub";
+    let (mut ide, f) = setup(
+        "Sub Main()\nNativeForm.Show 0\nEnd Sub",
+        Some(&source),
+        fixture::tab_companion(0),
+    )?;
+    let object = ide.form_instance_tab_object(f, 14, 1)?;
+    assert_eq!(ide.form_instance_tab_index(f, 14, object)?, 1);
+    assert!(ide.form_instance_tab_index(f, 12, object).is_err());
+    ide.form_instance_mouse(
+        f,
+        Some(14),
+        FormMouseInput {
+            event: FormMouseEvent::Down,
+            button: 1,
+            shift: 0,
+            x: 0.,
+            y: 0.,
+            index: 1,
+        },
+        &mut NoHost,
+    )?;
+    settle(&mut ide)?;
+    assert_eq!(ide.mode(), Mode::Break);
+    for _ in 0..4 {
+        assert_eq!(ide.form_instance_tab_index(f, 14, object)?, 0);
+        assert_eq!(ide.form_instance_tab_object(f, 14, 0)?, object);
+        assert_eq!(
+            ide.form_instance_field(f, None, "changes")?,
+            vba_ide::Value::Long(1)
+        );
+    }
+    assert_eq!(ide.mode(), Mode::Break);
+    ide.dispatch(Action::Run, &mut NoHost)?;
+    settle(&mut ide)?;
+    assert!(ide.form_instance_tab_index(f, 14, object).is_err());
+    ide.dispatch(Action::Reset, &mut NoHost)?;
+    assert!(ide.form_instance_tab_object(f, 14, 0).is_err());
     Ok(())
 }
 #[test]

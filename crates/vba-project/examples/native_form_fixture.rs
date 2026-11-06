@@ -15,7 +15,8 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let tabs = option.as_deref() == Some("--tab-controls");
     let frames = option.as_deref() == Some("--frame-controls");
     let metadata = option.as_deref() == Some("--metadata");
-    let combo = option.as_deref() == Some("--combo-controls");
+    let composite_mouse = option.as_deref() == Some("--composite-mouse");
+    let combo = option.as_deref() == Some("--combo-controls") || composite_mouse;
     let multiple = option.as_deref() == Some("--multi-select");
     let list = option.as_deref() == Some("--list-controls") || multiple;
     let numeric = option.as_deref() == Some("--numeric-controls");
@@ -35,7 +36,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             | "--list-controls" | "--multi-select" | "--combo-controls" | "--metadata"
             | "--frame-controls" | "--tab-controls" | "--page-controls" | "--image-controls"
             | "--refedit-controls" | "--keyboard-events" | "--keyboard-routing" | "--accelerators"
-            | "--mouse-events" | "--text-mouse",
+            | "--mouse-events" | "--text-mouse" | "--composite-mouse",
         ) => false,
         Some(_) => return Err("unknown fixture option".into()),
     };
@@ -65,6 +66,9 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         "Stop\r\nDebug.Print Entry.Text"
     };
     let mut text = String::from_utf8(fixture::export())?.replace("Debug.Print Entry.Text", body);
+    if composite_mouse {
+        text.push_str("\r\nPrivate Sub Combo1_MouseUp(ByVal Button As Integer,ByVal Shift As Integer,ByVal X As Single,ByVal Y As Single)\r\nDebug.Print \"up\"\r\nStop\r\nEnd Sub\r\nPrivate Sub Combo1_DropButtonClick()\r\nDebug.Print \"drop\"\r\nEnd Sub\r\n");
+    }
     if text_mouse {
         text.push_str("\r\nPrivate Sub Entry_MouseDown(ByVal Button As Integer,ByVal Shift As Integer,ByVal X As Single,ByVal Y As Single)\r\nDebug.Print \"down\"\r\nStop\r\nEnd Sub\r\nPrivate Sub Entry_MouseUp(ByVal Button As Integer,ByVal Shift As Integer,ByVal X As Single,ByVal Y As Single)\r\nDebug.Print Entry.SelLength\r\nEnd Sub\r\n");
     }

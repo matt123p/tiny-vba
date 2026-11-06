@@ -363,8 +363,14 @@ pub fn list_selection_companion(mode: u8) -> Vec<u8> {
 
 /// Independent ComboBox records: fmDisplayStyleCombo/DropList, shared list columns.
 pub fn combo_companion(style: u8, matching: u8) -> Vec<u8> {
+    combo_companion_flags(
+        style,
+        matching,
+        if style == 3 { 0x2c80481b } else { 0x2c80081b },
+    )
+}
+pub fn combo_companion_flags(style: u8, matching: u8, flags: u32) -> Vec<u8> {
     let mut all = controls();
-    let flags = if style == 3 { 0x2c80481b } else { 0x2c80081b };
     let mut body = u32s(&[0x80017941, 0, flags]);
     body.extend([style, 0]);
     body.extend(2u16.to_le_bytes());

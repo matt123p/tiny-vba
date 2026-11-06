@@ -89,6 +89,8 @@ and native save/reopen. See [ADR 0041](decisions/0041-worksheet-form-controls.md
   ADR 0072 adds selected native accelerators; duplicate/platform ordering remains open.
   ADR 0073 adds typed mouse callbacks and selected capture/default paths; M01 remains partial.
   ADR 0074 adds selected TextBox pointer selection and native AutoWordSelect metadata.
+  ADR 0075 adds selected composite/list/numeric/indexed-tab pointer defaults and
+  retained modal display metadata without changing input ownership.
   The [completion checklist](m7a4-completion-checklist.md) makes remaining cases explicit.
   Remaining requirements and integration are recorded there. Reuse the shared runtime
   behind native forms and close Office compatibility gaps for the inventoried

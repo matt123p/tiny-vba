@@ -212,3 +212,10 @@ anchors. Re-read values after callbacks, preserve cancelled/redirected focus and
 Stop/Reset, and authorize InstanceText like other executable form commands.
 Native AutoWordSelect bit 27 is inverted relative to its VBA property; do not
 confuse persisted defaults with new dynamic controls. Full M01/M7A.4 remains open.
+
+ADR 0075 adds selected composite/list/numeric/tab-header pointer defaults. Retain
+only region geometry/identities and raw anchors; ordinary VBA fields own values.
+Popup rows inherit the input barrier; numeric repeats use injected time and stop
+on release even during Stop. Inert tab queries preserve identity after reorder
+and reject detached members. Retained modal-display metadata never authorizes
+input. Keep the complete M7A.4 checklist open for remaining acceptance.

@@ -1,6 +1,45 @@
 //! Original native numeric control presentation; VBA classes own values and events.
 use super::*;
 use vba_ide::{FormNumericInput, Value};
+#[derive(Clone, Copy)]
+pub(super) struct Thumb {
+    pub vertical: bool,
+    pub track: egui::Rect,
+    pub thumb: egui::Rect,
+}
+impl Thumb {
+    pub(super) fn grab(&self, pos: egui::Pos2) -> f32 {
+        if self.vertical {
+            pos.y - self.thumb.center().y
+        } else {
+            pos.x - self.thumb.center().x
+        }
+    }
+    pub(super) fn value(&self, pos: egui::Pos2, grab: f32, low: i32, high: i32) -> Option<i32> {
+        let (at, extent, travel) = if self.vertical {
+            (
+                pos.y - self.track.top(),
+                self.thumb.height(),
+                self.track.height() - self.thumb.height(),
+            )
+        } else {
+            (
+                pos.x - self.track.left(),
+                self.thumb.width(),
+                self.track.width() - self.thumb.width(),
+            )
+        };
+        if travel <= 0. {
+            return None;
+        }
+        let ratio = f64::from(((at - grab - extent / 2.) / travel).clamp(0., 1.));
+        Some(
+            (f64::from(low) + (f64::from(high) - f64::from(low)) * ratio)
+                .round()
+                .clamp(f64::from(i32::MIN), f64::from(i32::MAX)) as i32,
+        )
+    }
+}
 pub(super) struct Numeric<'a> {
     pub ide: &'a Ide,
     pub instance: vba_ide::FormInstance,
@@ -19,7 +58,12 @@ impl Numeric<'_> {
             _ => default,
         }
     }
-    pub(super) fn show(&self, ui: &mut egui::Ui, commands: &mut Vec<Command>) {
+    pub(super) fn show(
+        &self,
+        ui: &mut egui::Ui,
+        commands: &mut Vec<Command>,
+    ) -> Vec<(egui::Rect, mouse::Part)> {
+        let mut regions = Vec::new();
         let spin = self.control.kind == ControlKind::SpinButton;
         let vertical = match self.long("Orientation", -1) {
             0 => true,
@@ -82,6 +126,7 @@ impl Numeric<'_> {
             (0, part(0., extent), spin && vertical),
             (1, part(axis - extent, axis), !vertical || !spin),
         ] {
+            regions.push((rect, mouse::Part::NumericStep { index: at, up }));
             let response = ui.interact(rect, self.widget.with(at), egui::Sense::click());
             let label = if spin {
                 if up { "Increase" } else { "Decrease" }
@@ -165,6 +210,15 @@ impl Numeric<'_> {
             let travel = (axis - 2. * extent - thumb_extent).max(0.);
             let thumb_start = extent + fraction as f32 * travel;
             let thumb = part(thumb_start, thumb_start + thumb_extent);
+            regions.push((track, mouse::Part::NumericPage { vertical, thumb }));
+            regions.push((
+                thumb,
+                mouse::Part::NumericThumb(Thumb {
+                    vertical,
+                    track,
+                    thumb,
+                }),
+            ));
             let page = ui.interact(track, self.widget.with("track"), egui::Sense::click());
             let drag = ui.interact(thumb, self.widget.with("thumb"), egui::Sense::drag());
             ui.painter()
@@ -247,5 +301,6 @@ impl Numeric<'_> {
                 action,
             )));
         }
+        regions
     }
 }

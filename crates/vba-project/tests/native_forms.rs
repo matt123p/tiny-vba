@@ -157,6 +157,18 @@ fn native_text_behavior_packet_decodes_exact_flags_password_and_preserves_origin
     let word = decode(&fixture::text_companion(flags & !(1 << 27), 42)).unwrap();
     assert!(word.design.controls[1].text_behavior.auto_word_select);
 }
+#[test]
+fn native_combo_word_selection_preserves_the_inverse_bit_and_resources() {
+    for (flags, expected) in [(0x2c80481b, false), (0x2480481b, true)] {
+        let bytes = fixture::combo_companion_flags(3, 2, flags);
+        let form = decode(&bytes).unwrap();
+        assert_eq!(
+            form.design.controls[3].text_behavior.auto_word_select,
+            expected
+        );
+        assert_eq!(form.resources[1].bytes, bytes);
+    }
+}
 
 #[test]
 fn native_spin_and_scroll_packets_keep_ranges_identity_and_no_font_tail() {

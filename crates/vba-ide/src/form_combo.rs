@@ -13,9 +13,11 @@ Public VbaEnterFieldBehavior As Long
 Public VbaSelStart As Long
 Public VbaSelLength As Long
 Public VbaDropVisible As Boolean
+Public AutoWordSelect As Boolean
 Private VbaUnambiguous As Boolean
 Public Event DropButtonClick
 Private Sub Class_Initialize()
+AutoWordSelect=True
 VbaItems=VBA.Array()
 VbaListIndex=-1
 VbaValue=Null

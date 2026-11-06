@@ -76,6 +76,11 @@ fn harness_options(
                         vba_ui_egui::Command::Form(
                             vba_ui_egui::FormCommand::InstanceMouse(..)
                                 | vba_ui_egui::FormCommand::InstanceText(..)
+                                | vba_ui_egui::FormCommand::InstanceDrop(..)
+                                | vba_ui_egui::FormCommand::InstanceList(..)
+                                | vba_ui_egui::FormCommand::InstanceListSelection(..)
+                                | vba_ui_egui::FormCommand::InstanceNumeric(..)
+                                | vba_ui_egui::FormCommand::InstanceTab(..)
                         )
                     ) {
                         assert!(
@@ -138,8 +143,11 @@ fn entry(h: &Harness<'_, State>) -> egui::Rect {
     .rect()
 }
 fn selected(h: &Harness<'_, State>) -> R<(i32, i32)> {
+    selection(h, 12)
+}
+fn selection(h: &Harness<'_, State>, control: u32) -> R<(i32, i32)> {
     let f = instance(h)?;
-    let field = |name| h.state().ide.form_instance_field(f, Some(12), name);
+    let field = |name| h.state().ide.form_instance_field(f, Some(control), name);
     let (Value::Long(start), Value::Long(length)) = (field("VbaSelStart")?, field("VbaSelLength")?)
     else {
         return Err("selection".into());
@@ -361,6 +369,444 @@ fn modeless_mouse_move_does_not_take_focus_from_the_source_editor() -> R {
     assert_clean(&h);
     assert_eq!(h.state().ide.output(), vec!["initialized", "move"]);
     assert!(h.get_by_label(label).is_focused());
+    Ok(())
+}
+#[test]
+fn combo_text_press_and_drag_wait_for_callbacks() -> R {
+    let mut h = harness_resource(
+        "Private Sub Combo1_MouseDown(ByVal b As Integer,ByVal s As Integer,ByVal x As Single,ByVal y As Single)\nDebug.Print \"combo down\"\nStop\nEnd Sub",
+        "Sub Main()\nNativeForm.Combo1.MatchEntry=2\nNativeForm.Combo1.Text=\"alpha beta\"\nNativeForm.Show\nEnd Sub",
+        false,
+        Some(fixture::combo_companion(3, 2)),
+    )?;
+    let p = h
+        .get(
+            egui_kittest::kittest::By::new()
+                .label("Combo1")
+                .role(egui::accesskit::Role::TextInput),
+        )
+        .rect()
+        .left_center()
+        + egui::vec2(3., 0.);
+    button(&mut h, p, true);
+    h.run_steps(15);
+    assert_eq!(h.state().ide.mode(), Mode::Break);
+    assert_eq!(h.state().ide.output(), vec!["initialized", "combo down"]);
+    h.state_mut().ide.dispatch(Action::Run, &mut NoHost)?;
+    h.run_steps(20);
+    assert_eq!(selection(&h, 14)?, (0, 0));
+    let end = p + egui::vec2(220., 0.);
+    h.event(egui::Event::PointerMoved(end));
+    button(&mut h, end, false);
+    h.run_steps(35);
+    assert_clean(&h);
+    assert_eq!(selection(&h, 14)?, (0, 10));
+    Ok(())
+}
+#[test]
+fn combo_drop_default_waits_for_mouseup_and_cancelled_double_click_keeps_it_open() -> R {
+    let mut h = harness_resource(
+        "Private Sub Combo1_MouseUp(ByVal b As Integer,ByVal s As Integer,ByVal x As Single,ByVal y As Single)\nDebug.Print \"up\"\nEnd Sub\nPrivate Sub Combo1_DblClick(ByVal Cancel As MSForms.ReturnBoolean)\nDebug.Print \"double\"\nCancel=True\nEnd Sub\nPrivate Sub Combo1_DropButtonClick()\nDebug.Print \"drop\"\nEnd Sub",
+        "Sub Main()\nNativeForm.Combo1.AddItem \"alpha\"\nNativeForm.Show\nEnd Sub",
+        false,
+        Some(fixture::combo_companion(3, 2)),
+    )?;
+    let p = point(&h, "Combo1 Drop down");
+    button(&mut h, p, true);
+    button(&mut h, p, false);
+    button(&mut h, p, true);
+    button(&mut h, p, false);
+    h.run_steps(90);
+    assert_clean(&h);
+    assert_eq!(
+        h.state().ide.output(),
+        vec!["initialized", "up", "drop", "double", "up"]
+    );
+    assert_eq!(
+        h.state()
+            .ide
+            .form_instance_field(instance(&h)?, Some(14), "VbaDropVisible")?,
+        Value::Boolean(true)
+    );
+    Ok(())
+}
+#[test]
+fn combo_text_double_click_observes_cancel_before_word_selection() -> R {
+    for cancel in [false, true] {
+        let mut h = harness_resource(
+            &format!(
+                "Private Sub Combo1_DblClick(ByVal Cancel As MSForms.ReturnBoolean)\nDebug.Print \"double\"\nCancel={}\nEnd Sub",
+                if cancel { "True" } else { "False" }
+            ),
+            "Sub Main()\nNativeForm.Combo1.MatchEntry=2\nNativeForm.Combo1.Text=\"alpha beta\"\nNativeForm.Show\nEnd Sub",
+            false,
+            Some(fixture::combo_companion(3, 2)),
+        )?;
+        let rect = h
+            .get(
+                egui_kittest::kittest::By::new()
+                    .label("Combo1")
+                    .role(egui::accesskit::Role::TextInput),
+            )
+            .rect();
+        let p = rect.left_center() + egui::vec2(16., 0.);
+        button(&mut h, p, true);
+        button(&mut h, p, false);
+        button(&mut h, p, true);
+        button(&mut h, p, false);
+        h.run_steps(90);
+        assert_clean(&h);
+        assert_eq!(selection(&h, 14)?.1, if cancel { 0 } else { 5 });
+        assert_eq!(h.state().ide.output(), vec!["initialized", "double"]);
+    }
+    Ok(())
+}
+#[test]
+fn combo_mouseup_focus_redirect_suppresses_the_drop_default() -> R {
+    let mut h = harness_resource(
+        "Private Sub Combo1_MouseUp(ByVal b As Integer,ByVal s As Integer,ByVal x As Single,ByVal y As Single)\nApply.SetFocus\nEnd Sub\nPrivate Sub Combo1_DropButtonClick()\nDebug.Print \"unexpected drop\"\nEnd Sub",
+        "Sub Main()\nNativeForm.Show\nEnd Sub",
+        false,
+        Some(fixture::combo_companion(3, 2)),
+    )?;
+    let p = point(&h, "Combo1 Drop down");
+    button(&mut h, p, true);
+    button(&mut h, p, false);
+    h.run_steps(50);
+    assert_clean(&h);
+    assert_eq!(h.state().ide.output(), vec!["initialized"]);
+    assert_eq!(
+        h.state()
+            .ide
+            .form_instance_field(instance(&h)?, Some(14), "VbaDropVisible")?,
+        Value::Boolean(false)
+    );
+    Ok(())
+}
+#[test]
+fn popup_row_mouse_callbacks_finish_before_selection_and_close() -> R {
+    let mut h = harness_resource(
+        "Private Sub Combo1_MouseUp(ByVal b As Integer,ByVal s As Integer,ByVal x As Single,ByVal y As Single)\nDebug.Print \"row up\"\nStop\nEnd Sub\nPrivate Sub Combo1_Change()\nDebug.Print \"change\"\nEnd Sub",
+        "Sub Main()\nNativeForm.Combo1.AddItem \"alpha\"\nNativeForm.Combo1.AddItem \"beta\"\nNativeForm.Show 0\nNativeForm.Combo1.DropDown\nEnd Sub",
+        false,
+        Some(fixture::combo_companion(3, 2)),
+    )?;
+    let p = h.get_by_label("Combo1 row 1: beta | ").rect().center();
+    button(&mut h, p, true);
+    button(&mut h, p, false);
+    h.run_steps(20);
+    assert_eq!(h.state().ide.mode(), Mode::Break);
+    let f = instance(&h)?;
+    assert_eq!(
+        h.state()
+            .ide
+            .form_instance_field(f, Some(14), "ListIndex")?,
+        Value::Long(-1)
+    );
+    assert_eq!(
+        h.state()
+            .ide
+            .form_instance_field(f, Some(14), "VbaDropVisible")?,
+        Value::Boolean(true)
+    );
+    h.state_mut().ide.dispatch(Action::Run, &mut NoHost)?;
+    h.run_steps(40);
+    assert_clean(&h);
+    assert_eq!(
+        h.state().ide.output(),
+        vec!["initialized", "row up", "change"]
+    );
+    assert_eq!(
+        h.state()
+            .ide
+            .form_instance_field(f, Some(14), "ListIndex")?,
+        Value::Long(1)
+    );
+    assert_eq!(
+        h.state()
+            .ide
+            .form_instance_field(f, Some(14), "VbaDropVisible")?,
+        Value::Boolean(false)
+    );
+    Ok(())
+}
+#[test]
+fn native_list_row_selection_waits_for_a_stopped_mouse_handler() -> R {
+    let mut h = harness_resource(
+        "Private Sub List1_MouseDown(ByVal b As Integer,ByVal s As Integer,ByVal x As Single,ByVal y As Single)\nDebug.Print \"list down\"\nStop\nEnd Sub",
+        "Sub Main()\nNativeForm.List1.AddItem \"alpha\"\nNativeForm.List1.AddItem \"beta\"\nNativeForm.List1.Height=70\nNativeForm.Show\nEnd Sub",
+        false,
+        Some(fixture::list_companion()),
+    )?;
+    let p = h.get_by_label("List1 row 1: beta | ").rect().center();
+    button(&mut h, p, true);
+    button(&mut h, p, false);
+    h.run_steps(20);
+    assert_eq!(h.state().ide.mode(), Mode::Break);
+    let f = instance(&h)?;
+    assert_eq!(
+        h.state()
+            .ide
+            .form_instance_field(f, Some(14), "ListIndex")?,
+        Value::Long(-1)
+    );
+    h.state_mut().ide.dispatch(Action::Run, &mut NoHost)?;
+    h.run_steps(40);
+    assert_clean(&h);
+    assert_eq!(h.state().ide.output(), vec!["initialized", "list down"]);
+    assert_eq!(
+        h.state()
+            .ide
+            .form_instance_field(f, Some(14), "ListIndex")?,
+        Value::Long(1)
+    );
+    Ok(())
+}
+#[test]
+fn spin_step_waits_for_mouse_down_and_stopped_release_cancels_repeat() -> R {
+    let mut h = harness_resource(
+        "Private Sub Spin1_MouseDown(ByVal b As Integer,ByVal s As Integer,ByVal x As Single,ByVal y As Single)\nDebug.Print \"spin down\"\nStop\nEnd Sub\nPrivate Sub Spin1_SpinUp()\nDebug.Print \"spin\"\nEnd Sub",
+        "Sub Main()\nNativeForm.Spin1.Min=0\nNativeForm.Spin1.Max=100\nNativeForm.Spin1.Value=0\nNativeForm.Spin1.SmallChange=1\nNativeForm.Spin1.Delay=50\nNativeForm.Show\nEnd Sub",
+        false,
+        Some(fixture::numeric_companion()),
+    )?;
+    let p = point(&h, "Spin1 Increase");
+    button(&mut h, p, true);
+    h.run_steps(15);
+    assert_eq!(h.state().ide.mode(), Mode::Break);
+    let f = instance(&h)?;
+    assert_eq!(
+        h.state().ide.form_instance_field(f, Some(14), "Value")?,
+        Value::Long(0)
+    );
+    button(&mut h, p, false);
+    h.run_steps(4);
+    h.state_mut().ide.dispatch(Action::Run, &mut NoHost)?;
+    h.run_steps(50);
+    assert_clean(&h);
+    assert_eq!(
+        h.state().ide.form_instance_field(f, Some(14), "Value")?,
+        Value::Long(1)
+    );
+    assert_eq!(
+        h.state().ide.output(),
+        vec!["initialized", "spin down", "spin"]
+    );
+    Ok(())
+}
+#[test]
+fn held_spin_repeats_defaults_without_repeating_mouse_down_or_resuming_after_release() -> R {
+    let mut h = harness_resource(
+        "Private Sub Spin1_MouseDown(ByVal b As Integer,ByVal s As Integer,ByVal x As Single,ByVal y As Single)\nDebug.Print \"down\"\nEnd Sub\nPrivate Sub Spin1_MouseUp(ByVal b As Integer,ByVal s As Integer,ByVal x As Single,ByVal y As Single)\nDebug.Print \"up\"\nStop\nEnd Sub",
+        "Sub Main()\nNativeForm.Spin1.Min=0\nNativeForm.Spin1.Max=100\nNativeForm.Spin1.Value=0\nNativeForm.Spin1.SmallChange=1\nNativeForm.Spin1.Delay=50\nNativeForm.Show\nEnd Sub",
+        false,
+        Some(fixture::numeric_companion()),
+    )?;
+    let p = point(&h, "Spin1 Increase");
+    button(&mut h, p, true);
+    h.run_steps(35);
+    let f = instance(&h)?;
+    let Value::Long(value) = h.state().ide.form_instance_field(f, Some(14), "Value")? else {
+        return Err("spin value".into());
+    };
+    assert!(value > 1 && value < 30, "{value}");
+    button(&mut h, p, false);
+    h.run_steps(15);
+    assert_eq!(h.state().ide.mode(), Mode::Break);
+    let value = h.state().ide.form_instance_field(f, Some(14), "Value")?;
+    h.run_steps(20);
+    assert_eq!(
+        h.state().ide.form_instance_field(f, Some(14), "Value")?,
+        value
+    );
+    h.state_mut().ide.dispatch(Action::Run, &mut NoHost)?;
+    h.run_steps(30);
+    assert_clean(&h);
+    assert_eq!(
+        h.state().ide.form_instance_field(f, Some(14), "Value")?,
+        value
+    );
+    assert_eq!(h.state().ide.output(), vec!["initialized", "down", "up"]);
+    Ok(())
+}
+#[test]
+fn scrollbar_capture_does_not_replay_a_stationary_drag_after_callback_reset() -> R {
+    let mut h = harness_resource(
+        "Private Sub Scroll1_MouseDown(ByVal b As Integer,ByVal s As Integer,ByVal x As Single,ByVal y As Single)\nDebug.Print \"scroll down\"\nStop\nEnd Sub\nPrivate Sub Scroll1_Scroll()\nDebug.Print Scroll1.Value\nScroll1.Value=0\nEnd Sub",
+        "Sub Main()\nNativeForm.Scroll1.Min=0\nNativeForm.Scroll1.Max=100\nNativeForm.Scroll1.Value=0\nNativeForm.Scroll1.Orientation=1\nNativeForm.Scroll1.Width=120\nNativeForm.Scroll1.Height=18\nNativeForm.Scroll1.Top=150\nNativeForm.Show\nEnd Sub",
+        false,
+        Some(fixture::numeric_companion()),
+    )?;
+    let rect = h
+        .get(
+            egui_kittest::kittest::By::new()
+                .label("Scroll1")
+                .role(egui::accesskit::Role::ScrollBar),
+        )
+        .rect();
+    let start = rect.left_center() + egui::vec2(36., 0.);
+    let end = rect.right_center() - egui::vec2(36., 0.);
+    button(&mut h, start, true);
+    h.run_steps(15);
+    assert_eq!(h.state().ide.mode(), Mode::Break);
+    h.state_mut().ide.dispatch(Action::Run, &mut NoHost)?;
+    h.run_steps(20);
+    h.event(egui::Event::PointerMoved(end));
+    h.run_steps(20);
+    button(&mut h, end, false);
+    h.run_steps(40);
+    assert_clean(&h);
+    assert_eq!(
+        h.state().ide.output(),
+        vec!["initialized", "scroll down", "100"]
+    );
+    assert_eq!(
+        h.state()
+            .ide
+            .form_instance_field(instance(&h)?, Some(15), "Value")?,
+        Value::Long(0)
+    );
+    Ok(())
+}
+#[test]
+fn tab_and_page_mouse_indices_precede_stopped_selection_defaults() -> R {
+    for pages in [false, true] {
+        let (name, collection, control, resource) = if pages {
+            ("Multi1", "Pages", 20, fixture::multipage_companion(0))
+        } else {
+            ("Tabs1", "Tabs", 14, fixture::tab_companion(0))
+        };
+        let mut h = harness_resource(
+            &format!(
+                "Private Sub {name}_MouseDown(Index As Long,ByVal b As Integer,ByVal s As Integer,ByVal x As Single,ByVal y As Single)\nDebug.Print Index\nStop\nEnd Sub\nPrivate Sub {name}_MouseUp(Index As Long,ByVal b As Integer,ByVal s As Integer,ByVal x As Single,ByVal y As Single)\nDebug.Print Index\nEnd Sub\nPrivate Sub {name}_Change()\nDebug.Print \"change\"\nEnd Sub"
+            ),
+            &format!(
+                "Sub Main()\nNativeForm.{name}.{collection}(1).Caption=\"Second\"\nNativeForm.Show\nEnd Sub"
+            ),
+            false,
+            Some(resource),
+        )?;
+        let p = h
+            .get(
+                egui_kittest::kittest::By::new()
+                    .label("Second")
+                    .role(egui::accesskit::Role::Tab),
+            )
+            .rect()
+            .center();
+        button(&mut h, p, true);
+        button(&mut h, p, false);
+        h.run_steps(20);
+        assert_eq!(h.state().ide.mode(), Mode::Break);
+        let f = instance(&h)?;
+        assert_eq!(
+            h.state()
+                .ide
+                .form_instance_field(f, Some(control), "Value")?,
+            Value::Long(0)
+        );
+        h.state_mut().ide.dispatch(Action::Run, &mut NoHost)?;
+        h.run_steps(50);
+        assert_clean(&h);
+        assert_eq!(
+            h.state().ide.output(),
+            vec!["initialized", "1", "1", "change"]
+        );
+        assert_eq!(
+            h.state()
+                .ide
+                .form_instance_field(f, Some(control), "Value")?,
+            Value::Long(1)
+        );
+    }
+    Ok(())
+}
+#[test]
+fn queued_tab_release_retains_identity_through_reorder_and_discards_removal() -> R {
+    for remove in [false, true] {
+        let edit = if remove {
+            "Tabs1.Tabs.Remove Index"
+        } else {
+            "Tabs1.Tabs(Index).Index=0"
+        };
+        let mut h = harness_resource(
+            &format!(
+                "Private Sub Tabs1_MouseDown(Index As Long,ByVal b As Integer,ByVal s As Integer,ByVal x As Single,ByVal y As Single)\n{edit}\nStop\nEnd Sub"
+            ),
+            "Sub Main()\nNativeForm.Tabs1.Tabs(1).Caption=\"Second\"\nNativeForm.Show\nEnd Sub",
+            false,
+            Some(fixture::tab_companion(0)),
+        )?;
+        let f = instance(&h)?;
+        let object = h.state().ide.form_instance_tab_object(f, 14, 1)?;
+        let p = h
+            .get(
+                egui_kittest::kittest::By::new()
+                    .label("Second")
+                    .role(egui::accesskit::Role::Tab),
+            )
+            .rect()
+            .center();
+        button(&mut h, p, true);
+        button(&mut h, p, false);
+        h.run_steps(20);
+        assert_eq!(h.state().ide.mode(), Mode::Break);
+        if remove {
+            assert!(
+                h.state()
+                    .ide
+                    .form_instance_tab_index(f, 14, object)
+                    .is_err()
+            );
+        } else {
+            assert_eq!(h.state().ide.form_instance_tab_index(f, 14, object)?, 0);
+        }
+        h.state_mut().ide.dispatch(Action::Run, &mut NoHost)?;
+        h.run_steps(50);
+        assert_clean(&h);
+        assert_eq!(
+            h.state().ide.form_instance_field(f, Some(14), "Value")?,
+            Value::Long(0)
+        );
+        assert_eq!(h.state().ide.output(), vec!["initialized"]);
+    }
+    Ok(())
+}
+#[test]
+fn refedit_picker_and_compact_text_keep_the_same_authorized_input_path() -> R {
+    let mut h = harness_resource(
+        "Private Sub Entry_MouseDown(ByVal b As Integer,ByVal s As Integer,ByVal x As Single,ByVal y As Single)\nDebug.Print \"ref down\"\nStop\nEnd Sub",
+        "Sub Main()\nNativeForm.Show\nEnd Sub",
+        false,
+        Some(fixture::refedit_companion()),
+    )?;
+    h.state_mut().view.range_selection_enabled = true;
+    h.run_steps(6);
+    let p = point(&h, "Select range");
+    button(&mut h, p, true);
+    button(&mut h, p, false);
+    h.run_steps(15);
+    assert_eq!(h.state().ide.mode(), Mode::Break);
+    assert_eq!(h.state().ide.form_range_selection()?, None);
+    h.state_mut().ide.dispatch(Action::Run, &mut NoHost)?;
+    h.run_steps(40);
+    assert_clean(&h);
+    assert!(h.state().ide.form_range_selection()?.is_some());
+    let rect = entry(&h);
+    button(&mut h, rect.left_center() + egui::vec2(3., 0.), true);
+    h.run_steps(15);
+    assert_eq!(h.state().ide.mode(), Mode::Break);
+    h.state_mut().ide.dispatch(Action::Run, &mut NoHost)?;
+    h.run_steps(20);
+    button(&mut h, rect.right_center() + egui::vec2(60., 0.), false);
+    h.run_steps(30);
+    assert_clean(&h);
+    // The helper moves before releasing: capture extends selection outside the compact strip.
+    assert_eq!(selected(&h)?, (0, 7));
+    assert_eq!(
+        h.state().ide.output(),
+        vec!["initialized", "ref down", "ref down"]
+    );
     Ok(())
 }
 #[test]

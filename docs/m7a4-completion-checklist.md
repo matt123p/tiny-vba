@@ -10,13 +10,13 @@ reference-based expectations and fresh Office observations remain distinct.
 | C01 | Projects with no form components: bare/qualified UserForms, Count=0, aliases/TypeName, empty For Each, Item bounds, Add of missing form, shadowing, Stop/Reset/source edits, document callbacks | PASS: ADR 0069; seven shared cases and both pinned host suites |
 | C02 | Additional default/control-reference aliases and reloads; implicit reference behavior after unload and reentrant mutation | PARTIAL: ADR 0044/0067/0068; remaining cases open |
 | C03 | Dynamic collections and structural changes during iteration; review direct enumerator cursor applicability against Office's exposed interfaces | PARTIAL: snapshot profile retained; remaining parity open |
-| L01 | Activate/Deactivate across Show/Hide, multiple modeless windows, document focus, repeated activation and unloading | PARTIAL: full ordering/focus ownership open |
+| L01 | Activate/Deactivate across Show/Hide, multiple modeless windows, document focus, repeated activation and unloading | PARTIAL: ADR 0075 retains modal presentation during callbacks without granting input; full ordering/focus ownership open |
 | L02 | Lifecycle handlers redirect focus, show/hide/unload another form, Stop/resume or Reset without stale ownership or replay | OPEN |
 | F01 | Recursive SetFocus and cancellation, nested containers/page switches, dirty validation and binding callbacks, boolean update timing | PARTIAL: selected focus/validation implemented; edge cases open |
 | K01 | KeyDown/KeyPress/KeyUp with mutable ByVal MSForms.ReturnInteger and typed Shift; cancellation/default processing in ordinary frames | PARTIAL: ADR 0070 evidence plus ADR 0071 root/Tab/SetFocus/Space cases PASS (nine runtime, 11 new UI, Chromium, both hosts); remaining cases open |
 | K02 | Held-key repeat; modifiers; Tab/navigation focus transitions; Default/Cancel Enter/Escape exceptions; ANSI input versus Unicode/IME/paste | PARTIAL: raw-input barrier and ADR 0071 focus/default ordering; remaining platform/shortcut/focus/IME cases open |
 | K03 | Accelerators select/focus/activate the appropriate eligible control and preserve keyboard/event ordering | PARTIAL: ADR 0072 selected Label/button/boolean/Tab/Page actions; duplicate, non-ASCII/platform and further ordering cases open |
-| M01 | Applicable MouseDown/MouseMove/MouseUp/Click/DblClick, typed button/modifier/coordinate/cancellation arguments, event order and container-relative coordinates | PARTIAL: ADR 0073 typed callbacks and selected simple-control capture/defaults; ADR 0074 selected TextBox caret/drag/word selection; ComboBox/RefEdit/list/numeric/indexed-tab/platform defaults and further ordering open |
+| M01 | Applicable MouseDown/MouseMove/MouseUp/Click/DblClick, typed button/modifier/coordinate/cancellation arguments, event order and container-relative coordinates | PARTIAL: ADR 0073 typed callbacks and selected simple-control capture/defaults; ADR 0074 selected TextBox caret/drag/word selection; ADR 0075 selected ComboBox/RefEdit/list/numeric/tab-header defaults; further ordering, background/drag/wheel/mutation and platform cases open |
 | P01 | Remaining common properties, defaults, exact errors/coercions, text/selection edge cases | PARTIAL: remaining contract/member audit open |
 | B01 | List/Column array shape/loading, binding value types and update timing, protected failures and reentrant handlers | PARTIAL: current selected array/binding packets implemented |
 | W01 | Frame, TabStrip/Tabs, MultiPage/Pages: remaining storage/resource/property/presentation cases, transitions, focus and lifecycle | PARTIAL |
@@ -57,9 +57,10 @@ replacement cases, cross-window lifecycle/focus changes and remaining non-text
 control defaults. Root focus and selected Tab/SetFocus/Space cases follow ADR 0071.
 No refusal counts as a completed inventoried behavior.
 
-Next implementation packet: M01 remaining text/platform selection,
-list/numeric/drop/picker input and indexed Tab/Page hits, preserving typed callback
-ordering, capture, validation/cancellation, Stop/Continue and stale input rejection.
+Next implementation packet: remaining M01 platform/order/selection/drag/wheel and
+reentrant collection/binding cases, tab/page background hits and the unchanged
+lifecycle, keyboard and property/member checklist. ADR 0075 adds the selected
+composite/list/numeric/header defaults with capture and ordinary continuation.
 ADR 0073 implements the callback and selected simple-control capture/default paths;
 ADR 0074 adds selected TextBox defaults without deferring the remaining K03
 accelerator/platform or lifecycle cases.

@@ -3,6 +3,17 @@ use super::*;
 use std::collections::VecDeque;
 use vba_ide::{FormInstance, FormMouseEvent as Phase, FormMouseInput, ObjectRef, Value};
 #[derive(Clone)]
+pub(super) enum Part {
+    Body,
+    Text(text::Geometry),
+    Drop,
+    Tab(ObjectRef),
+    Row { index: i32, popup: bool },
+    NumericStep { index: u8, up: bool },
+    NumericPage { vertical: bool, thumb: egui::Rect },
+    NumericThumb(numeric::Thumb),
+}
+#[derive(Clone)]
 pub(super) struct Hit {
     pub owner: FormInstance,
     pub control: Option<u32>,
@@ -11,7 +22,7 @@ pub(super) struct Hit {
     pub origin: egui::Pos2,
     pub parent: egui::Pos2,
     pub kind: Option<ControlKind>,
-    pub text: Option<text::Geometry>,
+    pub part: Part,
 }
 impl Hit {
     fn same(&self, other: &Self) -> bool {
@@ -22,6 +33,12 @@ impl Hit {
             && self.control.is_none_or(|control| {
                 ide.form_instance_control_object(self.owner, control).ok() == Some(self.object)
             })
+            && match (self.control, &self.part) {
+                (Some(control), Part::Tab(tab)) => ide
+                    .form_instance_tab_index(self.owner, control, *tab)
+                    .is_ok(),
+                _ => true,
+            }
     }
     fn simple(&self) -> bool {
         self.kind.is_none_or(|kind| {
@@ -38,10 +55,23 @@ impl Hit {
         })
     }
     fn text(&self) -> bool {
-        self.kind == Some(ControlKind::TextBox)
+        matches!(self.part, Part::Text(_))
     }
     fn supported(&self) -> bool {
-        self.simple() || self.text()
+        self.simple()
+            || self.text()
+            || matches!(
+                self.part,
+                Part::Drop
+                    | Part::Tab(_)
+                    | Part::Row { .. }
+                    | Part::NumericStep { .. }
+                    | Part::NumericPage { .. }
+                    | Part::NumericThumb(_)
+            )
+    }
+    fn drags(&self) -> bool {
+        self.text() || matches!(self.part, Part::NumericThumb(_))
     }
 }
 #[derive(Clone)]
@@ -65,6 +95,11 @@ struct TextAnchor {
     end: usize,
     words: bool,
 }
+struct NumericAnchor {
+    gesture: u64,
+    grab: f32,
+    last: egui::Pos2,
+}
 #[derive(Default)]
 pub(crate) struct Mouse {
     pub(super) hits: Vec<Hit>,
@@ -74,8 +109,10 @@ pub(crate) struct Mouse {
     queue: VecDeque<Raw>,
     pending: Option<Pending>,
     default: Option<Raw>,
-    text_wait: Option<Hit>,
+    action_wait: Option<Hit>,
     text_anchor: Option<TextAnchor>,
+    numeric_anchor: Option<NumericAnchor>,
+    numeric_repeat: Option<(Raw, f64)>,
     capture: Option<(Hit, u8, u64, bool)>,
     last: Option<(Hit, f64, egui::Pos2)>,
     serial: u64,
@@ -106,19 +143,45 @@ impl Mouse {
             .rev()
             .find(|h| h.owner == owner && h.control == Some(control))
         {
-            hit.text = Some(geometry);
+            hit.part = Part::Text(geometry);
+        }
+    }
+    pub(super) fn regions(
+        &mut self,
+        owner: FormInstance,
+        control: u32,
+        regions: Vec<(egui::Rect, Part)>,
+    ) {
+        let Some(base) = self
+            .hits
+            .iter()
+            .rev()
+            .find(|h| h.owner == owner && h.control == Some(control))
+            .cloned()
+        else {
+            return;
+        };
+        for (rect, part) in regions {
+            let mut hit = base.clone();
+            hit.rect = if matches!(part, Part::Row { popup: true, .. }) {
+                rect
+            } else {
+                rect.intersect(base.rect)
+            };
+            hit.part = part;
+            self.hit(hit);
         }
     }
     pub(super) fn idle(&self) -> bool {
         !self.pending() && self.queue.is_empty() && self.capture.is_none()
     }
     pub(super) fn pending(&self) -> bool {
-        self.pending.is_some() || self.default.is_some() || self.text_wait.is_some()
+        self.pending.is_some() || self.default.is_some() || self.action_wait.is_some()
     }
     pub(super) fn blocks(&self, owner: FormInstance) -> bool {
         self.faulted == Some(owner)
             || self.default.as_ref().is_some_and(|r| r.hit.owner == owner)
-            || self.text_wait.as_ref().is_some_and(|h| h.owner == owner)
+            || self.action_wait.as_ref().is_some_and(|h| h.owner == owner)
             || self
                 .pending
                 .as_ref()
@@ -200,6 +263,9 @@ impl Mouse {
                     .is_some_and(|p| p.raw.gesture == *serial)
                 || self.queue.iter().any(|r| r.gesture == *serial)
         });
+        if self.capture.is_none() {
+            self.numeric_repeat = None;
+        }
         let events = ctx.input(|input| input.events.clone());
         let time = ctx.input(|input| input.time);
         let options = ctx.memory(|memory| memory.options.input_options);
@@ -235,6 +301,13 @@ impl Mouse {
                     self.hits
                         .iter()
                         .rev()
+                        .filter(|h| matches!(h.part, Part::Row { popup: true, .. }))
+                        .chain(
+                            self.hits
+                                .iter()
+                                .rev()
+                                .filter(|h| !matches!(h.part, Part::Row { popup: true, .. })),
+                        )
                         .find(|h| {
                             h.rect.contains(pos)
                                 && (ide.form_instance_can_deliver(h.owner)
@@ -243,7 +316,10 @@ impl Mouse {
                                         .default
                                         .as_ref()
                                         .is_some_and(|r| r.hit.owner == h.owner)
-                                    || self.text_wait.as_ref().is_some_and(|r| r.owner == h.owner)
+                                    || self
+                                        .action_wait
+                                        .as_ref()
+                                        .is_some_and(|r| r.owner == h.owner)
                                     || self
                                         .pending
                                         .as_ref()
@@ -257,7 +333,7 @@ impl Mouse {
             }
             let Some(hit) = hit.take().filter(|h| {
                 Self::listens(ide, h)
-                    || h.simple() && (key_owner == Some(h.owner) || self.blocks(h.owner))
+                    || h.supported() && (key_owner == Some(h.owner) || self.blocks(h.owner))
             }) else {
                 continue;
             };
@@ -316,7 +392,7 @@ impl Mouse {
                 }
                 Phase::Up
             } else {
-                if !(hit.text()
+                if !(hit.drags()
                     && self
                         .capture
                         .as_ref()
@@ -365,8 +441,10 @@ impl Mouse {
                 self.queue.clear();
                 self.pending = None;
                 self.default = None;
-                self.text_wait = None;
+                self.action_wait = None;
                 self.text_anchor = None;
+                self.numeric_anchor = None;
+                self.numeric_repeat = None;
                 self.capture = None;
                 self.faulted = Some(hit.owner);
                 commands.push(Command::Report("native mouse input budget exceeded".into()));
@@ -383,14 +461,34 @@ impl Mouse {
                 last,
             });
         }
+        if allow_dispatch
+            && !self.pending()
+            && self.queue.is_empty()
+            && self
+                .capture
+                .as_ref()
+                .is_some_and(|(_, mask, _, _)| mask & 1 != 0)
+            && let Some((raw, at)) = self.numeric_repeat.as_ref()
+            && time >= *at
+            && raw.hit.current(ide)
+            && ide.form_instance_can_deliver(raw.hit.owner)
+        {
+            if ctx
+                .input(|i| i.pointer.latest_pos())
+                .is_some_and(|p| raw.hit.rect.contains(p))
+            {
+                self.default = Some(raw.clone());
+            }
+            ctx.request_repaint_after(std::time::Duration::from_millis(16));
+        }
         if !allow_dispatch && !self.pending() {
             return;
         }
-        if let Some(hit) = self.text_wait.take()
+        if let Some(hit) = self.action_wait.take()
             && hit.current(ide)
             && !ide.form_instance_can_deliver(hit.owner)
         {
-            self.text_wait = Some(hit);
+            self.action_wait = Some(hit);
             ctx.request_repaint();
             return;
         }
@@ -402,8 +500,8 @@ impl Mouse {
                 ctx.request_repaint();
                 return;
             }
-            if raw.hit.current(ide) && self.text_default(ctx, ide, commands, &raw) {
-                self.text_wait = Some(raw.hit);
+            if raw.hit.current(ide) && self.default_action(ctx, ide, commands, &raw) {
+                self.action_wait = Some(raw.hit);
                 ctx.request_repaint();
                 return;
             }
@@ -426,9 +524,22 @@ impl Mouse {
                         self.suppressed.push(p.raw.gesture);
                     }
                     if allow
-                        && p.raw.hit.text()
                         && p.raw.button & 1 != 0
-                        && matches!(p.raw.phase, Phase::Down | Phase::Move | Phase::DoubleClick)
+                        && ((p.raw.hit.text() || matches!(p.raw.hit.part, Part::NumericThumb(_)))
+                            && matches!(
+                                p.raw.phase,
+                                Phase::Down | Phase::Move | Phase::DoubleClick
+                            )
+                            || matches!(p.raw.hit.part, Part::NumericStep { .. })
+                                && matches!(p.raw.phase, Phase::Down | Phase::DoubleClick)
+                            || matches!(
+                                p.raw.hit.part,
+                                Part::Drop
+                                    | Part::Row { .. }
+                                    | Part::Tab(_)
+                                    | Part::NumericPage { .. }
+                            ) && p.raw.phase == Phase::Up
+                                && p.raw.click)
                         && !self.suppressed.contains(&p.raw.gesture)
                     {
                         self.default = Some(p.raw);
@@ -448,6 +559,8 @@ impl Mouse {
                     } else if p.raw.last {
                         self.suppressed.retain(|s| *s != p.raw.gesture);
                         self.text_anchor = None;
+                        self.numeric_anchor = None;
+                        self.numeric_repeat = None;
                     }
                 }
             }
@@ -487,7 +600,15 @@ impl Mouse {
                 shift: raw.shift,
                 x: point.x,
                 y: point.y,
-                index: -1,
+                index: match (&raw.hit.part, raw.hit.control) {
+                    (Part::Tab(tab), Some(control)) => {
+                        match ide.form_instance_tab_index(raw.hit.owner, control, *tab) {
+                            Ok(index) => index,
+                            Err(_) => return,
+                        }
+                    }
+                    _ => -1,
+                },
             },
         )));
         if matches!(raw.phase, Phase::Down | Phase::DoubleClick) {
@@ -498,6 +619,185 @@ impl Mouse {
         }
         self.pending = Some(Pending { raw, epoch });
         ctx.request_repaint();
+    }
+    fn default_action(
+        &mut self,
+        ctx: &egui::Context,
+        ide: &Ide,
+        commands: &mut Vec<Command>,
+        raw: &Raw,
+    ) -> bool {
+        if raw.hit.text() {
+            return self.text_default(ctx, ide, commands, raw);
+        }
+        let Some(control) = raw.hit.control else {
+            return false;
+        };
+        if ide
+            .form_instance_field(raw.hit.owner, None, "VbaActiveControl")
+            .ok()
+            != Some(Value::Object(raw.hit.object))
+        {
+            self.numeric_repeat = None;
+            return false;
+        }
+        if matches!(
+            raw.hit.part,
+            Part::NumericStep { .. } | Part::NumericPage { .. } | Part::NumericThumb(_)
+        ) {
+            return self.numeric_default(ctx, ide, commands, raw, control);
+        }
+        if let Part::Tab(tab) = raw.hit.part {
+            if !self
+                .hits
+                .iter()
+                .any(|h| h.same(&raw.hit) && matches!(h.part,Part::Tab(object) if object==tab))
+            {
+                return false;
+            }
+            let Ok(index) = ide.form_instance_tab_index(raw.hit.owner, control, tab) else {
+                return false;
+            };
+            commands.push(Command::Form(FormCommand::InstanceTab(
+                raw.hit.owner,
+                control,
+                index,
+            )));
+            return true;
+        }
+        if let Part::Row { index, popup } = raw.hit.part {
+            if !self.hits.iter().any(|h| {
+                h.same(&raw.hit)
+                    && matches!(h.part,Part::Row{index:row,popup:pop} if row==index && pop==popup)
+            }) {
+                return false;
+            }
+            let command = if raw.hit.kind == Some(ControlKind::ListBox) {
+                FormCommand::InstanceListSelection(
+                    raw.hit.owner,
+                    control,
+                    vba_ide::FormListInput {
+                        row: index,
+                        extend: raw.shift & 1 != 0,
+                        toggle: raw.shift & 2 != 0,
+                        navigate: false,
+                    },
+                )
+            } else {
+                FormCommand::InstanceList(raw.hit.owner, control, index)
+            };
+            commands.push(Command::Form(command));
+            return true;
+        }
+        if !self
+            .hits
+            .iter()
+            .any(|h| h.same(&raw.hit) && matches!(h.part, Part::Drop))
+        {
+            return false;
+        }
+        let Ok(Value::Boolean(opened)) =
+            ide.form_instance_field(raw.hit.owner, Some(control), "VbaDropVisible")
+        else {
+            return false;
+        };
+        commands.push(Command::Form(FormCommand::InstanceDrop(
+            raw.hit.owner,
+            control,
+            !opened,
+        )));
+        true
+    }
+    fn numeric_default(
+        &mut self,
+        ctx: &egui::Context,
+        ide: &Ide,
+        commands: &mut Vec<Command>,
+        raw: &Raw,
+        control: u32,
+    ) -> bool {
+        use vba_ide::FormNumericInput;
+        let Some(part) = self
+            .hits
+            .iter()
+            .find(|h| {
+                h.same(&raw.hit)
+                    && match (&h.part, &raw.hit.part) {
+                        (
+                            Part::NumericStep { index: a, .. },
+                            Part::NumericStep { index: b, .. },
+                        ) => a == b,
+                        (Part::NumericPage { .. }, Part::NumericPage { .. })
+                        | (Part::NumericThumb(_), Part::NumericThumb(_)) => true,
+                        _ => false,
+                    }
+            })
+            .map(|h| h.part.clone())
+        else {
+            return false;
+        };
+        let long = |name, default| match ide.form_instance_field(raw.hit.owner, Some(control), name)
+        {
+            Ok(Value::Long(n)) => n,
+            _ => default,
+        };
+        let action = match part {
+            Part::NumericStep { up, .. } => {
+                let time = ctx.input(|i| i.time);
+                let delay = long("Delay", 50).max(1);
+                self.numeric_repeat = Some((raw.clone(), time + f64::from(delay) / 1000.));
+                ctx.request_repaint_after(std::time::Duration::from_millis(
+                    u64::try_from(delay).unwrap_or(50),
+                ));
+                FormNumericInput::Step { up, large: false }
+            }
+            Part::NumericPage { vertical, thumb } => {
+                if thumb.contains(raw.pos) {
+                    return false;
+                }
+                FormNumericInput::Step {
+                    up: if vertical {
+                        raw.pos.y > thumb.center().y
+                    } else {
+                        raw.pos.x > thumb.center().x
+                    },
+                    large: true,
+                }
+            }
+            Part::NumericThumb(geometry) => {
+                if matches!(raw.phase, Phase::Down | Phase::DoubleClick) {
+                    self.numeric_anchor = Some(NumericAnchor {
+                        gesture: raw.gesture,
+                        grab: geometry.grab(raw.pos),
+                        last: raw.pos,
+                    });
+                    return false;
+                }
+                let Some(anchor) = &mut self.numeric_anchor else {
+                    return false;
+                };
+                if anchor.gesture != raw.gesture || anchor.last == raw.pos {
+                    return false;
+                }
+                anchor.last = raw.pos;
+                let Some(value) =
+                    geometry.value(raw.pos, anchor.grab, long("Min", 0), long("Max", 32767))
+                else {
+                    return false;
+                };
+                if value == long("Value", 0) {
+                    return false;
+                }
+                FormNumericInput::Drag(value)
+            }
+            _ => return false,
+        };
+        commands.push(Command::Form(FormCommand::InstanceNumeric(
+            raw.hit.owner,
+            control,
+            action,
+        )));
+        true
     }
     fn text_default(
         &mut self,
@@ -522,8 +822,11 @@ impl Mouse {
         let Some(geometry) = self
             .hits
             .iter()
-            .find(|h| h.same(&raw.hit))
-            .and_then(|h| h.text.as_ref())
+            .find(|h| h.same(&raw.hit) && h.text())
+            .and_then(|h| match &h.part {
+                Part::Text(geometry) => Some(geometry),
+                _ => None,
+            })
         else {
             return false;
         };

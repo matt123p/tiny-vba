@@ -588,3 +588,11 @@ CRLF, Stop/Reset and source/resource identity are preserved. Native AutoWordSele
 bit 27 is the inverse of the Boolean property; imported defaults and new dynamic
 controls are distinguished. ComboBox/RefEdit pointer defaults, further platform/
 word/selection cases and the full M7A.4 checklist remain open.
+
+[ADR 0075](decisions/0075-native-composite-pointer-defaults.md) adds selected
+ComboBox/RefEdit text and drop/picker, list/popup row, numeric step/repeat/drag and
+indexed tab/page-header pointer defaults after ordinary mouse callbacks. Inert
+modal-display metadata is separate from input ownership; popup input inherits the
+execution barrier and tab identity is revalidated after mutation. ComboBox native
+AutoWordSelect uses its inverse file bit. Canonical state and existing executable
+command authorization remain authoritative. Full M01/M7A.4 acceptance stays open.

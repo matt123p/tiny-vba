@@ -5,10 +5,15 @@ pub(super) struct RefEdit<'a> {
     pub picker: bool,
 }
 impl RefEdit<'_> {
-    pub(super) fn show(&self, ui: &mut egui::Ui, commands: &mut Vec<Command>) {
+    pub(super) fn show(
+        &self,
+        ui: &mut egui::Ui,
+        commands: &mut Vec<Command>,
+    ) -> Vec<(egui::Rect, mouse::Part)> {
+        let mut regions = Vec::new();
         let bounds = self.text.bounds;
         if bounds.width() <= 4. || bounds.height() <= 4. {
-            return;
+            return regions;
         }
         let button_width = bounds.height().min(24.).min(bounds.width());
         let edit = egui::Rect::from_min_max(
@@ -19,11 +24,17 @@ impl RefEdit<'_> {
             egui::pos2(edit.right(), bounds.top()),
             bounds.right_bottom(),
         );
-        let _ = text::TextBox {
+        if let Some(geometry) = (text::TextBox {
             bounds: edit,
             ..self.text
+        })
+        .show(ui, commands)
+        {
+            regions.push((edit, mouse::Part::Text(geometry)));
         }
-        .show(ui, commands);
+        if self.picker {
+            regions.push((button, mouse::Part::Drop));
+        }
         let opened = self
             .text
             .ide
@@ -73,5 +84,6 @@ impl RefEdit<'_> {
                 !opened,
             )));
         }
+        regions
     }
 }

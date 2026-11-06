@@ -21,9 +21,14 @@ impl ComboBox<'_> {
             _ => default,
         }
     }
-    pub(super) fn show(&self, ui: &mut egui::Ui, commands: &mut Vec<Command>) {
+    pub(super) fn show(
+        &self,
+        ui: &mut egui::Ui,
+        commands: &mut Vec<Command>,
+    ) -> Vec<(egui::Rect, mouse::Part)> {
+        let mut regions = Vec::new();
         if self.bounds.width() <= 4. || self.bounds.height() <= 4. {
-            return;
+            return regions;
         }
         let opened = self.field("VbaDropVisible") == Some(Value::Boolean(true));
         let arrow_width = self.bounds.height().min(24.).min(self.bounds.width());
@@ -35,9 +40,10 @@ impl ComboBox<'_> {
             egui::pos2(edit.right(), self.bounds.top()),
             self.bounds.right_bottom(),
         );
+        regions.push((arrow, mouse::Part::Drop));
         let mut toggle = false;
         if self.long("Style", 0) == 0 {
-            let _ = text::TextBox {
+            if let Some(geometry) = (text::TextBox {
                 ide: self.ide,
                 instance: self.instance,
                 control: self.control,
@@ -45,9 +51,13 @@ impl ComboBox<'_> {
                 widget: self.widget,
                 enabled: ui.is_enabled(),
                 theme: self.theme,
+            })
+            .show(ui, commands)
+            {
+                regions.push((edit, mouse::Part::Text(geometry)));
             }
-            .show(ui, commands);
         } else {
+            regions.push((edit, mouse::Part::Drop));
             let response = ui.interact(edit, self.widget, egui::Sense::click());
             response.widget_info(|| {
                 egui::WidgetInfo::labeled(
@@ -137,6 +147,7 @@ impl ComboBox<'_> {
             )));
         }
         let mut show = opened;
+        let enabled = ui.is_enabled();
         egui::Popup::from_response(&response)
             .anchor(self.bounds)
             .frame(
@@ -150,6 +161,9 @@ impl ComboBox<'_> {
             .close_behavior(egui::PopupCloseBehavior::CloseOnClickOutside)
             .width(self.bounds.width())
             .show(|ui| {
+                if !enabled {
+                    ui.disable();
+                }
                 let rows = self.long("ListRows", 8).clamp(1, 32);
                 let count = self.long("ListCount", 0).clamp(1, 1024);
                 let height = (rows.min(count) as f32
@@ -160,7 +174,7 @@ impl ComboBox<'_> {
                     egui::vec2(self.bounds.width(), height),
                     egui::Sense::hover(),
                 );
-                list::ListBox {
+                let rows = list::ListBox {
                     ide: self.ide,
                     instance: self.instance,
                     control: self.control,
@@ -169,10 +183,12 @@ impl ComboBox<'_> {
                     theme: self.theme,
                 }
                 .show(ui, commands);
+                regions.extend(rows);
             });
-        if opened && !show && !commands.iter().any(|c|matches!(c,Command::Form(FormCommand::InstanceDrop(owner,_,_)|FormCommand::InstanceList(owner,_,_)|FormCommand::InstanceEvent(owner,_,_)|FormCommand::InstanceFocus(owner,_)|FormCommand::InstanceActivate(owner,_)) if *owner==self.instance)) {
+        if ui.is_enabled() && opened && !show && !commands.iter().any(|c|matches!(c,Command::Form(FormCommand::InstanceDrop(owner,_,_)|FormCommand::InstanceList(owner,_,_)|FormCommand::InstanceEvent(owner,_,_)|FormCommand::InstanceFocus(owner,_)|FormCommand::InstanceActivate(owner,_)) if *owner==self.instance)) {
             commands.push(Command::Form(FormCommand::InstanceDrop(self.instance,self.control.id,false)));
         }
+        regions
     }
 }
 /// Run before default/cancel routing so an open list owns Enter and Escape.

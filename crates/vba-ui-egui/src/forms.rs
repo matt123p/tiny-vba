@@ -1132,23 +1132,47 @@ impl EditorUi {
                         ui.add_enabled_ui(idle && self.range_selection_enabled, |ui| {
                             let (bounds, _) =
                                 ui.allocate_exact_size(egui::vec2(320., 26.), egui::Sense::hover());
-                            refedit::RefEdit {
+                            let widget = ui.scope_id().with(c.id);
+                            self.form_runtime_focus.push((instance, c.id, widget));
+                            if idle
+                                && !previous_focus.iter().any(|(owner, _, target)| {
+                                    *owner == instance && *target == widget
+                                })
+                            {
+                                ui.ctx().memory_mut(|m| m.request_focus(widget));
+                            }
+                            if let Ok(object) = ide.form_instance_control_object(instance, c.id) {
+                                self.form_mouse.hit(mouse::Hit {
+                                    owner: instance,
+                                    control: Some(c.id),
+                                    object,
+                                    rect: bounds.intersect(ui.clip_rect()),
+                                    origin: bounds.min,
+                                    parent: bounds.min,
+                                    kind: Some(c.kind),
+                                    part: mouse::Part::Body,
+                                });
+                            }
+                            let regions = refedit::RefEdit {
                                 text: text::TextBox {
                                     ide,
                                     instance,
                                     control: c,
                                     bounds,
-                                    widget: ui.scope_id().with(c.id),
+                                    widget,
                                     enabled: true,
                                     theme,
                                 },
                                 picker: true,
                             }
                             .show(ui, commands);
-                            if ui.input_mut(|i| {
-                                i.consume_key(egui::Modifiers::NONE, egui::Key::Escape)
-                                    || i.consume_key(egui::Modifiers::NONE, egui::Key::Enter)
-                            }) {
+                            self.form_mouse.regions(instance, c.id, regions);
+                            if idle
+                                && ui.input_mut(|i| {
+                                    i.consume_key(egui::Modifiers::NONE, egui::Key::Escape)
+                                        || i.consume_key(egui::Modifiers::NONE, egui::Key::Enter)
+                                })
+                            {
                                 commands.push(Command::Form(FormCommand::InstanceDrop(
                                     instance, c.id, false,
                                 )));
@@ -1396,7 +1420,7 @@ impl EditorUi {
                         egui::Sense::hover(),
                     );
                     if native {
-                        self.form_mouse.hit(mouse::Hit{owner:instance,control:None,object:instance.object,rect:rect.intersect(ui.clip_rect()),origin:rect.min,parent:rect.min,kind:None,text:None});
+                        self.form_mouse.hit(mouse::Hit{owner:instance,control:None,object:instance.object,rect:rect.intersect(ui.clip_rect()),origin:rect.min,parent:rect.min,kind:None,part:mouse::Part::Body});
                     }
                     let mut focus = Vec::new();
                     let root_eligible = native
@@ -1452,7 +1476,7 @@ impl EditorUi {
                             ) * scale,
                         );
                         if native && enabled && let Ok(object)=ide.form_instance_control_object(instance,c.id) {
-                            self.form_mouse.hit(mouse::Hit{owner:instance,control:Some(c.id),object,rect:bounds.intersect(parent_clip).intersect(ui.clip_rect()),origin:bounds.min,parent:rect.min+offset,kind:Some(c.kind),text:None});
+                            self.form_mouse.hit(mouse::Hit{owner:instance,control:Some(c.id),object,rect:bounds.intersect(parent_clip).intersect(ui.clip_rect()),origin:bounds.min,parent:rect.min+offset,kind:Some(c.kind),part:mouse::Part::Body});
                         }
                         let widget_id = ui.scope_id().with(("runtime.control", c.id));
                         if native && idle && keyboard_owner==Some(instance)
@@ -1478,8 +1502,9 @@ impl EditorUi {
                         ui.set_clip_rect(previous_clip.intersect(parent_clip));
                         let control_scope=egui::UiBuilder::new().id_salt(("runtime",c.id));
                         let control_scope=if let Some(parent)=c.parent {control_scope.accessibility_parent(ui.scope_id().with(("runtime.control",parent)))} else {control_scope};
-                        ui.scope_builder(control_scope, |ui| {
-                            ui.add_enabled_ui(enabled, |ui| match c.kind {
+                        {
+                            let mut control_ui=ui.new_child(control_scope.max_rect(bounds));
+                            control_ui.add_enabled_ui(enabled, |ui| match c.kind {
                                 ControlKind::Frame | ControlKind::Page=> {
                                     let response=ui.interact(bounds,widget_id,if c.kind==ControlKind::Page {egui::Sense::hover()}else{egui::Sense::click()});
                                     ui.painter().rect_filled(bounds,2.,theme.chrome);
@@ -1488,13 +1513,13 @@ impl EditorUi {
                                     response.widget_info(||egui::WidgetInfo::labeled(egui::accesskit::Role::Group,enabled,&c.name));
                                     if response.clicked() {commands.push(Command::Form(FormCommand::InstanceEvent(instance,Some(c.id),None)));}
                                 }
-                                ControlKind::TabStrip | ControlKind::MultiPage=> {tabs::Tabs{ide,instance,control:c,bounds,widget:widget_id,theme}.show(ui,commands);}
+                                ControlKind::TabStrip | ControlKind::MultiPage=> {let regions=tabs::Tabs{ide,instance,control:c,bounds,widget:widget_id,theme}.show(ui,commands);self.form_mouse.regions(instance,c.id,regions);}
 
-                                ControlKind::RefEdit => {refedit::RefEdit{text:text::TextBox{ide,instance,control:c,bounds,widget:widget_id,enabled,theme},picker:self.range_selection_enabled && ide.form_instance_is_modal(instance)}.show(ui,commands);}
+                                ControlKind::RefEdit => {let regions=refedit::RefEdit{text:text::TextBox{ide,instance,control:c,bounds,widget:widget_id,enabled,theme},picker:self.range_selection_enabled && ide.form_instance_has_modal_window(instance)}.show(ui,commands);self.form_mouse.regions(instance,c.id,regions);}
                                 ControlKind::Image=> {images::Image{ide,instance,control:c,bounds,widget:widget_id,theme}.show(ui,&mut self.form_picture_textures,commands);}
-                                ControlKind::ComboBox=> {combo::ComboBox{ide,instance,control:c,bounds,widget:widget_id,theme}.show(ui,commands);}
-                                ControlKind::ListBox => {list::ListBox{ide,instance,control:c,bounds,widget:widget_id,theme}.show(ui,commands);}
-                                ControlKind::SpinButton|ControlKind::ScrollBar=> {numeric::Numeric{ide,instance,control:c,bounds,widget:widget_id,theme}.show(ui,commands);}
+                                ControlKind::ComboBox=> {let regions=combo::ComboBox{ide,instance,control:c,bounds,widget:widget_id,theme}.show(ui,commands);self.form_mouse.regions(instance,c.id,regions);}
+                                ControlKind::ListBox => {let regions=list::ListBox{ide,instance,control:c,bounds,widget:widget_id,theme}.show(ui,commands);self.form_mouse.regions(instance,c.id,regions);}
+                                ControlKind::SpinButton|ControlKind::ScrollBar=> {let regions=numeric::Numeric{ide,instance,control:c,bounds,widget:widget_id,theme}.show(ui,commands);self.form_mouse.regions(instance,c.id,regions);}
                                 ControlKind::TextBox if native => { if let Some(geometry)= (text::TextBox {ide,instance,control:c,bounds,widget:widget_id,enabled,theme}).show(ui,commands) {self.form_mouse.text_geometry(instance,c.id,geometry);} }
                                 ControlKind::TextBox => {
                                     let mut text = ide
@@ -1623,7 +1648,7 @@ impl EditorUi {
                                     }
                                 }
                             });
-                        });
+                        }
                         if native && !matches!(c.kind,ControlKind::TabStrip|ControlKind::MultiPage) && enabled && ui.rect_contains_pointer(bounds)
                             && !ui.input(|i| i.pointer.any_down())
                             && let Ok(vba_ide::Value::String(tip)) = ide.form_instance_field(instance, Some(c.id), "ControlTipText")
@@ -1664,7 +1689,7 @@ impl EditorUi {
                 instance.object.object,
                 instance.object.generation,
             ));
-            if ide.mode() == Mode::Waiting && ide.form_instance_is_modal(instance) {
+            if ide.form_instance_has_modal_window(instance) {
                 egui::Modal::new(scope)
                     .frame(
                         egui::Frame::new()

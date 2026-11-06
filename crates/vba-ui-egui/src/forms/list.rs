@@ -22,7 +22,12 @@ impl ListBox<'_> {
             _ => default,
         }
     }
-    pub(super) fn show(&self, ui: &mut egui::Ui, commands: &mut Vec<Command>) {
+    pub(super) fn show(
+        &self,
+        ui: &mut egui::Ui,
+        commands: &mut Vec<Command>,
+    ) -> Vec<(egui::Rect, mouse::Part)> {
+        let mut regions = Vec::new();
         let count = usize::try_from(self.long("ListCount", 0))
             .unwrap_or(0)
             .min(1024);
@@ -46,7 +51,7 @@ impl ListBox<'_> {
             columns.clamp(0, 10) as usize
         };
         let Some(Value::Array(items)) = self.field("VbaItems") else {
-            return;
+            return regions;
         };
         let response = ui.interact(
             self.bounds,
@@ -86,7 +91,7 @@ impl ListBox<'_> {
             );
         }
         if self.bounds.width() <= 6. || self.bounds.height() <= 6. {
-            return;
+            return regions;
         }
         let row_height = ui.text_style_height(&egui::TextStyle::Body).max(16.) + 6.;
         let visible = (self.bounds.height() / row_height).floor().max(1.) as i32;
@@ -164,6 +169,13 @@ impl ListBox<'_> {
                 };
                 let (rect, response) =
                     ui.allocate_exact_size(egui::vec2(width, row_height), egui::Sense::click());
+                regions.push((
+                    rect.intersect(ui.clip_rect()),
+                    mouse::Part::Row {
+                        index: row as i32,
+                        popup: self.control.kind == ControlKind::ComboBox,
+                    },
+                ));
                 response.widget_info(|| {
                     egui::WidgetInfo::selected(
                         egui::accesskit::Role::ListBoxOption,
@@ -226,5 +238,6 @@ impl ListBox<'_> {
             };
             commands.push(Command::Form(command));
         }
+        regions
     }
 }
