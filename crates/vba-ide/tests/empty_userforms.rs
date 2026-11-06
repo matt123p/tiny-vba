@@ -126,3 +126,86 @@ fn idle_document_callbacks_can_inspect_the_collection_without_a_form_component()
     assert!(ide.form_instances()?.is_empty());
     Ok(())
 }
+
+#[test]
+fn collection_services_forward_external_wait_resume_and_reset_cancellation_once() -> R {
+    use std::collections::BTreeMap;
+    use vba_foreign::{Completion, Host, HostCall, Import, InvokeKind, Reply};
+    use vba_values::{ObjectRef, Value};
+    #[derive(Default)]
+    struct WaitingHost {
+        calls: usize,
+        polls: usize,
+        cancels: usize,
+    }
+    impl Host for WaitingHost {
+        fn identity(&self) -> u64 {
+            88
+        }
+        fn invoke(&mut self, _: HostCall) -> Reply {
+            self.calls += 1;
+            Reply::Wait(7)
+        }
+        fn resume(&mut self, token: u64) -> Reply {
+            assert_eq!(token, 7);
+            self.polls += 1;
+            Reply::Complete(Completion {
+                value: Value::Long(42),
+                writes: vec![],
+            })
+        }
+        fn cancel(&mut self, token: u64) {
+            assert_eq!(token, 7);
+            self.cancels += 1;
+        }
+    }
+    for cancel in [false, true] {
+        let mut ide = Ide::new();
+        ide.configure_host(
+            vec![Import {
+                name: "WaitHere".into(),
+                root: "remote".into(),
+                member: Some("Wait".into()),
+                kind: InvokeKind::Call,
+            }],
+            BTreeMap::from([(
+                "remote".into(),
+                ObjectRef {
+                    host: 88,
+                    object: 1,
+                    generation: 1,
+                },
+            )]),
+            vec![],
+        )?;
+        ide.add_module(
+            "Main.bas",
+            "Sub Main()\nDebug.Print UserForms.Count\nDebug.Print WaitHere()\nEnd Sub",
+        )?;
+        let mut host = WaitingHost::default();
+        ide.dispatch(Action::Run, &mut host)?;
+        for _ in 0..2000 {
+            if ide.mode() != Mode::Running {
+                break;
+            }
+            ide.tick(&mut host)?;
+        }
+        assert_eq!(ide.mode(), Mode::Waiting, "{:?}", ide.diagnostics);
+        assert_eq!(ide.output(), vec!["0"]);
+        if cancel {
+            ide.dispatch(Action::Reset, &mut host)?;
+            assert_eq!((host.calls, host.polls, host.cancels), (1, 0, 1));
+        } else {
+            for _ in 0..2000 {
+                ide.tick(&mut host)?;
+                if ide.mode() == Mode::Completed {
+                    break;
+                }
+            }
+            assert_eq!(ide.mode(), Mode::Completed, "{:?}", ide.diagnostics);
+            assert_eq!(ide.output(), vec!["0", "42"]);
+            assert_eq!((host.calls, host.polls, host.cancels), (1, 1, 0));
+        }
+    }
+    Ok(())
+}

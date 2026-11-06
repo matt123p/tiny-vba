@@ -2,10 +2,19 @@
 
 ## M7A.4 continued — UserForms without form components (2026-11-06)
 
-Shared implementation and validation PASS under ADR 0069. All six authored
-collection, error, shadowing, source-edit/Reset, Stop and idle document callback
-cases pass, alongside all 99 native form cases. Full CI, WASM compilation and
-actual WASI execution pass. Pinned host validation is in progress. A concrete completion checklist records remaining
+Shared implementation and validation PASS under ADR 0069. All seven authored
+collection, error, shadowing, source-edit/Reset, Stop, idle document callback and
+external wait/resume/cancel cases pass, alongside all 99 native form cases. Full
+CI, WASM compilation and actual WASI execution pass; the final seven-case target
+also passes natively, under strict Clippy and actual WASI.
+Pinned GridCraft full CI (10 steps), strict optional VBA/UI Clippy, four form UI
+cases, optional web and 13 native/13 Node-WASM identity cases pass at shared product
+revision `0e7a3fea4f306a1aac8207e00b0a2deb206f6737` (integration `681deb4d`).
+WordCraft's three selected Node-WASM workflows, strict optional Clippy, 13 VBA UI,
+hidden-editor form, optional web checks and full CI (8 steps, isolated serial
+tests; 29 native workflows) pass at the same shared revision (integration
+`a956615c`). Completion checklist C01 is PASS; all three repositories are committed
+and pushed. The remaining M7A.4 requirements are still open. A concrete completion checklist records remaining
 keyboard/mouse, lifecycle/focus, collection, property/binding and platform cases
 without reducing M7A.4 scope.
 

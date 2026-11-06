@@ -7,7 +7,7 @@ reference-based expectations and fresh Office observations remain distinct.
 
 | ID | Required acceptance cases | State |
 |---|---|---|
-| C01 | Projects with no form components: bare/qualified UserForms, Count=0, aliases/TypeName, empty For Each, Item bounds, Add of missing form, shadowing, Stop/Reset/source edits, document callbacks | Shared implementation; host acceptance pending (ADR 0069) |
+| C01 | Projects with no form components: bare/qualified UserForms, Count=0, aliases/TypeName, empty For Each, Item bounds, Add of missing form, shadowing, Stop/Reset/source edits, document callbacks | PASS: ADR 0069; seven shared cases and both pinned host suites |
 | C02 | Additional default/control-reference aliases and reloads; implicit reference behavior after unload and reentrant mutation | PARTIAL: ADR 0044/0067/0068; remaining cases open |
 | C03 | Dynamic collections and structural changes during iteration; review direct enumerator cursor applicability against Office's exposed interfaces | PARTIAL: snapshot profile retained; remaining parity open |
 | L01 | Activate/Deactivate across Show/Hide, multiple modeless windows, document focus, repeated activation and unloading | PARTIAL: full ordering/focus ownership open |

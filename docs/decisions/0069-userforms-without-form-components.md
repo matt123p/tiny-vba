@@ -45,5 +45,12 @@ Primary references:
 - [Missing form Add error 424](https://learn.microsoft.com/en-us/office/vba/language/reference/user-interface-help/form-not-found-error-424)
 
 Shared validation PASS: full CI, WASM compilation and actual WASI execution,
-including all six empty-collection and 99 native form cases. Pinned host validation
-remains pending. No new UI renderer or VM/foreign-protocol code was needed.
+including all seven empty-collection and 99 native form cases. The final seven-case
+target also passes native, strict Clippy and actual WASI after adding external
+wait/resume/cancel coverage. Pinned GridCraft full CI (10 steps), both optional
+VBA/UI Clippy checks, host UI/web and 13 GridCraft/three WordCraft Node-WASM cases
+pass. Full WordCraft CI passes all eight steps with isolated serial execution,
+including 29 native workflows. Both consumers pin shared product revision
+`0e7a3fea4f306a1aac8207e00b0a2deb206f6737`. Integration commits are GridCraft
+`681deb4d` and WordCraft `a956615c`. Completion checklist C01 is PASS. No new UI renderer or VM/foreign-
+protocol code was needed.
