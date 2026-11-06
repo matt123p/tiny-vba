@@ -9,8 +9,15 @@ active modeless window. Thirteen runtime and four actual egui cases pass; source
 and original resources stay inert. Existing authorization/budgets are unchanged.
 Full shared CI/strict Clippy, WASM/WASI, UI/native/web and Chromium activation,
 nested input, editor smoke and modal-form checks pass. Native/browser output and
-five native theme/scale views were inspected. Pinned consumer acceptance is in
-progress. Automatic
+five native theme/scale views were inspected. Both consumers pin shared product
+`a7d9d3122c42ca602e14118da48477ea02522f06`.
+GridCraft full CI (10 steps), strict optional VBA/UI Clippy, four form UI cases,
+VBA web and all 28 native/28 Node-WASM package cases pass (integration `f16fbe88`).
+WordCraft full CI (8 steps, isolated serial tests), strict optional VBA/UI Clippy,
+13 VBA UI cases, the hidden-editor form, VBA web and all 23 native/23 Node-WASM
+package cases pass (integration `4c1867dc`). New stopped Deactivate cases preserve
+host authorization, one-shot effects and original resources; Word verifies one
+undo step. All three repositories are committed and pushed. Automatic
 host document-input buffering/replay and the full M7A.4 checklist remain open;
 fresh Office comparisons remain M8.5 NOT_RUN.
 

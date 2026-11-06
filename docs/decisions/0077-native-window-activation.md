@@ -1,6 +1,6 @@
 # ADR 0077: Native UserForm window activation
 
-Status: implemented shared runtime and UI; consumer acceptance pending.
+Status: implemented and validated in shared runtime/UI and both pinned consumers.
 Date: 2026-11-06.
 
 ## Contract and ownership
@@ -68,3 +68,14 @@ edited persistence and legacy format removal. M8.5 observations remain NOT_RUN.
 The references establish application-internal activation and the absence of
 Deactivate on unloading. Exact reentrant event traces remain authored inferences
 pending the separate fresh Office comparison gate.
+
+Shared full CI/strict Clippy, WASM/WASI, UI/native/web and actual Chromium
+activation/nested-input/editor/modal-form checks pass. Both consumers pin product
+`a7d9d3122c42ca602e14118da48477ea02522f06`. GridCraft full CI (10 steps), strict
+optional VBA/UI Clippy, four form UI cases, web and 28 native/28 Node-WASM package
+cases pass. WordCraft full CI (8 steps, isolated serial tests), strict optional VBA/UI
+Clippy, 13 VBA UI cases, the hidden-editor form, web and 23 native/23 Node-WASM
+package cases pass. The native nested-frame UI regression waits for its canonical
+Tab KeyUp continuation before requesting the next pointer action; broader mixed
+input queuing while callbacks run remains part of the open M01/L02 acceptance.
+These results accept this change, not the complete M7A.4 checklist.
