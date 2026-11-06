@@ -654,3 +654,85 @@ fn nominal_event_signatures_share_the_bounded_verification_index() -> Result<(),
     assert!(ir::verify(invalid, &options.capabilities, &options.limits).is_err());
     Ok(())
 }
+
+#[test]
+fn event_signatures_keep_nominal_arguments_without_unused_class_field_aliases()
+-> Result<(), Box<dyn Error>> {
+    use vba_syntax::{ModuleKind, parse};
+    let mut publisher = String::new();
+    for n in 0..256 {
+        publisher.push_str(&format!("Private child{n} As Publisher\n"));
+    }
+    for n in 0..20 {
+        publisher.push_str(&format!(
+            "Public Event Changed{n}(ByVal value As Publisher)\n"
+        ));
+    }
+    publisher.push_str("Public Sub Fire(ByVal value As Publisher)\nSet child0=value\nRaiseEvent Changed0(value)\nEnd Sub\n");
+    let modules = [
+        parse(
+            &SourceFile::new(
+                SourceId(1),
+                "Main.bas".into(),
+                "Sub Main()\nDim p As Publisher\nSet p=New Publisher\np.Fire p\nEnd Sub".into(),
+            )?,
+            ModuleKind::Standard,
+        )?,
+        parse(
+            &SourceFile::new(SourceId(2), "Publisher.cls".into(), publisher)?,
+            ModuleKind::Class,
+        )?,
+    ];
+    let compiled = compile_modules(
+        &modules,
+        &CompileOptions {
+            entry: "Main".into(),
+            capabilities: ir::Capabilities::ir11_structural(),
+            ..Default::default()
+        },
+    )?;
+    let program = compiled.program();
+    let class = program
+        .classes
+        .iter()
+        .find(|c| c.name == "Publisher")
+        .ok_or("publisher")?;
+    assert_eq!(class.fields.len(), 256);
+    assert_eq!(class.events.len(), 20);
+    assert!(class.fields.iter().all(|field| {
+        field
+            .nominal
+            .as_ref()
+            .is_some_and(|ty| ty.name().eq_ignore_ascii_case("Publisher"))
+    }));
+    for event in &class.events {
+        let proc = program.procedures.get(event.0 as usize).ok_or("event")?;
+        assert_eq!(proc.parameters.len(), 1);
+        assert!(
+            proc.locals
+                .iter()
+                .all(|local| !matches!(local.role, ir::SlotRole::InstanceField(_)))
+        );
+        assert!(
+            program
+                .nominal_locals
+                .iter()
+                .any(|local| local.procedure == *event
+                    && local.slot == ir::LocalSlot(0)
+                    && local.ty.name().eq_ignore_ascii_case("Publisher"))
+        );
+    }
+    let fire = program
+        .procedures
+        .iter()
+        .find(|p| p.name == "Fire")
+        .ok_or("Fire")?;
+    assert_eq!(
+        fire.locals
+            .iter()
+            .filter(|local| matches!(local.role, ir::SlotRole::InstanceField(_)))
+            .count(),
+        256
+    );
+    Ok(())
+}

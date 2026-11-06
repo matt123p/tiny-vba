@@ -8,7 +8,12 @@ control/background pointer capture/defaults, stopped/outside release, Reset and
 keyboard focus preservation pass six model and five real egui cases. Full shared
 CI/Clippy, WASM/WASI, the six-case WASI mouse target, UI/native/web and actual
 Chromium stopped MouseDown/captured MouseUp/one Click pass. Live/paused/resumed
-views were inspected. Consumer integration validation is in progress. M01 and M7A.4 remain partial; remaining pointer
+views were inspected. Host validation found redundant field aliases in event
+signature metadata; binding now omits those aliases while retaining typed event
+arguments, real method fields and all existing limits. A generic compiler
+regression, corrected full CI/WASM/WASI, all 17 compiler cases under WASI,
+UI/native/web and Chromium mouse/smoke/modal-form regressions pass. Consumer
+pinning and final host validation are in progress. M01 and M7A.4 remain partial; remaining pointer
 defaults, lifecycle, keyboard and other checklist rows are unchanged.
 
 ## M7A.4 continued — native accelerators (2026-11-06)

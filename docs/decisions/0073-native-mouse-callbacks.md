@@ -40,6 +40,14 @@ UserForm.Click runs its authored handler without closing the form. A temporary
 focus bookmark and keyboard dispatch arbitration retain text arriving during a
 mouse callback without moving it into the source editor.
 
+Event declarations now retain typed arguments and receiver metadata without
+copying unused instance-field aliases into their signature-only local tables.
+Executable methods retain all field aliases and nominal checks. A generic compiler
+regression with 256 typed fields and 20 events proves the distinction; the previous
+representation exceeded the unchanged 4,096 nominal-local metadata cap in two
+existing GridCraft MultiPage cases. No permission, metadata or runtime budget is
+raised, and all public mouse event declarations/forwarding remain available.
+
 ## Evidence and remaining work
 
 Authored runtime cases cover masks/Single arguments, enum widths, indexed events,

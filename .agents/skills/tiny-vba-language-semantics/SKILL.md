@@ -343,3 +343,9 @@ completion checklist remain partial until their executable acceptance passes.
 Do not interpret UTF-16 string storage as an ANSI code page for Asc/Chr. Preserve
 ASCII; require a configured ANSI encoding for non-ASCII. Byte variants keep their
 existing representation, independently of the ANSI character contract (ADR 0070).
+
+ADR 0073 keeps Event declarations as typed signatures without unused class-field
+local aliases. Preserve nominal event parameters, receiver metadata, class fields
+and all aliases/checks in executable methods. Regress large typed field/event
+projects under unchanged 4,096 nominal-local entries; do not raise budgets or omit
+public events to hide compiler metadata expansion.

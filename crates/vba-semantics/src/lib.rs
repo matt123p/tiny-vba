@@ -1304,6 +1304,11 @@ pub fn bind_with_procedure_aliases(
         }
         binder.collect(&syntax.body, &mut local_names)?;
         for declaration in &module.declarations {
+            // Events declare signatures rather than executable bodies. Keep their
+            // typed parameters; instance-field aliases belong to executable frames.
+            if sig.event {
+                continue;
+            }
             if declaration.constant.is_some() || local_names.contains(&declaration.name.key()) {
                 continue;
             }

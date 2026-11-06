@@ -500,3 +500,8 @@ completion receipts. Selected shared pointer capture/default paths preserve
 Stop/Continue, Reset, identity and keyboard focus; remaining text/list/numeric/
 indexed-tab/platform defaults and full event ordering keep M01 PARTIAL. M7A.4
 remains incomplete and fresh Office observations remain M8.5 NOT_RUN.
+
+ADR 0073's event-signature metadata refinement omits unused instance-field
+aliases from Event declarations. Declared argument types, receivers, canonical
+class fields and every executable method's field aliases remain verified under
+the existing nominal metadata and runtime limits. No IR change is needed.
