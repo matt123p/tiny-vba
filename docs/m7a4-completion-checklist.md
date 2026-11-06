@@ -56,3 +56,9 @@ Next keyboard acceptance packet: remaining platform/shortcut/IME and DBCS
 replacement cases, cross-window lifecycle/focus changes and remaining non-text
 control defaults. Root focus and selected Tab/SetFocus/Space cases follow ADR 0071.
 No refusal counts as a completed inventoried behavior.
+
+Next implementation packet: M01 typed MouseDown/MouseMove/MouseUp and DblClick
+through ordinary control event frames, with bounded raw pointer input and
+container-relative point coordinates. Cover button/modifier types, callback
+ordering, Stop/Continue, stale input after Reset and affected host authorization.
+This does not defer the still-partial K03 accelerator/platform cases.

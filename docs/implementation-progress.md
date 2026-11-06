@@ -10,7 +10,17 @@ no-handler dispatch and web text/key pairing. Decoder tests (24), model tests (8
 keyboard UI tests (14), full shared CI/strict Clippy, WASM/WASI and the final
 eight-case accelerator target under WASI pass. Shared UI/native/web gates and
 actual Chromium Alt/text/Stop/Continue pass; light/dark/narrow/scaled/host and
-paused browser captures were inspected. Consumer validation is in progress.
+paused browser captures were inspected. Existing Chromium editor smoke and modal
+form workflows also pass. Both consumers pin shared product revision
+`7d43f082de4b7827da1e1d93c257ebeb50eca4ae`. GridCraft full CI (10 steps), strict
+optional VBA/UI Clippy, four form UI cases, web and all 23 native/23 Node-WASM
+package cases pass (integration `d7d42075`). WordCraft full CI (8 steps, isolated
+serial tests), strict optional VBA/UI Clippy, 13 VBA UI cases, hidden-editor form,
+web and all 18 native/18 Node-WASM package cases pass (integration `842254a0`).
+Host cases verify authority, one-shot Stop/Continue and original resources;
+Word also verifies text mutation and one undo step. All three repositories are
+committed and pushed. Next: M01 typed mouse input/events in ordinary frames,
+with shared UI and host regressions, while the other checklist rows remain open.
 Duplicate routing explicitly refuses; non-ASCII/platform ordering remains open.
 K03 is PARTIAL and M7A.4 remains incomplete, with its full checklist unchanged.
 
