@@ -3598,3 +3598,25 @@ fn native_vartype_reads_control_defaults_but_preserves_collection_and_form_ident
     );
     Ok(())
 }
+
+#[test]
+fn native_as_new_arrays_keep_windows_distinct_and_recreate_only_a_cleared_element() -> R {
+    let ide = setup(
+        "Sub Main()\nDim forms(0 To 1) As New NativeForm,a As NativeForm\nDebug.Print UserForms.Count\nforms(0).Show 0\nforms(0).Entry.Text=\"first\"\nforms(1).Show 0\nforms(1).Entry.Text=\"second\"\nSet a=forms(0)\nSet forms(0)=Nothing\nforms(0).Show 0\nIf forms(0) Is a Then Err.Raise 5\nDebug.Print a.Entry.Text,forms(1).Entry.Text,forms(0).Entry.Text\nDebug.Print UserForms.Count\nEnd Sub",
+        None,
+    )?;
+    assert_eq!(ide.mode(), Mode::Completed, "{:?}", ide.diagnostics);
+    assert_eq!(
+        ide.output(),
+        vec![
+            "0",
+            "initialized",
+            "initialized",
+            "initialized",
+            "first\tsecond\tinitial",
+            "3"
+        ]
+    );
+    assert_eq!(ide.form_instances()?.len(), 3);
+    Ok(())
+}

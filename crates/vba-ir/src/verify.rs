@@ -135,6 +135,7 @@ fn validate(
             | IR11_VERSION
             | IR12_VERSION
             | IR13_VERSION
+            | IR14_VERSION
     ) || p.profile != caps.profile
         || !caps.ir_versions.contains(&p.ir_version)
     {
@@ -1499,6 +1500,22 @@ fn procedure(
                     Stack::Reference(local.kind)
                 });
             }
+            Instruction::TouchElement(slot) => {
+                if p.ir_version < IR14_VERSION {
+                    return Err(incompatible("array auto-instancing requires IR 14"));
+                }
+                feature(p, caps, "auto-array-elements-v14")?;
+                let local = proc
+                    .locals
+                    .get(slot.0 as usize)
+                    .ok_or_else(|| invalid("auto element declaration"))?;
+                if local.array != Some(ScalarKind::Object)
+                    || local.auto_new.is_none()
+                    || stack.last() != Some(&Stack::Reference(ScalarKind::Object))
+                {
+                    return Err(invalid("auto element reference/declaration"));
+                }
+            }
             Instruction::ReadRef => {
                 if !matches!(pop(&mut stack)?, Stack::Reference(_)) {
                     return Err(invalid("ReadRef needs Location"));
@@ -1785,8 +1802,14 @@ fn verify_auto_new(
         .iter()
         .find(|class| class.source == source && !class.document)
         .ok_or_else(|| invalid("auto-instancing class"))?;
-    if kind != ScalarKind::Object
-        || array.is_some()
+    if array.is_some() {
+        if p.ir_version < IR14_VERSION {
+            return Err(incompatible("array auto-instancing requires IR 14"));
+        }
+        feature(p, caps, "auto-array-elements-v14")?;
+    }
+    if (array.is_none() && kind != ScalarKind::Object
+        || array.is_some() && (kind != ScalarKind::Variant || array != Some(ScalarKind::Object)))
         || nominal.is_none_or(|ty| {
             ty.library() != "vbaproject"
                 || ty.version() != "1"

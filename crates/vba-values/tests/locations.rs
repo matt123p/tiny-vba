@@ -37,3 +37,31 @@ fn locations_are_bounded_and_invalidated_without_reuse() -> Result<(), Diagnosti
     assert_ne!(Value::Integer(1), Value::Long(1));
     Ok(())
 }
+
+#[test]
+fn flat_element_locations_preserve_owner_and_reject_stale_or_foreign_access()
+-> Result<(), Diagnostic> {
+    use vba_values::{ScalarKind, VbaArray};
+    let mut store = Locations::new(7);
+    let owner = store.allocate(Value::Array(VbaArray::new(
+        ScalarKind::Object,
+        vec![(2, 3), (-1, 0)],
+        true,
+    )?))?;
+    let element = store.element_at(owner, 2)?;
+    assert_eq!(element, store.element(owner, &[2, 0])?);
+    assert_eq!(store.element_owner(element)?, Some(owner));
+    assert_eq!(store.element_owner(owner)?, None);
+    assert!(store.element_at(owner, 4).is_err());
+    assert!(store.element_at(element, 0).is_err());
+    assert!(Locations::new(8).element_owner(element).is_err());
+    store.write(element, Value::Nothing)?;
+    assert_eq!(store.element_owner(element)?, Some(owner));
+    store.write(
+        owner,
+        Value::Array(VbaArray::new(ScalarKind::Object, vec![(2, 2)], true)?),
+    )?;
+    assert!(store.element_owner(element).is_err());
+    assert!(store.read(element).is_err());
+    Ok(())
+}

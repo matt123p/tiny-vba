@@ -6,6 +6,10 @@ Updated 2026-11-06. **IN PROGRESS. M7A.4 is not complete.** This record extends
 
 Implemented in shared tiny-vba:
 
+- [ADR 0068](decisions/0068-lazy-project-class-array-elements.md): lazy fixed/dynamic project-class/native-form arrays,
+  independent elements, Preserve/Erase, static/private storage, canonical ByRef,
+  constructor and For Each continuations, inert inspection and unchanged budgets.
+
 - [VarType default values](decisions/0067-vartype-default-value-inspection.md):
   one compatible public default getter/function through normal frames or authorized
   host calls, preserving getter errors, Variant/array tags and Stop/wait continuations.
@@ -148,7 +152,7 @@ Remaining M7A.4 requirements, without reducing the milestone's scope:
 - Additional default/control-reference alias and reload edge cases against Office;
   full Activate/Deactivate ordering and modeless focus ownership. The selected
   replacement/code-lifetime cases are implemented under ADR 0044.
-- Additional implicit/alias behavior, As New arrays, empty-project/dynamic
+- Additional implicit/alias behavior beyond ADR 0068 array instancing, empty-project/dynamic
   collection cases, direct enumerator cursor interfaces and structural-mutation
   parity. External class activation remains outside the project-only path.
   For Each uses the existing bounded snapshot profile.

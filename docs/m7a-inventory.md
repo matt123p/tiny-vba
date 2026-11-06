@@ -243,3 +243,11 @@ through normal project frames or authorized host calls, preserving errors and
 Stop/wait continuations. Public default functions and New value contexts use
 ordinary binding. Inert watches, host ownership and existing budgets are retained.
 Shared CI, WASM and actual WASI validation pass; the full M7A.4 ledger stays open.
+
+
+[ADR 0068](decisions/0068-lazy-project-class-array-elements.md) adds IR 14 lazy project-class/native-form array elements.
+Fixed/dynamic arrays, Preserve/Erase, private/static storage, canonical ByRef,
+source-order capture and constructor/For Each Stop continuations reuse existing
+locations, classes and budgets. Whole-array reads and safe inspection stay inert;
+external activation and object-module Public arrays remain refused. Shared CI,
+WASM and actual WASI pass; the broader M7A.4 ledger and M8.5 comparisons remain open.

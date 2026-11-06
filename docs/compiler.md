@@ -294,3 +294,11 @@ case; names are verified identifiers of at most 128 bytes. The compiler emits
 `runtime-class-names-v12` and IR 12 only when such metadata is supplied. Nominal
 identity and authored class names remain independent of TypeName presentation.
 Older consumers refuse IR 12. See [ADR 0064](decisions/0064-native-runtime-type-names.md).
+
+
+[ADR 0068](decisions/0068-lazy-project-class-array-elements.md) adds IR 14
+array auto_new declarations and TouchElement(declaration-slot). Lowering touches
+only referenced elements and ByRef actuals, retaining source-order argument
+capture and index evaluation once. Set targets and whole-array reads stay inert.
+Older capabilities reject array metadata/instructions. No intrinsic or ambient
+host authority is added. Scalar auto-instancing retains IR 10 selection.

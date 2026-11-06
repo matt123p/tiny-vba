@@ -2342,7 +2342,10 @@ impl Binder<'_> {
                             .map(|e| self.expr(e))
                             .transpose()?
                             .as_ref()
-                            .is_some_and(|e| self.project_field(e).is_some())),
+                            .is_some_and(|e| {
+                                self.project_field(e).is_some()
+                                    || matches!(e.kind, ExprKind::Element { .. })
+                            })),
                     name: arg.name.as_ref().map(|n| n.spelling.clone()),
                     value: arg.value.as_ref().map(|e| self.expr(e)).transpose()?,
                 },
@@ -4135,9 +4138,6 @@ fn auto_new_type(
 ) -> Result<Option<String>> {
     if !d.auto_new {
         return Ok(None);
-    }
-    if d.dimensions.is_some() {
-        return Err(unsupported("As New arrays", d.span));
     }
     let ty = nominal(d.ty.as_ref(), references)?
         .ok_or_else(|| err("As New requires a named project class", d.span))?;

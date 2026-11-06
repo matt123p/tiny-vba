@@ -1,6 +1,27 @@
 //! Lazy project-class construction on canonical variable reads. Inspection stays inert.
 use super::*;
 impl Session {
+    pub(super) fn register_element_reference(
+        &mut self,
+        owner: Location,
+        location: Location,
+        kind: ScalarKind,
+    ) -> Result<()> {
+        if self.kinds.len() >= 65536 {
+            return Err(resource());
+        }
+        self.kinds.insert(location, kind);
+        if !self.nominal_types.contains_key(&location)
+            && let Some(ty) = self.nominal_types.get(&owner)
+        {
+            self.charge(nominal_bytes(ty))?;
+            if let Some(ty) = self.nominal_types.get(&owner).cloned() {
+                self.nominal_types.insert(location, ty);
+            }
+        }
+        Ok(())
+    }
+
     /// Returns true only when an ordinary initializer frame was entered. The
     /// caller retains its instruction/operands until initialization completes.
     pub(super) fn ensure_auto_instance(

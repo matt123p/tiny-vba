@@ -310,3 +310,8 @@ normal class frames/authorized host calls, getter errors and one-shot Stop/wait
 continuations. Resolver presence metadata is inert and identity checked; actual
 getters remain executable. Older IR consumers refuse this capability. Watches
 stay inert and all existing budgets remain. Full M7A.4/M8.5 are separate gates.
+
+
+## Lazy project-class array elements
+
+Keep IR 14 array auto_new metadata and TouchElement in compiler/IR/VM. Reuse canonical Locations, element kind/nominal metadata and existing constructor frames; never add an object or construction registry. See [ADR 0068](../../../docs/decisions/0068-lazy-project-class-array-elements.md). Existing budgets remain unchanged; full M7A.4 remains open.

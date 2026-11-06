@@ -1,5 +1,18 @@
 # Implementation progress
 
+## M7A.4 continued — lazy class/form array elements (2026-11-06)
+
+Shared implementation and validation PASS under ADR 0068/IR 14. Fixed/dynamic
+project-class/native-form arrays preserve lazy element identity, bounds and nominal
+tags, canonical ByRef/source order, Preserve/Erase, private/static/restored storage
+and constructor/For Each continuations. Inert inspection, exact owner validation
+and old/forged bytecode refusal retain existing budgets and permission limits.
+Full CI, WASM compilation and actual WASI execution pass, including 18 generic
+auto-instancing and all 98 native form cases. Both new host-native regressions
+pass callback receiver, trust and original XLSM/DOCM resource assertions; Word
+also verifies one undo step. Pinned consumer gates are pending. The broader
+M7A.4 ledger remains open.
+
 ## M7A.4 continued — VarType default values (2026-11-06)
 
 Shared implementation and validation PASS under ADR 0067/IR 13: one compatible

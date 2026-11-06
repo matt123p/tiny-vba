@@ -21,7 +21,7 @@ use vba_values::{Location, Locations, ScalarKind, Value};
 type Result<T> = std::result::Result<T, Diagnostic>;
 pub const PROFILE: &str = runtime::PROFILE;
 pub fn capabilities() -> ir::Capabilities {
-    let mut c = ir::Capabilities::ir13_structural();
+    let mut c = ir::Capabilities::ir14_structural();
     c.profile = PROFILE.into();
 
     c
@@ -220,6 +220,7 @@ struct ErrorState {
     erl: i32,
 }
 struct Enumeration {
+    auto_new: Option<ir::SourceIndex>,
     source: Option<Location>,
     values: vba_values::VbaArray,
     index: usize,
@@ -2908,6 +2909,16 @@ impl Session {
                 let Value::Array(values) = self.pop_value()? else {
                     return Err(protocol("enumeration reply must be a bounded array"));
                 };
+                let auto_new = source
+                    .map(|slot| {
+                        self.proc()?
+                            .locals
+                            .get(slot.0 as usize)
+                            .map(|local| local.auto_new)
+                            .ok_or_else(|| invariant("enumeration declaration"))
+                    })
+                    .transpose()?
+                    .flatten();
                 let source = source
                     .map(|s| self.location(s))
                     .transpose()?
@@ -2919,6 +2930,7 @@ impl Session {
                 self.top_mut()?.enumerations.insert(
                     state,
                     Enumeration {
+                        auto_new,
                         source,
                         values,
                         index: 0,
@@ -2935,6 +2947,23 @@ impl Session {
                         message: "For Each is not initialized".into(),
                     })
                 })?;
+                if let (Some(owner), Some(source)) = (cursor.source, cursor.auto_new) {
+                    let Value::Array(array) = self.store.read(owner)? else {
+                        return Err(invariant("auto enumeration array"));
+                    };
+                    if cursor.index < array.elements().len() {
+                        let location = self.store.element_at(owner, cursor.index)?;
+                        self.register_element_reference(owner, location, ScalarKind::Object)?;
+                        if self.ensure_auto_instance(location, Some(source))? {
+                            return Ok(());
+                        }
+                    }
+                }
+                let cursor = self
+                    .top()?
+                    .enumerations
+                    .get(&state)
+                    .ok_or_else(|| invariant("auto enumeration cursor"))?;
                 let values = if let Some(source) = cursor.source {
                     let Value::Array(array) = self.store.read(source)? else {
                         return Err(invariant("enumerated array replaced"));
@@ -3012,20 +3041,8 @@ impl Session {
                     }));
                 }
                 let location = self.store.element(owner, &indices)?;
-                if self.kinds.len() >= 65536 {
-                    return Err(resource());
-                }
                 let actual = array.kind();
-                self.kinds.insert(location, actual);
-                if !self.nominal_types.contains_key(&location)
-                    && let Some(ty) = self.nominal_types.get(&owner)
-                {
-                    let bytes = nominal_bytes(ty);
-                    self.charge(bytes)?;
-                    if let Some(ty) = self.nominal_types.get(&owner).cloned() {
-                        self.nominal_types.insert(location, ty);
-                    }
-                }
+                self.register_element_reference(owner, location, actual)?;
                 self.push(Operand::Reference(location))?;
                 self.advance()?;
             }
@@ -3229,6 +3246,26 @@ impl Session {
             }
             I::RefLocal(slot) => {
                 self.push(Operand::Reference(self.location(slot)?))?;
+                self.advance()?;
+            }
+            I::TouchElement(slot) => {
+                let owner = self.location(slot)?;
+                let source = self
+                    .proc()?
+                    .locals
+                    .get(slot.0 as usize)
+                    .and_then(|local| local.auto_new)
+                    .ok_or_else(|| invariant("auto element declaration"))?;
+                let location = match self.top()?.stack.last() {
+                    Some(Operand::Reference(location)) => *location,
+                    _ => return Err(invariant("auto element reference")),
+                };
+                if self.store.element_owner(location)? != Some(owner) {
+                    return Err(protocol("auto element belongs to another declaration"));
+                }
+                if self.ensure_auto_instance(location, Some(source))? {
+                    return Ok(());
+                }
                 self.advance()?;
             }
             I::ReadRef => {

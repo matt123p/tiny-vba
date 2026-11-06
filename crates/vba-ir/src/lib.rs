@@ -38,7 +38,9 @@ pub const IR10_VERSION: u32 = 10;
 pub const IR11_VERSION: u32 = 11;
 pub const IR12_VERSION: u32 = 12;
 pub const IR13_VERSION: u32 = 13;
-pub const FEATURES: [&str; 29] = [
+pub const IR14_VERSION: u32 = 14;
+pub const FEATURES: [&str; 30] = [
+    "auto-array-elements-v14",
     "inspection-defaults-v13",
     "runtime-class-names-v12",
     "class-interfaces-v11",
@@ -129,6 +131,7 @@ pub enum Opcode {
     EnumerationEnd,
     SaveReference,
     LoadReference,
+    TouchElement,
     RefElement,
     ArrayResize,
     ArrayErase,
@@ -158,7 +161,7 @@ pub enum Opcode {
     Stop,
     Return,
 }
-pub const OPCODES: [Opcode; 35] = [
+pub const OPCODES: [Opcode; 36] = [
     Opcode::DefaultInstance,
     Opcode::NewInstance,
     Opcode::EnumerationInit,
@@ -169,6 +172,7 @@ pub const OPCODES: [Opcode; 35] = [
     Opcode::Intrinsic,
     Opcode::IntrinsicCall,
     Opcode::BinaryCompare,
+    Opcode::TouchElement,
     Opcode::RefElement,
     Opcode::ArrayResize,
     Opcode::ArrayErase,
@@ -218,6 +222,7 @@ pub enum Instruction {
     EnumerationEnd(LocalSlot),
     SaveReference(LocalSlot),
     LoadReference(LocalSlot),
+    TouchElement(LocalSlot),
     RefElement {
         rank: u8,
         kind: ScalarKind,
@@ -290,6 +295,7 @@ impl Instruction {
             Self::EnumerationEnd(_) => Opcode::EnumerationEnd,
             Self::SaveReference(_) => Opcode::SaveReference,
             Self::LoadReference(_) => Opcode::LoadReference,
+            Self::TouchElement(_) => Opcode::TouchElement,
             Self::RefElement { .. } => Opcode::RefElement,
             Self::ArrayResize { .. } => Opcode::ArrayResize,
             Self::ArrayErase => Opcode::ArrayErase,
@@ -622,6 +628,8 @@ impl Capabilities {
                 .collect(),
             declarations: ScalarKind::ALL.into_iter().collect(),
         };
+        caps.features.remove("auto-array-elements-v14");
+        caps.instructions.remove(&Opcode::TouchElement);
         caps.features.remove("inspection-defaults-v13");
         caps.features.remove("runtime-class-names-v12");
         caps.features.remove("class-interfaces-v11");
@@ -632,6 +640,14 @@ impl Capabilities {
         caps.features.remove("string-comparison-context-v1");
         caps.instructions.remove(&Opcode::IntrinsicCall);
         caps.instructions.remove(&Opcode::BinaryCompare);
+        caps
+    }
+    pub fn ir14_structural() -> Self {
+        let mut caps = Self::ir13_structural();
+        caps.profile = "ir14-structural".into();
+        caps.ir_versions.insert(IR14_VERSION);
+        caps.features.insert("auto-array-elements-v14".into());
+        caps.instructions.insert(Opcode::TouchElement);
         caps
     }
     pub fn ir13_structural() -> Self {

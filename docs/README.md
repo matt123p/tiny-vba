@@ -294,3 +294,7 @@ through normal project frames or authorized host calls, preserving errors and
 Stop/wait continuations. Public default functions and New value contexts use
 ordinary binding. Inert watches, host ownership and existing budgets are retained.
 Shared CI, WASM and actual WASI validation pass; the full M7A.4 ledger stays open.
+
+
+[ADR 0068](decisions/0068-lazy-project-class-array-elements.md) defines lazy project-class/native-form array elements, capability-gated
+IR 14 TouchElement, ordinary constructor frames and inert inspection.

@@ -241,6 +241,9 @@ pub fn compile_modules(
         for (i, local) in procedure.locals.iter().enumerate() {
             if local.auto_new.is_some() {
                 builder.feature("auto-instancing-v10");
+                if local.array.is_some() {
+                    builder.feature("auto-array-elements-v14");
+                }
             }
             if local.array.is_some() {
                 builder.feature("arrays-v2");
@@ -348,6 +351,13 @@ pub fn compile_modules(
     for class in &program.classes {
         if class.fields.iter().any(|field| field.auto_new.is_some()) {
             features.insert("auto-instancing-v10".into());
+        }
+        if class
+            .fields
+            .iter()
+            .any(|field| field.auto_new.is_some() && field.array.is_some())
+        {
+            features.insert("auto-array-elements-v14".into());
         }
         features.insert("project-classes-v7".into());
         if class.fields.iter().any(|field| {
@@ -476,7 +486,9 @@ pub fn compile_modules(
     let mut ir = ir::Program {
         classes,
         nominal_locals,
-        ir_version: if features.contains("inspection-defaults-v13") {
+        ir_version: if features.contains("auto-array-elements-v14") {
+            ir::IR14_VERSION
+        } else if features.contains("inspection-defaults-v13") {
             ir::IR13_VERSION
         } else if features.contains("runtime-class-names-v12") {
             ir::IR12_VERSION
@@ -775,10 +787,24 @@ impl Builder<'_> {
         if self
             .locals
             .get(slot)
-            .is_some_and(|local| local.auto_new.is_some())
+            .is_some_and(|local| local.auto_new.is_some() && local.array.is_none())
         {
             self.emit(block, ir::Instruction::ReadLocal(ir::LocalSlot(idx(slot)?)))?;
             self.emit(block, ir::Instruction::DropValue)?;
+        }
+        Ok(())
+    }
+    fn touch_element(&mut self, block: usize, slot: usize) -> Result<()> {
+        if self
+            .locals
+            .get(slot)
+            .is_some_and(|local| local.auto_new.is_some() && local.array.is_some())
+        {
+            self.feature("auto-array-elements-v14");
+            self.emit(
+                block,
+                ir::Instruction::TouchElement(ir::LocalSlot(idx(slot)?)),
+            )?;
         }
         Ok(())
     }
@@ -794,6 +820,14 @@ impl Builder<'_> {
     fn call(&mut self, block: usize, callee: usize, args: &[bound::Argument]) -> Result<bool> {
         self.feature("direct-calls");
         let capture = args.iter().any(|a| {
+            if let bound::Argument::Element { slot, .. } = a
+                && self
+                    .locals
+                    .get(*slot)
+                    .is_some_and(|local| local.auto_new.is_some())
+            {
+                return true;
+            }
             matches!(
                 a,
                 bound::Argument::Mapped { .. } | bound::Argument::Temporary { .. }
@@ -869,6 +903,7 @@ impl Builder<'_> {
                 } => {
                     if capture {
                         self.element(block, *slot, indices, *kind)?;
+                        self.touch_element(block, *slot)?;
                         let temporary = self.scratch(*kind)?;
                         self.locals
                             .get_mut(temporary)
@@ -948,6 +983,7 @@ impl Builder<'_> {
                     kind,
                 } => {
                     self.element(block, *slot, indices, *kind)?;
+                    self.touch_element(block, *slot)?;
                     ir::ArgumentMode::Reference
                 }
                 bound::Argument::Reference(slot) => {
@@ -1040,6 +1076,16 @@ impl Builder<'_> {
                 {
                     self.touch_auto_instance(block, slot)?;
                     self.emit(block, ir::Instruction::RefLocal(ir::LocalSlot(idx(slot)?)))?;
+                    ir::ArgumentMode::Reference
+                } else if arg.reference
+                    && let bound::ExprKind::Element {
+                        slot,
+                        indices,
+                        kind,
+                    } = &value.kind
+                {
+                    self.element(block, *slot, indices, *kind)?;
+                    self.touch_element(block, *slot)?;
                     ir::ArgumentMode::Reference
                 } else if arg.reference
                     && let bound::ExprKind::Foreign {
@@ -1208,6 +1254,7 @@ impl Builder<'_> {
                 kind,
             } => {
                 self.element(block, *slot, indices, *kind)?;
+                self.touch_element(block, *slot)?;
                 self.emit(block, ir::Instruction::ReadRef)
             }
             bound::ExprKind::ErrField(field) => {

@@ -1,6 +1,6 @@
 # M3/M4 runtime and debugger
 
-Implemented 2026-10-26, extended by new M1.1. The current consumer is `m5-host-v1`, using verified IR 1/2/3/4/5/6/7/8/9/10/11/12.
+Implemented 2026-10-26, extended by new M1.1. The current consumer is `m5-host-v1`, using verified IR 1/2/3/4/5/6/7/8/9/10/11/12/13/14.
 The [M4 language contract](m4-language.md) and [ADR 0011](decisions/0011-m4-language-extension.md)
 define scalar coercions, arrays, arguments, persistent state, builtins and VBA handlers.
 [ADR 0013](decisions/0013-m5-host-contract.md) adds the versioned native host protocol and hidden
@@ -534,3 +534,11 @@ through normal project frames or authorized host calls, preserving errors and
 Stop/wait continuations. Public default functions and New value contexts use
 ordinary binding. Inert watches, host ownership and existing budgets are retained.
 Shared CI, WASM and actual WASI validation pass; the full M7A.4 ledger stays open.
+
+
+[ADR 0068](decisions/0068-lazy-project-class-array-elements.md) adds IR 14 lazy project-class/native-form array elements.
+Fixed/dynamic arrays, Preserve/Erase, private/static storage, canonical ByRef,
+source-order capture and constructor/For Each Stop continuations reuse existing
+locations, classes and budgets. Whole-array reads and safe inspection stay inert;
+external activation and object-module Public arrays remain refused. Shared CI,
+WASM and actual WASI pass; the broader M7A.4 ledger and M8.5 comparisons remain open.

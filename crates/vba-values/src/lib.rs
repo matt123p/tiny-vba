@@ -273,11 +273,32 @@ impl Locations {
             return Err(Diagnostic::new("VBA_ARRAY_9", "Array required"));
         };
         let index = array.offset(indices)?;
+        self.element_at(owner, index)
+    }
+    /// Resolve a checked column-major element without allocating an index vector.
+    pub fn element_at(&self, owner: Location, index: usize) -> Result<Location, Diagnostic> {
+        if owner.element.is_some() {
+            return Err(stale());
+        }
+        let Value::Array(array) = self.read(owner)? else {
+            return Err(stale());
+        };
+        if index >= array.elements.len() {
+            return Err(stale());
+        }
         let generation = *self.generations.get(owner.slot).ok_or_else(stale)?;
         Ok(Location {
             element: Some((generation, index)),
             ..owner
         })
+    }
+    /// Return the validated canonical array variable for an element reference.
+    pub fn element_owner(&self, location: Location) -> Result<Option<Location>, Diagnostic> {
+        self.read(location)?;
+        Ok(location.element.map(|_| Location {
+            element: None,
+            ..location
+        }))
     }
     pub fn write(&mut self, location: Location, value: Value) -> Result<(), Diagnostic> {
         self.read(location)?;

@@ -2,6 +2,8 @@
 
 Date: 2026-11-04. Status: adopted for scalar project classes and native UserForms.
 M7A.4 remains in progress; this is not full control/lifecycle acceptance.
+Array support is extended by [ADR 0068](0068-lazy-project-class-array-elements.md);
+the scalar packet and its original limits below remain historical evidence.
 
 The language/compiler/IR/VM own As New. Follow the VBA
 [Dim statement](https://learn.microsoft.com/en-us/office/vba/language/reference/user-interface-help/dim-statement),

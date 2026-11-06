@@ -145,7 +145,6 @@ fn invalid_declarations_and_old_consumers_refuse_auto_instancing() -> R {
     for declaration in [
         "Dim c As New Long",
         "Dim c As New Object",
-        "Dim c(1 To 2) As New Counter",
         "Const c As New Counter=Nothing",
     ] {
         assert!(
@@ -273,5 +272,218 @@ fn reset_during_initialization_never_runs_termination_and_static_restore_never_r
         Outcome::Completed(ReturnValue::Function(Value::Long(9)))
     );
     assert!(second.output().is_empty());
+    Ok(())
+}
+
+#[test]
+fn array_elements_are_lazy_distinct_and_nothing_rearms_only_the_selected_element() -> R {
+    let mut s = session(
+        "Function Answer() As Long\nDim items(-1 To 0,2 To 3) As New Counter,a As Counter,b As Counter\nDebug.Print \"before\"\nSet items(-1,2)=Nothing\nSet a=items(-1,2)\nSet b=items(0,3)\nIf a Is b Then Err.Raise 5\nitems(-1,2).value=10\nIf items(-1,2) Is a Then Answer=items(-1,2).value+b.value\nSet items(-1,2)=Nothing\nAnswer=Answer+items(-1,2).value\nEnd Function",
+        COUNTER,
+        "",
+    )?;
+    assert_eq!(
+        drive(&mut s)?,
+        Outcome::Completed(ReturnValue::Function(Value::Long(24)))
+    );
+    let log = output(&s)?;
+    assert_eq!(log.first().map(String::as_str), Some("before"));
+    assert_eq!(log.iter().filter(|line| line.as_str() == "init").count(), 3);
+    Ok(())
+}
+#[test]
+fn dynamic_auto_arrays_keep_preserved_members_and_reset_new_or_erased_elements() -> R {
+    let mut s = session(
+        "Function Answer() As Long\nDim items() As New Counter,a As Counter\nReDim items(2 To 3)\nSet a=items(2)\na.value=12\nReDim Preserve items(2 To 4)\nIf Not items(2) Is a Then Err.Raise 5\nAnswer=items(2).value+items(4).value\nErase items\nReDim items(2 To 2)\nAnswer=Answer+items(2).value\nEnd Function",
+        COUNTER,
+        "",
+    )?;
+    assert_eq!(
+        drive(&mut s)?,
+        Outcome::Completed(ReturnValue::Function(Value::Long(26)))
+    );
+    assert_eq!(
+        output(&s)?
+            .iter()
+            .filter(|line| line.as_str() == "init")
+            .count(),
+        3
+    );
+    Ok(())
+}
+#[test]
+fn element_byref_preparation_is_in_source_order_and_does_not_replay_indices() -> R {
+    let mut s = session(
+        "Private indices As Long\nFunction Answer() As Long\nDim items(0 To 1) As New Counter\nClear items(Index()),Trace()\nAnswer=items(0).value+indices\nEnd Function\nFunction Index() As Long\nindices=indices+1\nDebug.Print \"index\"\nEnd Function\nFunction Trace() As Long\nDebug.Print \"later\"\nEnd Function\nSub Clear(ByRef child As Counter,ByVal later As Long)\nDebug.Print child.value\nSet child=Nothing\nEnd Sub",
+        COUNTER,
+        "",
+    )?;
+    assert_eq!(
+        drive(&mut s)?,
+        Outcome::Completed(ReturnValue::Function(Value::Long(8)))
+    );
+    let log = output(&s)?;
+    assert_eq!(
+        log.get(..4),
+        Some(["index".into(), "init".into(), "later".into(), "7".into()].as_slice())
+    );
+    Ok(())
+}
+#[test]
+fn element_constructor_stop_keeps_indices_and_failure_retries_the_same_cell() -> R {
+    let main = "Private indices As Long\nFunction Answer() As Long\nDim items(0 To 1) As New Counter\nAnswer=items(Index()).value+indices\nEnd Function\nFunction Index() As Long\nindices=indices+1\nEnd Function";
+    let mut s = session(main, &COUNTER.replace("value=7", "Stop\nvalue=7"), "")?;
+    assert!(matches!(drive(&mut s)?, Outcome::Paused(_)));
+    s.continue_execution()?;
+    assert_eq!(
+        drive(&mut s)?,
+        Outcome::Completed(ReturnValue::Function(Value::Long(8)))
+    );
+    let mut s = session(
+        "Function Answer() As Long\nDim items(0 To 0) As New Counter\nOn Error Resume Next\nAnswer=items(0).value\nDebug.Print Err.Number\nErr.Clear\nAnswer=items(0).value\nDebug.Print Err.Number\nEnd Function",
+        "Public value As Long\nPrivate Sub Class_Initialize()\nDebug.Print \"attempt\"\nErr.Raise 6\nEnd Sub",
+        "",
+    )?;
+    assert_eq!(
+        drive(&mut s)?,
+        Outcome::Completed(ReturnValue::Function(Value::Long(0)))
+    );
+    assert_eq!(output(&s)?, vec!["attempt", "6", "attempt", "6"]);
+    Ok(())
+}
+#[test]
+fn private_field_and_static_auto_arrays_retain_canonical_elements() -> R {
+    let p = program(
+        "Function Answer() As Long\nStatic items(0 To 0) As New Counter\nDim h As New Holder\nitems(0).value=items(0).value+1\nAnswer=items(0).value+h.Read()\nEnd Function",
+        COUNTER,
+        "Private items(0 To 1) As New Counter\nPublic Function Read() As Long\nRead=items(1).value\nEnd Function",
+    )?;
+    let mut s = Session::new(p.clone(), 1, vec![], None, Limits::default())?;
+    assert_eq!(
+        drive(&mut s)?,
+        Outcome::Completed(ReturnValue::Function(Value::Long(15)))
+    );
+    let state = s.project_state()?;
+    let mut restored = Session::new(p, 2, vec![], None, Limits::default())?;
+    restored.restore_project(state)?;
+    assert_eq!(
+        drive(&mut restored)?,
+        Outcome::Completed(ReturnValue::Function(Value::Long(16)))
+    );
+    Ok(())
+}
+#[test]
+fn for_each_auto_array_constructs_each_element_once_across_initializer_stops() -> R {
+    let mut s = session(
+        "Function Answer() As Long\nDim items(1 To 2) As New Counter,item As Variant\nFor Each item In items\nAnswer=Answer+item.value\nNext item\nEnd Function",
+        &COUNTER.replace("value=7", "Stop\nvalue=7"),
+        "",
+    )?;
+    for _ in 0..2 {
+        assert!(matches!(drive(&mut s)?, Outcome::Paused(_)));
+        s.continue_execution()?;
+    }
+    assert_eq!(
+        drive(&mut s)?,
+        Outcome::Completed(ReturnValue::Function(Value::Long(14)))
+    );
+    assert_eq!(
+        output(&s)?
+            .iter()
+            .filter(|line| line.as_str() == "init")
+            .count(),
+        2
+    );
+    Ok(())
+}
+
+#[test]
+fn class_method_byref_keeps_the_element_location_after_lazy_initialization() -> R {
+    let mut s = session(
+        "Function Answer() As Long\nDim items(0 To 0) As New Counter,h As New Holder\nh.Clear items(0)\nAnswer=items(0).value\nEnd Function",
+        COUNTER,
+        "Public Sub Clear(ByRef child As Counter)\nDebug.Print child.value\nSet child=Nothing\nEnd Sub",
+    )?;
+    assert_eq!(
+        drive(&mut s)?,
+        Outcome::Completed(ReturnValue::Function(Value::Long(7)))
+    );
+    assert_eq!(
+        output(&s)?
+            .iter()
+            .filter(|line| line.as_str() == "init")
+            .count(),
+        2
+    );
+    Ok(())
+}
+#[test]
+fn array_inspection_is_inert_and_old_or_forged_element_bytecode_is_refused() -> R {
+    let main = "Function Answer() As Long\nDim items(0 To 1) As New Counter,other(0 To 1) As New Counter\nSet other(0)=Nothing\nStop\nAnswer=items(0).value\nEnd Function";
+    let p = program(main, COUNTER, "")?;
+    assert_eq!(p.program().ir_version, vba_ir::IR14_VERSION);
+    let mut caps = vba_ir::Capabilities::ir13_structural();
+    caps.profile = p.program().profile.clone();
+    assert!(vba_ir::recheck(&p, &caps, &Default::default()).is_err());
+    for mode in 0..3 {
+        let mut raw = p.program().clone();
+        match mode {
+            0 => {
+                raw.ir_version = vba_ir::IR13_VERSION;
+            }
+            1 => {
+                raw.required_features.remove("auto-array-elements-v14");
+            }
+            _ => {
+                for procedure in &mut raw.procedures {
+                    for instruction in &mut procedure.code {
+                        if let vba_ir::Instruction::TouchElement(slot) = instruction {
+                            *slot = vba_ir::LocalSlot(u32::MAX);
+                        }
+                    }
+                }
+            }
+        }
+        assert!(vba_ir::verify(raw, &vba_vm::capabilities(), &Default::default()).is_err());
+    }
+    let mut s = Session::new(p.clone(), 1, vec![], None, Limits::default())?;
+    let Outcome::Paused(stop) = drive(&mut s)? else {
+        return Err("inspection stop".into());
+    };
+    let Value::Array(array) = s.read_local(stop.handle, "items")? else {
+        return Err("array".into());
+    };
+    assert!(
+        array
+            .elements()
+            .iter()
+            .all(|value| *value == Value::Nothing)
+    );
+    assert!(s.output().is_empty());
+    s.continue_execution()?;
+    assert_eq!(
+        drive(&mut s)?,
+        Outcome::Completed(ReturnValue::Function(Value::Long(7)))
+    );
+    let mut forged = p.program().clone();
+    for procedure in &mut forged.procedures {
+        let other = procedure
+            .locals
+            .iter()
+            .position(|local| local.name == "other");
+        for instruction in &mut procedure.code {
+            if let (Some(other), vba_ir::Instruction::TouchElement(slot)) = (other, instruction) {
+                *slot = vba_ir::LocalSlot(u32::try_from(other)?);
+            }
+        }
+    }
+    let verified = vba_ir::verify(forged, &vba_vm::capabilities(), &Default::default())?;
+    let mut s = Session::new(verified, 2, vec![], None, Limits::default())?;
+    assert!(matches!(drive(&mut s)?, Outcome::Paused(_)));
+    s.continue_execution()?;
+    assert!(
+        matches!(drive(&mut s)?,Outcome::Failed(failure) if failure.kind==vba_vm::FailureKind::HostProtocol)
+    );
+    assert!(s.output().is_empty());
     Ok(())
 }

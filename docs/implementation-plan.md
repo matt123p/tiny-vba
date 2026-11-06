@@ -81,6 +81,7 @@ and native save/reopen. See [ADR 0041](decisions/0041-worksheet-form-controls.md
   ADR 0065 adds selected native cell/row bindings and the approved static permission cap.
   ADR 0066 extends read-only runtime type names to embedding-owned objects.
   ADR 0067 adds VarType default value inspection and public default functions.
+  ADR 0068 adds lazy project-class/native-form arrays under IR 14.
   Remaining requirements and integration are recorded there. Reuse the shared runtime
   behind native forms and close Office compatibility gaps for the inventoried
   standard controls. Match instance/default-instance behavior, lifecycle, modal/

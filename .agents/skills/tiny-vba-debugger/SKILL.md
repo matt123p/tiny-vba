@@ -179,3 +179,8 @@ normal class frames/authorized host calls, getter errors and one-shot Stop/wait
 continuations. Resolver presence metadata is inert and identity checked; actual
 getters remain executable. Older IR consumers refuse this capability. Watches
 stay inert and all existing budgets remain. Full M7A.4/M8.5 are separate gates.
+
+
+## Lazy project-class array elements
+
+TouchElement may construct only during authorized program execution. Local/array snapshots and safe watches remain inert. Preserve element references and caller instruction state across constructor Stop/failure; do not replay indices or earlier arguments. See [ADR 0068](../../../docs/decisions/0068-lazy-project-class-array-elements.md). Existing budgets remain unchanged; full M7A.4 remains open.
