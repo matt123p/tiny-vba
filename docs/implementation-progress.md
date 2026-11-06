@@ -9,7 +9,15 @@ receipts and authorization stay unchanged. Eight new actual-input regressions
 bring the pointer suite to 34 cases. Full shared CI, strict Clippy, WASM/WASI,
 UI/native/web and actual Chromium nested/composite/editor/modal-form checks pass.
 Native/browser live, paused and completed captures and five native theme/scale
-views were inspected. Consumer integration is being finalized. L02 and M7A.4
+views were inspected. Both consumers pin shared product
+`c99996351a80a234b23f2e81b54e210dae0bd530`.
+GridCraft full CI (10 steps), strict optional VBA/UI Clippy, four form UI cases,
+VBA web and all 27 native/27 Node-WASM package cases pass (integration
+`8d1a938c`). WordCraft full CI (8 steps, isolated serial tests), strict optional
+VBA/UI Clippy, 13 VBA UI cases, the hidden-editor form, VBA web and all 22 native/
+22 Node-WASM cases pass (integration `2374efb3`). Nested host callbacks preserve
+separate caller receipts, one-shot effects and original resources; Word verifies
+one undo step. All three repositories are committed and pushed. L02 and M7A.4
 remain partial; the unchanged checklist is authoritative.
 
 ## M7A.4 continued — composite pointer defaults (2026-11-06)

@@ -1,6 +1,6 @@
 # 0076 — Native modal input continuations
 
-Date: 2026-11-06. Status: implemented; validation receipts in progress.
+Date: 2026-11-06. Status: implemented; validation receipts recorded in progress.
 L02 and M7A.4 remain PARTIAL. Fresh Office observations remain M8.5 NOT_RUN.
 
 ## Owning layer and existing contract
