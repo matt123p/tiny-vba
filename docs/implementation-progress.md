@@ -10,8 +10,15 @@ identity through reorder and reject removal. ComboBox AutoWordSelect preserves
 the native inverse bit and separate dynamic default. All 25 decoder cases, ten
 shared model cases (native and WASI) and 26 actual egui pointer cases pass. Full
 shared CI/strict Clippy, WASM, UI/native/web and Chromium composite/editor/modal
-checks and full WASI pass. Consumer integration is being finalized. Native
-light/dark/narrow/scaled/host-theme and browser paused/popup/selected/completed
+checks and full WASI pass. Both consumers pin shared product
+`f027c5d14f0a57c6a0ebfa0f1cc2fb393cb9c2b7`. GridCraft full CI (10 steps),
+strict optional VBA/UI Clippy, four form UI cases, VBA web and all 26 native/26
+Node-WASM package cases pass (integration `dff8608c`). WordCraft full CI (8 steps,
+isolated serial tests), strict optional VBA/UI Clippy, 13 VBA UI cases, the hidden
+editor form, VBA web and all 21 native/21 Node-WASM package cases pass (integration
+`20a44d27`). New host cases preserve stopped modal authority, one-shot effects
+and original resources; Word verifies one undo step. All three repositories are
+committed and pushed. Native light/dark/narrow/scaled/host-theme and browser paused/popup/selected/completed
 views were inspected. M01 and M7A.4 remain partial; next are the unchanged
 lifecycle, keyboard, property/member, platform and reentrant input checklist.
 
