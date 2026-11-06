@@ -53,6 +53,14 @@ renderer does not temporarily turn a modal form into a modeless window during it
 callback. It grants no input permission. Headless tests verify that stopped input
 still refuses and Reset revokes the display metadata.
 
+Retained modal display order follows the parked Show waits, independent of object
+creation order. A child created before its parent still renders above it; closing
+that child resumes the suspended parent pointer once. The keyboard display owner
+uses the same retained order without bypassing executable input authorization.
+The actual egui mouse suite now contains 26 cases. Nested child raw mouse callback
+reentrancy remains in L02.
+
+
 Manually positioned runtime controls render in child UIs bounded by their native
 rectangles, without advancing the form's flow cursor. Popup state cannot resize
 or reposition the parent form through a control's layout allocation. This preserves

@@ -304,3 +304,7 @@ Popup rows inherit the input barrier; numeric repeats use injected time and stop
 on release even during Stop. Inert tab queries preserve identity after reorder
 and reject detached members. Retained modal-display metadata never authorizes
 input. Keep the complete M7A.4 checklist open for remaining acceptance.
+
+Retained native modal presentation follows parked Show order, independent of
+object creation, and never grants executable input permission. Nested child raw
+mouse callback reentrancy remains an open L02 requirement.

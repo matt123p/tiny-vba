@@ -999,6 +999,16 @@ impl EditorUi {
             .copied()
             .find(|instance| ide.form_instance_is_modal(*instance))
             .or_else(|| {
+                instances
+                    .iter()
+                    .filter_map(|instance| {
+                        ide.form_instance_modal_rank(*instance)
+                            .map(|rank| (rank, *instance))
+                    })
+                    .max_by_key(|(rank, _)| *rank)
+                    .map(|(_, instance)| instance)
+            })
+            .or_else(|| {
                 self.form_runtime_focus
                     .iter()
                     .find(|(_, _, id)| Some(*id) == focused)
@@ -1074,9 +1084,13 @@ impl EditorUi {
         let last_focus = ctx
             .memory(|memory| memory.focused())
             .or(self.form_last_focus.take());
-        let Ok(instances) = ide.form_instances() else {
+        let Ok(mut instances) = ide.form_instances() else {
             return;
         };
+        instances.sort_by_key(|instance| {
+            ide.form_instance_modal_rank(*instance)
+                .map_or((false, 0), |rank| (true, rank))
+        });
         let keyboard_owner = input.owner;
         let key_blocked = input.blocked;
         for instance in instances {

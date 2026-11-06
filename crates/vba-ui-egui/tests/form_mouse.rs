@@ -773,6 +773,44 @@ fn queued_tab_release_retains_identity_through_reorder_and_discards_removal() ->
     Ok(())
 }
 #[test]
+fn nested_modal_display_follows_wait_order_and_child_close_resumes_the_parent_pointer() -> R {
+    let mut h = harness(
+        "Private Sub Apply_MouseDown(ByVal b As Integer,ByVal s As Integer,ByVal x As Single,ByVal y As Single)\nIf Me.Caption=\"Parent\" Then NativeForm.Show\nEnd Sub",
+        "Sub Main()\nDim parent As NativeForm\nNativeForm.Caption=\"Child\"\nNativeForm.Heading.Visible=False\nNativeForm.Entry.Visible=False\nNativeForm.Apply.Visible=False\nSet parent=New NativeForm\nparent.Caption=\"Parent\"\nparent.Show\nEnd Sub",
+        false,
+    )?;
+    let forms = h.state().ide.form_instances()?;
+    let child = *forms.first().ok_or("child")?;
+    let parent = *forms.last().ok_or("parent")?;
+    let p = point(&h, "Apply");
+    button(&mut h, p, true);
+    button(&mut h, p, false);
+    h.run_steps(25);
+    assert_eq!(h.state().ide.mode(), Mode::Waiting);
+    assert!(h.state().ide.form_instance_visible(child));
+    assert_eq!(h.state().ide.form_instance_modal_rank(parent), Some(0));
+    assert_eq!(h.state().ide.form_instance_modal_rank(child), Some(1));
+    assert!(!h.state().ide.form_instance_can_deliver(parent));
+    h.get_all_by_label("Close Form")
+        .last()
+        .ok_or("child close")?
+        .click();
+    h.run_steps(60);
+    assert_eq!(
+        h.state().ide.mode(),
+        Mode::Completed,
+        "{:?}",
+        h.state().errors
+    );
+    assert!(h.state().errors.is_empty(), "{:?}", h.state().errors);
+    assert_eq!(
+        h.state().ide.output(),
+        vec!["initialized", "initialized", "initial"]
+    );
+    assert!(!h.state().ide.form_instance_visible(child));
+    Ok(())
+}
+#[test]
 fn refedit_picker_and_compact_text_keep_the_same_authorized_input_path() -> R {
     let mut h = harness_resource(
         "Private Sub Entry_MouseDown(ByVal b As Integer,ByVal s As Integer,ByVal x As Single,ByVal y As Single)\nDebug.Print \"ref down\"\nStop\nEnd Sub",

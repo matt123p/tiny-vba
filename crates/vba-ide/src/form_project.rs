@@ -2208,12 +2208,15 @@ impl Ide {
     /// Display modality survives a callback while its modal caller remains parked.
     /// This is inert window metadata, not permission to deliver another input.
     pub fn form_instance_has_modal_window(&self, instance: FormInstance) -> bool {
-        self.validate_form_instance(instance).is_ok()
-            && self
-                .form_gate
-                .waits
-                .values()
-                .any(|object| *object == instance.object)
+        self.form_instance_modal_rank(instance).is_some()
+    }
+    /// Retained display order, oldest to newest; this is not an input grant.
+    pub fn form_instance_modal_rank(&self, instance: FormInstance) -> Option<usize> {
+        self.validate_form_instance(instance).ok()?;
+        self.form_gate
+            .waits
+            .values()
+            .position(|object| *object == instance.object)
     }
     pub fn form_can_deliver(&self, id: SourceId) -> bool {
         self.default_form_instance(id)
