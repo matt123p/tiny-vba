@@ -1,6 +1,6 @@
 # ADR 0066 — Foreign runtime type names
 
-Date: 2026-11-06. Status: shared implementation and validation passed; pinned fork integration in progress.
+Date: 2026-11-06. Status: shared implementation and pinned fork validation passed. M7A.4 remains open.
 
 M7A.4 includes dynamic TypeName for objects supplied by an embedding. ADR 0064
 already covers ordinary project classes and native Forms classes. This increment

@@ -249,7 +249,7 @@ remain in force. Further binding timing/types and the broader M7A.4 ledger remai
 host type resolution with bounded native TypeName metadata. Identity/lifetime,
 no-getter/no-activation rules, lookup/allocation budgets and generic Object fallback
 are retained. TypeName/VarType/IsArray named varname binding matches their documented
-signatures. Validation is in progress; the remaining M7A.4 ledger stays open.
+signatures. Shared and pinned fork validation passed; the remaining M7A.4 ledger stays open.
 
 VarType's named argument now follows the documented varname spelling; this does
 not close its existing object-default-member evaluation gap. TypeName preserves

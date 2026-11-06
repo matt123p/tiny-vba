@@ -1,6 +1,6 @@
 # M7A Office forms — control, property, event, format and host contracts
 
-Updated 2026-11-05. FC0.2/FC0.3 contract inventory under
+Updated 2026-11-06. FC0.2/FC0.3 contract inventory under
 [ADR 0038](decisions/0038-native-office-forms-and-compatibility-only.md),
 [ADR 0039](decisions/0039-m7a-native-control-metadata.md) and
 [ADR 0040](decisions/0040-native-userform-import-and-attachment.md).
@@ -254,4 +254,4 @@ remain in force. Further binding timing/types and the broader M7A.4 ledger remai
 host type resolution with bounded native TypeName metadata. Identity/lifetime,
 no-getter/no-activation rules, lookup/allocation budgets and generic Object fallback
 are retained. TypeName/VarType/IsArray named varname binding matches their documented
-signatures. Validation is in progress; the remaining M7A.4 ledger stays open.
+signatures. Shared and pinned fork validation passed; the remaining M7A.4 ledger stays open.

@@ -9,8 +9,14 @@ revocation, stale/foreign/switched host identity, fallback and UTF-16 name bound
 Full CI, WASM compilation, full actual WASI execution and the final 17-case WASI
 nominal suite pass. TypeName/VarType/IsArray accept their documented named varname
 argument; VarType object-default evaluation remains a separate compatibility gap.
-GridCraft/WordCraft local object-alias and document/undo preservation tests pass;
-final pinned fork integration is in progress. The full M7A.4 ledger remains open.
+Pinned fork validation PASS at shared revision
+`c48e109d95074153b37bb342d3206b50a33ee5fa`: GridCraft full CI (10 steps),
+strict optional VBA/UI Clippy, four form UI cases, optional VBA web and all 11
+actual Node/WASM identity cases; WordCraft full CI (8 steps), strict optional
+VBA/UI Clippy, 13 VBA UI tests, hidden-editor form regression, optional web and
+both new actual Node/WASM store-lifetime/alias cases. Document contents/undo
+remain unchanged by introspection. Integration commits are GridCraft `39598827`
+and WordCraft `bd483ef5`. The full M7A.4 ledger remains open.
 
 ## M7A.4 continued — native cell/row bindings (2026-11-05)
 

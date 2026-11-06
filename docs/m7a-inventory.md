@@ -1,6 +1,6 @@
 # M7A native forms — implementation inventory and work ledger
 
-Updated 2026-11-05. **IN PROGRESS**. FC0 and FC3.1–FC3.4 are complete for
+Updated 2026-11-06. **IN PROGRESS**. FC0 and FC3.1–FC3.4 are complete for
 `native-userform-import-v1`; see the [control/property/event/format/host matrix](m7a-control-contracts.md).
 M7A.3's worksheet profile is implemented under
 [ADR 0041](decisions/0041-worksheet-form-controls.md). Shared runtime increments
@@ -234,4 +234,4 @@ remain in force. Further binding timing/types and the broader M7A.4 ledger remai
 host type resolution with bounded native TypeName metadata. Identity/lifetime,
 no-getter/no-activation rules, lookup/allocation budgets and generic Object fallback
 are retained. TypeName/VarType/IsArray named varname binding matches their documented
-signatures. Validation is in progress; the remaining M7A.4 ledger stays open.
+signatures. Shared and pinned fork validation passed; the remaining M7A.4 ledger stays open.
