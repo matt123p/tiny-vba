@@ -13,7 +13,9 @@ signature metadata; binding now omits those aliases while retaining typed event
 arguments, real method fields and all existing limits. A generic compiler
 regression, corrected full CI/WASM/WASI, all 17 compiler cases under WASI,
 UI/native/web and Chromium mouse/smoke/modal-form regressions pass. Consumer
-pinning and final host validation are in progress. M01 and M7A.4 remain partial; remaining pointer
+pinning and final host validation are in progress. Final integration review also
+corrected InstanceMouse executable classification, with a per-command UI
+regression, to preserve embedding consent and snapshot preparation. M01 and M7A.4 remain partial; remaining pointer
 defaults, lifecycle, keyboard and other checklist rows are unchanged.
 
 ## M7A.4 continued — native accelerators (2026-11-06)

@@ -13,6 +13,10 @@ are Single. DblClick receives a mutable ByVal MSForms.ReturnBoolean. The Forms
 provider adds the published fmButton constants without changing the generic VM.
 Source attachment and handler generation validate signatures before publication.
 
+The shared command classifier treats form commands as executable unless they
+are explicitly known inert design operations. This includes InstanceMouse, so embedding
+hosts perform their existing consent and fresh snapshot preparation for every
+mouse command. UI regressions assert this for every emitted pointer callback.
 The authorized native mouse command enters an ordinary form callback, retains
 its receiver and publishes canonical epoch/done/allow fields only on completion.
 Focus validation can suppress a press before its handler. Detached, hidden,

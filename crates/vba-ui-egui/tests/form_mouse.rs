@@ -58,6 +58,15 @@ fn harness_resource(
         .build_ui_state(
             |ui, s: &mut State| {
                 for command in s.view.show(ui, &s.ide, Theme::light()) {
+                    if matches!(
+                        command,
+                        vba_ui_egui::Command::Form(vba_ui_egui::FormCommand::InstanceMouse(..))
+                    ) {
+                        assert!(
+                            command.executes_code(),
+                            "mouse callbacks must require host preparation and authorization"
+                        );
+                    }
                     if let Err(error) = apply(&mut s.ide, command, &mut NoHost) {
                         s.errors.push(error.to_string());
                     }

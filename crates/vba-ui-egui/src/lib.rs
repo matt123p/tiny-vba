@@ -50,28 +50,14 @@ impl Command {
     /// Embeddings use this classification to enforce their existing execution policy
     /// before dispatch, including instance-addressed native form input.
     pub fn executes_code(&self) -> bool {
-        matches!(
-            self,
+        match self {
+            Self::Form(command) => command.executes_code(),
             Self::Action(Action::Run | Action::StepInto | Action::StepOver | Action::StepOut)
-                | Self::RunToCursor
-                | Self::Immediate(_)
-                | Self::IsolatedImmediate(_)
-                | Self::Form(
-                    FormCommand::Run(..)
-                        | FormCommand::Event(..)
-                        | FormCommand::InstanceEvent(..)
-                        | FormCommand::InstanceKey(..)
-                        | FormCommand::InstanceFocus(..)
-                        | FormCommand::InstanceActivate(..)
-                        | FormCommand::InstanceText(..)
-                        | FormCommand::InstanceNumeric(..)
-                        | FormCommand::InstanceList(..)
-                        | FormCommand::InstanceListSelection(..)
-                        | FormCommand::InstanceTab(..)
-                        | FormCommand::InstanceDrop(..)
-                        | FormCommand::InstanceNavigate(..)
-                )
-        )
+            | Self::RunToCursor
+            | Self::Immediate(_)
+            | Self::IsolatedImmediate(_) => true,
+            _ => false,
+        }
     }
 }
 /// Execute a rendered command through the same headless IDE action route.
