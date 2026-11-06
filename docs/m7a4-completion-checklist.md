@@ -16,7 +16,7 @@ reference-based expectations and fresh Office observations remain distinct.
 | K01 | KeyDown/KeyPress/KeyUp with mutable ByVal MSForms.ReturnInteger and typed Shift; cancellation/default processing in ordinary frames | PARTIAL: ADR 0070 evidence plus ADR 0071 root/Tab/SetFocus/Space cases PASS (nine runtime, 11 new UI, Chromium, both hosts); remaining cases open |
 | K02 | Held-key repeat; modifiers; Tab/navigation focus transitions; Default/Cancel Enter/Escape exceptions; ANSI input versus Unicode/IME/paste | PARTIAL: raw-input barrier and ADR 0071 focus/default ordering; remaining platform/shortcut/focus/IME cases open |
 | K03 | Accelerators select/focus/activate the appropriate eligible control and preserve keyboard/event ordering | PARTIAL: ADR 0072 selected Label/button/boolean/Tab/Page actions; duplicate, non-ASCII/platform and further ordering cases open |
-| M01 | Applicable MouseDown/MouseMove/MouseUp/Click/DblClick, typed button/modifier/coordinate/cancellation arguments, event order and container-relative coordinates | OPEN |
+| M01 | Applicable MouseDown/MouseMove/MouseUp/Click/DblClick, typed button/modifier/coordinate/cancellation arguments, event order and container-relative coordinates | PARTIAL: ADR 0073 typed callbacks and selected simple-control capture/defaults; text/list/numeric/indexed-tab/platform defaults and further ordering open |
 | P01 | Remaining common properties, defaults, exact errors/coercions, text/selection edge cases | PARTIAL: remaining contract/member audit open |
 | B01 | List/Column array shape/loading, binding value types and update timing, protected failures and reentrant handlers | PARTIAL: current selected array/binding packets implemented |
 | W01 | Frame, TabStrip/Tabs, MultiPage/Pages: remaining storage/resource/property/presentation cases, transitions, focus and lifecycle | PARTIAL |
@@ -57,8 +57,8 @@ replacement cases, cross-window lifecycle/focus changes and remaining non-text
 control defaults. Root focus and selected Tab/SetFocus/Space cases follow ADR 0071.
 No refusal counts as a completed inventoried behavior.
 
-Next implementation packet: M01 typed MouseDown/MouseMove/MouseUp and DblClick
-through ordinary control event frames, with bounded raw pointer input and
-container-relative point coordinates. Cover button/modifier types, callback
-ordering, Stop/Continue, stale input after Reset and affected host authorization.
-This does not defer the still-partial K03 accelerator/platform cases.
+Next implementation packet: M01 raw pointer defaults for native text selection,
+list/numeric/drop/picker input and indexed Tab/Page hits, preserving typed callback
+ordering, capture, validation/cancellation, Stop/Continue and stale input rejection.
+ADR 0073 implements the callback and selected simple-control capture/default paths;
+it does not defer the remaining K03 accelerator/platform or lifecycle cases.

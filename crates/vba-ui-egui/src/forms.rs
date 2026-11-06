@@ -5,6 +5,7 @@ mod combo;
 mod images;
 pub(super) mod keyboard;
 mod list;
+pub(super) mod mouse;
 mod numeric;
 mod refedit;
 mod tabs;
@@ -39,6 +40,7 @@ pub enum FormCommand {
     InstanceListSelection(vba_ide::FormInstance, u32, vba_ide::FormListInput),
     InstanceTab(vba_ide::FormInstance, u32, i32),
     InstanceNumeric(vba_ide::FormInstance, u32, vba_ide::FormNumericInput),
+    InstanceMouse(vba_ide::FormInstance, Option<u32>, vba_ide::FormMouseInput),
     InstanceKey(vba_ide::FormInstance, Option<u32>, vba_ide::FormKeyInput),
     InstanceText(vba_ide::FormInstance, u32, vba_ide::VbaString, (u32, u32)),
 }
@@ -84,6 +86,9 @@ pub(super) fn apply_form(
         FormCommand::Handler(id, c, event) => ide.generate_form_handler(id, c, &event),
         FormCommand::Run(id, modal) => ide.run_form(id, modal, host),
         FormCommand::Event(id, c, text) => ide.form_event(id, c, text, host),
+        FormCommand::InstanceMouse(instance, control, input) => ide
+            .form_instance_mouse(instance, control, input, host)
+            .map(|_| ()),
         FormCommand::InstanceKey(instance, control, input) => ide
             .form_instance_key(instance, control, input, host)
             .map(|_| ()),
@@ -894,6 +899,21 @@ impl EditorUi {
         ide: &Ide,
         commands: &mut Vec<Command>,
     ) -> KeyboardFrame {
+        self.form_mouse
+            .step(ctx, ide, commands, !self.form_keys.pending());
+        if ctx.memory(|memory| memory.focused()).is_none()
+            && let Some(widget) = self.form_mouse.keyboard_focus.filter(|widget| {
+                self.form_runtime_focus
+                    .iter()
+                    .any(|(_, _, id)| id == widget)
+                    || self.form_runtime_roots.iter().any(|(_, id)| id == widget)
+            })
+        {
+            ctx.memory_mut(|memory| memory.request_focus(widget));
+        }
+        if self.form_mouse.idle() {
+            self.form_mouse.keyboard_focus = None;
+        }
         if matches!(ide.mode(), Mode::Design | Mode::Failed | Mode::Stale) {
             self.form_keys.clear();
             self.form_runtime_roots.clear();
@@ -959,9 +979,12 @@ impl EditorUi {
             ctx,
             ide,
             owner,
-            &self.form_runtime_focus,
-            &self.form_runtime_roots,
+            keyboard::Targets {
+                focus: &self.form_runtime_focus,
+                roots: &self.form_runtime_roots,
+            },
             commands,
+            !owner.is_some_and(|owner| self.form_mouse.blocks(owner)),
         );
         let focused = ctx.memory(|memory| memory.focused());
         let owns_keys = ide.mode() != Mode::Break
@@ -1002,6 +1025,7 @@ impl EditorUi {
             }
             return;
         }
+        self.form_mouse.hits.clear();
         let previous_active = std::mem::take(&mut self.form_active_control);
         let previous_focus = std::mem::take(&mut self.form_runtime_focus);
         let previous_roots = std::mem::take(&mut self.form_runtime_roots);
@@ -1025,6 +1049,8 @@ impl EditorUi {
             let form = &runtime_form;
             let _ = designer;
             let idle = ide.form_instance_can_deliver(instance)
+                && (!self.form_mouse.blocks(instance)
+                    || self.form_keys.busy() && !self.form_mouse.pending())
                 && !(key_blocked && keyboard_owner == Some(instance));
             let native = ide.native_form(id).is_some();
             if let Some((owner, control)) = ide
@@ -1327,6 +1353,9 @@ impl EditorUi {
                         ),
                         egui::Sense::hover(),
                     );
+                    if native {
+                        self.form_mouse.hit(mouse::Hit{owner:instance,control:None,object:instance.object,rect:rect.intersect(ui.clip_rect()),origin:rect.min,parent:rect.min,kind:None});
+                    }
                     let mut focus = Vec::new();
                     let root_eligible = native
                         && ide.form_keyboard_target(instance).ok() == Some(None)
@@ -1380,6 +1409,9 @@ impl EditorUi {
                                 number("Height", c.bounds.height).max(0.0),
                             ) * scale,
                         );
+                        if native && enabled && let Ok(object)=ide.form_instance_control_object(instance,c.id) {
+                            self.form_mouse.hit(mouse::Hit{owner:instance,control:Some(c.id),object,rect:bounds.intersect(parent_clip).intersect(ui.clip_rect()),origin:bounds.min,parent:rect.min+offset,kind:Some(c.kind)});
+                        }
                         let widget_id = ui.scope_id().with(("runtime.control", c.id));
                         if native && idle && keyboard_owner==Some(instance)
                             && !previous_focus.iter().any(|(owner,_,_)|*owner==instance)

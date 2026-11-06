@@ -8,6 +8,7 @@ use vba_foreign::{Completion, ForeignError, HostCall, Reply};
 enum FormInput {
     Physical,
     Key(Vec<Value>),
+    Mouse(Vec<Value>),
     Refresh(Vec<ObjectRef>),
     Focus,
     Activate,
@@ -614,6 +615,7 @@ pub(crate) fn checked_handlers(
             "userform_deactivate",
             "userform_terminate",
             "userform_queryclose",
+            "userform_click",
         ]
         .contains(&key.as_str());
         let keyboard = if native {
@@ -640,6 +642,9 @@ pub(crate) fn checked_handlers(
         } else {
             None
         };
+        let mouse = native
+            .then(|| crate::form_mouse::handler(form, &p.name.spelling))
+            .flatten();
         let focus = native
             .then(|| {
                 form.controls.iter().find_map(|c| {
@@ -680,6 +685,10 @@ pub(crate) fn checked_handlers(
                 })
             {
                 return Err(error("invalid native control collection event signature"));
+            }
+        } else if let Some((event, indexed)) = mouse {
+            if !crate::form_mouse::valid_handler(p, event, indexed) {
+                return Err(error("invalid native mouse event signature"));
             }
         } else if let Some(event) = keyboard {
             if !crate::form_keyboard::valid_handler(p, event) {
@@ -1127,6 +1136,7 @@ fn compiled_form(
     if native.is_some() {
         source.push_str(&crate::form_focus::members(form, &handlers));
         source.push_str(&crate::form_keyboard::members(form, &handlers));
+        source.push_str(&crate::form_mouse::members(form, &handlers));
         source.push_str(crate::form_tabs::INPUT);
     }
     if ranges {
@@ -1549,7 +1559,13 @@ impl Ide {
                         .flatten()
                 })
                 .flatten();
-            let canonical = if let Some(name) = keyboard
+            let mouse = self
+                .native_form(id)
+                .is_some()
+                .then(|| crate::form_mouse::event(event))
+                .flatten();
+            let canonical = if let Some(name) = mouse
+                .or(keyboard)
                 .or_else(|| crate::form_numeric::event(c.kind, event))
                 .or_else(|| crate::form_list::event(c.kind, event))
                 .or_else(|| crate::form_refedit::event(c.kind, event))
@@ -1572,7 +1588,9 @@ impl Ide {
             };
             (
                 format!("{}_{}", c.name, canonical),
-                if keyboard.is_some() {
+                if mouse.is_some() {
+                    crate::form_mouse::parameters(canonical, crate::form_mouse::indexed(c.kind))
+                } else if keyboard.is_some() {
                     crate::form_keyboard::parameters(canonical)
                 } else if focus.is_some_and(|(_, cancel)| cancel) {
                     "ByVal Cancel As MSForms.ReturnBoolean"
@@ -1589,16 +1607,23 @@ impl Ide {
                 "Deactivate",
                 "Terminate",
                 "QueryClose",
+                "Click",
                 "KeyDown",
                 "KeyPress",
                 "KeyUp",
+                "MouseDown",
+                "MouseMove",
+                "MouseUp",
+                "DblClick",
             ]
             .into_iter()
             .find(|e| e.eq_ignore_ascii_case(event))
             .ok_or_else(|| error("unsupported form event"))?;
             (
                 format!("UserForm_{canonical}"),
-                if crate::form_keyboard::event(canonical).is_some() {
+                if crate::form_mouse::event(canonical).is_some() {
+                    crate::form_mouse::parameters(canonical, false)
+                } else if crate::form_keyboard::event(canonical).is_some() {
                     crate::form_keyboard::parameters(canonical)
                 } else if canonical == "QueryClose" {
                     "Cancel As Integer, CloseMode As Integer"
@@ -2477,6 +2502,15 @@ impl Ide {
         }
         self.deliver_form_input(instance, control, None, FormInput::Key(arguments), host)
     }
+    pub(crate) fn deliver_form_mouse(
+        &mut self,
+        instance: FormInstance,
+        control: Option<u32>,
+        arguments: Vec<Value>,
+        host: &mut impl Host,
+    ) -> Result<()> {
+        self.deliver_form_input(instance, control, None, FormInput::Mouse(arguments), host)
+    }
     fn deliver_form_input(
         &mut self,
         instance: FormInstance,
@@ -2619,7 +2653,18 @@ impl Ide {
             {
                 return Err(error("drop-list ComboBox does not accept typed text"));
             }
-            if let FormInput::Key(ref values) = input {
+            if let FormInput::Mouse(ref values) = input {
+                let index = form
+                    .controls
+                    .iter()
+                    .position(|c| c.id == id)
+                    .and_then(|index| i32::try_from(index).ok())
+                    .ok_or_else(|| error("mouse control index"))?;
+                object = instance.object;
+                let mut args = vec![Value::Long(index)];
+                args.extend(values.iter().cloned());
+                ("VbaMouseInput", args)
+            } else if let FormInput::Key(ref values) = input {
                 if !crate::form_keyboard::eligible(c.kind) {
                     return Err(error("control cannot receive keyboard input"));
                 }
@@ -2760,6 +2805,10 @@ impl Ide {
             let mut args = vec![Value::Long(-1)];
             args.extend(values.iter().cloned());
             ("VbaKeyInput", args)
+        } else if let FormInput::Mouse(ref values) = input {
+            let mut args = vec![Value::Long(-1)];
+            args.extend(values.iter().cloned());
+            ("VbaMouseInput", args)
         } else if let FormInput::Refresh(ref targets) = input {
             let upper = i32::try_from(
                 targets

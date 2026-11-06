@@ -1,5 +1,16 @@
 # Implementation progress
 
+## M7A.4 continued — native mouse callbacks (2026-11-06)
+
+ADR 0073 adds typed native MouseDown/MouseMove/MouseUp/DblClick, indexed tab/page
+arguments, mutable cancellation and canonical completion receipts. Selected simple
+control/background pointer capture/defaults, stopped/outside release, Reset and
+keyboard focus preservation pass six model and five real egui cases. Full shared
+CI/Clippy, WASM/WASI, the six-case WASI mouse target, UI/native/web and actual
+Chromium stopped MouseDown/captured MouseUp/one Click pass. Live/paused/resumed
+views were inspected. Consumer integration validation is in progress. M01 and M7A.4 remain partial; remaining pointer
+defaults, lifecycle, keyboard and other checklist rows are unchanged.
+
 ## M7A.4 continued — native accelerators (2026-11-06)
 
 ADR 0072 implements persisted Label/button/boolean accelerator records, canonical

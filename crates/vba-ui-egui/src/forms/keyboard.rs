@@ -11,6 +11,10 @@ struct Pending {
     text_open: bool,
     drop_repeat_text: bool,
 }
+pub(super) struct Targets<'a> {
+    pub focus: &'a [(FormInstance, u32, egui::Id)],
+    pub roots: &'a [(FormInstance, egui::Id)],
+}
 #[derive(Default)]
 pub(crate) struct Keyboard {
     generation: Option<u64>,
@@ -117,6 +121,12 @@ fn shift(modifiers: egui::Modifiers) -> u8 {
     u8::from(modifiers.shift) | (u8::from(modifiers.ctrl) * 2) | (u8::from(modifiers.alt) * 4)
 }
 impl Keyboard {
+    pub(super) fn pending(&self) -> bool {
+        !self.pending.is_empty()
+    }
+    pub(super) fn busy(&self) -> bool {
+        !self.queue.is_empty() || !self.pending.is_empty()
+    }
     pub(crate) fn clear(&mut self) {
         *self = Self::default();
     }
@@ -193,10 +203,11 @@ impl Keyboard {
         ctx: &egui::Context,
         ide: &Ide,
         owner: Option<FormInstance>,
-        focus: &[(FormInstance, u32, egui::Id)],
-        roots: &[(FormInstance, egui::Id)],
+        widgets: Targets<'_>,
         commands: &mut Vec<Command>,
+        allow_dispatch: bool,
     ) -> bool {
+        let Targets { focus, roots } = widgets;
         let Some(owner) = owner.filter(|owner| ide.native_form(owner.source).is_some()) else {
             self.clear();
             return false;
@@ -299,7 +310,8 @@ impl Keyboard {
                     || self.held.iter().any(|(instance, _)| *instance == owner));
         let accelerator_input=ctx.input(|input|input.events.iter().any(|event|matches!(event,egui::Event::Key{pressed:true,modifiers,..} if modifiers.alt && !modifiers.ctrl)));
         if owns_focus
-            && (accelerator_input
+            && (!allow_dispatch
+                || accelerator_input
                 || self.observes
                 || listens
                 || self.pending.iter().any(|pending| pending.owner == owner)
@@ -421,7 +433,7 @@ impl Keyboard {
         if !self.queue.is_empty() || !self.pending.is_empty() {
             ctx.request_repaint();
         }
-        if !ide.form_instance_can_deliver(owner) {
+        if (!allow_dispatch && self.pending.is_empty()) || !ide.form_instance_can_deliver(owner) {
             return self.pending.iter().any(|pending| pending.owner == owner);
         }
         if let Some(index) = self

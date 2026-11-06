@@ -21,6 +21,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let numeric = option.as_deref() == Some("--numeric-controls");
     let focus = option.as_deref() == Some("--focus-events");
     let keyboard = option.as_deref() == Some("--keyboard-events");
+    let mouse = option.as_deref() == Some("--mouse-events");
     let accelerators = option.as_deref() == Some("--accelerators");
     let routing = option.as_deref() == Some("--keyboard-routing");
     let text_controls = option.as_deref() == Some("--text-controls");
@@ -32,7 +33,8 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             "--focus-events" | "--text-controls" | "--password-text" | "--numeric-controls"
             | "--list-controls" | "--multi-select" | "--combo-controls" | "--metadata"
             | "--frame-controls" | "--tab-controls" | "--page-controls" | "--image-controls"
-            | "--refedit-controls" | "--keyboard-events" | "--keyboard-routing" | "--accelerators",
+            | "--refedit-controls" | "--keyboard-events" | "--keyboard-routing" | "--accelerators"
+            | "--mouse-events",
         ) => false,
         Some(_) => return Err("unknown fixture option".into()),
     };
@@ -54,12 +56,15 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         "Stop\r\nDebug.Print Check1.Value\r\nDebug.Print ChoiceA.Value\r\nDebug.Print ChoiceB.Value\r\nDebug.Print Toggle1.Value"
     } else if text_controls {
         "Stop\r\nDebug.Print Len(Entry.Text)\r\nDebug.Print Entry.SelStart\r\nDebug.Print Entry.SelLength"
-    } else if focus {
+    } else if focus || mouse {
         "Debug.Print Entry.Text"
     } else {
         "Stop\r\nDebug.Print Entry.Text"
     };
     let mut text = String::from_utf8(fixture::export())?.replace("Debug.Print Entry.Text", body);
+    if mouse {
+        text.push_str("\r\nPrivate Sub Apply_MouseDown(ByVal Button As Integer,ByVal Shift As Integer,ByVal X As Single,ByVal Y As Single)\r\nDebug.Print \"down\"\r\nStop\r\nEnd Sub\r\nPrivate Sub Apply_MouseUp(ByVal Button As Integer,ByVal Shift As Integer,ByVal X As Single,ByVal Y As Single)\r\nDebug.Print \"up\"\r\nEnd Sub\r\n");
+    }
     if accelerators {
         text = text.replace(
             "Debug.Print \"initialized\"",

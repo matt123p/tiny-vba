@@ -290,3 +290,11 @@ caption underlines. Duplicate routing explicitly refuses; non-ASCII/platform and
 further ordering cases remain open. Checklist K03 is PARTIAL; M7A.4 remains in
 progress, edited persistence/removal remain M7A.5/.6 and Office observations remain
 M8.5 NOT_RUN.
+
+
+[ADR 0073](decisions/0073-native-mouse-callbacks.md) adds typed native mouse events,
+indexed Tab/MultiPage arguments, mutable DblClick cancellation and canonical
+completion receipts. Selected shared pointer capture/default paths preserve
+Stop/Continue, Reset, identity and keyboard focus; remaining text/list/numeric/
+indexed-tab/platform defaults and full event ordering keep M01 PARTIAL. M7A.4
+remains incomplete and fresh Office observations remain M8.5 NOT_RUN.

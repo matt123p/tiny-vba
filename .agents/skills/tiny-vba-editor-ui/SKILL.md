@@ -283,3 +283,10 @@ queue raw Alt even without keyboard listeners and preserve web text/key pairing.
 Actions use ordinary VBA focus/validation/event frames and existing authorization.
 Duplicate routing refuses explicitly; keep K03 partial and do not claim full
 platform/Unicode/event-order or milestone parity.
+
+ADR 0073 adds typed mouse callbacks and selected simple-control pointer capture.
+Retain only bounded raw input/identity/geometry; canonical receipts and all control
+values remain in ordinary classes. Capture survives callback Stop and coordinates
+retain their declared basis. Keep keyboard focus through a bookmark, validate
+receivers before dispatch and suppress cancelled/stale defaults. Text/list/numeric/
+indexed-tab defaults, mixed/platform ordering and full M7A.4 remain open.

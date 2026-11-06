@@ -85,6 +85,14 @@ impl Ide {
         }
         for (enum_name, constants) in [
             (
+                "fmButton",
+                &[
+                    ("fmButtonLeft", 1),
+                    ("fmButtonRight", 2),
+                    ("fmButtonMiddle", 4),
+                ][..],
+            ),
+            (
                 "fmShiftState",
                 &[("fmShiftMask", 1), ("fmCtrlMask", 2), ("fmAltMask", 4)][..],
             ),
@@ -363,6 +371,11 @@ impl Ide {
                 _ => vec!["Click".into()],
             });
             if let Some(events) = &mut specific.event_names {
+                if kind != ControlKind::Page {
+                    events.extend(
+                        ["MouseDown", "MouseMove", "MouseUp", "DblClick"].map(str::to_owned),
+                    );
+                }
                 if crate::form_keyboard::eligible(kind) {
                     events.extend(["KeyDown", "KeyPress", "KeyUp"].map(str::to_owned));
                 }
