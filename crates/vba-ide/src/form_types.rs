@@ -85,6 +85,10 @@ impl Ide {
         }
         for (enum_name, constants) in [
             (
+                "fmShiftState",
+                &[("fmShiftMask", 1), ("fmCtrlMask", 2), ("fmAltMask", 4)][..],
+            ),
+            (
                 "fmPictureSizeMode",
                 &[
                     ("fmPictureSizeModeClip", 0),
@@ -359,6 +363,9 @@ impl Ide {
                 _ => vec!["Click".into()],
             });
             if let Some(events) = &mut specific.event_names {
+                if crate::form_keyboard::eligible(kind) {
+                    events.extend(["KeyDown", "KeyPress", "KeyUp"].map(str::to_owned));
+                }
                 for event in ["Enter", "Exit", "BeforeUpdate", "AfterUpdate"] {
                     if crate::form_focus::event(kind, event).is_some() {
                         events.push(event.into());

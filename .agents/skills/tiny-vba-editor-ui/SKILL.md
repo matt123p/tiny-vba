@@ -264,3 +264,10 @@ range import. Import and rendering remain inert; GridCraft owns cell commands,
 trust and revision-driven callbacks. The owner approved 4,096 static permission
 entries on 2026-11-05; per-site authorization and executed-call/work/memory limits
 remain in force. Further binding timing/types and the broader M7A.4 ledger remain open.
+
+ADR 0070 adds native typed keyboard events. Keep mutable ReturnInteger and
+completion receipts in ordinary VBA frames/fields; UI queues only bounded raw
+input and waits before default widget processing. Inspection must not execute
+getters. Preserve Stop/Continue/Reset, injected ANSI services, distinct paste/IME
+input and existing host trust checks. Keyboard/platform and the full M7A.4
+completion checklist remain partial until their executable acceptance passes.

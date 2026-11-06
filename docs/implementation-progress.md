@@ -1,5 +1,17 @@
 # Implementation progress
 
+## M7A.4 continued — native keyboard callbacks (2026-11-06)
+
+ADR 0070 adds ordinary typed KeyDown/KeyPress/KeyUp callbacks, mutable
+ReturnInteger arguments, canonical completion receipts and a bounded raw-input
+barrier before egui widget edits. Shared full CI/WASM/WASI, the final eight-case
+keyboard target natively and in WASI, all 24 native form UI cases and UI/native/
+web gates PASS. An actual Chromium Stop/Continue/replacement workflow passes;
+paused/resumed renders were inspected. Host acceptance is being integrated;
+no full M7A.4 completion or new Office observation is claimed. Remaining keyboard
+platform/shortcut/focus/IME cases, accelerators, mouse, lifecycle and other
+acceptance rows stay open in the completion checklist.
+
 ## M7A.4 continued — UserForms without form components (2026-11-06)
 
 Shared implementation and validation PASS under ADR 0069. All seven authored

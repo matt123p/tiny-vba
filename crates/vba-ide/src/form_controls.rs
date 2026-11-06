@@ -211,6 +211,9 @@ pub(crate) fn control_class(kind: ControlKind, ranges: bool) -> String {
             s.push_str(&format!("Public Event {declared}({parameters})\nPublic Sub VbaRaise{event}({parameters})\nRaiseEvent {declared}{arguments}\nEnd Sub\n"));
         }
     }
+    if crate::form_keyboard::eligible(kind) {
+        s.push_str(&crate::form_keyboard::control_members());
+    }
     if kind == ControlKind::Frame {
         s.push_str("Public Event AddControl\nPublic Event RemoveControl(ByVal control As MSForms.Control)\nPublic Sub VbaNotifyControl(ByVal added As Boolean,ByVal control As MSForms.Control)\nIf added Then\nRaiseEvent AddControl\nElse\nRaiseEvent RemoveControl(control)\nEnd If\nEnd Sub\n");
     }

@@ -332,3 +332,10 @@ code tokens; normal binding resolves shadows. Runtime selection uses verified
 class/source identity, never mutable source during ticks. Preserve Reset, inert
 inspection, wrapped callback waits/identity, existing budgets and no extra object
 registry. Fresh comparisons remain M8.5; use the M7A.4 completion checklist.
+
+ADR 0070 adds native typed keyboard events. Keep mutable ReturnInteger and
+completion receipts in ordinary VBA frames/fields; UI queues only bounded raw
+input and waits before default widget processing. Inspection must not execute
+getters. Preserve Stop/Continue/Reset, injected ANSI services, distinct paste/IME
+input and existing host trust checks. Keyboard/platform and the full M7A.4
+completion checklist remain partial until their executable acceptance passes.

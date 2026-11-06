@@ -60,6 +60,7 @@ impl Command {
                     FormCommand::Run(..)
                         | FormCommand::Event(..)
                         | FormCommand::InstanceEvent(..)
+                        | FormCommand::InstanceKey(..)
                         | FormCommand::InstanceFocus(..)
                         | FormCommand::InstanceActivate(..)
                         | FormCommand::InstanceText(..)
@@ -247,6 +248,7 @@ pub struct EditorUi {
     pub range_selection_enabled: bool,
     pub form_report: Option<FormLayoutReport>,
     form_modal: bool,
+    form_keys: forms::keyboard::Keyboard,
     form_last_focus: Option<egui::Id>,
     form_active_control: Vec<(vba_ide::FormInstance, Option<vba_ide::ObjectRef>)>,
     form_picture_textures: Vec<(std::sync::Weak<[u8]>, egui::TextureHandle)>,
@@ -325,6 +327,7 @@ impl Default for EditorUi {
             range_selection_enabled: false,
             form_report: None,
             form_modal: true,
+            form_keys: Default::default(),
             form_drag: None,
             form_runtime_focus: vec![],
             form_picture_textures: vec![],

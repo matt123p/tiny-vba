@@ -4,9 +4,10 @@ use crate::{
     *,
 };
 use vba_foreign::{Completion, ForeignError, HostCall, Reply};
-#[derive(Clone, PartialEq, Eq)]
+#[derive(Clone, PartialEq)]
 enum FormInput {
     Physical,
+    Key(Vec<Value>),
     Refresh(Vec<ObjectRef>),
     Focus,
     Activate,
@@ -615,6 +616,30 @@ pub(crate) fn checked_handlers(
             "userform_queryclose",
         ]
         .contains(&key.as_str());
+        let keyboard = if native {
+            p.name
+                .spelling
+                .get(..9)
+                .filter(|prefix| prefix.eq_ignore_ascii_case("UserForm_"))
+                .and_then(|_| p.name.spelling.get(9..))
+                .and_then(crate::form_keyboard::event)
+                .or_else(|| {
+                    form.controls
+                        .iter()
+                        .filter(|c| crate::form_keyboard::eligible(c.kind))
+                        .find_map(|c| {
+                            let prefix = format!("{}_", c.name);
+                            p.name
+                                .spelling
+                                .get(..prefix.len())
+                                .filter(|name| name.eq_ignore_ascii_case(&prefix))
+                                .and_then(|_| p.name.spelling.get(prefix.len()..))
+                                .and_then(crate::form_keyboard::event)
+                        })
+                })
+        } else {
+            None
+        };
         let focus = native
             .then(|| {
                 form.controls.iter().find_map(|c| {
@@ -655,6 +680,10 @@ pub(crate) fn checked_handlers(
                 })
             {
                 return Err(error("invalid native control collection event signature"));
+            }
+        } else if let Some(event) = keyboard {
+            if !crate::form_keyboard::valid_handler(p, event) {
+                return Err(error("invalid native keyboard event signature"));
             }
         } else if let Some((_, cancel)) = focus {
             if !crate::form_focus::valid_handler(p, cancel) {
@@ -1089,6 +1118,7 @@ fn compiled_form(
     }
     if native.is_some() {
         source.push_str(&crate::form_focus::members(form, &handlers));
+        source.push_str(&crate::form_keyboard::members(form, &handlers));
         source.push_str(crate::form_tabs::INPUT);
     }
     if ranges {
@@ -1118,7 +1148,7 @@ impl Ide {
             object: session.project_object(&form.form().name)?,
         })
     }
-    fn validate_form_instance(&self, instance: FormInstance) -> Result<()> {
+    pub(crate) fn validate_form_instance(&self, instance: FormInstance) -> Result<()> {
         let form = self
             .forms
             .get(&instance.source)
@@ -1502,7 +1532,17 @@ impl Ide {
                 .is_some()
                 .then(|| crate::form_focus::event(c.kind, event))
                 .flatten();
-            let canonical = if let Some(name) = crate::form_numeric::event(c.kind, event)
+            let keyboard = self
+                .native_form(id)
+                .is_some()
+                .then(|| {
+                    crate::form_keyboard::eligible(c.kind)
+                        .then(|| crate::form_keyboard::event(event))
+                        .flatten()
+                })
+                .flatten();
+            let canonical = if let Some(name) = keyboard
+                .or_else(|| crate::form_numeric::event(c.kind, event))
                 .or_else(|| crate::form_list::event(c.kind, event))
                 .or_else(|| crate::form_refedit::event(c.kind, event))
                 .or_else(|| crate::form_tabs::event(c.kind, event))
@@ -1524,7 +1564,9 @@ impl Ide {
             };
             (
                 format!("{}_{}", c.name, canonical),
-                if focus.is_some_and(|(_, cancel)| cancel) {
+                if keyboard.is_some() {
+                    crate::form_keyboard::parameters(canonical)
+                } else if focus.is_some_and(|(_, cancel)| cancel) {
                     "ByVal Cancel As MSForms.ReturnBoolean"
                 } else if crate::form_tabs::indexed(c.kind, canonical) {
                     "ByVal Index As Long"
@@ -1539,13 +1581,18 @@ impl Ide {
                 "Deactivate",
                 "Terminate",
                 "QueryClose",
+                "KeyDown",
+                "KeyPress",
+                "KeyUp",
             ]
             .into_iter()
             .find(|e| e.eq_ignore_ascii_case(event))
             .ok_or_else(|| error("unsupported form event"))?;
             (
                 format!("UserForm_{canonical}"),
-                if canonical == "QueryClose" {
+                if crate::form_keyboard::event(canonical).is_some() {
+                    crate::form_keyboard::parameters(canonical)
+                } else if canonical == "QueryClose" {
                     "Cancel As Integer, CloseMode As Integer"
                 } else {
                     ""
@@ -2408,6 +2455,18 @@ impl Ide {
         };
         session.read_instance_field(tab, field)
     }
+    pub(crate) fn deliver_form_key(
+        &mut self,
+        instance: FormInstance,
+        control: Option<u32>,
+        arguments: Vec<Value>,
+        host: &mut impl Host,
+    ) -> Result<()> {
+        if self.native_form(instance.source).is_none() {
+            return Err(error("keyboard input requires a native form"));
+        }
+        self.deliver_form_input(instance, control, None, FormInput::Key(arguments), host)
+    }
     fn deliver_form_input(
         &mut self,
         instance: FormInstance,
@@ -2550,7 +2609,21 @@ impl Ide {
             {
                 return Err(error("drop-list ComboBox does not accept typed text"));
             }
-            if let FormInput::Tab(tab) = input {
+            if let FormInput::Key(ref values) = input {
+                if !crate::form_keyboard::eligible(c.kind) {
+                    return Err(error("control cannot receive keyboard input"));
+                }
+                let index = form
+                    .controls
+                    .iter()
+                    .position(|c| c.id == id)
+                    .and_then(|index| i32::try_from(index).ok())
+                    .ok_or_else(|| error("keyboard control index"))?;
+                object = instance.object;
+                let mut args = vec![Value::Long(index)];
+                args.extend(values.iter().cloned());
+                ("VbaKeyInput", args)
+            } else if let FormInput::Tab(tab) = input {
                 if !matches!(c.kind, ControlKind::TabStrip | ControlKind::MultiPage) {
                     return Err(error("tab input requires a TabStrip"));
                 }
@@ -2673,6 +2746,10 @@ impl Ide {
                 }
                 ("VbaClick", vec![])
             }
+        } else if let FormInput::Key(ref values) = input {
+            let mut args = vec![Value::Long(-1)];
+            args.extend(values.iter().cloned());
+            ("VbaKeyInput", args)
         } else if let FormInput::Refresh(ref targets) = input {
             let upper = i32::try_from(
                 targets

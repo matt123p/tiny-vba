@@ -20,6 +20,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let list = option.as_deref() == Some("--list-controls") || multiple;
     let numeric = option.as_deref() == Some("--numeric-controls");
     let focus = option.as_deref() == Some("--focus-events");
+    let keyboard = option.as_deref() == Some("--keyboard-events");
     let text_controls = option.as_deref() == Some("--text-controls");
     let password = option.as_deref() == Some("--password-text");
     let boolean = match option.as_deref() {
@@ -29,7 +30,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             "--focus-events" | "--text-controls" | "--password-text" | "--numeric-controls"
             | "--list-controls" | "--multi-select" | "--combo-controls" | "--metadata"
             | "--frame-controls" | "--tab-controls" | "--page-controls" | "--image-controls"
-            | "--refedit-controls",
+            | "--refedit-controls" | "--keyboard-events",
         ) => false,
         Some(_) => return Err("unknown fixture option".into()),
     };
@@ -57,6 +58,13 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         "Stop\r\nDebug.Print Entry.Text"
     };
     let mut text = String::from_utf8(fixture::export())?.replace("Debug.Print Entry.Text", body);
+    if keyboard {
+        text = text.replace(
+            "Debug.Print \"initialized\"",
+            "Entry.Text=\"\"\r\nDebug.Print \"initialized\"",
+        );
+        text.push_str("\r\nPrivate Sub Entry_KeyPress(ByVal KeyANSI As MSForms.ReturnInteger)\r\nDebug.Print KeyANSI.Value\r\nStop\r\nKeyANSI.Value=90\r\nEnd Sub\r\n");
+    }
     if metadata {
         text = text.replace(
             " ClientHeight",

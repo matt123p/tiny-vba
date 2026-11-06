@@ -289,3 +289,7 @@ through normal project frames or authorized host calls, preserving errors and
 Stop/wait continuations. Public default functions and New value contexts use
 ordinary binding. Inert watches, host ownership and existing budgets are retained.
 Shared CI, WASM and actual WASI validation pass; the full M7A.4 ledger stays open.
+
+Native typed keyboard callbacks and the raw-input/default-processing barrier are
+implemented under [ADR 0070](decisions/0070-native-keyboard-events.md). Keyboard
+completion is still partial pending the remaining K01/K02 acceptance cases.

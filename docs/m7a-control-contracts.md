@@ -88,7 +88,8 @@ into permission to load a library.
 | UserForm QueryClose | Private Sub `UserForm_QueryClose(Cancel As Integer, CloseMode As Integer)`; ByRef | Existing shared cancellation contract reused | Native source/resource lifecycle comparisons M7A.4/M8.5 |
 | Native non-label Enter/Exit | Private Sub `control_Enter()` / `control_Exit(ByVal Cancel As MSForms.ReturnBoolean)` | Selected canonical focus and typed cancellation under ADR 0048 | Additional activation/container/redirection observations remain open |
 | Native TextBox validation | Private Sub `control_BeforeUpdate(ByVal Cancel As MSForms.ReturnBoolean)` / `control_AfterUpdate()` | User-input update/cancellation on focus transition; ordinary frames and mutable ByVal identity | Broader binding/coercion/update cases remain open |
-| Key / mouse / additional events | Microsoft Forms signatures, including ReturnBoolean/ReturnInteger where applicable | U; never approximate event argument objects | Exact typed packet and independent reference evidence required |
+| Native KeyDown / KeyPress / KeyUp | Private Sub with ByVal MSForms.ReturnInteger; Down/Up add typed Shift | ADR 0070: ordinary callbacks, static/dynamic WithEvents, cancellation/replacement and Stop/Reset receipts; bounded raw-input UI barrier | Full platform/shortcut/root-window/focus/IME acceptance remains partial |
+| Mouse / additional events | Microsoft Forms signatures, including ReturnBoolean/ReturnInteger where applicable | U; never approximate event argument objects | Exact typed packet and independent reference evidence required |
 
 Unknown handlers, wrong supported signatures and generated-support/member name
 collisions refuse attachment. Native export attributes are retained; generated

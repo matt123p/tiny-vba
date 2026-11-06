@@ -89,7 +89,8 @@ fn native_default_and_cancel_buttons_receive_enter_and_escape() -> R {
         let mut ide = Ide::new();
         ide.import_native_form_export(
             "NativeForm.frm",
-            &fixture::export(),
+            &String::from_utf8(fixture::export())?.replace(fixture::SOURCE,
+                &(fixture::SOURCE.to_owned()+"\nPrivate Sub Entry_KeyDown(ByVal KeyCode As MSForms.ReturnInteger,ByVal Shift As Integer)\nDebug.Print \"unexpected down\"\nEnd Sub\nPrivate Sub Entry_KeyUp(ByVal KeyCode As MSForms.ReturnInteger,ByVal Shift As Integer)\nDebug.Print \"unexpected up\"\nEnd Sub")).into_bytes(),
             1252,
             &[NativeFormResource {
                 name: "NativeForm.frx".into(),
@@ -1791,6 +1792,226 @@ fn native_multiselect_pointer_shift_arrows_and_space_preserve_canonical_selectio
             vba_ide::Value::Null
         );
         assert!(h.state().errors.is_empty(), "{:?}", h.state().errors);
+    }
+    Ok(())
+}
+
+#[test]
+fn native_keyboard_barrier_cancels_replaces_and_waits_for_debugger() -> R {
+    for (body, budget) in [
+        ("KeyANSI.Value=0", false),
+        ("KeyANSI.Value=90", false),
+        ("Stop\nKeyANSI.Value=0", false),
+        ("KeyANSI.Value=0", true),
+    ] {
+        let mut ide = Ide::new();
+        let source = format!(
+            "{}\nPrivate Sub Entry_KeyPress(ByVal KeyANSI As MSForms.ReturnInteger)\nDebug.Print \"press\"\n{body}\nEnd Sub\nPrivate Sub Entry_Change()\nDebug.Print \"change\"\nEnd Sub",
+            fixture::SOURCE
+        );
+        let export = String::from_utf8(fixture::export())?.replace(fixture::SOURCE, &source);
+        ide.import_native_form_export(
+            "NativeForm.frm",
+            export.as_bytes(),
+            1252,
+            &[NativeFormResource {
+                name: "NativeForm.frx".into(),
+                bytes: fixture::companion(),
+            }],
+        )?;
+        ide.add_module(
+            "Main.bas",
+            "Sub Main()\nNativeForm.Show 0\nNativeForm.Entry.SetFocus\nEnd Sub",
+        )?;
+        ide.dispatch(Action::Run, &mut NoHost)?;
+        for _ in 0..100 {
+            ide.tick(&mut NoHost)?;
+            if ide.mode() == Mode::Completed {
+                break;
+            }
+        }
+        let f = *ide.form_instances()?.first().ok_or("instance")?;
+        let mut h = Harness::builder()
+            .with_size(egui::vec2(1400., 1000.))
+            .build_ui_state(
+                |ui, s: &mut State| {
+                    for command in s.view.show(ui, &s.ide, Theme::light()) {
+                        if let Err(error) = apply(&mut s.ide, command, &mut NoHost) {
+                            s.errors.push(error.to_string());
+                        }
+                    }
+                    if let Err(error) = s.ide.tick(&mut NoHost) {
+                        s.errors.push(error.to_string());
+                    }
+                },
+                State {
+                    ide,
+                    view: EditorUi::default(),
+                    errors: vec![],
+                },
+            );
+        h.run_steps(5);
+        h.get(
+            egui_kittest::kittest::By::new()
+                .label("Entry")
+                .role(egui::accesskit::Role::TextInput),
+        )
+        .click();
+        h.run_steps(5);
+        h.event(egui::Event::Text(if budget {
+            "a".repeat(65)
+        } else {
+            "a".into()
+        }));
+        h.run_steps(12);
+        assert!(h.state().errors.is_empty(), "{:?}", h.state().errors);
+        if budget {
+            assert!(
+                h.state()
+                    .ide
+                    .messages
+                    .iter()
+                    .any(|message| message.contains("keyboard input budget exceeded"))
+            );
+            assert_eq!(h.state().ide.output(), vec!["initialized"]);
+            assert_eq!(
+                h.state().ide.form_instance_field(f, Some(12), "VbaText")?,
+                vba_ide::Value::String(vba_ide::VbaString::from_utf8("initial")?)
+            );
+            h.event(egui::Event::Text("a".into()));
+            h.run_steps(12);
+        }
+        if body.starts_with("Stop") {
+            assert_eq!(h.state().ide.mode(), Mode::Break);
+            assert_eq!(
+                h.state().ide.form_instance_field(f, Some(12), "VbaText")?,
+                vba_ide::Value::String(vba_ide::VbaString::from_utf8("initial")?)
+            );
+            h.state_mut().ide.dispatch(Action::Run, &mut NoHost)?;
+            h.run_steps(12);
+        }
+        let vba_ide::Value::String(text) =
+            h.state().ide.form_instance_field(f, Some(12), "VbaText")?
+        else {
+            return Err("text".into());
+        };
+        if body == "KeyANSI.Value=90" {
+            assert!(
+                String::from_utf16_lossy(text.units()).contains('Z'),
+                "{:?}",
+                text
+            );
+            assert_eq!(
+                h.state().ide.output(),
+                vec!["initialized", "press", "change"]
+            );
+        } else {
+            assert_eq!(text, vba_ide::VbaString::from_utf8("initial")?);
+            assert_eq!(h.state().ide.output(), vec!["initialized", "press"]);
+        }
+    }
+    Ok(())
+}
+
+#[test]
+fn native_raw_key_sequence_preserves_event_and_change_order() -> R {
+    for (cancelled, repeated) in [(false, false), (true, false), (false, true)] {
+        let mut ide = Ide::new();
+        let source = format!(
+            "{}\nPrivate Sub Entry_KeyDown(ByVal KeyCode As MSForms.ReturnInteger,ByVal Shift As Integer)\nDebug.Print \"down\",Shift\n{}\nEnd Sub\nPrivate Sub Entry_KeyPress(ByVal KeyANSI As MSForms.ReturnInteger)\nDebug.Print \"press\"\nEnd Sub\nPrivate Sub Entry_Change()\nDebug.Print \"change\"\nEnd Sub\nPrivate Sub Entry_KeyUp(ByVal KeyCode As MSForms.ReturnInteger,ByVal Shift As Integer)\nDebug.Print \"up\"\nEnd Sub",
+            fixture::SOURCE,
+            if cancelled { "KeyCode.Value=0" } else { "" }
+        );
+        let export = String::from_utf8(fixture::export())?.replace(fixture::SOURCE, &source);
+        ide.import_native_form_export(
+            "NativeForm.frm",
+            export.as_bytes(),
+            1252,
+            &[NativeFormResource {
+                name: "NativeForm.frx".into(),
+                bytes: fixture::companion(),
+            }],
+        )?;
+        ide.add_module(
+            "Main.bas",
+            "Sub Main()\nNativeForm.Show 0\nNativeForm.Entry.SetFocus\nEnd Sub",
+        )?;
+        ide.dispatch(Action::Run, &mut NoHost)?;
+        for _ in 0..100 {
+            ide.tick(&mut NoHost)?;
+            if ide.mode() == Mode::Completed {
+                break;
+            }
+        }
+        let mut h = Harness::builder()
+            .with_size(egui::vec2(1400., 1000.))
+            .build_ui_state(
+                |ui, s: &mut State| {
+                    for command in s.view.show(ui, &s.ide, Theme::light()) {
+                        if let Err(error) = apply(&mut s.ide, command, &mut NoHost) {
+                            s.errors.push(error.to_string());
+                        }
+                    }
+                    if let Err(error) = s.ide.tick(&mut NoHost) {
+                        s.errors.push(error.to_string());
+                    }
+                },
+                State {
+                    ide,
+                    view: EditorUi::default(),
+                    errors: vec![],
+                },
+            );
+        h.run_steps(5);
+        h.get(
+            egui_kittest::kittest::By::new()
+                .label("Entry")
+                .role(egui::accesskit::Role::TextInput),
+        )
+        .click();
+        h.run_steps(5);
+        let key = |pressed| egui::Event::Key {
+            key: egui::Key::A,
+            physical_key: Some(egui::Key::A),
+            pressed,
+            repeat: false,
+            modifiers: egui::Modifiers {
+                shift: true,
+                ..Default::default()
+            },
+        };
+        h.event(key(true));
+        h.event(egui::Event::Text("A".into()));
+        if repeated {
+            let mut repeat = key(true);
+            if let egui::Event::Key { repeat, .. } = &mut repeat {
+                *repeat = true;
+            }
+            h.event(repeat);
+            h.event(egui::Event::Text("A".into()));
+        }
+        h.event(key(false));
+        h.run_steps(30);
+        assert!(h.state().errors.is_empty(), "{:?}", h.state().errors);
+        assert_eq!(
+            h.state().ide.output(),
+            if cancelled {
+                vec!["initialized", "down\t1", "up"]
+            } else if repeated {
+                vec![
+                    "initialized",
+                    "down\t1",
+                    "press",
+                    "change",
+                    "down\t1",
+                    "press",
+                    "change",
+                    "up",
+                ]
+            } else {
+                vec!["initialized", "down\t1", "press", "change", "up"]
+            }
+        );
     }
     Ok(())
 }

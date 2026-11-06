@@ -73,27 +73,45 @@ pub(super) fn remap(
         value => Ok(value),
     }
 }
+type EventTarget = (u64, vba_values::ObjectRef, ir::ProcedureId);
 impl Session {
-    pub(super) fn raise_event(
-        &mut self,
-        procedure: ir::ProcedureId,
-        arguments: Vec<Operand>,
-    ) -> Result<()> {
-        self.reference_graph_dirty = true;
-        let publisher = self
-            .top()?
-            .receiver
-            .ok_or_else(|| invariant("event publisher"))?;
-        let event = self
+    /// Inert, bounded metadata inspection; never invokes getters or activates objects.
+    pub fn has_instance_procedure(
+        &self,
+        object: vba_values::ObjectRef,
+        name: &str,
+    ) -> Result<bool> {
+        if name.len() > 128 {
+            return Err(command("procedure name limit"));
+        }
+        let instance = self.instance_object(object)?;
+        let class = self
             .program
             .program()
-            .procedures
-            .get(procedure.0 as usize)
-            .ok_or_else(|| invariant("event signature"))?;
-        let event_name = event
-            .name
-            .strip_prefix("Event ")
-            .ok_or_else(|| invariant("event name"))?;
+            .classes
+            .iter()
+            .find(|class| class.source == instance.source)
+            .ok_or_else(|| invariant("procedure class"))?;
+        Ok(class.methods.iter().any(|method| {
+            method.kind == ir::ForeignKind::Call && method.name.eq_ignore_ascii_case(name)
+        }))
+    }
+    /// Use the same eligibility/exposure/connection selection as RaiseEvent.
+    pub fn has_project_event_handlers(
+        &self,
+        object: vba_values::ObjectRef,
+        event: &str,
+    ) -> Result<bool> {
+        if event.len() > 128 {
+            return Err(command("event name limit"));
+        }
+        Ok(!self.project_event_deliveries(object, event)?.0.is_empty())
+    }
+    fn project_event_deliveries(
+        &self,
+        publisher: vba_values::ObjectRef,
+        event_name: &str,
+    ) -> Result<(Vec<EventTarget>, u64)> {
         let publisher_type = self.instance_object(publisher)?;
         let mut deliveries = Vec::new();
         let mut work = u64::try_from(self.instances.len()).map_err(|_| resource())?;
@@ -194,6 +212,29 @@ impl Session {
                 ));
             }
         }
+        Ok((deliveries, work))
+    }
+    pub(super) fn raise_event(
+        &mut self,
+        procedure: ir::ProcedureId,
+        arguments: Vec<Operand>,
+    ) -> Result<()> {
+        self.reference_graph_dirty = true;
+        let publisher = self
+            .top()?
+            .receiver
+            .ok_or_else(|| invariant("event publisher"))?;
+        let event = self
+            .program
+            .program()
+            .procedures
+            .get(procedure.0 as usize)
+            .ok_or_else(|| invariant("event signature"))?;
+        let event_name = event
+            .name
+            .strip_prefix("Event ")
+            .ok_or_else(|| invariant("event name"))?;
+        let (mut deliveries, work) = self.project_event_deliveries(publisher, event_name)?;
         self.counters.instance_work = self
             .counters
             .instance_work

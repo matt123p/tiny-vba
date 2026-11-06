@@ -2,6 +2,7 @@
 use super::*;
 mod combo;
 mod images;
+pub(super) mod keyboard;
 mod list;
 mod numeric;
 mod refedit;
@@ -30,6 +31,7 @@ pub enum FormCommand {
     InstanceListSelection(vba_ide::FormInstance, u32, vba_ide::FormListInput),
     InstanceTab(vba_ide::FormInstance, u32, i32),
     InstanceNumeric(vba_ide::FormInstance, u32, vba_ide::FormNumericInput),
+    InstanceKey(vba_ide::FormInstance, Option<u32>, vba_ide::FormKeyInput),
     InstanceText(vba_ide::FormInstance, u32, vba_ide::VbaString, (u32, u32)),
 }
 pub(super) fn apply_form(
@@ -74,6 +76,9 @@ pub(super) fn apply_form(
         FormCommand::Handler(id, c, event) => ide.generate_form_handler(id, c, &event),
         FormCommand::Run(id, modal) => ide.run_form(id, modal, host),
         FormCommand::Event(id, c, text) => ide.form_event(id, c, text, host),
+        FormCommand::InstanceKey(instance, control, input) => ide
+            .form_instance_key(instance, control, input, host)
+            .map(|_| ()),
         FormCommand::InstanceText(instance, control, text, selection) => {
             ide.form_instance_text(instance, control, text, selection, host)
         }
@@ -885,11 +890,15 @@ impl EditorUi {
         if matches!(ide.mode(), Mode::Break | Mode::Stale) {
             // Paused controls do not execute, but their stable IDs restore focus before input.
             if ide.mode() == Mode::Stale {
+                self.form_keys.clear();
                 self.form_runtime_focus.clear();
             }
             self.form_last_focus = None;
             self.form_active_control.clear();
             return;
+        }
+        if matches!(ide.mode(), Mode::Design | Mode::Failed) {
+            self.form_keys.clear();
         }
         let previous_active = std::mem::take(&mut self.form_active_control);
         let last_focus = self.form_last_focus.take();
@@ -914,6 +923,9 @@ impl EditorUi {
                     .copied()
                     .find(|instance| ide.form_instance_visible(*instance))
             });
+        let key_blocked = self
+            .form_keys
+            .step(ctx, ide, keyboard_owner, &previous_focus, commands);
         for instance in instances {
             let id = instance.source;
             let Some(designer) = ide.form(id).filter(|_| ide.form_instance_visible(instance))
@@ -925,7 +937,8 @@ impl EditorUi {
             };
             let form = &runtime_form;
             let _ = designer;
-            let idle = ide.form_instance_can_deliver(instance);
+            let idle = ide.form_instance_can_deliver(instance)
+                && !(key_blocked && keyboard_owner == Some(instance));
             let native = ide.native_form(id).is_some();
             if let Some((owner, control)) = ide
                 .form_range_selection()
@@ -1451,7 +1464,7 @@ impl EditorUi {
                         let active = ide.form_instance_field(instance, None, "VbaActiveControl").ok();
                         let active_id = focus.iter().find(|(_, control, _)| form.controls.iter().find(|c| c.id == *control).is_some_and(|c| ide.form_instance_control_object(instance,c.id).ok().map(vba_ide::Value::Object) == active));
                         let requested = focus.iter().find(|(_, _, target)| Some(*target) == focused);
-                        let pending = commands.iter().any(|command| matches!(command, Command::Form(FormCommand::InstanceFocus(owner, _) | FormCommand::InstanceActivate(owner, _) | FormCommand::InstanceText(owner, _, _, _) | FormCommand::InstanceNumeric(owner, _, _) | FormCommand::InstanceList(owner, _, _) | FormCommand::InstanceListSelection(owner, _, _) | FormCommand::InstanceTab(owner, _, _) | FormCommand::InstanceDrop(owner, _, _) | FormCommand::InstanceNavigate(owner, _, _) | FormCommand::InstanceEvent(owner, _, _)) if *owner == instance));
+                        let pending = commands.iter().any(|command| matches!(command, Command::Form(FormCommand::InstanceKey(owner, _, _) | FormCommand::InstanceFocus(owner, _) | FormCommand::InstanceActivate(owner, _) | FormCommand::InstanceText(owner, _, _, _) | FormCommand::InstanceNumeric(owner, _, _) | FormCommand::InstanceList(owner, _, _) | FormCommand::InstanceListSelection(owner, _, _) | FormCommand::InstanceTab(owner, _, _) | FormCommand::InstanceDrop(owner, _, _) | FormCommand::InstanceNavigate(owner, _, _) | FormCommand::InstanceEvent(owner, _, _)) if *owner == instance));
                         if let Some((_, control, _)) = requested && requested != active_id && !pending {
                             commands.push(Command::Form(FormCommand::InstanceFocus(instance, *control)));
                         }

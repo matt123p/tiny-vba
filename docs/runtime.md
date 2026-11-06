@@ -551,3 +551,7 @@ semantic shadowing, compiled identity, inert inspection, host ownership and
 existing budgets remain authoritative. Shared/host acceptance is tracked in
 progress; [the completion checklist](m7a4-completion-checklist.md) retains the
 full remaining M7A.4 scope. No new IR, format or control library is introduced.
+
+Native typed keyboard callbacks and the raw-input/default-processing barrier are
+implemented under [ADR 0070](decisions/0070-native-keyboard-events.md). Keyboard
+completion is still partial pending the remaining K01/K02 acceptance cases.
