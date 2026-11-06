@@ -470,3 +470,8 @@ database comparison is unsupported. Tests use the deterministic test double and
 make no Office locale or error-number claim.
 
 Next task: S6 string edge/case/reverse/repetition functions.
+
+ADR 0070 integration correction: UTF-16 string storage is not an ANSI code page.
+Asc/Chr preserve ASCII in that context; non-ASCII ANSI conversion requires an
+explicit configured code page. AscB/ChrB/LenB retain their byte representation
+contract, and AscW/ChrW retain their Unicode contract.

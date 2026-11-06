@@ -2117,7 +2117,7 @@ pub(crate) fn string_intrinsic_with_context(
             let first_character =
                 VbaString::from_units(units.get(..width).ok_or_else(mismatch)?.to_vec())
                     .map_err(|_| mismatch())?;
-            if function == F::Asc && is_unconfigured_code_page(code_page) {
+            if function == F::Asc && is_utf16_code_page(code_page) {
                 if width == 1 && first_unit <= 0x7f {
                     return Ok(V::Integer(
                         i16::try_from(first_unit).map_err(|_| overflow())?,
@@ -2147,6 +2147,14 @@ pub(crate) fn string_intrinsic_with_context(
         }
         F::Chr | F::ChrDollar => {
             let number = argument_integer(first, i128::from(i16::MIN), i128::from(u16::MAX))?;
+            if is_utf16_code_page(code_page) {
+                if (0..=0x7f).contains(&number) {
+                    return make_string(vec![u16::try_from(number).map_err(|_| overflow())?]);
+                }
+                return Err(Error::Unsupported(
+                    "Chr for non-ASCII codes requires a configured ANSI code page".into(),
+                ));
+            }
             let bytes = if (0..=i128::from(u8::MAX)).contains(&number) {
                 vec![u8::try_from(number).map_err(|_| overflow())?]
             } else {
@@ -2276,12 +2284,6 @@ fn is_utf16_code_page(code_page: &str) -> bool {
     matches!(
         code_page.to_ascii_lowercase().as_str(),
         "utf-16" | "utf-16le" | "unicode" | "unconfigured" | "invariant"
-    )
-}
-fn is_unconfigured_code_page(code_page: &str) -> bool {
-    matches!(
-        code_page.to_ascii_lowercase().as_str(),
-        "unconfigured" | "invariant"
     )
 }
 fn code_page_encoding(code_page: &str) -> Result<&'static encoding_rs::Encoding> {

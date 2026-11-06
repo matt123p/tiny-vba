@@ -46,3 +46,13 @@ Shared validation PASS: full CI, WASM compilation, actual WASI suite and the
 final eight-case keyboard target, all 24 native form UI cases, UI/native/web
 gates and an actual Chromium stopped-KeyPress/replacement workflow. Paused and
 resumed captures were inspected. Host pins and acceptance are recorded separately.
+
+Host integration found UTF-16 context incorrectly feeding its stored bytes into
+Asc as a DBCS character (ASCII a became 24832). The runtime now treats UTF-16
+storage as lacking an ANSI code page: Asc/Chr preserve ASCII and refuse non-ASCII
+ANSI conversion until a genuine code page is configured. AscB/ChrB/LenB and
+byte-string storage retain their existing representation contract; configured
+Windows-1252 and Shift-JIS behavior stays covered by the runtime suite. This
+shared intrinsic correction applies equally inside and outside keyboard handlers.
+See the primary [Asc](https://learn.microsoft.com/en-us/office/vba/language/reference/user-interface-help/asc-function)
+and [Chr](https://learn.microsoft.com/en-us/office/vba/language/reference/user-interface-help/chr-function) references.

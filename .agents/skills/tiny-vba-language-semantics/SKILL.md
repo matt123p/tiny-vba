@@ -339,3 +339,7 @@ input and waits before default widget processing. Inspection must not execute
 getters. Preserve Stop/Continue/Reset, injected ANSI services, distinct paste/IME
 input and existing host trust checks. Keyboard/platform and the full M7A.4
 completion checklist remain partial until their executable acceptance passes.
+
+Do not interpret UTF-16 string storage as an ANSI code page for Asc/Chr. Preserve
+ASCII; require a configured ANSI encoding for non-ASCII. Byte variants keep their
+existing representation, independently of the ANSI character contract (ADR 0070).

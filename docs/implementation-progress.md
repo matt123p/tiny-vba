@@ -7,7 +7,9 @@ ReturnInteger arguments, canonical completion receipts and a bounded raw-input
 barrier before egui widget edits. Shared full CI/WASM/WASI, the final eight-case
 keyboard target natively and in WASI, all 24 native form UI cases and UI/native/
 web gates PASS. An actual Chromium Stop/Continue/replacement workflow passes;
-paused/resumed renders were inspected. Host acceptance is being integrated;
+paused/resumed renders were inspected. Host integration additionally found and corrected UTF-16 storage being used
+as an ANSI Asc/Chr code page; ASCII is stable and non-ASCII ANSI requires an
+explicit code page. Host acceptance is being integrated;
 no full M7A.4 completion or new Office observation is claimed. Remaining keyboard
 platform/shortcut/focus/IME cases, accelerators, mouse, lifecycle and other
 acceptance rows stay open in the completion checklist.

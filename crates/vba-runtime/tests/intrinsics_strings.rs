@@ -1468,3 +1468,34 @@ fn m6a8_strconv_case_width_kana_and_codepage_flags() -> TestResult {
     ));
     Ok(())
 }
+
+#[test]
+fn ansi_character_intrinsics_do_not_treat_utf16_storage_as_an_ansi_code_page() -> TestResult {
+    for code_page in ["UTF-16", "UTF-16LE", "unicode", "invariant", "unconfigured"] {
+        assert_eq!(
+            checked_string_call(I::Asc, &[Some(string("a")?)], "invariant", code_page)?,
+            V::Integer(97)
+        );
+        assert_eq!(
+            checked_string_call(I::Chr, &[Some(V::Integer(97))], "invariant", code_page)?,
+            string("a")?
+        );
+        assert!(matches!(
+            contextual_string_call(I::Asc, &[Some(string("é")?)], "invariant", code_page),
+            Err(Error::Unsupported(_))
+        ));
+        assert!(matches!(
+            contextual_string_call(I::Chr, &[Some(V::Integer(233))], "invariant", code_page),
+            Err(Error::Unsupported(_))
+        ));
+        assert_eq!(
+            checked_string_call(I::AscB, &[Some(string("a")?)], "invariant", code_page)?,
+            V::Integer(97)
+        );
+        assert_eq!(
+            checked_string_call(I::LenB, &[Some(string("a")?)], "invariant", code_page)?,
+            V::Long(2)
+        );
+    }
+    Ok(())
+}

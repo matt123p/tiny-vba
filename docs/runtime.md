@@ -555,3 +555,7 @@ full remaining M7A.4 scope. No new IR, format or control library is introduced.
 Native typed keyboard callbacks and the raw-input/default-processing barrier are
 implemented under [ADR 0070](decisions/0070-native-keyboard-events.md). Keyboard
 completion is still partial pending the remaining K01/K02 acceptance cases.
+
+UTF-16 storage contexts do not supply an ANSI code page to Asc/Chr. ASCII works;
+non-ASCII ANSI conversion refuses without a configured ANSI encoding. The byte
+variants and Unicode AscW/ChrW contracts are unchanged (ADR 0070).
