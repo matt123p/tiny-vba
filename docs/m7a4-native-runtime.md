@@ -344,3 +344,11 @@ current callback owner, and Reset/unload discard stale defaults. The shared raw
 queue stays at 64, modal scope depth stays bounded by eight existing waits, and
 canonical state/receipts remain ordinary VBA. Selected nested lifecycle/input
 cases are covered; L02 and the full M7A.4 checklist remain partial.
+
+[ADR 0077](decisions/0077-native-window-activation.md) adds canonical native
+window activation, Show/Hide/modeless ordering, reentrant continuation guards,
+modal ownership before foreign waits and executable focus commands. Keyboard
+receipt ownership stays with its callback while later raw input follows the
+new active modeless window. External viewport focus and passive hover stay inert.
+Automatic document-canvas input barriers and the full L01/L02/M7A.4 checklist
+remain open; consumer acceptance is recorded separately in progress.

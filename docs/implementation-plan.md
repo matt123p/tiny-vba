@@ -91,6 +91,8 @@ and native save/reopen. See [ADR 0041](decisions/0041-worksheet-form-controls.md
   ADR 0074 adds selected TextBox pointer selection and native AutoWordSelect metadata.
   ADR 0075 adds selected composite/list/numeric/indexed-tab pointer defaults and
   retained modal display metadata without changing input ownership.
+  ADR 0077 adds selected native window activation and cross-modeless key continuations;
+  automatic document-input routing and full lifecycle acceptance remain open.
   ADR 0076 adds selected nested modal mouse/keyboard input continuations with
   shared raw-input bounds, held release, parent unload and Reset regressions. L02
   remains partial; all remaining lifecycle and control contracts stay open.

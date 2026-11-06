@@ -99,6 +99,9 @@ Dim control As Object,key As MSForms.ReturnInteger
 Set key=New VbaFormReturnInteger
 key.Value=value
 If Not VbaLoaded Or Not VbaVisible Then GoTo finished
+If phase=0 Then
+If Not VbaWindowEnter() Then GoTo finished
+End If
 If index>=0 Then
 Set control=VbaAllControls.Item(index)
 If Not (VbaActiveControl Is control) Then GoTo finished

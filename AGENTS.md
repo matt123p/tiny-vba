@@ -246,3 +246,10 @@ selection and authorization. Original source/resources stay separate. Broader
 RefEdit/platform/property/event/binding semantics and the unchanged M7A.4 ledger
 remain open. Native edited saving/removal stay M7A.5/.6; fresh Office traces stay
 NOT_RUN under M8.5.
+
+ADR 0077 adds canonical native window activation and separate keyboard receipt/
+destination ownership. Activation commands execute VBA and retain existing trust
+checks. External viewport focus and passive hover stay inert. Embedders must
+apply document activation before document input; automatic raw document barriers
+remain open. Preserve reentrant transition guards, modal ownership and bounded
+raw input; L01/L02 and full M7A.4 remain partial.

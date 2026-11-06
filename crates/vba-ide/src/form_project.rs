@@ -7,6 +7,7 @@ use vba_foreign::{Completion, ForeignError, HostCall, Reply};
 #[derive(Clone, PartialEq)]
 enum FormInput {
     Physical,
+    Window(bool),
     Key(Vec<Value>),
     Mouse(Vec<Value>),
     Refresh(Vec<ObjectRef>),
@@ -806,6 +807,9 @@ fn compiled_form(
         });
     source.push_str("Private Sub Class_Initialize()\nVbaLoaded=True\nVbaVisible=False\nSet VbaControls=New VbaFormControls\n");
     if native.is_some() {
+        source.push_str("VbaWindowNative=True\nVbaWindowActive=False\nVbaWindowModal=False\n");
+    }
+    if native.is_some() {
         source.push_str(
             "Set VbaContext=New VbaFormControlContext\nSet VbaControls.VbaContext=VbaContext\n",
         );
@@ -1030,18 +1034,36 @@ fn compiled_form(
         }
     }
     source.push_str(&call("UserForm_Initialize"));
-    source.push_str("End Sub\nPublic Sub VbaLoad()\nIf Not VbaLoaded Then Class_Initialize\nEnd Sub\nPublic Sub Show(Optional ByVal modal As Variant=1)\nIf modal<>0 And modal<>1 Then\nErr.Raise 5\nEnd If\nIf Not VbaLoaded Then Class_Initialize\nIf VbaVisible Then\nIf modal=1 Then Err.Raise 400\nExit Sub\nEnd If\nSet VbaDisplayOwner=Me\nVbaVisible=True\n");
-    source.push_str(&call("UserForm_Activate"));
+    source.push_str("End Sub\nPublic Sub VbaLoad()\nIf Not VbaLoaded Then Class_Initialize\nEnd Sub\nPublic Sub Show(Optional ByVal modal As Variant=1)\nIf modal<>0 And modal<>1 Then\nErr.Raise 5\nEnd If\nIf Not VbaLoaded Then Class_Initialize\nIf VbaVisible Then\nIf modal=1 Then Err.Raise 400\n");
     if native.is_some() {
-        source.push_str("If VbaVisible And VbaLoaded Then VbaInitialFocus\n");
+        source.push_str("VbaFormUserForms.VbaSelectWindow Me\nVbaWindowFocusDefault\n");
+    }
+    source.push_str("Exit Sub\nEnd If\n");
+    if native.is_some() {
+        source.push_str("Dim VbaShowVersion As Long\nVbaWindowVersion=VbaWindowVersion+1\nVbaShowVersion=VbaWindowVersion\nVbaFormUserForms.VbaShowWindow Me,modal<>0\nIf VbaShowVersion<>VbaWindowVersion Then Exit Sub\n");
+    } else {
+        source.push_str("VbaVisible=True\n");
+    }
+    source.push_str("If Not VbaVisible Or Not VbaLoaded Then Exit Sub\nSet VbaDisplayOwner=Me\n");
+    if native.is_some() {
+        source.push_str("If VbaWindowActive Then VbaInitialFocus\nIf VbaShowVersion<>VbaWindowVersion Or Not VbaVisible Or Not VbaLoaded Then Exit Sub\n");
+    } else {
+        source.push_str(&call("UserForm_Activate"));
     }
     source.push_str("VbaFormWait Me,modal\nEnd Sub\nPublic Sub Hide()\nIf Not VbaLoaded Then Class_Initialize\nIf VbaVisible Then\nVbaVisible=False\n");
-    source.push_str(&call("UserForm_Deactivate"));
-    source.push_str("End If\nSet VbaDisplayOwner=Nothing\nEnd Sub\nPublic Property Get Visible() As Boolean\nVisible=VbaVisible\nEnd Property\nPublic Sub VbaClose(ByVal closeMode As Integer)\nIf Not VbaLoaded Then Exit Sub\nDim cancel As Integer\n");
+    if native.is_some() {
+        source.push_str("VbaWindowVersion=VbaWindowVersion+1\nVbaWindowModal=False\nVbaFormUserForms.VbaRetireWindow Me,True\nVbaFormUserForms.VbaRestoreWindow\n");
+    } else {
+        source.push_str(&call("UserForm_Deactivate"));
+    }
+    source.push_str("End If\nIf Not VbaVisible Then Set VbaDisplayOwner=Nothing\nEnd Sub\nPublic Property Get Visible() As Boolean\nVisible=VbaVisible\nEnd Property\nPublic Sub VbaClose(ByVal closeMode As Integer)\nIf Not VbaLoaded Then Exit Sub\nDim cancel As Integer\n");
     if handlers.contains("userform_queryclose") {
         source.push_str("UserForm_QueryClose cancel,closeMode\n");
     }
     source.push_str("If cancel=0 Then\nVbaVisible=False\nSet VbaDisplayOwner=Nothing\n");
+    if native.is_some() {
+        source.push_str("VbaWindowVersion=VbaWindowVersion+1\nVbaWindowModal=False\nVbaFormUserForms.VbaRetireWindow Me,False\n");
+    }
     source.push_str("VbaLoaded=False\n");
     if native.is_some() {
         source.push_str("Set VbaActiveControl=Nothing\n");
@@ -1052,7 +1074,11 @@ fn compiled_form(
     source.push_str("Set VbaControls=Nothing\nSet VbaAllControls=Nothing\n");
     // Unload drops the displayed state and its default reference, not aliased code state.
     source.push_str(&format!("VbaFormRelease {},Me\n", quoted(&form.name)));
+    if native.is_some() {
+        source.push_str("VbaFormUserForms.VbaRestoreWindow\n");
+    }
     source.push_str("End If\nEnd Sub\n");
+    source.push_str(&crate::form_window::members(&handlers, native.is_some()));
     source.push_str(crate::form_container::ROOT);
     source.push_str("Private Function VbaLookup(ByVal key As Long) As Object\n");
     source.push_str("If key>0 Then\n");
@@ -2192,6 +2218,29 @@ impl Ide {
         };
         session.read_instance_field(object, field)
     }
+    /// Inert canonical window state; does not load forms or execute callbacks.
+    pub fn form_instance_window_active(&self, instance: FormInstance) -> bool {
+        self.form_instance_visible(instance)
+            && self
+                .form_instance_field(instance, None, "VbaWindowActive")
+                .is_ok_and(|value| value == Value::Boolean(true))
+    }
+    /// Current native window, inspected without constructing the UserForms singleton.
+    pub fn form_active_window(&self) -> Option<FormInstance> {
+        self.form_instances()
+            .ok()?
+            .into_iter()
+            .find(|instance| self.form_instance_window_active(*instance))
+    }
+    /// Window focus is executable input, separate from process/viewport activation.
+    pub fn form_instance_window_focus(
+        &mut self,
+        instance: FormInstance,
+        active: bool,
+        host: &mut impl Host,
+    ) -> Result<()> {
+        self.deliver_form_input(instance, None, None, FormInput::Window(active), host)
+    }
     pub fn form_is_modal(&self, id: SourceId) -> bool {
         self.default_form_instance(id)
             .is_ok_and(|instance| self.form_instance_is_modal(instance))
@@ -2213,10 +2262,45 @@ impl Ide {
     /// Retained display order, oldest to newest; this is not an input grant.
     pub fn form_instance_modal_rank(&self, instance: FormInstance) -> Option<usize> {
         self.validate_form_instance(instance).ok()?;
-        self.form_gate
+        if let Some(rank) = self
+            .form_gate
             .waits
             .values()
             .position(|object| *object == instance.object)
+        {
+            return Some(rank);
+        }
+        // Show sets canonical display modality before Activate, which may suspend.
+        if !self.form_instance_visible(instance)
+            || self
+                .form_instance_field(instance, None, "VbaWindowModal")
+                .ok()
+                != Some(Value::Boolean(true))
+        {
+            return None;
+        }
+        let Value::Long(order) = self
+            .form_instance_field(instance, None, "VbaWindowOrder")
+            .ok()?
+        else {
+            return None;
+        };
+        Some(
+            self.form_instances()
+                .ok()?
+                .into_iter()
+                .filter(|other| {
+                    self.form_instance_visible(*other)
+                        && self
+                            .form_instance_field(*other, None, "VbaWindowModal")
+                            .ok()
+                            == Some(Value::Boolean(true))
+                        && self
+                            .form_instance_field(*other, None, "VbaWindowOrder")
+                            .is_ok_and(|value| matches!(value,Value::Long(n) if n<order))
+                })
+                .count(),
+        )
     }
     pub fn form_can_deliver(&self, id: SourceId) -> bool {
         self.default_form_instance(id)
@@ -2587,6 +2671,7 @@ impl Ide {
     ) -> Result<()> {
         let focus = input == FormInput::Focus;
         let modal = self.form_instance_is_modal(instance);
+        let window_modal = self.form_instance_has_modal_window(instance);
         self.validate_form_instance(instance)?;
         let id = instance.source;
         if self.stale
@@ -2875,6 +2960,11 @@ impl Ide {
             let mut args = vec![Value::Long(-1)];
             args.extend(values.iter().cloned());
             ("VbaMouseInput", args)
+        } else if let FormInput::Window(active) = input {
+            if !self.native_forms.contains_key(&id) || !active && window_modal {
+                return Err(error("window focus requires an eligible native form"));
+            }
+            ("VbaWindowInput", vec![Value::Boolean(active)])
         } else if let FormInput::Refresh(ref targets) = input {
             let upper = i32::try_from(
                 targets

@@ -285,7 +285,10 @@ impl Mouse {
             return;
         }
         // A suspended parent's keyboard event cannot block its active child dialog.
-        let key_owner = key_owner.filter(|owner| top.is_none_or(|top| top == *owner));
+        let key_owner = key_owner.filter(|owner| {
+            top.or_else(|| ide.form_active_window())
+                .is_none_or(|top| top == *owner)
+        });
         let queue_limit = MAX_QUEUED.saturating_sub(
             self.parked
                 .iter()

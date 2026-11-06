@@ -322,3 +322,9 @@ current callback owner, and Reset/unload discard stale defaults. The shared raw
 queue stays at 64, modal scope depth stays bounded by eight existing waits, and
 canonical state/receipts remain ordinary VBA. Selected nested lifecycle/input
 cases are covered; L02 and the full M7A.4 checklist remain partial.
+
+ADR 0077 adds selected native Show/Hide/modeless Activate/Deactivate ordering,
+unload retirement without Deactivate, reentrant lifecycle guards and cross-window
+keyboard continuations. Inert inspection and executable window-focus commands
+retain existing trust. Automatic document-canvas input barriers, broader binding/
+collection/platform ordering and full M7A.4 acceptance remain open.

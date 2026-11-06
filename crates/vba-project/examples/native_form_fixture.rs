@@ -15,6 +15,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let tabs = option.as_deref() == Some("--tab-controls");
     let frames = option.as_deref() == Some("--frame-controls");
     let metadata = option.as_deref() == Some("--metadata");
+    let window_activation = option.as_deref() == Some("--window-activation");
     let nested_mouse = option.as_deref() == Some("--nested-mouse");
     let composite_mouse = option.as_deref() == Some("--composite-mouse");
     let combo = option.as_deref() == Some("--combo-controls") || composite_mouse;
@@ -33,11 +34,27 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         None => false,
         Some("--boolean-controls") => true,
         Some(
-            "--focus-events" | "--text-controls" | "--password-text" | "--numeric-controls"
-            | "--list-controls" | "--multi-select" | "--combo-controls" | "--metadata"
-            | "--frame-controls" | "--tab-controls" | "--page-controls" | "--image-controls"
-            | "--refedit-controls" | "--keyboard-events" | "--keyboard-routing" | "--accelerators"
-            | "--mouse-events" | "--text-mouse" | "--composite-mouse" | "--nested-mouse",
+            "--focus-events"
+            | "--text-controls"
+            | "--password-text"
+            | "--numeric-controls"
+            | "--list-controls"
+            | "--multi-select"
+            | "--combo-controls"
+            | "--metadata"
+            | "--frame-controls"
+            | "--tab-controls"
+            | "--page-controls"
+            | "--image-controls"
+            | "--refedit-controls"
+            | "--keyboard-events"
+            | "--keyboard-routing"
+            | "--accelerators"
+            | "--mouse-events"
+            | "--text-mouse"
+            | "--composite-mouse"
+            | "--nested-mouse"
+            | "--window-activation",
         ) => false,
         Some(_) => return Err("unknown fixture option".into()),
     };
@@ -69,6 +86,37 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         "Stop\r\nDebug.Print Entry.Text"
     };
     let mut text = String::from_utf8(fixture::export())?.replace("Debug.Print Entry.Text", body);
+    if window_activation {
+        text = String::from_utf8(fixture::export())?.replace(
+            fixture::SOURCE,
+            &r#"Attribute VB_Name = "NativeForm"
+Attribute VB_PredeclaredId = True
+Option Explicit
+Private started As Boolean
+Private Sub UserForm_Activate()
+Debug.Print Me.Caption & " active"
+If Not started And VBA.UserForms.Count=1 Then
+started=True
+Me.Hide
+Me.Caption="A"
+Me.Show 0
+Dim child As NativeForm
+Set child=New NativeForm
+child.Caption="B"
+child.Show 0
+End If
+End Sub
+Private Sub UserForm_Deactivate()
+Debug.Print Me.Caption & " inactive"
+End Sub
+Private Sub Apply_Click()
+Debug.Print Me.Caption & " clicked"
+Me.Hide
+End Sub
+"#
+            .replace("\n", "\r\n"),
+        );
+    }
     if nested_mouse {
         text = text.replace(
             "Debug.Print \"initialized\"",

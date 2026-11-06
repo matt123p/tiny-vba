@@ -353,3 +353,7 @@ current callback owner, and Reset/unload discard stale defaults. The shared raw
 queue stays at 64, modal scope depth stays bounded by eight existing waits, and
 canonical state/receipts remain ordinary VBA. Selected nested lifecycle/input
 cases are covered; L02 and the full M7A.4 checklist remain partial.
+
+[ADR 0077](decisions/0077-native-window-activation.md) records canonical native
+window activation, reentrant lifecycle guards and cross-modeless keyboard
+continuations. Automatic host document-input routing and full M7A.4 remain open.

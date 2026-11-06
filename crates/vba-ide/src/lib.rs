@@ -30,6 +30,7 @@ mod form_tab_state;
 mod form_tabs;
 mod form_text;
 mod form_types;
+mod form_window;
 pub use form_keyboard::{FormKeyEvent, FormKeyInput, FormKeyResult};
 pub use form_mouse::{FormMouseEvent, FormMouseInput};
 pub use form_project::{FormInstance, FormListInput, FormNumericInput};

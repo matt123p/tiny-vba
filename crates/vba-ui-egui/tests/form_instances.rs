@@ -1136,6 +1136,15 @@ fn native_nested_frames_render_groups_and_tab_from_the_child_to_the_outer_button
             .form_instance_field(f, None, "VbaActiveControl")?,
         h.state().ide.form_instance_field(f, None, "VbaApply")?
     );
+    // Canonical Tab focus can commit before its KeyUp continuation completes.
+    for _ in 0..40 {
+        h.run_steps(1);
+        if h.state().ide.mode() == Mode::Completed {
+            break;
+        }
+    }
+    assert_eq!(h.state().ide.mode(), Mode::Completed);
+    h.run_steps(2);
     h.get_by_label("Apply").click();
     h.run_steps(8);
     assert_eq!(h.state().ide.output(), vec!["initialized", "initial"]);

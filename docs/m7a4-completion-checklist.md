@@ -10,8 +10,8 @@ reference-based expectations and fresh Office observations remain distinct.
 | C01 | Projects with no form components: bare/qualified UserForms, Count=0, aliases/TypeName, empty For Each, Item bounds, Add of missing form, shadowing, Stop/Reset/source edits, document callbacks | PASS: ADR 0069; seven shared cases and both pinned host suites |
 | C02 | Additional default/control-reference aliases and reloads; implicit reference behavior after unload and reentrant mutation | PARTIAL: ADR 0044/0067/0068; remaining cases open |
 | C03 | Dynamic collections and structural changes during iteration; review direct enumerator cursor applicability against Office's exposed interfaces | PARTIAL: snapshot profile retained; remaining parity open |
-| L01 | Activate/Deactivate across Show/Hide, multiple modeless windows, document focus, repeated activation and unloading | PARTIAL: ADR 0075 retains modal presentation during callbacks without granting input; full ordering/focus ownership open |
-| L02 | Lifecycle handlers redirect focus, show/hide/unload another form, Stop/resume or Reset without stale ownership or replay | PARTIAL: ADR 0076 selected nested modal mouse/keyboard, held release, parent unload and Reset cases; remaining lifecycle/focus/binding cases open |
+| L01 | Activate/Deactivate across Show/Hide, multiple modeless windows, document focus, repeated activation and unloading | PARTIAL: ADR 0077 selected Show/Hide/modeless ordering, unload and explicit executable document activation; automatic host document input and full ordering remain open |
+| L02 | Lifecycle handlers redirect focus, show/hide/unload another form, Stop/resume or Reset without stale ownership or replay | PARTIAL: ADR 0076 selected nested input; ADR 0077 reentrant window handlers, stopped activation and cross-modeless key transfer; remaining lifecycle/document-input/focus/binding cases open |
 | F01 | Recursive SetFocus and cancellation, nested containers/page switches, dirty validation and binding callbacks, boolean update timing | PARTIAL: selected focus/validation implemented; edge cases open |
 | K01 | KeyDown/KeyPress/KeyUp with mutable ByVal MSForms.ReturnInteger and typed Shift; cancellation/default processing in ordinary frames | PARTIAL: ADR 0070 evidence plus ADR 0071 root/Tab/SetFocus/Space cases PASS (nine runtime, 11 new UI, Chromium, both hosts); remaining cases open |
 | K02 | Held-key repeat; modifiers; Tab/navigation focus transitions; Default/Cancel Enter/Escape exceptions; ANSI input versus Unicode/IME/paste | PARTIAL: raw-input barrier and ADR 0071 focus/default ordering; remaining platform/shortcut/focus/IME cases open |
@@ -64,3 +64,10 @@ composite/list/numeric/header defaults with capture and ordinary continuation.
 ADR 0073 implements the callback and selected simple-control capture/default paths;
 ADR 0074 adds selected TextBox defaults without deferring the remaining K03
 accelerator/platform or lifecycle cases.
+
+Next lifecycle acceptance packet: automatic GridCraft/WordCraft document-canvas
+activation with an authorized pre-document raw-input barrier, stopped/reentrant
+Deactivate continuation, Reset/document replacement cancellation and RefEdit
+modal selection preservation. ADR 0077 supplies canonical native activation and
+the explicit executable command; a host calling it after a document action is
+not sufficient. Remaining K/M/property/binding/platform cases above stay open.

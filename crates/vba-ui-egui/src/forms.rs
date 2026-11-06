@@ -33,6 +33,7 @@ pub enum FormCommand {
     Event(SourceId, Option<u32>, Option<String>),
     InstanceEvent(vba_ide::FormInstance, Option<u32>, Option<String>),
     InstanceFocus(vba_ide::FormInstance, u32),
+    InstanceWindowFocus(vba_ide::FormInstance, bool),
     InstanceActivate(vba_ide::FormInstance, u32),
     InstanceNavigate(vba_ide::FormInstance, u32, i32),
     InstanceDrop(vba_ide::FormInstance, u32, bool),
@@ -132,6 +133,9 @@ pub(super) fn apply_form(
         }
         FormCommand::InstanceActivate(instance, control) => {
             ide.form_instance_activate(instance, control, host)
+        }
+        FormCommand::InstanceWindowFocus(instance, active) => {
+            ide.form_instance_window_focus(instance, active, host)
         }
         FormCommand::InstanceFocus(instance, control) => {
             ide.form_instance_focus(instance, control, host)
@@ -910,12 +914,54 @@ impl EditorUi {
             }
         }
     }
+    /// Build an executable focus command after the embedding activates its document window.
+    /// The embedding must dispatch with normal authorization before handling document input.
+    /// OS/viewport activation is deliberately not an application window transition.
+    pub fn document_window_activated(&self, ide: &Ide) -> Option<Command> {
+        let owner = ide.form_active_window()?;
+        (ide.form_instance_can_deliver(owner) && !ide.form_instance_has_modal_window(owner))
+            .then_some(Command::Form(FormCommand::InstanceWindowFocus(
+                owner, false,
+            )))
+    }
     pub(super) fn form_keyboard_input(
         &mut self,
         ctx: &egui::Context,
         ide: &Ide,
         commands: &mut Vec<Command>,
     ) -> KeyboardFrame {
+        if matches!(ide.mode(), Mode::Completed | Mode::Waiting) {
+            let active = ide.form_active_window();
+            if self.form_last_active_window != active {
+                self.form_last_active_window = active;
+                if let Some(owner) = active {
+                    let control = ide
+                        .form_instance_field(owner, None, "VbaActiveControl")
+                        .ok();
+                    let widget = self
+                        .form_runtime_focus
+                        .iter()
+                        .find(|(form, id, _)| {
+                            *form == owner
+                                && ide
+                                    .form_instance_control_object(owner, *id)
+                                    .ok()
+                                    .map(vba_ide::Value::Object)
+                                    == control
+                        })
+                        .map(|(_, _, widget)| *widget)
+                        .or_else(|| {
+                            self.form_runtime_roots
+                                .iter()
+                                .find(|(form, _)| *form == owner)
+                                .map(|(_, widget)| *widget)
+                        });
+                    if let Some(widget) = widget {
+                        ctx.memory_mut(|memory| memory.request_focus(widget));
+                    }
+                }
+            }
+        }
         self.form_mouse
             .step(ctx, ide, commands, self.form_keys.pending_owner(ide));
         // A completed pointer callback may redirect focus. Restore the canonical
@@ -958,6 +1004,7 @@ impl EditorUi {
         }
         if matches!(ide.mode(), Mode::Design | Mode::Failed | Mode::Stale) {
             self.form_keys.clear();
+            self.form_last_active_window = None;
             self.form_runtime_roots.clear();
             return KeyboardFrame {
                 owner: None,
@@ -1008,6 +1055,8 @@ impl EditorUi {
                     .max_by_key(|(rank, _)| *rank)
                     .map(|(_, instance)| instance)
             })
+            .or_else(|| self.form_keys.pending_owner(ide))
+            .or_else(|| ide.form_active_window())
             .or_else(|| {
                 self.form_runtime_focus
                     .iter()
@@ -1088,8 +1137,23 @@ impl EditorUi {
             return;
         };
         instances.sort_by_key(|instance| {
-            ide.form_instance_modal_rank(*instance)
-                .map_or((false, 0), |rank| (true, rank))
+            ide.form_instance_modal_rank(*instance).map_or_else(
+                || {
+                    let order = ide
+                        .form_instance_field(*instance, None, "VbaWindowOrder")
+                        .ok()
+                        .and_then(|v| {
+                            if let vba_ide::Value::Long(n) = v {
+                                usize::try_from(n).ok()
+                            } else {
+                                None
+                            }
+                        })
+                        .unwrap_or(0);
+                    (false, order)
+                },
+                |rank| (true, rank),
+            )
         });
         let keyboard_owner = input.owner;
         let key_blocked = input.blocked;
@@ -1676,7 +1740,7 @@ impl EditorUi {
                         let active = ide.form_instance_field(instance, None, "VbaActiveControl").ok();
                         let active_id = focus.iter().find(|(_, control, _)| form.controls.iter().find(|c| c.id == *control).is_some_and(|c| ide.form_instance_control_object(instance,c.id).ok().map(vba_ide::Value::Object) == active));
                         let requested = focus.iter().find(|(_, _, target)| Some(*target) == focused);
-                        let pending = commands.iter().any(|command| matches!(command, Command::Form(FormCommand::InstanceMouse(owner, _, _) | FormCommand::InstanceKey(owner, _, _) | FormCommand::InstanceFocus(owner, _) | FormCommand::InstanceActivate(owner, _) | FormCommand::InstanceText(owner, _, _, _) | FormCommand::InstanceNumeric(owner, _, _) | FormCommand::InstanceList(owner, _, _) | FormCommand::InstanceListSelection(owner, _, _) | FormCommand::InstanceTab(owner, _, _) | FormCommand::InstanceDrop(owner, _, _) | FormCommand::InstanceNavigate(owner, _, _) | FormCommand::InstanceEvent(owner, _, _)) if *owner == instance));
+                        let pending = commands.iter().any(|command| matches!(command, Command::Form(FormCommand::InstanceWindowFocus(owner, _) | FormCommand::InstanceMouse(owner, _, _) | FormCommand::InstanceKey(owner, _, _) | FormCommand::InstanceFocus(owner, _) | FormCommand::InstanceActivate(owner, _) | FormCommand::InstanceText(owner, _, _, _) | FormCommand::InstanceNumeric(owner, _, _) | FormCommand::InstanceList(owner, _, _) | FormCommand::InstanceListSelection(owner, _, _) | FormCommand::InstanceTab(owner, _, _) | FormCommand::InstanceDrop(owner, _, _) | FormCommand::InstanceNavigate(owner, _, _) | FormCommand::InstanceEvent(owner, _, _)) if *owner == instance));
                         if let Some((_, control, _)) = requested && requested != active_id && !pending {
                             commands.push(Command::Form(FormCommand::InstanceFocus(instance, *control)));
                         }
@@ -1716,7 +1780,10 @@ impl EditorUi {
                     )
                     .show(ctx, show);
             } else {
-                egui::Window::new(
+                if native {
+                    ctx.move_to_top(egui::LayerId::new(egui::Order::Middle, scope));
+                }
+                let window = egui::Window::new(
                     ide.form_instance_field(instance, None, "Caption")
                         .map(control_text)
                         .unwrap_or_else(|_| form.caption.clone()),
@@ -1732,6 +1799,20 @@ impl EditorUi {
                 .collapsible(false)
                 .resizable(false)
                 .show(ctx, show);
+                if native
+                    && idle
+                    && !ide.form_instance_window_active(instance)
+                    && let Some(window) = window
+                    && ctx.input(|input| input.pointer.any_pressed())
+                    && let Some(pos) = ctx.input(|input| input.pointer.interact_pos())
+                    && window.response.rect.contains(pos)
+                    && ctx.layer_id_at(pos) == Some(window.response.layer_id)
+                    && !commands.iter().any(|command| command.executes_code())
+                {
+                    commands.push(Command::Form(FormCommand::InstanceWindowFocus(
+                        instance, true,
+                    )));
+                }
             }
             self.form_runtime_focus.extend(rendered_focus);
             if let Some(root) = rendered_root {

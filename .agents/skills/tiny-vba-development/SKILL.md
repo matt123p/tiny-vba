@@ -352,3 +352,10 @@ ADR 0076 parks raw input scopes for modal callers (at most eight existing waits)
 and keeps a shared 64-event queue. Preserve original capture release, owner-local
 keyboard/mouse barriers, canonical receipts, normal authorization and full Reset
 invalidation. Selected nested Stop/unload/Reset cases do not finish L02/M7A.4.
+
+ADR 0077 adds canonical native window activation and separate keyboard receipt/
+destination ownership. Activation commands execute VBA and retain existing trust
+checks. External viewport focus and passive hover stay inert. Embedders must
+apply document activation before document input; automatic raw document barriers
+remain open. Preserve reentrant transition guards, modal ownership and bounded
+raw input; L01/L02 and full M7A.4 remain partial.

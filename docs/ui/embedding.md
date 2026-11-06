@@ -190,3 +190,20 @@ design revisions. Hosts persist the payload and keep package/trust policy.
 The standalone shell accepts `.bas`, `.cls` and `.tvform`; the browser uses explicit
 upload/download. The original sample is `examples/forms/CustomerForm.tvform`.
 See [M2 profile, workflow, format and acceptance](../m2-acceptance.md).
+
+Native application-window activation follows ADR 0077. The inert
+`Ide::form_active_window` and `form_instance_window_active` inspect canonical
+provider state. `FormCommand::InstanceWindowFocus` executes VBA and needs the same
+host authorization as control input. The renderer emits it for modeless window
+presses; external viewport focus does not represent a document-window transition.
+`EditorUi::document_window_activated` builds the explicit executable command for a
+host document activation. Dispatch it before document input and suspend input
+while its callbacks run/Stop; automatic raw document-canvas buffering/replay is
+not supplied by this helper and remains unimplemented in the two consumers.
+
+The authored Chromium activation fixture is reproducible with
+`cargo run -p vba-project --example native_form_fixture -- /tmp/native-window --window-activation`,
+then run `tools/ui-browser/native-window-activation.cjs` with
+`VBA_NATIVE_FIXTURE_DIR=/tmp/native-window` and the usual Playwright environment.
+It verifies reentrant modal-to-modeless Show, physical header switching and Hide
+restoration through the actual web UI. It is not fresh Office evidence.

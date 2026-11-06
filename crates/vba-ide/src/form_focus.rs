@@ -55,6 +55,10 @@ Set ActiveControl=VbaPublicActive
 End Property
 Public Sub VbaMoveFocus(ByVal target As Object)
 If Not VbaLoaded Or Not VbaVisible Then Err.Raise 2110
+Dim windowSerial As Long
+windowSerial=VbaFocusSerial
+If Not VbaWindowEnter() Then Exit Sub
+If windowSerial<>VbaFocusSerial Then Exit Sub
 If target Is Nothing Then Err.Raise 2110
 Dim kind As Integer
 kind=target.VbaKind
@@ -211,6 +215,7 @@ control.VbaDrag value
 End If
 End Sub
 Public Sub VbaInput(ByVal index As Long,ByVal text As String)
+If Not VbaWindowEnter() Then Exit Sub
 Dim control As Object
 Set control=VbaAllControls.Item(index)
 If control.VbaKind=11 Or control.VbaKind=15 Then

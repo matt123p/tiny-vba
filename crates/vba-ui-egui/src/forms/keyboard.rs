@@ -5,6 +5,7 @@ use vba_ide::{FormInstance, FormKeyEvent as Phase, FormKeyInput};
 #[derive(Clone)]
 struct Pending {
     owner: FormInstance,
+    receipt_owner: FormInstance,
     event: egui::Event,
     epoch: i32,
     phase: Phase,
@@ -126,7 +127,16 @@ impl Keyboard {
             .iter()
             .rev()
             .find(|pending| ide.form_instance_visible(pending.owner))
-            .map(|pending| pending.owner)
+            .map(|pending| {
+                ide.form_active_window()
+                    .filter(|owner| {
+                        *owner != pending.owner
+                            && ide
+                                .form_instance_key_result(pending.receipt_owner, pending.epoch)
+                                .is_ok_and(|result| result.is_some())
+                    })
+                    .unwrap_or(pending.owner)
+            })
     }
     pub(super) fn busy(&self) -> bool {
         !self.queue.is_empty() || !self.pending.is_empty()
@@ -174,6 +184,7 @@ impl Keyboard {
         let text_open = phase != Phase::Up && matches!(event, egui::Event::Key { .. });
         self.pending.push(Pending {
             owner,
+            receipt_owner: owner,
             event,
             phase,
             epoch,
@@ -229,6 +240,37 @@ impl Keyboard {
                     })
                 })
             });
+        }
+        // A completed callback can transfer focus to another native window.
+        // Keep the receipt with its executing receiver and route only remaining
+        // raw/default processing to the now-active window.
+        if ide.form_instance_window_active(owner) {
+            for pending in &mut self.pending {
+                if pending.owner != owner
+                    && ide.form_instance_visible(pending.owner)
+                    && ide
+                        .form_instance_key_result(pending.receipt_owner, pending.epoch)
+                        .is_ok_and(|result| result.is_some())
+                {
+                    let previous = pending.owner;
+                    pending.owner = owner;
+                    for (target, _) in &mut self.queue {
+                        if *target == previous {
+                            *target = owner;
+                        }
+                    }
+                    for (target, _) in &mut self.held {
+                        if *target == previous {
+                            *target = owner;
+                        }
+                    }
+                    for target in self.suppressed.iter_mut().chain(&mut self.spaces) {
+                        if *target == previous {
+                            *target = owner;
+                        }
+                    }
+                }
+            }
         }
         self.queue
             .retain(|(instance, _)| ide.form_instance_visible(*instance));
@@ -300,7 +342,8 @@ impl Keyboard {
             }
         }
         let focused = ctx.memory(|memory| memory.focused());
-        let owns_focus = ide.form_instance_is_modal(owner)
+        let owns_focus = self.pending.iter().any(|pending| pending.owner == owner)
+            || ide.form_instance_is_modal(owner)
             || focus
                 .iter()
                 .any(|(instance, _, widget)| *instance == owner && Some(*widget) == focused)
@@ -450,7 +493,15 @@ impl Keyboard {
             let Some(pending) = self.pending.get(index) else {
                 return true;
             };
-            match ide.form_instance_key_result(owner, pending.epoch) {
+            if pending.receipt_owner != owner
+                && !focus
+                    .iter()
+                    .any(|(instance, control, _)| *instance == owner && Some(*control) == target)
+                && !(target.is_none() && roots.iter().any(|(instance, _)| *instance == owner))
+            {
+                return true;
+            }
+            match ide.form_instance_key_result(pending.receipt_owner, pending.epoch) {
                 Ok(None) => return true,
                 Err(error) => {
                     self.pending.remove(index);

@@ -604,3 +604,10 @@ current callback owner, and Reset/unload discard stale defaults. The shared raw
 queue stays at 64, modal scope depth stays bounded by eight existing waits, and
 canonical state/receipts remain ordinary VBA. Selected nested lifecycle/input
 cases are covered; L02 and the full M7A.4 checklist remain partial.
+
+Native UserForm activation follows [ADR 0077](decisions/0077-native-window-activation.md):
+ordinary coordinator fields own the active application window, Show/Hide/Unload
+ordering and reentrant transitions. Inert active-window inspection never loads a
+form; executable window focus uses the normal input/authorization path. Shared
+egui modeless routing preserves callback receipts across window changes. Automatic
+host document-input barriers and full M7A.4 lifecycle acceptance remain open.

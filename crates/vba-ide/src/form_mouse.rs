@@ -124,6 +124,9 @@ VbaMouseAllow=False
 Dim control As Object,cancel As MSForms.ReturnBoolean
 Set cancel=New VbaFormReturnBoolean
 If Not VbaLoaded Or Not VbaVisible Then GoTo finished
+If phase=0 Or phase=3 Or phase=4 Then
+If Not VbaWindowEnter() Then GoTo finished
+End If
 If target>=0 Then
 If target>=VbaAllControls.Count Then GoTo finished
 Set control=VbaAllControls.Item(target)
@@ -157,6 +160,7 @@ Else
 VbaRootMouse phase,button,shift,x,y,cancel
 If Not VbaLoaded Or Not VbaVisible Then GoTo finished
 End If
+If button<>0 And Not VbaWindowActive Then GoTo finished
 VbaMouseAllow=Not cancel.Value
 finished:
 VbaMouseDone=True

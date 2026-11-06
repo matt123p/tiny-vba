@@ -1,5 +1,19 @@
 # Implementation progress
 
+## M7A.4 continued — native window activation (2026-11-06)
+
+ADR 0077 adds canonical Show/Hide/modeless activation, unload retirement,
+reentrant Show/focus guards and modal ownership before foreign waits. Keyboard
+callbacks retain their receipt owner while remaining raw input follows a newly
+active modeless window. Thirteen runtime and four actual egui cases pass; source
+and original resources stay inert. Existing authorization/budgets are unchanged.
+Full shared CI/strict Clippy, WASM/WASI, UI/native/web and Chromium activation,
+nested input, editor smoke and modal-form checks pass. Native/browser output and
+five native theme/scale views were inspected. Pinned consumer acceptance is in
+progress. Automatic
+host document-input buffering/replay and the full M7A.4 checklist remain open;
+fresh Office comparisons remain M8.5 NOT_RUN.
+
 ## M7A.4 continued — nested modal input (2026-11-06)
 
 ADR 0076 fixes child mouse callbacks while a parent mouse/key callback is parked,

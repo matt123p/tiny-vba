@@ -253,6 +253,7 @@ pub(crate) fn userforms_class(components: &[String]) -> String {
         ));
     }
     source.push_str("Err.Raise 424\nEnd Function\n");
+    source.push_str(crate::form_window::COORDINATOR);
     // Native component/control identifiers share the same bounded ASCII name profile.
     if let Some((_, key)) = collection_class().split_once("Private Function VbaKey") {
         source.push_str("Private Function VbaKey");
