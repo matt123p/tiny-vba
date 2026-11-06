@@ -1,6 +1,6 @@
 # ADR 0068 — lazy project-class array elements
 
-Date: 2026-11-06. Status: adopted; shared validation passed.
+Date: 2026-11-06. Status: adopted; shared and pinned consumer validation passed.
 
 The language/compiler/IR/VM own this extension of ADR 0046. MS-VBAL's variable
 and ReDim contracts explicitly retain automatic instantiation for each dependent
@@ -57,6 +57,12 @@ Primary references:
 - [VBA Dim](https://learn.microsoft.com/en-us/office/vba/language/reference/user-interface-help/dim-statement)
 
 Shared validation PASS: full CI, WASM compilation and actual WASI execution,
-including 18 generic auto-instancing cases, 98 native form-instance cases and
+including 18 generic auto-instancing cases, 99 native form-instance cases and
 flat/stale/foreign location assertions. Both host-local array callback/trust/
-resource regressions pass. Pinned fork full CI and Node/WASM remain pending.
+resource regressions pass. The additional modal-array case passes natively and
+in the full 99-case WASI form target without reinitializing its parked receiver.
+Pinned GridCraft full CI (10 steps), both optional VBA/UI Clippy checks, host UI/
+web checks and 20 GridCraft/15 WordCraft Node-WASM package cases pass. Full
+WordCraft CI passes all eight steps with isolated serial test execution. Both
+consumers pin shared product revision `d3f00127a47f08996bd89968ebb7ec019ed13c8b`.
+Integration commits: GridCraft `e043fae9`, WordCraft `f1208db6`.

@@ -3620,3 +3620,24 @@ fn native_as_new_arrays_keep_windows_distinct_and_recreate_only_a_cleared_elemen
     assert_eq!(ide.form_instances()?.len(), 3);
     Ok(())
 }
+
+#[test]
+fn native_as_new_array_retains_its_modal_receiver_and_parked_caller() -> R {
+    let mut ide = setup(
+        "Sub Main()\nDim forms(0 To 0) As New NativeForm\nforms(0).Show\nDebug.Print \"after\",forms(0).Entry.Text\nEnd Sub",
+        None,
+    )?;
+    assert_eq!(ide.mode(), Mode::Waiting, "{:?}", ide.diagnostics);
+    let instance = *ide.form_instances()?.first().ok_or("modal form")?;
+    assert_eq!(ide.output(), vec!["initialized"]);
+    ide.form_instance_event(instance, Some(13), None, &mut NoHost)?;
+    settle(&mut ide)?;
+    ide.tick(&mut NoHost)?;
+    settle(&mut ide)?;
+    assert_eq!(ide.mode(), Mode::Completed, "{:?}", ide.diagnostics);
+    assert_eq!(
+        ide.output(),
+        vec!["initialized", "initial", "after\tinitial"]
+    );
+    Ok(())
+}

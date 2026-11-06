@@ -8,10 +8,18 @@ tags, canonical ByRef/source order, Preserve/Erase, private/static/restored stor
 and constructor/For Each continuations. Inert inspection, exact owner validation
 and old/forged bytecode refusal retain existing budgets and permission limits.
 Full CI, WASM compilation and actual WASI execution pass, including 18 generic
-auto-instancing and all 98 native form cases. Both new host-native regressions
+auto-instancing and all 99 native form cases. Both new host-native regressions
 pass callback receiver, trust and original XLSM/DOCM resource assertions; Word
-also verifies one undo step. Pinned consumer gates are pending. The broader
-M7A.4 ledger remains open.
+also verifies one undo step. A modal array regression additionally proves the
+parked caller retains its receiver and resumes without reinitializing; the final
+full CI and 99-case WASI form target pass. Pinned GridCraft full CI (10 steps),
+strict optional VBA/UI Clippy, four form UI cases, optional web and all 20 native/
+20 Node-WASM package cases pass at shared product revision
+`d3f00127a47f08996bd89968ebb7ec019ed13c8b` (integration `e043fae9`). WordCraft's
+15 Node-WASM package, strict optional Clippy, 13 VBA UI, hidden-editor form and
+optional web checks and full CI (8 steps, isolated serial tests) pass at the same
+shared product revision (integration `f1208db6`). All three repositories are
+committed and pushed. The broader M7A.4 ledger remains open.
 
 ## M7A.4 continued — VarType default values (2026-11-06)
 
