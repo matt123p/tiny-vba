@@ -65,9 +65,11 @@ ADR 0073 implements the callback and selected simple-control capture/default pat
 ADR 0074 adds selected TextBox defaults without deferring the remaining K03
 accelerator/platform or lifecycle cases.
 
-Next lifecycle acceptance packet: coalesced form-key/IME input before the document
-press, activation through other chrome/keyboard routes and further reentrant
-focus/collection/binding cases. ADR 0078 implements the selected authorized canvas
+Next lifecycle acceptance packet: activation through other chrome/keyboard routes,
+arbitrary mixed pointer/key ordering and further reentrant focus/collection/binding
+cases. ADR 0079 adds selected coalesced form-key/paste/IME prefixes and spanning
+composition before document deactivation, including stopped callbacks and modal
+redirection. ADR 0078 implements the selected authorized canvas
 barrier, Stop/Continue, Reset/identity/geometry invalidation, repaint acknowledgment
 and native keyboard ownership. RefEdit keeps its existing modal selection path.
 The complete K/M/property/binding/platform requirements above remain open.

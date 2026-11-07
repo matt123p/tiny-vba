@@ -1,5 +1,24 @@
 # Implementation progress
 
+## M7A.4 continued — form input before document activation (2026-11-07)
+
+ADR 0079 transfers earlier native key/text/paste/IME input in a document-press
+batch to the existing bounded keyboard barrier. Deactivate waits for canonical
+receipts, widget defaults, Change callbacks and preexisting IME composition.
+Stop/Continue and Reset preserve ordering; IME continuation stays out of debugger
+source input. A prefix callback opening a modal cancels the later document gesture
+while preserving its own parked keyboard receipt. A Change-triggered modeless
+transition retains its raw tail through a transient missing active window and
+Stop, then routes KeyUp to the canonical destination. Context/trust invalidation and
+existing entry/text budgets discard unapplied input. No budget, VM or host API is
+changed. All 21 document-input, 14 keyboard and 34 mouse regressions pass. Final
+shared CI/strict Clippy, WASM/WASI, UI/native/web, repository checks and Chromium
+editor/modal-form/native-window checks pass. Five native theme/scale views and
+browser paused/modeless output were inspected. Consumer pins and host integration
+are being validated. Full L01/L02/K02/M7A.4 remain partial, including
+other chrome/keyboard activation, arbitrary mixed pointer order and the unchanged
+control/property/binding/platform checklist. Fresh Office traces stay M8.5 NOT_RUN.
+
 ## M7A.4 continued — document activation input (2026-11-07)
 
 ADR 0078 retains bounded raw document gestures before begin_pass and dispatches

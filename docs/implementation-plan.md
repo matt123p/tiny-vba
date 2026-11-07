@@ -1,6 +1,6 @@
 # Remaining implementation plan
 
-Updated 2026-11-06. This plan contains **remaining work only**: M7A followed by stable M8 IDs,
+Updated 2026-11-07. This plan contains **remaining work only**: M7A followed by stable M8 IDs,
 after completed M1–M6, M6A and M7 for their declared profiles.
 [M7 acceptance](m7-acceptance.md) records the authored unchanged-document/package
 profile and [ADR 0037](decisions/0037-m7-package-preservation-and-writeback.md)
@@ -93,7 +93,9 @@ and native save/reopen. See [ADR 0041](decisions/0041-worksheet-form-controls.md
   retained modal display metadata without changing input ownership.
   ADR 0077 adds selected native window activation and cross-modeless key continuations;
   ADR 0078 adds selected automatic document-input routing with an authorized raw
-  barrier; full lifecycle acceptance remains open.
+  barrier; ADR 0079 orders selected earlier native key/paste/IME input before
+  document deactivation, including stopped prefix callbacks and spanning composition.
+  Full lifecycle acceptance remains open.
   ADR 0076 adds selected nested modal mouse/keyboard input continuations with
   shared raw-input bounds, held release, parent unload and Reset regressions. L02
   remains partial; all remaining lifecycle and control contracts stay open.

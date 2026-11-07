@@ -138,11 +138,85 @@ impl Keyboard {
                     .unwrap_or(pending.owner)
             })
     }
-    pub(super) fn busy(&self) -> bool {
+    pub(crate) fn busy(&self) -> bool {
         !self.queue.is_empty() || !self.pending.is_empty()
     }
     pub(crate) fn clear(&mut self) {
         *self = Self::default();
+    }
+    fn prepare(&mut self, ide: &Ide, owner: FormInstance) {
+        if self.generation != Some(owner.object.generation) {
+            self.clear();
+            self.generation = Some(owner.object.generation);
+            self.observes = ide.modules.iter().any(|module| {
+                module.procedures.iter().any(|procedure| {
+                    ["_KeyDown", "_KeyPress", "_KeyUp"].iter().any(|suffix| {
+                        procedure
+                            .name
+                            .get(procedure.name.len().saturating_sub(suffix.len())..)
+                            .is_some_and(|name| name.eq_ignore_ascii_case(suffix))
+                    })
+                })
+            });
+        }
+    }
+    /// Transfer a pre-document keyboard event into the ordinary input barrier.
+    /// This retains raw input only; callbacks/defaults still run through step.
+    pub(crate) fn defer(
+        &mut self,
+        ide: &Ide,
+        owner: FormInstance,
+        event: &egui::Event,
+        previous_single_text: &mut bool,
+    ) -> bool {
+        self.prepare(ide, owner);
+        self.enqueue(owner, event, previous_single_text)
+    }
+    fn enqueue(
+        &mut self,
+        owner: FormInstance,
+        event: &egui::Event,
+        previous_single_text: &mut bool,
+    ) -> bool {
+        let entries = match event {
+            egui::Event::Text(text) => text.chars().take(65).count(),
+            _ => 1,
+        };
+        if self.queue.len() + self.pending.len() + entries > 64
+            || self.units().saturating_add(event_units(event)) > 32768
+        {
+            return false;
+        }
+        if let egui::Event::Key { key, pressed, .. } = event {
+            if *pressed && !self.held.contains(&(owner, *key)) {
+                if self.held.len() >= 64 {
+                    return false;
+                }
+                self.held.push((owner, *key));
+            } else if !pressed {
+                self.held.retain(|(_, held)| held != key);
+            }
+        }
+        // eframe-web can emit an adjacent Text, Key pair. Normalize only
+        // a matching single ASCII character within the same raw input batch.
+        let text_first = *previous_single_text
+            && self.queue.back().is_some_and(
+                |(_, prior)| matches!(prior,egui::Event::Text(text) if paired_text_key(text,event)),
+            );
+        *previous_single_text = matches!(event,egui::Event::Text(text) if !text.is_empty() && text.chars().nth(1).is_none());
+        if let egui::Event::Text(text) = event {
+            for c in text.chars() {
+                self.queue
+                    .push_back((owner, egui::Event::Text(c.to_string())));
+            }
+        } else {
+            self.queue.push_back((owner, event.clone()));
+        }
+        if text_first && self.queue.len() >= 2 {
+            let last = self.queue.len().saturating_sub(1);
+            self.queue.swap(last.saturating_sub(1), last);
+        }
+        true
     }
     fn units(&self) -> usize {
         self.queue
@@ -224,23 +298,22 @@ impl Keyboard {
     ) -> bool {
         let Targets { focus, roots } = widgets;
         let Some(owner) = owner.filter(|owner| ide.native_form(owner.source).is_some()) else {
+            // A default's Change handler can stop between Deactivate and
+            // Activate, after its key receipt was consumed. Keep its remaining
+            // raw input until that ordinary transition completes.
+            if matches!(ide.mode(), Mode::Running | Mode::Break | Mode::Waiting)
+                && self
+                    .queue
+                    .iter()
+                    .any(|(owner, _)| ide.form_instance_visible(*owner))
+            {
+                ctx.request_repaint();
+                return true;
+            }
             self.clear();
             return false;
         };
-        if self.generation != Some(owner.object.generation) {
-            self.clear();
-            self.generation = Some(owner.object.generation);
-            self.observes = ide.modules.iter().any(|module| {
-                module.procedures.iter().any(|procedure| {
-                    ["_KeyDown", "_KeyPress", "_KeyUp"].iter().any(|suffix| {
-                        procedure
-                            .name
-                            .get(procedure.name.len().saturating_sub(suffix.len())..)
-                            .is_some_and(|name| name.eq_ignore_ascii_case(suffix))
-                    })
-                })
-            });
-        }
+        self.prepare(ide, owner);
         // A completed callback can transfer focus to another native window.
         // Keep the receipt with its executing receiver and route only remaining
         // raw/default processing to the now-active window.
@@ -268,6 +341,35 @@ impl Keyboard {
                         if *target == previous {
                             *target = owner;
                         }
+                    }
+                }
+            }
+            // Widget defaults (paste/text/IME) can redirect focus in Change
+            // after the physical key receipt has already been consumed. A
+            // completed modeless transition still owns the remaining raw tail.
+            // Parked modal scopes retain their original destinations.
+            if self.pending.is_empty()
+                && ide.form_instance_can_deliver(owner)
+                && !ide.form_instance_has_modal_window(owner)
+            {
+                let redirect = |previous| {
+                    previous != owner
+                        && ide.form_instance_visible(previous)
+                        && !ide.form_instance_has_modal_window(previous)
+                };
+                for target in self
+                    .queue
+                    .iter_mut()
+                    .map(|(target, _)| target)
+                    .chain(self.held.iter_mut().map(|(target, _)| target))
+                {
+                    if redirect(*target) {
+                        *target = owner;
+                    }
+                }
+                for target in self.suppressed.iter_mut().chain(&mut self.spaces) {
+                    if redirect(*target) {
+                        *target = owner;
                     }
                 }
             }
@@ -368,7 +470,6 @@ impl Keyboard {
             let mut exceeded = false;
             let mut cancel_focus_navigation = false;
             let mut previous_single_text = false;
-            let mut units = self.units();
             ctx.input_mut(|input| {
                 input.events.retain(|event| {
                     if !raw(event) {
@@ -420,49 +521,10 @@ impl Keyboard {
                     if exceeded {
                         return false;
                     }
-                    if let egui::Event::Key { key, pressed, .. } = event {
+                    if let egui::Event::Key { pressed, .. } = event {
                         cancel_focus_navigation |= *pressed;
-                        if *pressed && !self.held.contains(&(owner, *key)) {
-                            if self.held.len() >= 64 {
-                                exceeded = true;
-                                return false;
-                            }
-                            self.held.push((owner, *key));
-                        } else if !pressed {
-                            self.held.retain(|(_, held)| held != key);
-                        }
                     }
-                    // eframe-web emits an adjacent Text, Key pair when its text
-                    // agent is unfocused. Normalize only a matching single ASCII
-                    // character within this input batch, never unrelated IME text.
-                    let text_first=previous_single_text && self.queue.back().is_some_and(|(_,prior)| {
-                        matches!(prior,egui::Event::Text(text) if paired_text_key(text,event))
-                    });
-                    previous_single_text=matches!(event,egui::Event::Text(text) if !text.is_empty() && text.chars().nth(1).is_none());
-                    let mut enqueue = |event: egui::Event| {
-                        units = units.saturating_add(event_units(&event));
-                        if self.queue.len() + self.pending.len() >= 64 || units > 32768 {
-                            exceeded = true;
-                            return false;
-                        }
-                        self.queue.push_back((owner, event));
-                        true
-                    };
-                    if let egui::Event::Text(text) = event {
-                        for c in text.chars() {
-                            if !enqueue(egui::Event::Text(c.to_string())) {
-                                break;
-                            }
-                        }
-                    } else if event_units(event) > 32768 {
-                        exceeded = true;
-                    } else {
-                        enqueue(event.clone());
-                    }
-                    if text_first && !exceeded && self.queue.len()>=2 {
-                        let last=self.queue.len().saturating_sub(1);
-                        self.queue.swap(last.saturating_sub(1),last);
-                    }
+                    exceeded = !self.enqueue(owner, event, &mut previous_single_text);
                     false
                 });
             });

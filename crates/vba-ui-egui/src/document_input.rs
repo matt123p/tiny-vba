@@ -1,8 +1,15 @@
 //! Raw document gestures wait outside egui until ordinary window callbacks finish.
+use crate::forms::keyboard::Keyboard;
 use crate::{Command, EditorUi, FormCommand};
 use egui::{Context, Event, Key, PointerButton, RawInput, Rect};
 use std::collections::VecDeque;
 use vba_ide::{Ide, Mode};
+
+struct Surface {
+    document: u64,
+    area: Option<Rect>,
+    visible: bool,
+}
 
 #[derive(Clone, Copy, PartialEq)]
 enum Phase {
@@ -20,6 +27,7 @@ struct Pending {
     offered: Option<u64>,
     held: u8,
     delivered: u8,
+    prefix: bool,
 }
 #[derive(Default)]
 pub(super) struct DocumentInput {
@@ -27,6 +35,7 @@ pub(super) struct DocumentInput {
     discarded: u8,
     debugger_keys: u8,
     applied_pass: Option<u64>,
+    composition: Option<((u64, vba_ide::SessionInstance), vba_ide::FormInstance)>,
 }
 fn mask(button: PointerButton) -> u8 {
     match button {
@@ -66,8 +75,19 @@ fn keyboard(event: &Event) -> bool {
             | Event::Ime(_)
     )
 }
+#[allow(deprecated)] // Accept older embedders as well as the current preedit contract.
+fn composing(event: &egui::ImeEvent) -> Option<bool> {
+    match event {
+        egui::ImeEvent::Enabled => Some(true),
+        egui::ImeEvent::Preedit { text, .. } => Some(!text.is_empty()),
+        egui::ImeEvent::Commit(_) | egui::ImeEvent::Disabled => Some(false),
+        _ => None,
+    }
+}
 impl DocumentInput {
-    fn cancel(&mut self, ctx: &Context, raw: &mut RawInput) {
+    fn cancel(&mut self, ctx: &Context, raw: &mut RawInput) -> bool {
+        self.composition = None;
+        let prefix = self.pending.as_ref().is_some_and(|pending| pending.prefix);
         if let Some(pending) = self.pending.take() {
             self.discarded |= pending.held;
             let unapplied_capture = pending
@@ -96,31 +116,37 @@ impl DocumentInput {
                 raw.events.drain(start..start.saturating_add(batch.len()));
             }
         }
+        prefix
     }
     fn hook(
         &mut self,
         ctx: &Context,
         ide: &Ide,
-        document: u64,
-        area: Option<Rect>,
-        visible: bool,
+        surface: Surface,
         raw: &mut RawInput,
+        keys: &mut Keyboard,
+        mouse_idle: bool,
     ) -> Option<Command> {
         if raw.viewport_id != egui::ViewportId::ROOT {
             return None;
         }
-        let surface = surface_size(raw);
+        let Surface {
+            document,
+            area,
+            visible,
+        } = surface;
+        let screen = surface_size(raw);
         let identity = ide
             .execution_identity()
             .map(|execution| (document, execution));
-        if self.pending.as_ref().is_some_and(|pending| {
+        let invalid = self.pending.as_ref().is_some_and(|pending| {
             Some(pending.identity) != identity
                 || pending.area != area
-                || surface.is_some_and(|size| size != pending.screen)
+                || screen.is_some_and(|size| size != pending.screen)
         }) || matches!(ide.mode(), Mode::Design | Mode::Stale | Mode::Failed)
-            || area.is_none()
-        {
-            self.cancel(ctx, raw);
+            || area.is_none();
+        if invalid && self.cancel(ctx, raw) {
+            keys.clear();
         }
         let on_document = |pos: egui::Pos2| {
             visible
@@ -139,7 +165,14 @@ impl DocumentInput {
                     })
         }) || modal
         {
+            // A modal/reentrant callback owns its original form input. Cancel
+            // the later document gesture without dropping that callback receipt.
             self.cancel(ctx, raw);
+        }
+        if self.composition.is_some_and(|(epoch, owner)| {
+            Some(epoch) != identity || Some(owner) != active || !ide.form_instance_visible(owner)
+        }) {
+            self.composition = None;
         }
         // Do not re-inject input eframe already retains for an unapplied logic tick.
         if self
@@ -152,6 +185,22 @@ impl DocumentInput {
         if let Some(pending) = self.pending.as_mut() {
             pending.offered = None;
         }
+        let press = self.pending.is_none().then(|| {
+            raw.events.iter().position(|event| {
+                matches!(event, Event::PointerButton { pos, pressed: true, .. } if on_document(*pos))
+            })
+        }).flatten().filter(|_| {
+            !modal && area.is_some() && identity.is_some() && active.is_some()
+                && !matches!(ide.mode(), Mode::Design | Mode::Stale | Mode::Failed)
+        });
+        let native = active.filter(|owner| ide.native_form(owner.source).is_some());
+        // Backends can dismiss preedit immediately before emitting Commit in
+        // the same raw batch. Both events still belong to that composition.
+        let mut ime_batch = self.composition.is_some();
+        let mut previous_single_text = false;
+        let mut prefix_error = false;
+        let mut unprocessed_prefix = false;
+        let mut index = 0usize;
         let mut pos = ctx.input(|input| input.pointer.latest_pos());
         let mut batch = Vec::new();
         let mut exceeded = false;
@@ -162,6 +211,11 @@ impl DocumentInput {
             pending.batches.iter().flatten().map(units).sum::<usize>()
         });
         raw.events.retain(|event| {
+            let before_press = press.is_some_and(|press| index < press);
+            index = index.saturating_add(1);
+            if !keyboard(event) {
+                previous_single_text = false;
+            }
             if let Event::Key { key, pressed, .. } = event {
                 let bit = match key {
                     Key::F5 => 1,
@@ -176,6 +230,46 @@ impl DocumentInput {
                     self.debugger_keys &= !bit;
                     return false;
                 }
+            }
+            let ime_continuation = (self.composition.is_some() || ime_batch)
+                && self
+                    .pending
+                    .as_ref()
+                    .is_some_and(|p| p.phase == Phase::Requested)
+                && matches!(event, Event::Ime(_));
+            if let Event::Ime(ime) = event {
+                ime_batch |= before_press && native.is_some();
+                match composing(ime) {
+                    Some(true) => {
+                        if area.is_some()
+                            && (self.pending.is_none() && visible
+                                || before_press
+                                || ime_continuation)
+                        {
+                            self.composition = identity.zip(native);
+                        }
+                    }
+                    Some(false) => {
+                        self.composition = None;
+                    }
+                    None => {}
+                }
+            }
+            if (before_press && ide.mode() != Mode::Break || ime_continuation)
+                && keyboard(event)
+                && let Some(owner) = native
+            {
+                if !prefix_error {
+                    prefix_error = !keys.defer(ide, owner, event, &mut previous_single_text);
+                }
+                if let Some(pending) = self.pending.as_mut() {
+                    pending.prefix = true;
+                }
+                return false;
+            }
+            if before_press {
+                previous_single_text = false;
+                unprocessed_prefix = true;
             }
             match event {
                 Event::PointerMoved(p) | Event::PointerButton { pos: p, .. } => pos = Some(*p),
@@ -203,7 +297,7 @@ impl DocumentInput {
                 self.pending = Some(Pending {
                     identity,
                     area,
-                    screen: surface
+                    screen: screen
                         .unwrap_or_else(|| ctx.input(|input| input.viewport_rect().size())),
                     departure: None,
                     phase: Phase::Requested,
@@ -211,6 +305,7 @@ impl DocumentInput {
                     offered: None,
                     held: 0,
                     delivered: 0,
+                    prefix: keys.busy(),
                 });
             }
             let Some(pending) = self.pending.as_mut() else {
@@ -247,9 +342,18 @@ impl DocumentInput {
             }
             false
         });
-        if exceeded {
-            self.cancel(ctx, raw);
-            return Some(Command::Report("document input budget exceeded".into()));
+        if exceeded || prefix_error {
+            if self.cancel(ctx, raw) || prefix_error {
+                keys.clear();
+            }
+            return Some(Command::Report(
+                if prefix_error {
+                    "native keyboard input budget exceeded"
+                } else {
+                    "document input budget exceeded"
+                }
+                .into(),
+            ));
         }
         let pending = self.pending.as_mut()?;
         if !batch.is_empty() {
@@ -258,6 +362,14 @@ impl DocumentInput {
         if ide.mode() == Mode::Completed {
             match pending.phase {
                 Phase::Requested => {
+                    if keys.busy()
+                        || !mouse_idle
+                        || unprocessed_prefix
+                        || self.composition.is_some()
+                    {
+                        ctx.request_repaint();
+                        return None;
+                    }
                     if let Some(owner) =
                         active.filter(|owner| ide.form_instance_can_deliver(*owner))
                     {
@@ -304,11 +416,23 @@ impl EditorUi {
         visible: bool,
         raw: &mut RawInput,
     ) -> Option<Command> {
-        self.document_input
-            .hook(ctx, ide, document, area, visible, raw)
+        self.document_input.hook(
+            ctx,
+            ide,
+            Surface {
+                document,
+                area,
+                visible,
+            },
+            raw,
+            &mut self.form_keys,
+            self.form_mouse.idle(),
+        )
     }
     pub fn cancel_document_input(&mut self, ctx: &Context, raw: &mut RawInput) {
-        self.document_input.cancel(ctx, raw);
+        if self.document_input.cancel(ctx, raw) {
+            self.form_keys.clear();
+        }
     }
     /// Acknowledge only after a completed document UI pass, beside synthetic input.
     pub fn document_input_applied(&mut self, ctx: &Context) {

@@ -218,3 +218,10 @@ allows the embedding to restore the requested document view. Call
 document_input_applied only after a completed, non-discarded document UI pass;
 request hidden paint while document_input_pending. The helper retains only bounded
 raw input; SessionInstance and ordinary VBA remain the execution authority.
+
+ADR 0079 keeps the same host API: earlier native key/text/paste/IME events in a
+document-press batch enter the existing keyboard queue. Deactivation waits for
+callbacks/defaults and an IME composition that started before the press. Continue
+and Reset keep their normal paths. Keep calling the raw hook even while stopped;
+it owns IME continuations and leaves debugger shortcuts available. The host must
+continue repainting/service ticks while document_input_pending is true.

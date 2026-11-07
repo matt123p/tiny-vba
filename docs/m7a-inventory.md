@@ -1,6 +1,6 @@
 # M7A native forms — implementation inventory and work ledger
 
-Updated 2026-11-06. **IN PROGRESS**. FC0 and FC3.1–FC3.4 are complete for
+Updated 2026-11-07. **IN PROGRESS**. FC0 and FC3.1–FC3.4 are complete for
 `native-userform-import-v1`; see the [control/property/event/format/host matrix](m7a-control-contracts.md).
 M7A.3's worksheet profile is implemented under
 [ADR 0041](decisions/0041-worksheet-form-controls.md). Shared runtime increments
@@ -336,3 +336,13 @@ pre-document raw-input barrier and opaque execution identity for native modeless
 activation. Hosts authorize the ordinary Deactivate callback before document
 input; Stop/Continue, cancellation and acknowledged repaint precede replay.
 The remaining M7A.4 checklist and M8.5 NOT_RUN status are unchanged.
+
+[ADR 0079](decisions/0079-form-input-before-document-activation.md) orders selected
+native key/text/paste/IME prefixes before document deactivation. The raw hook
+transfers earlier input to the existing bounded keyboard barrier and waits for
+receipts, defaults and ordinary callbacks. Spanning IME composition retains only
+owner/lifetime metadata; its raw continuation stays with the form through Stop.
+Reset/context invalidation discards unapplied input; a modal opened by the prefix
+cancels the later document gesture while preserving the parked keyboard receipt.
+No VM/foreign behavior or budget changes. Full M7A.4 and platform/Office comparison
+requirements remain open.

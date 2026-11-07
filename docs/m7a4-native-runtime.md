@@ -358,3 +358,13 @@ pre-document raw-input barrier and opaque execution identity for native modeless
 activation. Hosts authorize the ordinary Deactivate callback before document
 input; Stop/Continue, cancellation and acknowledged repaint precede replay.
 The remaining M7A.4 checklist and M8.5 NOT_RUN status are unchanged.
+
+[ADR 0079](decisions/0079-form-input-before-document-activation.md) orders selected
+native key/text/paste/IME prefixes before document deactivation. The raw hook
+transfers earlier input to the existing bounded keyboard barrier and waits for
+receipts, defaults and ordinary callbacks. Spanning IME composition retains only
+owner/lifetime metadata; its raw continuation stays with the form through Stop.
+Reset/context invalidation discards unapplied input; a modal opened by the prefix
+cancels the later document gesture while preserving the parked keyboard receipt.
+No VM/foreign behavior or budget changes. Full M7A.4 and platform/Office comparison
+requirements remain open.

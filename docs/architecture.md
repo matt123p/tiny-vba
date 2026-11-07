@@ -529,3 +529,13 @@ current callback owner, and Reset/unload discard stale defaults. The shared raw
 queue stays at 64, modal scope depth stays bounded by eight existing waits, and
 canonical state/receipts remain ordinary VBA. Selected nested lifecycle/input
 cases are covered; L02 and the full M7A.4 checklist remain partial.
+
+[ADR 0079](decisions/0079-form-input-before-document-activation.md) orders selected
+native key/text/paste/IME prefixes before document deactivation. The raw hook
+transfers earlier input to the existing bounded keyboard barrier and waits for
+receipts, defaults and ordinary callbacks. Spanning IME composition retains only
+owner/lifetime metadata; its raw continuation stays with the form through Stop.
+Reset/context invalidation discards unapplied input; a modal opened by the prefix
+cancels the later document gesture while preserving the parked keyboard receipt.
+No VM/foreign behavior or budget changes. Full M7A.4 and platform/Office comparison
+requirements remain open.

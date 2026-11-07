@@ -234,3 +234,11 @@ completed document-pass acknowledgment. Keep debugger input available at Stop;
 repaint before replay after skipped/hidden document passes. Reset/source/document/
 trust/geometry changes and authored activation invalidate retained input. No new
 VM/foreign behavior or increased budget is implied; full M7A.4 remains partial.
+
+ADR 0079 orders earlier native key/text/paste/IME prefixes through the existing
+bounded keyboard barrier before document Deactivate. Wait for receipts, defaults,
+ordinary callbacks and any composition started before the press. Preserve IME
+continuation through Stop and debugger shortcut ownership. Context invalidation
+clears unapplied prefixes; modal redirection cancels only the later document
+gesture, preserving its executing keyboard receipt. The host API and all budgets
+stay unchanged; full M7A.4/platform acceptance remains open.

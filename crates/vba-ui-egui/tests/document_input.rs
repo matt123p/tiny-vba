@@ -23,9 +23,12 @@ fn settle(ide: &mut Ide) -> R {
     Err("execution did not settle".into())
 }
 fn app(body: &str, modal: bool) -> R<App> {
+    app_with(body, modal, "")
+}
+fn app_with(body: &str, modal: bool, handlers: &str) -> R<App> {
     let mut ide = Ide::new();
     let code = format!(
-        "Attribute VB_Name = \"NativeForm\"\nAttribute VB_PredeclaredId = True\nOption Explicit\nPrivate Sub UserForm_Activate()\nDebug.Print \"activated\"\nEnd Sub\nPrivate Sub UserForm_Deactivate()\nDebug.Print \"deactivated\"\n{body}\nEnd Sub"
+        "Attribute VB_Name = \"NativeForm\"\nAttribute VB_PredeclaredId = True\nOption Explicit\nPrivate Sub UserForm_Activate()\nDebug.Print \"activated\"\nEnd Sub\nPrivate Sub UserForm_Deactivate()\nDebug.Print \"deactivated\"\n{body}\nEnd Sub\n{handlers}"
     );
     let export = String::from_utf8(fixture::export())?.replace(fixture::SOURCE, &code);
     ide.import_native_form_export(
@@ -59,6 +62,370 @@ fn app(body: &str, modal: bool) -> R<App> {
         frame(&mut s, vec![], true)?;
     }
     Ok(s)
+}
+fn key(pressed: bool) -> Event {
+    Event::Key {
+        key: egui::Key::A,
+        physical_key: Some(egui::Key::A),
+        pressed,
+        repeat: false,
+        modifiers: Modifiers::NONE,
+    }
+}
+fn text_handlers(down: &str, change: &str) -> String {
+    format!(
+        "Private Sub Entry_KeyDown(ByVal k As MSForms.ReturnInteger, ByVal s As Integer)\nDebug.Print \"down\"\n{down}\nEnd Sub\nPrivate Sub Entry_KeyPress(ByVal k As MSForms.ReturnInteger)\nDebug.Print \"press\"\nk.Value=122\nEnd Sub\nPrivate Sub Entry_KeyUp(ByVal k As MSForms.ReturnInteger, ByVal s As Integer)\nDebug.Print \"up\"\nEnd Sub\nPrivate Sub Entry_Change()\nDebug.Print \"change\"\n{change}\nEnd Sub"
+    )
+}
+fn preedit(text: &str) -> Event {
+    Event::Ime(egui::ImeEvent::Preedit {
+        text: text.into(),
+        active_range_chars: None,
+    })
+}
+#[test]
+fn coalesced_key_defaults_and_change_finish_before_deactivate() -> R {
+    let mut s = app_with("Debug.Print Entry.Text", false, &text_handlers("", ""))?;
+    let mut events = vec![key(true), Event::Text("a".into()), key(false)];
+    events.extend([pointer(true), pointer(false)]);
+    assert!(frame(&mut s, events, true)?.is_empty());
+    pump(&mut s)?;
+    assert_eq!(
+        s.ide.output(),
+        vec![
+            "activated",
+            "down",
+            "press",
+            "change",
+            "up",
+            "deactivated",
+            "z"
+        ]
+    );
+    assert_eq!(s.clicks, 1);
+    Ok(())
+}
+#[test]
+fn stopped_prefix_handlers_hold_document_input_until_continue_or_reset() -> R {
+    for in_change in [false, true] {
+        for reset in [false, true] {
+            let handlers = if in_change {
+                text_handlers("", "Stop")
+            } else {
+                text_handlers("Stop", "")
+            };
+            let mut s = app_with("Debug.Print Entry.Text", false, &handlers)?;
+            frame(
+                &mut s,
+                vec![
+                    key(true),
+                    Event::Text("a".into()),
+                    key(false),
+                    pointer(true),
+                    pointer(false),
+                ],
+                true,
+            )?;
+            pump(&mut s)?;
+            assert_eq!(s.ide.mode(), Mode::Break);
+            assert_eq!(s.clicks, 0);
+            assert!(!s.ide.output().iter().any(|line| line == "deactivated"));
+            s.ide
+                .dispatch(if reset { Action::Reset } else { Action::Run }, &mut NoHost)?;
+            pump(&mut s)?;
+            assert_eq!(s.clicks, usize::from(!reset));
+            assert_eq!(
+                s.ide
+                    .output()
+                    .iter()
+                    .filter(|line| *line == "deactivated")
+                    .count(),
+                usize::from(!reset)
+            );
+            assert!(!s.view.document_input_pending());
+        }
+    }
+    Ok(())
+}
+#[test]
+fn coalesced_paste_and_ime_commit_use_change_without_keypress_before_deactivate() -> R {
+    for event in [
+        Event::Paste("pasted".into()),
+        Event::Ime(egui::ImeEvent::Commit("界".into())),
+    ] {
+        let mut s = app_with("Debug.Print Entry.Text", false, &text_handlers("", ""))?;
+        let mut events = if matches!(event, Event::Ime(_)) {
+            vec![preedit("か")]
+        } else {
+            vec![]
+        };
+        events.extend([event, pointer(true), pointer(false)]);
+        frame(&mut s, events, true)?;
+        pump(&mut s)?;
+        let output = s.ide.output();
+        assert_eq!(output.first().map(String::as_str), Some("activated"));
+        assert_eq!(
+            output
+                .get(output.len().saturating_sub(2))
+                .map(String::as_str),
+            Some("deactivated")
+        );
+        assert!(output.iter().any(|line| line == "change"));
+        assert!(
+            !output
+                .iter()
+                .any(|line| matches!(line.as_str(), "down" | "press" | "up"))
+        );
+        assert_eq!(s.clicks, 1);
+    }
+    Ok(())
+}
+#[test]
+fn composition_started_before_document_press_finishes_in_the_form() -> R {
+    for terminal in [
+        vec![Event::Ime(egui::ImeEvent::Commit("界".into()))],
+        vec![preedit("")],
+        vec![preedit(""), Event::Ime(egui::ImeEvent::Commit("界".into()))],
+    ] {
+        let commit = terminal
+            .iter()
+            .any(|event| matches!(event, Event::Ime(egui::ImeEvent::Commit(_))));
+        let mut s = app_with("Debug.Print Entry.Text", false, &text_handlers("", ""))?;
+        frame(&mut s, vec![preedit("か")], true)?;
+        frame(&mut s, vec![pointer(true), pointer(false)], true)?;
+        pump(&mut s)?;
+        assert!(!s.ide.output().iter().any(|line| line == "deactivated"));
+        let changes = s
+            .ide
+            .output()
+            .iter()
+            .filter(|line| *line == "change")
+            .count();
+        assert_eq!(s.clicks, 0);
+        assert!(frame(&mut s, terminal, true)?.is_empty());
+        pump(&mut s)?;
+        assert_eq!(s.clicks, 1);
+        if commit {
+            assert!(
+                s.ide
+                    .output()
+                    .iter()
+                    .filter(|line| *line == "change")
+                    .count()
+                    > changes
+            );
+            assert_eq!(s.ide.output().last().map(String::as_str), Some("界"));
+        }
+        assert!(!s.ide.output().iter().any(|line| line == "press"));
+        assert!(s.ide.output().iter().any(|line| line == "deactivated"));
+    }
+    Ok(())
+}
+#[test]
+fn prefix_text_is_not_lost_when_the_form_is_painted_on_a_later_pass() -> R {
+    let mut s = app_with("Debug.Print Entry.Text", false, &text_handlers("", ""))?;
+    let mut raw = raw(vec![
+        Event::Paste("kept".into()),
+        pointer(true),
+        pointer(false),
+    ]);
+    let area = raw.screen_rect;
+    assert!(
+        s.view
+            .document_raw_input(&s.ctx, &s.ide, s.document, area, true, &mut raw)
+            .is_none()
+    );
+    assert!(raw.events.is_empty());
+    // A host can skip all form UI while loading fonts. No form default has run.
+    assert_eq!(s.ide.output(), vec!["activated"]);
+    frame(&mut s, vec![], true)?;
+    pump(&mut s)?;
+    assert_eq!(
+        s.ide.output(),
+        vec!["activated", "change", "deactivated", "kept"]
+    );
+    assert_eq!(s.clicks, 1);
+    Ok(())
+}
+#[test]
+fn prefix_budget_and_identity_invalidation_discard_unapplied_form_input() -> R {
+    for reason in 0..5 {
+        let mut s = app_with("", false, &text_handlers("", ""))?;
+        let input = if reason == 0 {
+            Event::Text("a".repeat(65))
+        } else if reason == 1 {
+            Event::Paste("a".repeat(32769))
+        } else {
+            Event::Paste("stale".into())
+        };
+        let mut raw = raw(vec![input, pointer(true), pointer(false)]);
+        let command =
+            s.view
+                .document_raw_input(&s.ctx, &s.ide, s.document, raw.screen_rect, true, &mut raw);
+        if reason <= 1 {
+            assert!(matches!(command, Some(Command::Report(_))));
+        } else {
+            assert!(command.is_none());
+            match reason {
+                2 => s.ide.dispatch(Action::Reset, &mut NoHost)?,
+                3 => s.document += 1,
+                _ => s.authorized = false,
+            }
+        }
+        pump(&mut s)?;
+        assert_eq!(s.clicks, 0);
+        assert!(!s.view.document_input_pending());
+        assert!(
+            !s.ide
+                .output()
+                .iter()
+                .any(|line| matches!(line.as_str(), "change" | "deactivated"))
+        );
+    }
+    Ok(())
+}
+#[test]
+fn ime_continuation_during_stopped_prefix_stays_out_of_debugger_input() -> R {
+    let mut s = app_with("Debug.Print Entry.Text", false, &text_handlers("Stop", ""))?;
+    frame(
+        &mut s,
+        vec![key(true), preedit("か"), pointer(true), pointer(false)],
+        true,
+    )?;
+    pump(&mut s)?;
+    assert_eq!(s.ide.mode(), Mode::Break);
+    assert!(
+        frame(
+            &mut s,
+            vec![Event::Ime(egui::ImeEvent::Commit("界".into()))],
+            true
+        )?
+        .is_empty()
+    );
+    pump(&mut s)?;
+    assert_eq!(s.clicks, 0);
+    assert_eq!(s.ide.output(), vec!["activated", "down"]);
+    s.ide.dispatch(Action::Run, &mut NoHost)?;
+    pump(&mut s)?;
+    assert_eq!(s.clicks, 1);
+    assert_eq!(s.ide.output().last().map(String::as_str), Some("界"));
+    assert!(!s.ide.output().iter().any(|line| line == "press"));
+    Ok(())
+}
+#[test]
+fn modal_opened_by_prefix_cancels_the_document_gesture_but_keeps_the_key_receipt() -> R {
+    let handlers = text_handlers(
+        "Dim child As New NativeForm\nchild.Show\nDebug.Print \"returned\"",
+        "",
+    ) + "\nPrivate Sub Apply_Click()\nMe.Hide\nEnd Sub";
+    let mut s = app_with("", false, &handlers)?;
+    frame(
+        &mut s,
+        vec![
+            key(true),
+            Event::Text("a".into()),
+            key(false),
+            pointer(true),
+            pointer(false),
+        ],
+        true,
+    )?;
+    pump(&mut s)?;
+    assert_eq!(s.ide.mode(), Mode::Waiting);
+    assert!(!s.view.document_input_pending());
+    let child = s.ide.form_active_window().ok_or("modal child")?;
+    assert!(s.ide.form_instance_has_modal_window(child));
+    apply(
+        &mut s.ide,
+        Command::Form(vba_ui_egui::FormCommand::InstanceEvent(
+            child,
+            Some(13),
+            None,
+        )),
+        &mut NoHost,
+    )?;
+    pump(&mut s)?;
+    assert_eq!(s.ide.mode(), Mode::Completed);
+    let output = s.ide.output();
+    for label in ["down", "returned", "press", "change", "up"] {
+        assert_eq!(
+            output.iter().filter(|line| *line == label).count(),
+            1,
+            "{output:?}"
+        );
+    }
+    assert_eq!(s.clicks, 0);
+    Ok(())
+}
+#[test]
+fn composition_in_the_visible_source_editor_does_not_hold_a_later_document_press() -> R {
+    let mut s = app("", false)?;
+    let mut raw = raw(vec![preedit("source composition")]);
+    assert!(
+        s.view
+            .document_raw_input(&s.ctx, &s.ide, s.document, raw.screen_rect, false, &mut raw)
+            .is_none()
+    );
+    assert_eq!(raw.events, vec![preedit("source composition")]);
+    // The source editor consumed that input, without a form composition.
+    frame(&mut s, vec![pointer(true), pointer(false)], true)?;
+    pump(&mut s)?;
+    assert_eq!(s.ide.output(), vec!["activated", "deactivated"]);
+    assert_eq!(s.clicks, 1);
+    Ok(())
+}
+#[test]
+fn change_redirecting_to_another_modeless_form_does_not_strand_the_prefix_keyup() -> R {
+    for stopped in [false, true] {
+        let mut s = app_with(
+            if stopped {
+                "If Entry.Text=\"z\" Then Stop\nDebug.Print Entry.Text"
+            } else {
+                "Debug.Print Entry.Text"
+            },
+            false,
+            &text_handlers(
+                "",
+                "Static moved As Boolean\nIf Not moved Then\nmoved=True\nDim other As New NativeForm\nother.Show 0\nother.Entry.SetFocus\nEnd If",
+            ),
+        )?;
+        frame(
+            &mut s,
+            vec![
+                key(true),
+                Event::Text("a".into()),
+                key(false),
+                pointer(true),
+                pointer(false),
+            ],
+            true,
+        )?;
+        pump(&mut s)?;
+        if stopped {
+            assert_eq!(s.ide.mode(), Mode::Break);
+            assert_eq!(s.clicks, 0);
+            s.ide.dispatch(Action::Run, &mut NoHost)?;
+            pump(&mut s)?;
+        }
+        assert_eq!(s.ide.mode(), Mode::Completed);
+        assert_eq!(s.clicks, 1, "{:?}", s.ide.output());
+        assert!(!s.view.document_input_pending());
+        assert_eq!(
+            s.ide.output().iter().filter(|line| *line == "up").count(),
+            1,
+            "{:?}",
+            s.ide.output()
+        );
+        assert_eq!(
+            s.ide
+                .output()
+                .iter()
+                .filter(|line| *line == "deactivated")
+                .count(),
+            2
+        );
+    }
+    Ok(())
 }
 fn raw(events: Vec<Event>) -> RawInput {
     RawInput {

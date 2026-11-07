@@ -392,7 +392,7 @@ impl MouseScope {
             self.hit(hit);
         }
     }
-    pub(super) fn idle(&self) -> bool {
+    pub(crate) fn idle(&self) -> bool {
         !self.pending() && self.queue.is_empty() && self.capture.is_none()
     }
     pub(super) fn pending(&self) -> bool {
