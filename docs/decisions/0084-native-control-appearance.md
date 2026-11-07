@@ -1,6 +1,6 @@
 # ADR 0084: Native control borders, effects and backgrounds
 
-Date: 2026-11-07. Status: selected shared and affected host acceptance passed. M7A.4 remains open.
+Date: 2026-11-07. Status: selected acceptance passed; list-renderer follow-up shared gates passed, affected host gates pending. M7A.4 remains open.
 
 ## Ownership and data
 
@@ -72,3 +72,9 @@ References:
 - [LabelDataBlock](https://learn.microsoft.com/en-us/openspecs/office_file_formats/ms-oforms/1d97ecdc-e827-49e8-88be-657eb3007f7d)
 - [FormDataBlock](https://learn.microsoft.com/en-us/openspecs/office_file_formats/ms-oforms/096870e8-5263-44ed-885b-379d23471c4f)
 - [ImageDataBlock](https://learn.microsoft.com/en-us/openspecs/office_file_formats/ms-oforms/e004baf2-792b-403e-b589-c16ba25ee696)
+
+Follow-up renderer audit: native ListBox no longer paints an unconditional
+outline underneath its canonical border/effect. The shared list view retains an
+independent frame only when serving a ComboBox popup. A GPU regression checks
+flat/borderless and requested single-border pixels; the five-view appearance and
+browser fixtures now include lists. Follow-up acceptance is recorded in progress.

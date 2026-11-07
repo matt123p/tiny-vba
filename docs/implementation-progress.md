@@ -1,5 +1,26 @@
 # Implementation progress
 
+## M7A.4 continued — native list border ownership (2026-11-07)
+
+The subsequent renderer audit found an unconditional ListBox outline underneath
+its canonical BorderStyle/SpecialEffect painting. The list view now leaves that
+outside edge to the native control. ComboBox popups retain their separate frame.
+A real GPU regression checks flat/borderless and single-border lists against exact
+background, foreground and requested border pixels. Appearance snapshots and the
+modal browser fixture include runtime-created lists. Six appearance GPU cases
+pass. Full shared CI, strict Clippy, WASM/WASI, UI/native/web, repository and all
+four Chromium flows pass. Five theme/scale views and the modal browser view
+were inspected. Affected host follow-up acceptance is in progress. This is a
+correction within ADR 0084, with no new API, canonical store, VM or budget change.
+Full M7A.4 and its unchanged remaining checklist remain open.
+
+Next smallest common-property task: audit and implement applicable native
+[TextAlign](https://learn.microsoft.com/en-us/office/vba/language/reference/user-interface-help/textalign-property)
+from the already retained ParagraphAlign metadata, through ordinary typed state,
+local text layout and pointer/caret geometry. ComboBox edit-region alignment must
+remain independent of popup list alignment. This does not replace the remaining
+lifecycle, input, binding, other members, image/RefEdit and ActiveX/platform work.
+
 ## M7A.4 continued — native appearance and member audit (2026-11-07)
 
 ADRs 0083–0085 correct Page appearance ownership, retain native border/effect/

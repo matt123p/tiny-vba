@@ -198,3 +198,29 @@ fn unused_transparent_and_flat_frame_palette_values_do_not_show_unavailable_noti
     );
     Ok(())
 }
+
+#[test]
+fn flat_borderless_lists_do_not_keep_an_unconditional_outline() -> R {
+    let prefix = "Dim rows As MSForms.ListBox\nSet rows=NativeForm.Controls.Add(\"Forms.ListBox.1\",\"Rows\")\nrows.Left=160\nrows.Top=24\nrows.Width=100\nrows.Height=70\nrows.BackColor=RGB(31,53,79)\nrows.ForeColor=RGB(170,190,210)\nrows.BorderColor=RGB(80,30,20)\nrows.SpecialEffect=0\nrows.BorderStyle=0\n";
+    let mut flat = app(prefix, Theme::light())?;
+    let pixels = flat.render()?;
+    assert!(!pixels.pixels().any(|p| p.0 == [170, 190, 210, 255]));
+    let bounds = flat
+        .get(
+            egui_kittest::kittest::By::new()
+                .label("Rows")
+                .role(egui::accesskit::Role::ListBox),
+        )
+        .rect();
+    assert_eq!(
+        pixels
+            .get_pixel(bounds.center().x as u32, bounds.center().y as u32)
+            .0,
+        [31, 53, 79, 255]
+    );
+    let mut single = app(&format!("{prefix}rows.BorderStyle=1"), Theme::light())?;
+    let pixels = single.render()?;
+    assert!(!pixels.pixels().any(|p| p.0 == [170, 190, 210, 255]));
+    assert!(pixels.pixels().filter(|p| p.0 == [80, 30, 20, 255]).count() > 50);
+    Ok(())
+}

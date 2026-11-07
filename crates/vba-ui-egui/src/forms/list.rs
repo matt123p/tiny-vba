@@ -69,7 +69,13 @@ impl ListBox<'_> {
             self.bounds,
             0.,
             self.theme.editor,
-            egui::Stroke::new(1., self.theme.text),
+            if self.control.kind == ControlKind::ComboBox {
+                egui::Stroke::new(1., self.theme.text)
+            } else {
+                // The owning native control paints its canonical border/effect.
+                // A ComboBox popup has an independent frame.
+                egui::Stroke::NONE
+            },
             egui::StrokeKind::Inside,
         );
         if response.has_focus() {
