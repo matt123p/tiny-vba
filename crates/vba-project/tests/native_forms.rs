@@ -44,6 +44,64 @@ fn native_export_decodes_three_controls_and_keeps_exact_source_and_resources() {
     // A raw CFB at the exact referenced offset is separately accepted.
     assert_eq!(decode(&bytes[4..]).unwrap().design, f.design);
 }
+#[test]
+fn native_colour_packets_keep_signed_ole_bits_defaults_and_original_resources() {
+    let default = decode(&fixture::companion()).unwrap();
+    assert_eq!(default.design.colors.back, 0x8000000fu32 as i32);
+    assert_eq!(default.design.controls[1].colors.back, 0x80000005u32 as i32);
+    assert_eq!(default.design.controls[1].colors.fore, 0x80000008u32 as i32);
+    for (back, fore) in [
+        (197121, 394500),
+        (i32::MIN, 0x01000009),
+        (0x02030201, 0x80000012u32 as i32),
+    ] {
+        let bytes = fixture::color_companion(back, fore);
+        let form = decode(&bytes).unwrap();
+        assert_eq!(form.design.colors, forms::Colors { back, fore });
+        assert!(
+            form.design
+                .controls
+                .iter()
+                .all(|c| c.colors == forms::Colors { back, fore })
+        );
+        assert_eq!(form.resources[1].bytes, bytes);
+    }
+    for value in [-1, 0x03000000, 0x01010000, 0x80000019u32 as i32] {
+        assert!(decode(&fixture::color_companion(value, 0)).is_err());
+    }
+}
+#[test]
+fn frame_colours_reconcile_with_binary_properties_and_stay_inert() {
+    let frame = fixture::frame(false).replace(
+        " Caption",
+        " BackColor = &H00030201&\r\n ForeColor = -2147483630\r\n Caption",
+    );
+    let form = forms::decode_export(
+        "NativeForm.frm",
+        format!("{frame}{}", fixture::SOURCE).as_bytes(),
+        1252,
+        &[],
+        &Limits::default(),
+    )
+    .unwrap();
+    assert_eq!(form.design.colors.back, 197121);
+    let export = String::from_utf8(fixture::export())
+        .unwrap()
+        .replace(" Caption", " BackColor = 123\r\n Caption");
+    assert!(
+        forms::decode_export(
+            "NativeForm.frm",
+            export.as_bytes(),
+            1252,
+            &[Resource {
+                name: "NativeForm.frx".into(),
+                bytes: fixture::color_companion(456, 0)
+            }],
+            &Limits::default()
+        )
+        .is_err()
+    );
+}
 pub fn embedded() -> Vec<u8> {
     let mut spec = support::Spec::new("NativeForm", "DesignerStorage", "BaseClass");
     spec.source = fixture::SOURCE.as_bytes().to_vec();

@@ -199,8 +199,21 @@ fn container(
         | (1 << 26)
         | (1 << 27);
     let m = mask(&mut b, allowed, 1 << 27)? as u64;
-    for bit in [1, 2, 3] {
-        field(&mut b, m, bit, 4, 0)?;
+    let mut colors = super::Colors {
+        back: field(&mut b, m, 1, 4, 0x8000000f)? as i32,
+        fore: field(&mut b, m, 2, 4, 0x80000012)? as i32,
+    };
+    field(&mut b, m, 3, 4, 0)?;
+    for (name, bit, target) in [
+        ("backcolor", 1, &mut colors.back),
+        ("forecolor", 2, &mut colors.fore),
+    ] {
+        if let Some(value) = frame::color(header, name)? {
+            if m & (1 << bit) != 0 && *target != value {
+                return Err(corrupt("conflicting native form colours"));
+            }
+            *target = value;
+        }
     }
     let flags = field(&mut b, m, 6, 4, 4)?;
     if flags & !0xc004 != 0 || depth == 0 && flags & 4 == 0 {
@@ -334,6 +347,7 @@ fn container(
             children.push(child_root);
             let frame_id = site.id;
             controls.push(Control {
+                colors: child.design.colors,
                 accelerator: String::new(),
                 id: site.id,
                 parent: None,
@@ -421,7 +435,15 @@ fn container(
             )));
         }
     }
-    Ok(NativeForm { format: Format::Embedded, name: header.name.clone(), code_page: 1252, source: String::new(), attributes: vec![], design: Design { caption, enabled: flags&4!=0, tag: frame::metadata(header)?.0, help_context_id: frame::metadata(header)?.1, width,height,controls }, resources: vec![], diagnostics: vec!["Native resources retained; fonts, colours, decoration and window placement use the existing shared renderer. Full Office presentation/lifecycle parity is tracked separately in M7A.4.".into()] })
+    if !super::valid_color(colors.back)
+        || !super::valid_color(colors.fore)
+        || controls
+            .iter()
+            .any(|c| !super::valid_color(c.colors.back) || !super::valid_color(c.colors.fore))
+    {
+        return Err(corrupt("invalid native OLE_COLOR"));
+    }
+    Ok(NativeForm { format: Format::Embedded, name: header.name.clone(), code_page: 1252, source: String::new(), attributes: vec![], design: Design { colors, caption, enabled: flags&4!=0, tag: frame::metadata(header)?.0, help_context_id: frame::metadata(header)?.1, width,height,controls }, resources: vec![], diagnostics: vec!["Native resources retained; fonts, decoration and window placement remain partial. Palette-indexed colours require the embedding's colour resolver; native RGB/system colours are rendered. Full Office presentation/lifecycle parity is tracked separately in M7A.4.".into()] })
 }
 struct Site {
     id: u32,
@@ -564,6 +586,7 @@ fn control(bytes: &[u8], site: Site) -> Result<Control> {
     let mut locked = false;
     let accelerator;
     let mut text_behavior = super::TextBehavior::default();
+    let mut colors = super::Colors::for_kind(site.kind);
     let (caption, text, width, height, enabled) = if matches!(
         site.kind,
         Kind::TextBox
@@ -633,8 +656,8 @@ fn control(bytes: &[u8], site: Site) -> Result<Control> {
             text_behavior.recall_selection = flags & (1 << 21) != 0;
             text_behavior.tab_key = flags & (1 << 22) != 0;
         }
-        field(&mut b, m, 1, 4, 0)?;
-        field(&mut b, m, 2, 4, 0)?;
+        colors.back = field(&mut b, m, 1, 4, colors.back as u32)? as i32;
+        colors.fore = field(&mut b, m, 2, 4, colors.fore as u32)? as i32;
         max_length = i32::try_from(field(&mut b, m, 3, 4, 0)?)
             .map_err(|_| unsupported("TextBox MaxLength exceeds Long"))?;
         field(&mut b, m, 4, 1, 0)?;
@@ -744,8 +767,8 @@ fn control(bytes: &[u8], site: Site) -> Result<Control> {
             0x17f
         };
         let m = mask(&mut b, allowed, 1 << 5)? as u64;
-        field(&mut b, m, 0, 4, 0)?;
-        field(&mut b, m, 1, 4, 0)?;
+        colors.fore = field(&mut b, m, 0, 4, colors.fore as u32)? as i32;
+        colors.back = field(&mut b, m, 1, 4, colors.back as u32)? as i32;
         let default = if site.kind == Kind::Label {
             0x0080_001b
         } else {
@@ -777,6 +800,7 @@ fn control(bytes: &[u8], site: Site) -> Result<Control> {
     text_props(&mut r)?;
     r.end()?;
     Ok(Control {
+        colors,
         accelerator,
         id: site.id,
         parent: None,
@@ -814,8 +838,10 @@ fn control(bytes: &[u8], site: Site) -> Result<Control> {
 fn numeric_control(r: Reader<'_>, mut b: Reader<'_>, site: Site) -> Result<Control> {
     let spin = site.kind == Kind::SpinButton;
     let m = u64::from(mask(&mut b, if spin { 0x5fef } else { 0xbeff }, 1 << 3)?);
-    field(&mut b, m, 0, 4, 0)?;
-    field(&mut b, m, 1, 4, 0)?;
+    let colors = super::Colors {
+        fore: field(&mut b, m, 0, 4, 0x80000012)? as i32,
+        back: field(&mut b, m, 1, 4, 0x8000000f)? as i32,
+    };
     let flags = field(&mut b, m, 2, 4, 0x1b)?;
     if flags & !2 != 0x19 {
         return Err(unsupported("numeric control behavior flags"));
@@ -859,6 +885,7 @@ fn numeric_control(r: Reader<'_>, mut b: Reader<'_>, site: Site) -> Result<Contr
     b.end()?;
     r.end()?;
     Ok(Control {
+        colors,
         accelerator: String::new(),
         id: site.id,
         parent: None,

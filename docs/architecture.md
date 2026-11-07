@@ -539,3 +539,10 @@ Reset/context invalidation discards unapplied input; a modal opened by the prefi
 cancels the later document gesture while preserving the parked keyboard receipt.
 No VM/foreign behavior or budget changes. Full M7A.4 and platform/Office comparison
 requirements remain open.
+
+[Native colours (ADR 0080)](decisions/0080-native-form-colours.md) retain signed
+OLE_COLOR metadata and ordinary BackColor/ForeColor fields, with RGB/system-theme
+rendering and an injected UI palette resolver. Invalid assignments preserve prior
+state; import/source/resources and inert inspection remain separate. Runtime Page
+lookup searches the existing MultiPage collections. Font/border/transparency,
+ambient/platform appearance and the full M7A.4 checklist remain open.

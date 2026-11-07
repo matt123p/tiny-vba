@@ -366,3 +366,10 @@ completed document-pass acknowledgment. Keep debugger input available at Stop;
 repaint before replay after skipped/hidden document passes. Reset/source/document/
 trust/geometry changes and authored activation invalidate retained input. No new
 VM/foreign behavior or increased budget is implied; full M7A.4 remains partial.
+
+ADR 0080 keeps native OLE_COLOR bits in ordinary BackColor/ForeColor fields and
+native metadata, never the legacy codec or a second mutable colour store. UI
+resolution uses injected theme/palette policy and reports unresolved client
+entries. Preserve typed errors, inert inspection, instance/lifetime/Stop/Reset and
+original resources. Existing collections own runtime MultiPage/Page lookup.
+Font/border/transparency, ambient/platform appearance and full M7A.4 stay open.

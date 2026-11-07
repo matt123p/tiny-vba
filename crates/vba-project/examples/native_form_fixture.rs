@@ -16,6 +16,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let frames = option.as_deref() == Some("--frame-controls");
     let metadata = option.as_deref() == Some("--metadata");
     let window_activation = option.as_deref() == Some("--window-activation");
+    let colors = option.as_deref() == Some("--colors");
     let nested_mouse = option.as_deref() == Some("--nested-mouse");
     let composite_mouse = option.as_deref() == Some("--composite-mouse");
     let combo = option.as_deref() == Some("--combo-controls") || composite_mouse;
@@ -54,7 +55,8 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             | "--text-mouse"
             | "--composite-mouse"
             | "--nested-mouse"
-            | "--window-activation",
+            | "--window-activation"
+            | "--colors",
         ) => false,
         Some(_) => return Err("unknown fixture option".into()),
     };
@@ -86,6 +88,10 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         "Stop\r\nDebug.Print Entry.Text"
     };
     let mut text = String::from_utf8(fixture::export())?.replace("Debug.Print Entry.Text", body);
+    if colors {
+        let code = "Attribute VB_Name = \"NativeForm\"\nAttribute VB_PredeclaredId = True\nOption Explicit\nPrivate Sub UserForm_Initialize()\nMe.BackColor=RGB(230,240,250)\nHeading.BackColor=RGB(200,230,190)\nEntry.EnterFieldBehavior=1\nEntry.ForeColor=RGB(80,30,20)\nApply.BackColor=RGB(190,220,240)\nDebug.Print \"colours ready\"\nEnd Sub\nPrivate Sub Apply_Click()\nEntry.BackColor=RGB(250,230,200)\nDebug.Print Entry.BackColor\nStop\nEntry.ForeColor=RGB(1,2,3)\nDebug.Print Entry.ForeColor\nMe.Hide\nEnd Sub\n".replace('\n',"\r\n");
+        text = String::from_utf8(fixture::export())?.replace(fixture::SOURCE, &code);
+    }
     if window_activation {
         text = String::from_utf8(fixture::export())?.replace(
             fixture::SOURCE,

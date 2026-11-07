@@ -269,6 +269,7 @@ Public VbaContext As VbaFormControlContext
 "#,
     );
     source.push_str(crate::form_tab_state::MEMBER);
+    source.push_str(&crate::form_colors::members(false, true));
     source.push_str(&COMMON.replace("Public Property Get Parent() As Object\n", "Public Property Get Parent() As Object\nIf Not VbaPosition.VbaAttached Then Err.Raise 91\n"));
     source=source.replace("Dim owner As Object\nRaiseEvent VbaParentRequested(Me,owner)\nIf owner Is Nothing Then Err.Raise 91\nSet Parent=owner", "If Not VbaPosition.VbaAttached Then Err.Raise 91\nSet Parent=VbaState.VbaOwner()");
     source.push_str(
@@ -278,7 +279,7 @@ Public VbaContext As VbaFormControlContext
     );
     source = source.replace(
         "Set VbaChildren=New VbaFormControls\n",
-        "Set VbaChildren=New VbaFormControls\nSet VbaPosition=New VbaFormTabPosition\nVbaKind=14\n",
+        "Set VbaChildren=New VbaFormControls\nSet VbaPosition=New VbaFormTabPosition\nVbaKind=14\nVbaBackColor=-2147483633\nVbaForeColor=-2147483630\n",
     );
     source.push_str("Public Sub VbaConfigureRuntime(ByVal owner As Object,ByVal model As Object)\nVbaParentKey=owner.VbaId\nSet VbaContext=owner.VbaContext\nVbaConfigureChildren\nIf model Is Nothing Then\nVbaTop=15\nVbaWidth=owner.Width\nVbaHeight=owner.Height-15\nIf VbaHeight<0 Then VbaHeight=0\nElse\nVbaLeft=model.VbaLeft\nVbaTop=model.VbaTop\nVbaWidth=model.VbaWidth\nVbaHeight=model.VbaHeight\nEnd If\nEnd Sub\n");
     if let Some(start) = source.find("Public Property Get Parent() As Object")

@@ -107,6 +107,58 @@ fn streams_with_controls(
 pub fn companion() -> Vec<u8> {
     companion_with_properties(0, false, false)
 }
+/// Authored RGB/palette cases; colours are the only added persisted properties.
+pub fn color_companion(back: i32, fore: i32) -> Vec<u8> {
+    let leaf = |caption: &str| {
+        let mut b = u32s(&[
+            0x2b,
+            fore as u32,
+            back as u32,
+            0x80000000 | caption.len() as u32,
+        ]);
+        b.extend(string(caption));
+        b.extend(u32s(&[2540, 635]));
+        let mut out = record(0x200, &b);
+        out.extend(record(0x200, &[0; 4]));
+        out
+    };
+    let mut b = u32s(&[
+        0x80400106,
+        0,
+        back as u32,
+        fore as u32,
+        0x80000007,
+        2540,
+        635,
+    ]);
+    b.extend(string("initial"));
+    let mut text = record(0x200, &b);
+    text.extend(record(0x200, &[0; 4]));
+    let mut streams = streams_with_controls(
+        vec![leaf("Authored label"), text, leaf("Apply")],
+        false,
+        false,
+    );
+    let f = &mut streams[0].1;
+    let n = u16::from_le_bytes(f[2..4].try_into().unwrap()) as usize;
+    let mask = u32::from_le_bytes(f[4..8].try_into().unwrap());
+    let mut b = u32s(&[mask | 6, back as u32, fore as u32]);
+    b.extend_from_slice(&f[8..n + 4]);
+    let mut encoded = record(0x400, &b);
+    encoded.extend_from_slice(&f[n + 4..]);
+    *f = encoded;
+    let mut file = cfb::CompoundFile::create(Cursor::new(Vec::new())).unwrap();
+    for (name, bytes) in streams {
+        file.create_stream(format!("/{name}"))
+            .unwrap()
+            .write_all(&bytes)
+            .unwrap();
+    }
+    let bytes = file.into_inner().into_inner();
+    let mut out = (bytes.len() as u32).to_le_bytes().to_vec();
+    out.extend(bytes);
+    out
+}
 pub fn companion_with_properties(max_length: u32, default: bool, cancel: bool) -> Vec<u8> {
     let mut file = cfb::CompoundFile::create(Cursor::new(Vec::new())).unwrap();
     for (name, bytes) in streams_with_properties(max_length, default, cancel) {

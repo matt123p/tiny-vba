@@ -49,6 +49,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         .nth(2)
         .is_some_and(|o| o == "--frame-controls");
     let metadata = std::env::args().nth(2).is_some_and(|o| o == "--metadata");
+    let colors = std::env::args().nth(2).is_some_and(|o| o == "--colors");
     for (name, theme, width, scale) in [
         ("light", Theme::light(), 1400., 1.),
         ("dark", Theme::dark(), 1400., 1.),
@@ -79,14 +80,16 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                     fixture::combo_companion(3, 1)
                 } else if lists {
                     fixture::list_companion()
-                } else if runtime_controls {
+                } else if runtime_controls || colors {
                     fixture::companion()
                 } else {
                     fixture::boolean_companion()
                 },
             }],
         )?;
-        let main = if runtime_controls {
+        let main = if colors {
+            "Sub Main()\nDim a As New NativeForm,b As New NativeForm\na.Caption=\"Native RGB colours\"\nb.Caption=\"Separate colour state\"\na.BackColor=RGB(230,240,250)\na.Heading.BackColor=RGB(200,230,190)\na.Heading.ForeColor=RGB(70,20,90)\na.Entry.BackColor=RGB(250,230,200)\na.Entry.ForeColor=RGB(80,30,20)\na.Entry.EnterFieldBehavior=1\na.Apply.BackColor=RGB(190,220,240)\na.Apply.ForeColor=RGB(10,50,100)\na.Show 0\nb.Show 0\nEnd Sub"
+        } else if runtime_controls {
             "Sub Main()\nDim group As MSForms.Frame,entry As MSForms.TextBox,list As MSForms.ListBox,button As MSForms.CommandButton\nNativeForm.Caption=\"Runtime native controls\"\nNativeForm.Width=360\nNativeForm.Height=340\nSet group=NativeForm.Controls.Add(\"Forms.Frame.1\",\"RuntimeGroup\")\ngroup.Caption=\"Added through Controls.Add\"\ngroup.Top=100\ngroup.Width=320\ngroup.Height=200\nSet entry=group.Controls.Add(\"Forms.TextBox.1\",\"RuntimeEntry\")\nentry.Text=\"Canonical runtime text\"\nentry.Left=10\nentry.Top=24\nentry.Width=270\nSet list=group.Controls.Add(\"Forms.ListBox.1\",\"RuntimeList\")\nlist.Left=10\nlist.Top=60\nlist.Width=180\nlist.Height=110\nlist.AddItem \"Alpha\"\nlist.AddItem \"Beta\"\nlist.AddItem \"Gamma\"\nlist.MultiSelect=2\nlist.Selected(0)=True\nlist.Selected(2)=True\nSet button=group.Controls.Add(\"Forms.CommandButton.1\",\"RuntimeButton\")\nbutton.Caption=\"Action\"\nbutton.Left=205\nbutton.Top=90\nNativeForm.Show 0\nlist.SetFocus\nlist.ListIndex=1\nEnd Sub"
         } else if multiple {
             "Sub Main()\nDim a As New NativeForm,b As New NativeForm\na.Caption=\"Multi selection\"\nb.Caption=\"Extended selection\"\na.List1.MultiSelect=1\nb.List1.MultiSelect=2\na.List1.Height=100\nb.List1.Height=100\na.List1.AddItem \"Alpha\"\na.List1.AddItem \"Beta\"\na.List1.AddItem \"Gamma\"\nb.List1.AddItem \"Alpha\"\nb.List1.AddItem \"Beta\"\nb.List1.AddItem \"Gamma\"\na.List1.Selected(0)=True\na.List1.Selected(2)=True\nb.List1.Selected(0)=True\nb.List1.Selected(2)=True\na.Show 0\nb.Show 0\nb.List1.SetFocus\nb.List1.ListIndex=1\nEnd Sub"
@@ -180,7 +183,9 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                 return Err("expected native tooltip".into());
             }
         }
-        let prefix = if runtime_controls {
+        let prefix = if colors {
+            "m7a4-native-colors"
+        } else if runtime_controls {
             "m7a4-runtime-controls"
         } else if multiple {
             "m7a4-multiple-selection"

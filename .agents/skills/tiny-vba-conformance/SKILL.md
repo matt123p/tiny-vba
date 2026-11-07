@@ -279,3 +279,10 @@ ADR 0076 parks raw input scopes for modal callers (at most eight existing waits)
 and keeps a shared 64-event queue. Preserve original capture release, owner-local
 keyboard/mouse barriers, canonical receipts, normal authorization and full Reset
 invalidation. Selected nested Stop/unload/Reset cases do not finish L02/M7A.4.
+
+ADR 0080 keeps native OLE_COLOR bits in ordinary BackColor/ForeColor fields and
+native metadata, never the legacy codec or a second mutable colour store. UI
+resolution uses injected theme/palette policy and reports unresolved client
+entries. Preserve typed errors, inert inspection, instance/lifetime/Stop/Reset and
+original resources. Existing collections own runtime MultiPage/Page lookup.
+Font/border/transparency, ambient/platform appearance and full M7A.4 stay open.

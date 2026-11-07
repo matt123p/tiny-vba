@@ -1,6 +1,7 @@
 //! Reusable form designer and real runtime controls. All edits/events are explicit IDE commands.
 use super::*;
 mod accelerator;
+mod colors;
 mod combo;
 mod images;
 pub(super) mod keyboard;
@@ -1180,6 +1181,7 @@ impl EditorUi {
         });
         let keyboard_owner = input.owner;
         let key_blocked = input.blocked;
+        let system_theme = theme;
         for instance in instances {
             let id = instance.source;
             let Some(designer) = ide.form(id).filter(|_| ide.form_instance_visible(instance))
@@ -1196,6 +1198,11 @@ impl EditorUi {
                     || self.form_keys.busy() && !self.form_mouse.pending())
                 && !(key_blocked && keyboard_owner == Some(instance));
             let native = ide.native_form(id).is_some();
+            let theme = if native {
+                colors::theme(ide, instance, None, system_theme)
+            } else {
+                system_theme
+            };
             if let Some((owner, control)) = ide
                 .form_range_selection()
                 .ok()
@@ -1218,13 +1225,13 @@ impl EditorUi {
                     .title_bar(false)
                     .frame(
                         egui::Frame::new()
-                            .fill(theme.chrome)
+                            .fill(system_theme.chrome)
                             .stroke(egui::Stroke::new(1., theme.border))
                             .corner_radius(5)
                             .inner_margin(8),
                     )
                     .show(ctx, |ui| {
-                        window_theme(ui, theme);
+                        window_theme(ui, system_theme);
                         ui.heading(
                             ide.form_instance_field(instance, None, "Caption")
                                 .map(control_text)
@@ -1262,7 +1269,11 @@ impl EditorUi {
                                     bounds,
                                     widget,
                                     enabled: true,
-                                    theme,
+                                    theme: if native {
+                                        colors::theme(ide, instance, Some(c.id), system_theme)
+                                    } else {
+                                        system_theme
+                                    },
                                 },
                                 picker: true,
                             }
@@ -1489,7 +1500,21 @@ impl EditorUi {
             let mut rendered_focus = Vec::new();
             let mut rendered_root = None;
             let show = |ui: &mut egui::Ui| {
-                window_theme(ui, theme);
+                // Window/debugger chrome belongs to the host theme. Authored
+                // BackColor paints only the form client canvas below it.
+                window_theme(ui, system_theme);
+                if native
+                    && (colors::unresolved(ide, instance, None, system_theme)
+                        || form
+                            .controls
+                            .iter()
+                            .any(|c| colors::unresolved(ide, instance, Some(c.id), system_theme)))
+                {
+                    ui.label(
+                        system_theme
+                            .label("Some form colours are unavailable in the current palette."),
+                    );
+                }
                 ui.horizontal(|ui| {
                     ui.heading(
                         ide.form_instance_field(instance, None, "Caption")
@@ -1520,6 +1545,7 @@ impl EditorUi {
                         ),
                         egui::Sense::hover(),
                     );
+                    if native { ui.painter().rect_filled(rect,0.,theme.editor); }
                     if native {
                         self.form_mouse.hit(mouse::Hit{owner:instance,control:None,object:instance.object,rect:rect.intersect(ui.clip_rect()),origin:rect.min,parent:rect.min,kind:None,part:mouse::Part::Body});
                     }
@@ -1605,6 +1631,17 @@ impl EditorUi {
                         let control_scope=if let Some(parent)=c.parent {control_scope.accessibility_parent(ui.scope_id().with(("runtime.control",parent)))} else {control_scope};
                         {
                             let mut control_ui=ui.new_child(control_scope.max_rect(bounds));
+                            let theme = if native { colors::theme(ide,instance,Some(c.id),system_theme) } else {system_theme};
+                            if native {
+                                window_theme(&mut control_ui,theme);
+                                let widgets = &mut control_ui.visuals_mut().widgets;
+                                for visual in [&mut widgets.inactive, &mut widgets.hovered, &mut widgets.active] {
+                                    visual.bg_fill=theme.editor;
+                                    visual.weak_bg_fill=theme.editor;
+                                    visual.fg_stroke.color=theme.text;
+                                }
+                                control_ui.painter().rect_filled(bounds,0.,theme.editor);
+                            }
                             control_ui.add_enabled_ui(enabled, |ui| match c.kind {
                                 ControlKind::Frame | ControlKind::Page=> {
                                     let response=ui.interact(bounds,widget_id,if c.kind==ControlKind::Page {egui::Sense::hover()}else{egui::Sense::click()});
@@ -1796,7 +1833,7 @@ impl EditorUi {
                 egui::Modal::new(scope)
                     .frame(
                         egui::Frame::new()
-                            .fill(theme.chrome)
+                            .fill(system_theme.chrome)
                             .stroke(egui::Stroke::new(1.0, theme.border))
                             .corner_radius(5)
                             .inner_margin(8),
@@ -1814,7 +1851,7 @@ impl EditorUi {
                 .id(scope)
                 .frame(
                     egui::Frame::new()
-                        .fill(theme.chrome)
+                        .fill(system_theme.chrome)
                         .stroke(egui::Stroke::new(1.0, theme.border))
                         .corner_radius(5)
                         .inner_margin(8),

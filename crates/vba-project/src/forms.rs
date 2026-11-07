@@ -32,9 +32,56 @@ pub enum Kind {
     Image,
     RefEdit,
 }
+/// Original OLE_COLOR values. Resolution is a caller/UI concern, never import IO.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct Colors {
+    pub back: i32,
+    pub fore: i32,
+}
+impl Colors {
+    pub fn for_kind(kind: Kind) -> Self {
+        if matches!(
+            kind,
+            Kind::TextBox
+                | Kind::RefEdit
+                | Kind::CheckBox
+                | Kind::OptionButton
+                | Kind::ToggleButton
+                | Kind::ListBox
+                | Kind::ComboBox
+        ) {
+            Self {
+                back: 0x80000005u32 as i32,
+                fore: 0x80000008u32 as i32,
+            }
+        } else {
+            Self::default()
+        }
+    }
+}
+impl Default for Colors {
+    fn default() -> Self {
+        Self {
+            back: 0x8000000fu32 as i32,
+            fore: 0x80000012u32 as i32,
+        }
+    }
+}
+/// OLE RGB, palette-relative RGB, client palette indices and defined system indices.
+pub fn valid_color(value: i32) -> bool {
+    let raw = value as u32;
+    let payload = raw & 0x00ff_ffff;
+    match raw >> 24 {
+        0 | 2 => true,
+        1 => payload <= 0xffff,
+        0x80 => payload <= 24 || (26..=30).contains(&payload),
+        _ => false,
+    }
+}
 /// Coordinates are original signed HIMETRIC units, not pixels or points.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Control {
+    pub colors: Colors,
     pub id: u32,
     /// Immediate native container site ID; None denotes the UserForm.
     pub parent: Option<u32>,
@@ -143,6 +190,7 @@ impl Default for TextBehavior {
 }
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Design {
+    pub colors: Colors,
     pub caption: String,
     pub enabled: bool,
     pub tag: String,

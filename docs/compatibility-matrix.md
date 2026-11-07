@@ -1,6 +1,6 @@
 # Compatibility matrix
 
-Updated 2026-11-05. Stage: M5 document/event/UDF profile accepted against GridCraft; M6 signed off for its tested integration profile (see the [M6.5 check](m6-context-resolution-check.md)); M6A VBA intrinsic coverage accepted for the [declared profile](m6a-acceptance.md), with GridCraft and WordCraft pinned to the published shared revision; **M7 authored unchanged-document/package acceptance is complete for [m7-unchanged-v1](m7-acceptance.md)**; **M7A is in progress: native Button metadata and selected native UserForm import/attachment are implemented; broader semantics, native edited saving and .tvform removal remain open**; M8 release gates remain. **The documented m5-host-v1 consumer, including M3 control, M4 scalar widths and IR 4 host roots, has execution evidence; the 44 authored and 153 reviewed fixtures remain asserted PASS.**
+Updated 2026-11-07. Stage: M5 document/event/UDF profile accepted against GridCraft; M6 signed off for its tested integration profile (see the [M6.5 check](m6-context-resolution-check.md)); M6A VBA intrinsic coverage accepted for the [declared profile](m6a-acceptance.md), with GridCraft and WordCraft pinned to the published shared revision; **M7 authored unchanged-document/package acceptance is complete for [m7-unchanged-v1](m7-acceptance.md)**; **M7A is in progress: native Button metadata and selected native UserForm import/attachment are implemented; broader semantics, native edited saving and .tvform removal remain open**; M8 release gates remain. **The documented m5-host-v1 consumer, including M3 control, M4 scalar widths and IR 4 host roots, has execution evidence; the 44 authored and 153 reviewed fixtures remain asserted PASS.**
 
 | Dimension | Status | Evidence / next gate |
 | Imported object member dispatch | Implemented binder correction, including getter aliases | ADR 0017/0025; vba-vm/tests/embedding.rs preserves actual Get/Call/Let/Set, named arguments and returned object targets |
@@ -304,3 +304,10 @@ current callback owner, and Reset/unload discard stale defaults. The shared raw
 queue stays at 64, modal scope depth stays bounded by eight existing waits, and
 canonical state/receipts remain ordinary VBA. Selected nested lifecycle/input
 cases are covered; L02 and the full M7A.4 checklist remain partial.
+
+[Native colours (ADR 0080)](decisions/0080-native-form-colours.md) retain signed
+OLE_COLOR metadata and ordinary BackColor/ForeColor fields, with RGB/system-theme
+rendering and an injected UI palette resolver. Invalid assignments preserve prior
+state; import/source/resources and inert inspection remain separate. Runtime Page
+lookup searches the existing MultiPage collections. Font/border/transparency,
+ambient/platform appearance and the full M7A.4 checklist remain open.

@@ -31,8 +31,10 @@ pub(super) fn control(bytes: &[u8], site: Site) -> Result<Control> {
     let allowed = 0x00fe_bf77u32;
     let m = mask(&mut b, allowed, (1 << 4) | (1 << 19))? as u64;
     let selected = field(&mut b, m, 0, 4, u32::MAX)? as i32;
-    field(&mut b, m, 1, 4, 0x8000000f)?;
-    field(&mut b, m, 2, 4, 0x80000012)?;
+    let colors = crate::forms::Colors {
+        back: field(&mut b, m, 1, 4, 0x8000000f)? as i32,
+        fore: field(&mut b, m, 2, 4, 0x80000012)? as i32,
+    };
     let items_size = field(&mut b, m, 5, 4, 0)?;
     if field(&mut b, m, 6, 1, 0)? != 0 {
         return Err(unsupported("TabStrip mouse pointer"));
@@ -103,6 +105,7 @@ pub(super) fn control(bytes: &[u8], site: Site) -> Result<Control> {
     }
     r.end()?;
     Ok(Control {
+        colors,
         accelerator: String::new(),
         id: site.id,
         parent: None,

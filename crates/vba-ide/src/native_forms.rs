@@ -115,6 +115,15 @@ impl Ide {
             return Err(error("native form metadata outside supported limits"));
         }
         let point = |n: i32| n as f32 * (72.0 / 2540.0);
+        if !vba_project::forms::valid_color(native.design.colors.back)
+            || !vba_project::forms::valid_color(native.design.colors.fore)
+            || native.design.controls.iter().any(|c| {
+                !vba_project::forms::valid_color(c.colors.back)
+                    || !vba_project::forms::valid_color(c.colors.fore)
+            })
+        {
+            return Err(error("invalid native OLE_COLOR"));
+        }
         let mut total_tabs = 0usize;
         let mut image_bytes = 0usize;
         for c in &native.design.controls {

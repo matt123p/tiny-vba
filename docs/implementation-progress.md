@@ -1,5 +1,24 @@
 # Implementation progress
 
+## M7A.4 continued — native form/control colours (2026-11-07)
+
+ADR 0080 retains native BackColor/ForeColor defaults and OLE_COLOR bits, joins
+VBFrame/binary properties and exposes ordinary typed properties without another
+value store. Native UI paints authored RGB values and theme-projected system
+colours; a caller-owned resolver supports exact platform/client palettes. Missing
+client entries keep their value and show an unavailable-palette message. Generated
+properties preserve coercion, errors, instance identity and Stop/Continue/Reset.
+The tests also fix Page lookup under runtime-created MultiPages through existing
+collections. Eight model cases (including 14 dynamic-family subcases), two decode
+cases and two actual pixel/palette UI cases cover the selected implementation.
+Shared CI/strict Clippy, WASM, UI/native/web, repository checks and actual Chromium
+editor/modal-form/native-colour checks pass. Five theme/scale views and browser
+Stop/Continue output were inspected. The full WASI run and both pinned host
+integrations are being validated. P01/W01 and
+M7A.4 remain incomplete; fonts, borders/effects, transparency, further ambient/
+platform/default/selection cases and the unchanged completion checklist stay open.
+Fresh Office comparisons remain M8.5 NOT_RUN.
+
 ## M7A.4 continued — form input before document activation (2026-11-07)
 
 ADR 0079 transfers earlier native key/text/paste/IME input in a document-press

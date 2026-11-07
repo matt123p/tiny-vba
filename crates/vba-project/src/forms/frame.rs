@@ -8,6 +8,31 @@ pub(super) struct Header {
     pub properties: BTreeMap<String, String>,
     pub source_start: usize,
 }
+pub(super) fn color(header: &Header, name: &str) -> Result<Option<i32>> {
+    let Some(value) = header.properties.get(name) else {
+        return Ok(None);
+    };
+    color_value(value).map(Some)
+}
+fn color_value(value: &str) -> Result<i32> {
+    let value = value.strip_suffix('&').unwrap_or(value);
+    let invalid = || corrupt("invalid native frame OLE_COLOR");
+    let color = if let Some(hex) = value
+        .strip_prefix("&H")
+        .or_else(|| value.strip_prefix("&h"))
+    {
+        if hex.is_empty() || hex.len() > 8 {
+            return Err(invalid());
+        }
+        u32::from_str_radix(hex, 16).map_err(|_| invalid())? as i32
+    } else {
+        value.parse::<i32>().map_err(|_| invalid())?
+    };
+    if !super::valid_color(color) {
+        return Err(invalid());
+    }
+    Ok(color)
+}
 pub(super) fn clean(line: &str) -> &str {
     let mut quoted = false;
     for (offset, c) in line.char_indices() {
@@ -106,6 +131,8 @@ pub(super) fn parse(input: &str, export: bool) -> Result<Header> {
             "oleobjectblob",
             "helpcontextid",
             "tag",
+            "backcolor",
+            "forecolor",
         ]
         .contains(&key.as_str())
         {
@@ -122,6 +149,9 @@ pub(super) fn parse(input: &str, export: bool) -> Result<Header> {
                 return Err(unsupported("external blob reference in embedded VBFrame"));
             }
             "oleobjectblob" => {}
+            "backcolor" | "forecolor" => {
+                color_value(value)?;
+            }
             "enabled" | "showmodal" => {
                 if !["true", "-1"].contains(&value.to_ascii_lowercase().as_str()) {
                     return Err(unsupported(
@@ -315,6 +345,10 @@ pub fn decode_export(
             source: String::new(),
             attributes: vec![],
             design: Design {
+                colors: super::Colors {
+                    back: color(&header, "backcolor")?.unwrap_or(super::Colors::default().back),
+                    fore: color(&header, "forecolor")?.unwrap_or(super::Colors::default().fore),
+                },
                 enabled: true,
                 tag: metadata(&header)?.0,
                 help_context_id: metadata(&header)?.1,

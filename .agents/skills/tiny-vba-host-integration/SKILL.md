@@ -369,3 +369,10 @@ continuation through Stop and debugger shortcut ownership. Context invalidation
 clears unapplied prefixes; modal redirection cancels only the later document
 gesture, preserving its executing keyboard receipt. The host API and all budgets
 stay unchanged; full M7A.4/platform acceptance remains open.
+
+ADR 0080 keeps native OLE_COLOR bits in ordinary BackColor/ForeColor fields and
+native metadata, never the legacy codec or a second mutable colour store. UI
+resolution uses injected theme/palette policy and reports unresolved client
+entries. Preserve typed errors, inert inspection, instance/lifetime/Stop/Reset and
+original resources. Existing collections own runtime MultiPage/Page lookup.
+Font/border/transparency, ambient/platform appearance and full M7A.4 stay open.

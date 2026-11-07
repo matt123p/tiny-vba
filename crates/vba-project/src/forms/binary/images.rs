@@ -76,7 +76,7 @@ pub(super) fn control(bytes: &[u8], site: Site) -> Result<Control> {
     let mut b = block(&mut r, 0x0200)?;
     let m = mask(&mut b, 0x3ffc, 1 << 9)? as u64;
     field(&mut b, m, 3, 4, 0x80000006)?;
-    field(&mut b, m, 4, 4, 0x8000000f)?;
+    let back = field(&mut b, m, 4, 4, 0x8000000f)? as i32;
     let border_style = field(&mut b, m, 5, 1, 1)?;
     let pointer = field(&mut b, m, 6, 1, 0)?;
     let size_mode = field(&mut b, m, 7, 1, 0)?;
@@ -119,6 +119,10 @@ pub(super) fn control(bytes: &[u8], site: Site) -> Result<Control> {
     };
     r.end()?;
     Ok(Control {
+        colors: crate::forms::Colors {
+            back,
+            ..Default::default()
+        },
         accelerator: String::new(),
         id: site.id,
         parent: None,

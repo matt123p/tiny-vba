@@ -521,7 +521,9 @@ pub(crate) fn checked_handlers(
             "class_terminate",
         ]
         .contains(&d.name.key().as_str())
-            || native && ["tag", "helpcontextid"].contains(&d.name.key().as_str())
+            || native
+                && ["tag", "helpcontextid", "backcolor", "forecolor"]
+                    .contains(&d.name.key().as_str())
             || d.name.spelling.to_ascii_lowercase().starts_with("vba")
             || form
                 .controls
@@ -535,7 +537,9 @@ pub(crate) fn checked_handlers(
     }
     for c in &form.controls {
         if c.name.to_ascii_lowercase().starts_with("vba")
-            || native && ["tag", "helpcontextid"].contains(&c.name.to_ascii_lowercase().as_str())
+            || native
+                && ["tag", "helpcontextid", "backcolor", "forecolor"]
+                    .contains(&c.name.to_ascii_lowercase().as_str())
             || [
                 "show",
                 "hide",
@@ -563,7 +567,7 @@ pub(crate) fn checked_handlers(
     for p in &parsed.module.procedures {
         let key = p.name.key();
         if key.starts_with("vba")
-            || native && ["tag", "helpcontextid"].contains(&key.as_str())
+            || native && ["tag", "helpcontextid", "backcolor", "forecolor"].contains(&key.as_str())
             || [
                 "class_initialize",
                 "class_terminate",
@@ -757,6 +761,7 @@ fn compiled_form(
     let mut source = module.text.clone();
     if native.is_some() {
         source.push_str(&crate::form_dynamic::root(&handlers));
+        source.push_str(&crate::form_colors::members(true, true));
     }
     let parsed = parse(&module.source()?, ModuleKind::Class)?;
     let has = |name: &str| {
@@ -827,6 +832,11 @@ fn compiled_form(
     ));
     if let Some(native) = native {
         source.push_str(&format!(
+            "VbaBackColor={}\nVbaForeColor={}\n",
+            crate::form_colors::literal(native.design.colors.back),
+            crate::form_colors::literal(native.design.colors.fore)
+        ));
+        source.push_str(&format!(
             "VbaTag={}\nVbaHelpContextID={}\n",
             vba_string(&native.design.tag),
             native.design.help_context_id
@@ -896,6 +906,18 @@ fn compiled_form(
             }
         }
         source.push_str(&setup);
+        if let Some(metadata) = metadata {
+            source.push_str(&format!(
+                "{temp}.VbaBackColor={}\n",
+                crate::form_colors::literal(metadata.colors.back)
+            ));
+            if c.kind != ControlKind::Image {
+                source.push_str(&format!(
+                    "{temp}.VbaForeColor={}\n",
+                    crate::form_colors::literal(metadata.colors.fore)
+                ));
+            }
+        }
         if let Some(metadata) =
             metadata.filter(|_| native.is_some() && crate::form_accelerator::supported(c.kind))
         {
@@ -1096,6 +1118,7 @@ fn compiled_form(
     }
     if native.is_some() {
         source.push_str("Dim entries As Variant,index As Long\nentries=VbaAllControls.VbaEntries\nFor index=0 To VbaAllControls.Count-1\nIf entries(index).VbaId=key Then\nSet VbaLookup=entries(index)\nExit Function\nEnd If\nNext index\n");
+        source.push_str("Dim runtimePage As Object\nFor index=0 To VbaAllControls.Count-1\nIf entries(index).VbaRuntime And entries(index).VbaKind=13 Then\nSet runtimePage=entries(index).VbaFindPage(key)\nIf Not (runtimePage Is Nothing) Then\nSet VbaLookup=runtimePage\nExit Function\nEnd If\nEnd If\nNext index\n");
     }
     source.push_str("Err.Raise 91\nEnd Function\n");
     for control in &form.controls {
@@ -1803,6 +1826,8 @@ impl Ide {
                         "tag",
                         "controltiptext",
                         "helpcontextid",
+                        "backcolor",
+                        "forecolor",
                         "click",
                         "change",
                         "class_initialize",
@@ -2175,6 +2200,8 @@ impl Ide {
             "caption" if control.is_none() => "VbaCaption",
             "tag" if control.is_none() => "VbaTag",
             "helpcontextid" => "VbaHelpContextID",
+            "backcolor" if self.native_forms.contains_key(&id) => "VbaBackColor",
+            "forecolor" if self.native_forms.contains_key(&id) => "VbaForeColor",
             "visible" if control.is_none() => "VbaVisible",
             "left" => "VbaLeft",
             "top" => "VbaTop",

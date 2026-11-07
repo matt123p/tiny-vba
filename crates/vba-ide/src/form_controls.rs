@@ -75,6 +75,10 @@ pub(crate) fn control_class(kind: ControlKind, ranges: bool) -> String {
     );
     s.push_str("Public Tag As String\nPublic ControlTipText As String\nPublic VbaHelpContextID As Long\nPublic Property Get HelpContextID() As Long\nHelpContextID=VbaHelpContextID\nEnd Property\nPublic Property Let HelpContextID(ByVal value As Long)\nIf value<0 Then Err.Raise 380\nVbaHelpContextID=value\nEnd Property\n");
     s.push_str(crate::form_container::COMMON);
+    s.push_str(&crate::form_colors::members(
+        false,
+        kind != ControlKind::Image,
+    ));
     if !matches!(kind, ControlKind::Label | ControlKind::Image) {
         s.push_str("Public VbaFocusConfirmed As Boolean\nPublic Event VbaFocusRequested(ByVal target As Object)\nPublic Sub SetFocus()\nVbaFocusConfirmed=False\nRaiseEvent VbaFocusRequested(Me)\nIf Not VbaFocusConfirmed Then Err.Raise 2110\nEnd Sub\n");
     }
@@ -227,6 +231,7 @@ pub(crate) fn control_class(kind: ControlKind, ranges: bool) -> String {
         s.push_str("Public Event AddControl(ByVal index As Long,ByVal control As MSForms.Control)\nPublic Event RemoveControl(ByVal index As Long,ByVal control As MSForms.Control)\nPublic Sub VbaNotifyControl(ByVal added As Boolean,ByVal index As Long,ByVal control As MSForms.Control)\nIf added Then\nRaiseEvent AddControl(index,control)\nElse\nRaiseEvent RemoveControl(index,control)\nEnd If\nEnd Sub\n");
     }
     let mut init = format!("VbaKind={kind_code}\n");
+    init.push_str(&crate::form_colors::initial(kind));
     if matches!(kind, ControlKind::TextBox | ControlKind::RefEdit) {
         init.push_str("AutoWordSelect=True\n");
     }

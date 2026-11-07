@@ -5,6 +5,9 @@ use std::borrow::Cow;
 /// Host-owned interface label lookup. Source text, identifiers and authored form
 /// captions are never passed to this callback.
 pub type Localizer = for<'a> fn(&'a str) -> Cow<'a, str>;
+/// Pure UI palette lookup. None uses the standard RGB/system-theme projection.
+/// Return None for a client palette entry the embedding cannot resolve.
+pub type FormColor = fn(i32) -> Option<C>;
 
 fn english(label: &str) -> Cow<'_, str> {
     Cow::Borrowed(label)
@@ -13,6 +16,7 @@ fn english(label: &str) -> Cow<'_, str> {
 #[derive(Clone, Copy, Debug)]
 pub struct Theme {
     pub localize: Localizer,
+    pub form_color: Option<FormColor>,
     pub dark: bool,
     pub chrome: C,
     pub editor: C,
@@ -36,6 +40,7 @@ impl Theme {
     pub fn light() -> Self {
         Self {
             localize: english,
+            form_color: None,
             dark: false,
             chrome: C::from_rgb(238, 240, 243),
             editor: C::WHITE,
@@ -55,6 +60,7 @@ impl Theme {
     pub fn dark() -> Self {
         Self {
             localize: english,
+            form_color: None,
             dark: true,
             chrome: C::from_rgb(37, 42, 51),
             editor: C::from_rgb(24, 28, 35),

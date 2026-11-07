@@ -1,6 +1,6 @@
 # M7A Office forms — control, property, event, format and host contracts
 
-Updated 2026-11-06. FC0.2/FC0.3 contract inventory under
+Updated 2026-11-07. FC0.2/FC0.3 contract inventory under
 [ADR 0038](decisions/0038-native-office-forms-and-compatibility-only.md),
 [ADR 0039](decisions/0039-m7a-native-control-metadata.md) and
 [ADR 0040](decisions/0040-native-userform-import-and-attachment.md).
@@ -29,7 +29,8 @@ are file-format defaults from MS-OFORMS, not undocumented VBE toolbox defaults.
 | TabIndex | Signed 16-bit native site index, format default -1 | D; sorted assigned order then native order for ties/unassigned; parity M7A.4 |
 | Form Caption / size | Native FormExtraDataBlock + VBFrame; v5 VBFrame caption supported | D |
 | Form scrolling / Zoom / Enabled | Import requires unscrolled matching physical/logical size, zoom 100, enabled form | Other values U |
-| Font / ForeColor / BackColor / border / effect | Known native property fields, StdFont/TextProps and original resources; no font file acquisition | P; renderer parity M7A.4 |
+| ForeColor / BackColor | Native OLE_COLOR fields and VBFrame reconciliation; canonical Long properties, RGB/system-theme rendering and optional caller palette resolution | D; ADR 0080, full platform/ambient appearance remains open |
+| Font / border / effect | Known native property fields, StdFont/TextProps and original resources; no font file acquisition | P; remaining renderer/member parity M7A.4 |
 | Tag / HelpContextID / ControlTipText | Known frame/site strings/scalars; ordinary per-instance metadata and runtime tips | D; Help/F1 routing remains U (ADR 0055) |
 | Window placement / StartUpPosition / ShowModal | VBFrame metadata retained; enabled/default-modal form required; explicit show modes use existing runtime | P for placement; disabled/default-modeless metadata U; parity M7A.4 |
 | Default / Cancel / Accelerator / TakeFocusOnClick changes | Native site/control flags or fields | Default/Cancel decoded and executed; other fields U |
@@ -334,3 +335,10 @@ pre-document raw-input barrier and opaque execution identity for native modeless
 activation. Hosts authorize the ordinary Deactivate callback before document
 input; Stop/Continue, cancellation and acknowledged repaint precede replay.
 The remaining M7A.4 checklist and M8.5 NOT_RUN status are unchanged.
+
+[Native colours (ADR 0080)](decisions/0080-native-form-colours.md) retain signed
+OLE_COLOR metadata and ordinary BackColor/ForeColor fields, with RGB/system-theme
+rendering and an injected UI palette resolver. Invalid assignments preserve prior
+state; import/source/resources and inert inspection remain separate. Runtime Page
+lookup searches the existing MultiPage collections. Font/border/transparency,
+ambient/platform appearance and the full M7A.4 checklist remain open.

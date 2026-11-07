@@ -96,6 +96,9 @@ and native save/reopen. See [ADR 0041](decisions/0041-worksheet-form-controls.md
   barrier; ADR 0079 orders selected earlier native key/paste/IME input before
   document deactivation, including stopped prefix callbacks and spanning composition.
   Full lifecycle acceptance remains open.
+  ADR 0080 adds selected native BackColor/ForeColor import, canonical properties,
+  palette/theme rendering and runtime-created MultiPage parent lookup. P01/W01
+  and the full colour/font/appearance/member audit remain partial.
   ADR 0076 adds selected nested modal mouse/keyboard input continuations with
   shared raw-input bounds, held release, parent unload and Reset regressions. L02
   remains partial; all remaining lifecycle and control contracts stay open.

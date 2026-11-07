@@ -225,3 +225,9 @@ callbacks/defaults and an IME composition that started before the press. Continu
 and Reset keep their normal paths. Keep calling the raw hook even while stopped;
 it owns IME continuations and leaves debugger shortcuts available. The host must
 continue repainting/service ticks while document_input_pending is true.
+
+ADR 0080: optional Theme.form_color is a pure UI lookup from an original OLE_COLOR
+Long to an optional Color32. Leave it None for standard RGB and injected theme
+roles. Supply it for exact platform or client palette entries; returning None
+keeps the default projection or displays the unavailable-client-palette message.
+Explicit RGB values bypass this resolver. It never authorizes execution or changes the canonical value.
