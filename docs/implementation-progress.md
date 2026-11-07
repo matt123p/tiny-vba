@@ -1,5 +1,18 @@
 # Implementation progress
 
+## M7A.4 continued — document activation input (2026-11-07)
+
+ADR 0078 retains bounded raw document gestures before begin_pass and dispatches
+ordinary, authorized Deactivate callbacks before canvas input. Non-reused
+SessionInstance/document/window identity, geometry, Reset/source/trust loss and
+reentrant activation invalidate stale input. Hidden/unapplied passes require a
+fresh acknowledged canvas paint; F5/F8 and debugger input remain available.
+Eleven shared input regressions and both local canvas/Reset flows pass. Full
+shared CI, strict WASM, WASI, native/web and Chromium checks pass; native/browser
+and five native theme/scale views were inspected. UI tests/renders passed, with
+a clean wrapper exit being rechecked after a signal-143 termination. Pinned
+consumer acceptance is in progress. L01/L02 and the full M7A.4 checklist remain partial.
+
 ## M7A.4 continued — native window activation (2026-11-06)
 
 ADR 0077 adds canonical Show/Hide/modeless activation, unload retirement,

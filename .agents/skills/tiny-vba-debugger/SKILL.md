@@ -227,3 +227,10 @@ ADR 0076 parks raw input scopes for modal callers (at most eight existing waits)
 and keeps a shared 64-event queue. Preserve original capture release, owner-local
 keyboard/mouse barriers, canonical receipts, normal authorization and full Reset
 invalidation. Selected nested Stop/unload/Reset cases do not finish L02/M7A.4.
+
+ADR 0078 orders document activation at the raw-input boundary. Use the opaque
+non-reused SessionInstance, existing host authorization, bounded raw batches and
+completed document-pass acknowledgment. Keep debugger input available at Stop;
+repaint before replay after skipped/hidden document passes. Reset/source/document/
+trust/geometry changes and authored activation invalidate retained input. No new
+VM/foreign behavior or increased budget is implied; full M7A.4 remains partial.

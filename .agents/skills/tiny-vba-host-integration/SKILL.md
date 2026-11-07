@@ -354,3 +354,10 @@ VBA focus and callbacks, bounded raw held-key ownership, root widget identities,
 paused character/release continuation and non-text Space ordering. Debugger
 F5/F8 releases must not become form KeyUp callbacks. Root input eligibility
 requires more than a missing TabStop. Full M7A.4 remains in progress.
+
+ADR 0078 orders document activation at the raw-input boundary. Use the opaque
+non-reused SessionInstance, existing host authorization, bounded raw batches and
+completed document-pass acknowledgment. Keep debugger input available at Stop;
+repaint before replay after skipped/hidden document passes. Reset/source/document/
+trust/geometry changes and authored activation invalidate retained input. No new
+VM/foreign behavior or increased budget is implied; full M7A.4 remains partial.

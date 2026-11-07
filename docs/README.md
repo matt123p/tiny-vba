@@ -357,3 +357,9 @@ cases are covered; L02 and the full M7A.4 checklist remain partial.
 [ADR 0077](decisions/0077-native-window-activation.md) records canonical native
 window activation, reentrant lifecycle guards and cross-modeless keyboard
 continuations. Automatic host document-input routing and full M7A.4 remain open.
+
+[ADR 0078](decisions/0078-document-activation-input-barrier.md) adds the bounded
+pre-document raw-input barrier and opaque execution identity for native modeless
+activation. Hosts authorize the ordinary Deactivate callback before document
+input; Stop/Continue, cancellation and acknowledged repaint precede replay.
+The remaining M7A.4 checklist and M8.5 NOT_RUN status are unchanged.

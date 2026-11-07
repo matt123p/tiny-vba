@@ -611,3 +611,9 @@ ordering and reentrant transitions. Inert active-window inspection never loads a
 form; executable window focus uses the normal input/authorization path. Shared
 egui modeless routing preserves callback receipts across window changes. Automatic
 host document-input barriers and full M7A.4 lifecycle acceptance remain open.
+
+[ADR 0078](decisions/0078-document-activation-input-barrier.md) adds the bounded
+pre-document raw-input barrier and opaque execution identity for native modeless
+activation. Hosts authorize the ordinary Deactivate callback before document
+input; Stop/Continue, cancellation and acknowledged repaint precede replay.
+The remaining M7A.4 checklist and M8.5 NOT_RUN status are unchanged.

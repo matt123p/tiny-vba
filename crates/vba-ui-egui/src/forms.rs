@@ -1040,6 +1040,28 @@ impl EditorUi {
             ctx.memory_mut(|memory| memory.request_focus(previous));
         }
         let focused = ctx.memory(|memory| memory.focused());
+        let pending_owner = self.form_keys.pending_owner(ide);
+        let owns_window = |owner| {
+            pending_owner == Some(owner)
+                || ide.native_form(owner.source).is_none()
+                || ide.form_instance_has_modal_window(owner)
+                || ide.form_instance_window_active(owner)
+        };
+        // A custom host canvas can own document input without replacing egui's
+        // old form focus bookmark. Canonical window activation is authoritative.
+        if let Some(widget) = focused
+            && (self
+                .form_runtime_focus
+                .iter()
+                .any(|(owner, _, id)| *id == widget && !owns_window(*owner))
+                || self
+                    .form_runtime_roots
+                    .iter()
+                    .any(|(owner, id)| *id == widget && !owns_window(*owner)))
+        {
+            ctx.memory_mut(|memory| memory.surrender_focus(widget));
+        }
+        let focused = ctx.memory(|memory| memory.focused());
         let instances = ide.form_instances().unwrap_or_default();
         let owner = instances
             .iter()
@@ -1075,7 +1097,8 @@ impl EditorUi {
                     .rev()
                     .copied()
                     .find(|instance| ide.form_instance_visible(*instance))
-            });
+            })
+            .filter(|owner| owns_window(*owner));
         let blocked = self.form_keys.step(
             ctx,
             ide,

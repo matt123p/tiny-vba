@@ -62,7 +62,7 @@ pub use vba_vm::Limits;
 use vba_vm::Session;
 pub use vba_vm::{
     FrameSnapshot, Handle, HostBinding, HostEventHandler, HostEventParameter, NoHost, Outcome,
-    Pause, PauseReason, ReturnValue,
+    Pause, PauseReason, ReturnValue, SessionInstance,
 };
 pub type Result<T> = std::result::Result<T, Diagnostic>;
 pub const MAX_MODULES: usize = 64;
@@ -1748,6 +1748,11 @@ impl Ide {
         self.show_execution();
         self.refresh_watches();
         Ok(())
+    }
+    /// Non-reused execution identity for invalidating retained embedding input.
+    /// Inspection never creates or resumes an execution.
+    pub fn execution_identity(&self) -> Option<SessionInstance> {
+        self.session.as_ref().map(Session::instance)
     }
     pub fn execution(&self) -> Option<StopLocation> {
         self.frame_location(self.selected_frame)

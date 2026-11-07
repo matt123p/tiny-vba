@@ -319,3 +319,10 @@ checks. External viewport focus and passive hover stay inert. Embedders must
 apply document activation before document input; automatic raw document barriers
 remain open. Preserve reentrant transition guards, modal ownership and bounded
 raw input; L01/L02 and full M7A.4 remain partial.
+
+ADR 0078 orders document activation at the raw-input boundary. Use the opaque
+non-reused SessionInstance, existing host authorization, bounded raw batches and
+completed document-pass acknowledgment. Keep debugger input available at Stop;
+repaint before replay after skipped/hidden document passes. Reset/source/document/
+trust/geometry changes and authored activation invalidate retained input. No new
+VM/foreign behavior or increased budget is implied; full M7A.4 remains partial.

@@ -207,3 +207,14 @@ then run `tools/ui-browser/native-window-activation.cjs` with
 `VBA_NATIVE_FIXTURE_DIR=/tmp/native-window` and the usual Playwright environment.
 It verifies reentrant modal-to-modeless Show, physical header switching and Hide
 restoration through the actual web UI. It is not fresh Office evidence.
+
+ADR 0078: after offering synthetic events, call EditorUi::document_raw_input
+before begin_pass, passing the host document/window lifetime identity, authorized
+canvas bounds and canvas visibility. Dispatch returned commands through the
+existing authorization gate; on failure call cancel_document_input. A None canvas
+cancels input on lost trust or invalid host context; a hidden canvas stalls replay
+while debugger input remains available. After the callback, document_input_ready
+allows the embedding to restore the requested document view. Call
+document_input_applied only after a completed, non-discarded document UI pass;
+request hidden paint while document_input_pending. The helper retains only bounded
+raw input; SessionInstance and ordinary VBA remain the execution authority.

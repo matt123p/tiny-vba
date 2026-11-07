@@ -352,3 +352,9 @@ receipt ownership stays with its callback while later raw input follows the
 new active modeless window. External viewport focus and passive hover stay inert.
 Automatic document-canvas input barriers and the full L01/L02/M7A.4 checklist
 remain open; consumer acceptance is recorded separately in progress.
+
+[ADR 0078](decisions/0078-document-activation-input-barrier.md) adds the bounded
+pre-document raw-input barrier and opaque execution identity for native modeless
+activation. Hosts authorize the ordinary Deactivate callback before document
+input; Stop/Continue, cancellation and acknowledged repaint precede replay.
+The remaining M7A.4 checklist and M8.5 NOT_RUN status are unchanged.

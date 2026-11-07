@@ -328,3 +328,9 @@ unload retirement without Deactivate, reentrant lifecycle guards and cross-windo
 keyboard continuations. Inert inspection and executable window-focus commands
 retain existing trust. Automatic document-canvas input barriers, broader binding/
 collection/platform ordering and full M7A.4 acceptance remain open.
+
+[ADR 0078](decisions/0078-document-activation-input-barrier.md) adds the bounded
+pre-document raw-input barrier and opaque execution identity for native modeless
+activation. Hosts authorize the ordinary Deactivate callback before document
+input; Stop/Continue, cancellation and acknowledged repaint precede replay.
+The remaining M7A.4 checklist and M8.5 NOT_RUN status are unchanged.

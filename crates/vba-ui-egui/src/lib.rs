@@ -1,5 +1,6 @@
 //! Embeddable Classic VBA editor/debugger panels. The caller owns context, theme, host and IO.
 #![forbid(unsafe_code)]
+mod document_input;
 mod forms;
 mod theme;
 pub use forms::{FormCommand, FormLayoutReport};
@@ -236,6 +237,7 @@ pub struct EditorUi {
     form_modal: bool,
     form_keys: forms::keyboard::Keyboard,
     form_mouse: forms::mouse::Mouse,
+    document_input: document_input::DocumentInput,
     form_last_focus: Option<egui::Id>,
     form_last_active_window: Option<vba_ide::FormInstance>,
     form_active_control: Vec<(vba_ide::FormInstance, Option<vba_ide::ObjectRef>)>,
@@ -318,6 +320,7 @@ impl Default for EditorUi {
             form_modal: true,
             form_keys: Default::default(),
             form_mouse: Default::default(),
+            document_input: Default::default(),
             form_drag: None,
             form_runtime_focus: vec![],
             form_runtime_roots: vec![],
