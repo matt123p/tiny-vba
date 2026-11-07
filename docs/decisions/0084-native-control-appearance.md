@@ -1,6 +1,6 @@
 # ADR 0084: Native control borders, effects and backgrounds
 
-Date: 2026-11-07. Status: shared acceptance passed; affected host acceptance in progress. M7A.4 remains open.
+Date: 2026-11-07. Status: selected shared and affected host acceptance passed. M7A.4 remains open.
 
 ## Ownership and data
 

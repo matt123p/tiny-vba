@@ -1,6 +1,6 @@
 # ADR 0085: Published Font attribute aliases
 
-Date: 2026-11-07. Status: shared acceptance passed; affected host acceptance in progress. M7A.4 remains open.
+Date: 2026-11-07. Status: selected shared and affected host acceptance passed. M7A.4 remains open.
 
 The Forms interface exposes FontName, FontSize, FontWeight, FontBold, FontItalic,
 FontUnderline and FontStrikethru on ten text control families: Label, TextBox,

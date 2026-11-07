@@ -17,7 +17,24 @@ budgets remain unchanged. Native edited saving is still M7A.5.
 five appearance/three colour/four Font GPU cases and 34 pointer cases pass.
 Shared CI, strict workspace Clippy, WASM/WASI, UI, Xvfb native launch, web,
 repository checks and all four Chromium flows pass. Five theme/scale views and
-browser runtime/breakpoint views were inspected. Affected host acceptance is in progress. Full M7A.4,
+browser runtime/breakpoint views were inspected. Both hosts pin product
+`23dab09fec89767c040693391f25647102ffdf1e`. GridCraft passes all 10 full CI
+steps, strict optional VBA/UI Clippy, five form UI cases, VBA web and
+33 native/33 actual Node-WASM package cases (integration
+`0c5a522ce0a53411d1019bd37e579243d4aae701`). WordCraft passes all eight full
+CI steps with isolated serial tests, strict optional VBA/UI Clippy, 13 VBA UI
+cases, the hidden-editor form, canvas-prefix/Reset, VBA web and 28 native/28
+actual Node-WASM package cases (integration
+`aa775125620aa5923de58d6d854afe9fb775280a`). Both document renders were
+inspected. Final shared/browser/host gates exited zero. Both integrations are
+committed and pushed; lockfiles change only the 13 shared package revisions.
+
+Shared commands: `cargo xtask ci`, `cargo xtask wasm`, `cargo xtask wasm-run`,
+`cargo xtask ui`, `xvfb-run -a cargo xtask ui-native`, `cargo xtask web`, strict
+workspace/all-target Clippy, repository checks and actual Chromium `smoke.cjs`,
+`forms.cjs`, `native-fonts.cjs`, `native-appearance.cjs`. Hosts use their full
+`xtask ci`, locked native/Node-WASM `native_forms`, optional VBA/UI Clippy, VBA
+web and the UI suites above. Full M7A.4,
 remaining member/default/selection, image/RefEdit, lifecycle/binding/keyboard/
 mouse/platform cases stay open. Fresh Office observations remain M8.5 NOT_RUN.
 
