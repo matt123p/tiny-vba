@@ -1,9 +1,7 @@
 //! Standard Forms colour properties keep their original OLE_COLOR in ordinary fields.
 use crate::forms::ControlKind;
-pub(crate) fn members(root: bool, foreground: bool) -> String {
-    let mut source = String::from(
-        r#"
-Private Sub VbaValidateColor(ByVal value As Long)
+pub(crate) const VALIDATE: &str = r#"
+Public Sub VbaValidateColor(ByVal value As Long)
 Dim kind As Long,payload As Long
 kind=value And -16777216
 payload=value And 16777215
@@ -14,8 +12,9 @@ If payload<=24 Or (payload>=26 And payload<=30) Then Exit Sub
 End If
 Err.Raise 380
 End Sub
-"#,
-    );
+"#;
+pub(crate) fn members(root: bool, foreground: bool) -> String {
+    let mut source = String::new();
     for name in ["BackColor", "ForeColor"] {
         if name == "ForeColor" && !foreground {
             continue;

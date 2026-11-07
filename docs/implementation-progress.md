@@ -13,8 +13,11 @@ collections. Eight model cases (including 14 dynamic-family subcases), two decod
 cases and two actual pixel/palette UI cases cover the selected implementation.
 Shared CI/strict Clippy, WASM, UI/native/web, repository checks and actual Chromium
 editor/modal-form/native-colour checks pass. Five theme/scale views and browser
-Stop/Continue output were inspected. The full WASI run and both pinned host
-integrations are being validated. P01/W01 and
+Stop/Continue output were inspected. The initial full WASI run passed. Host validation exposed a generated nominal
+metadata overflow in existing GridCraft MultiPage cases. A shared ordinary colour
+validator and direct Controls/Pages attachment remove redundant generated methods;
+the local GridCraft package suite now passes all 29 cases without increasing limits.
+Final shared gates and both published host pins are being validated. P01/W01 and
 M7A.4 remain incomplete; fonts, borders/effects, transparency, further ambient/
 platform/default/selection cases and the unchanged completion checklist stay open.
 Fresh Office comparisons remain M8.5 NOT_RUN.

@@ -26,6 +26,12 @@ previous value; normal type/Null/overflow errors remain in the common coercion
 path. Colour assignments do not raise text Change events. Inert inspection reads
 the fields and never invokes getters or loads a form.
 
+One generated standard-module validator serves all colour setters. Static child
+attachment uses the existing Controls/Pages collections directly, removing three
+redundant container forwarding methods. GridCraft MultiPage regressions exposed
+the nominal metadata cap: these source reductions preserve its 4,096-entry bound
+without weakening typed fields or changing compiler/VM limits.
+
 No compiler, VM, foreign-protocol or IR capability is added. Generated support
 uses decimal expressions, including the existing Long-minimum expression, rather
 than extending the language's literal profile. No execution, memory, callback or

@@ -36,9 +36,6 @@ End Property
 Public Property Get ActiveControl() As Object
 Set ActiveControl=VbaActiveControl
 End Property
-Public Sub VbaAdd(ByVal child As Object)
-VbaChildren.VbaAdd child
-End Sub
 Public Sub VbaClick()
 RaiseEvent Click
 End Sub

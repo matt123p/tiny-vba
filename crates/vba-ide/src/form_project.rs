@@ -939,7 +939,12 @@ fn compiled_form(
                 .iter()
                 .find(|p| p.id == parent)
                 .ok_or_else(|| error("missing Frame owner"))?;
-            source.push_str(&format!("Vba{}.VbaAdd {temp}\n", owner.name));
+            let collection = if owner.kind == ControlKind::MultiPage {
+                "Pages"
+            } else {
+                "Controls"
+            };
+            source.push_str(&format!("Vba{}.{collection}.VbaAdd {temp}\n", owner.name));
         } else if containers {
             source.push_str(&format!("VbaControls.VbaAdd {temp}\n"));
         }
@@ -1954,6 +1959,7 @@ impl Ide {
             )?);
             let mut support =
                 String::from("Public Const vbModal As Long=1\nPublic Const vbModeless As Long=0\n");
+            support.push_str(crate::form_colors::VALIDATE);
             support.push_str(crate::form_dynamic::INITIALIZE);
             if self.form_range_import().is_some() {
                 support.push_str(&crate::form_bindings::support(true));

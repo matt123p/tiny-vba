@@ -156,7 +156,7 @@ pub(crate) fn multipage() -> String {
             "Public Property Get Value() As Long\nAttribute Value.VB_UserMemId = 0\n",
         );
     source.push_str("Public Function VbaFindPage(ByVal key As Long) As Object\nDim entries() As Object,i As Long\nentries=VbaPages.VbaEntries\nFor i=0 To VbaPages.Count-1\nIf entries(i).VbaId=key Then\nSet VbaFindPage=entries(i)\nExit Function\nEnd If\nNext i\nEnd Function\n");
-    source.push_str("Public VbaActiveControl As Object\nPublic Sub VbaAdd(ByVal page As Object)\nVbaPages.VbaAdd page\nEnd Sub\n");
+    source.push_str("Public VbaActiveControl As Object\n");
     source
 }
 
