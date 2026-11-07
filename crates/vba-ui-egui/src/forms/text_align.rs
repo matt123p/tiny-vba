@@ -73,6 +73,16 @@ pub(super) fn paint(
     color: Color32,
     clip: Rect,
 ) {
+    let galley = layout(ui, alignment, value, font, color);
+    paint_galley(ui, bounds, alignment, galley, color, clip);
+}
+pub(super) fn layout(
+    ui: &egui::Ui,
+    alignment: Align,
+    value: impl AsRef<str>,
+    font: super::fonts::Style,
+    color: Color32,
+) -> std::sync::Arc<egui::Galley> {
     let mut job = LayoutJob::simple(
         value.as_ref().to_owned(),
         font.id.clone(),
@@ -82,7 +92,16 @@ pub(super) fn paint(
     job.halign = alignment;
     job.halign_min_is_start = false;
     super::fonts::decorate(&mut job, &font);
-    let galley = ui.fonts_mut(|fonts| fonts.layout_job(job));
+    ui.fonts_mut(|fonts| fonts.layout_job(job))
+}
+pub(super) fn paint_galley(
+    ui: &egui::Ui,
+    bounds: Rect,
+    alignment: Align,
+    galley: std::sync::Arc<egui::Galley>,
+    color: Color32,
+    clip: Rect,
+) {
     let x = match alignment {
         Align::Min => bounds.left(),
         Align::Center => bounds.center().x,

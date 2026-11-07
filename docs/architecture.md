@@ -608,3 +608,12 @@ rectangle beside the real indicator widget. Input, full accessible labels/state,
 Value/Null/groups/events, source/resources, global style and all budgets remain
 unchanged. ToggleButton's disabled property is not enabled. Other properties,
 AutoSize/scrolling and full M7A.4 remain open; fresh Office evidence is NOT_RUN.
+
+[ADR 0091](decisions/0091-native-hide-selection.md) adds selected native
+TextBox/ComboBox HideSelection flags, True defaults and ordinary Boolean state.
+Changing the property preserves text, ranges, events and resources. Passive
+highlights use canonical UTF-16 ranges and local clipped galley copies, including
+both ComboBox presentations; focus/style queries stay outside font locks.
+Inspection, global style, font caches and all VM/host budgets remain unchanged.
+Other selection/property/AutoSize/scrolling and full M7A.4 work stay open; fresh
+Office observations remain M8.5 NOT_RUN.

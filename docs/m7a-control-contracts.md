@@ -33,6 +33,7 @@ are file-format defaults from MS-OFORMS, not undocumented VBE toolbox defaults.
 | Font | ADR 0081 retains StdFont/TextProps and VBFrame data; typed attributes, independent objects/defaults, inert inspection and local rendering | D selected; replacement/ambient/platform realization P |
 | Border / effect / transparency | Applicable native fields, original resources and typed runtime members | D selected (ADR 0084); remaining member/ambient/platform parity M7A.4 |
 | Alignment / CheckBox, OptionButton | VariousPropertyBits bit 13 is inverse to public fmAlignmentLeft=0/Right=1; ordinary Long state/defaults/errors; ToggleButton disabled | D selected side/layout (ADR 0090); broader property/platform audit remains open |
+| HideSelection / TextBox, ComboBox | VariousPropertyBits bit 29; ordinary Boolean state, True defaults and passive selected-text highlights; ranges/events/resources stay canonical | D selected (ADR 0091); remaining selection/platform audit stays open |
 | WordWrap | VariousPropertyBits bit 23; distinct Label/CommandButton file defaults and typed runtime state | D selected captions/TextBox (ADRs 0087/0088), including Boolean captions; AutoSize/scrolling and broader presentation cases remain open |
 | Tag / HelpContextID / ControlTipText | Known frame/site strings/scalars; ordinary per-instance metadata and runtime tips | D; Help/F1 routing remains U (ADR 0055) |
 | Window placement / StartUpPosition / ShowModal | VBFrame metadata retained; enabled/default-modal form required; explicit show modes use existing runtime | P for placement; disabled/default-modeless metadata U; parity M7A.4 |
@@ -390,3 +391,12 @@ rectangle beside the real indicator widget. Input, full accessible labels/state,
 Value/Null/groups/events, source/resources, global style and all budgets remain
 unchanged. ToggleButton's disabled property is not enabled. Other properties,
 AutoSize/scrolling and full M7A.4 remain open; fresh Office evidence is NOT_RUN.
+
+[ADR 0091](decisions/0091-native-hide-selection.md) adds selected native
+TextBox/ComboBox HideSelection flags, True defaults and ordinary Boolean state.
+Changing the property preserves text, ranges, events and resources. Passive
+highlights use canonical UTF-16 ranges and local clipped galley copies, including
+both ComboBox presentations; focus/style queries stay outside font locks.
+Inspection, global style, font caches and all VM/host budgets remain unchanged.
+Other selection/property/AutoSize/scrolling and full M7A.4 work stay open; fresh
+Office observations remain M8.5 NOT_RUN.

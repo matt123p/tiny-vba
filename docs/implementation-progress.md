@@ -1,5 +1,27 @@
 # Implementation progress
 
+## M7A.4 continued — native HideSelection (2026-11-07)
+
+ADR 0091 adds native bit-29 decoding for TextBox/ComboBox, ordinary Boolean state
+and True file/dynamic defaults. Other fixed/non-applicable flags retain their
+validation. Property assignment preserves text, selected ranges, events, source/
+resources and all budgets. Inert queries preserve authored root members and do
+not instantiate objects or execute getters.
+
+The shared view paints inactive selections when HideSelection=False, using the
+canonical UTF-16 range and local clipped galley copies. Both ComboBox styles
+participate without changing edit permission, rows or drop state. Focus/style
+queries occur outside font locks; font caches and global styles stay unchanged.
+Seven model and three GPU/input cases pass, including a selected emoji/CRLF range
+and actual focus transfer with a once-only callback. Full shared CI, strict
+workspace/all-targets Clippy, WASM, UI, Xvfb native, web, repository checks and
+all nine Chromium flows pass. Full WASI passes on Node 22.23.4; all seven new
+cases also pass on Node 18.19.1. Five theme/scale/host snapshots and browser
+runtime/focus/Break views were inspected. Both host acceptance gates are in
+progress. Remaining selection, properties, AutoSize/
+scrolling, lifecycle/input/binding and image/RefEdit/ActiveX/platform cases stay
+open. Fresh Office evidence remains M8.5 NOT_RUN; full M7A.4 is not complete.
+
 ## M7A.4 continued — CheckBox/OptionButton caption Alignment (2026-11-07)
 
 ADR 0090 adds native bit-13/public-value translation, ordinary Long Alignment

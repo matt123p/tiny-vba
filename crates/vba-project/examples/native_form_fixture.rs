@@ -22,6 +22,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let word_wrap = option.as_deref() == Some("--word-wrap");
     let boolean_wrap = option.as_deref() == Some("--boolean-word-wrap");
     let caption_alignment = option.as_deref() == Some("--caption-alignment");
+    let hide_selection = option.as_deref() == Some("--hide-selection");
     let colors = option.as_deref() == Some("--colors");
     let nested_mouse = option.as_deref() == Some("--nested-mouse");
     let composite_mouse = option.as_deref() == Some("--composite-mouse");
@@ -68,7 +69,8 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             | "--text-align"
             | "--word-wrap"
             | "--boolean-word-wrap"
-            | "--caption-alignment",
+            | "--caption-alignment"
+            | "--hide-selection",
         ) => false,
         Some(_) => return Err("unknown fixture option".into()),
     };
@@ -100,6 +102,10 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         "Stop\r\nDebug.Print Entry.Text"
     };
     let mut text = String::from_utf8(fixture::export())?.replace("Debug.Print Entry.Text", body);
+    if hide_selection {
+        let code="Attribute VB_Name = \"NativeForm\"\nAttribute VB_PredeclaredId = True\nOption Explicit\nPrivate Sub UserForm_Initialize()\nDebug.Print \"selection ready\"\nDebug.Print Entry.HideSelection,Combo1.HideSelection\nHeading.Caption=\"Select text, then move focus\"\nHeading.Width=220\nEntry.Width=168\nEntry.Height=30\nEntry.FontSize=12\nEntry.EnterFieldBehavior=1\nEntry.Text=\"ALPHA BRAVO\"\nEntry.HideSelection=False\nEntry.SelStart=1\nEntry.SelLength=4\nCombo1.Left=16\nCombo1.Top=110\nCombo1.Width=168\nCombo1.Height=26\nCombo1.FontSize=12\nCombo1.EnterFieldBehavior=1\nCombo1.Text=\"ALPHA BRAVO\"\nCombo1.HideSelection=False\nCombo1.SelStart=1\nCombo1.SelLength=4\nEnd Sub\nPrivate Sub Apply_Click()\nEntry.SelStart=1\nEntry.SelLength=4\nCombo1.SelStart=1\nCombo1.SelLength=4\nEntry.HideSelection=True\nCombo1.HideSelection=True\nDebug.Print VarType(Entry.HideSelection),Entry.HideSelection,Combo1.HideSelection,Entry.SelLength,Combo1.SelLength\nStop\nEntry.HideSelection=False\nCombo1.HideSelection=False\nDebug.Print Entry.HideSelection,Combo1.HideSelection,Entry.SelText,Combo1.SelText\nMe.Hide\nEnd Sub\n".replace('\n',"\r\n");
+        text = String::from_utf8(fixture::export())?.replace(fixture::SOURCE, &code);
+    }
     if caption_alignment {
         let code="Attribute VB_Name = \"NativeForm\"\nAttribute VB_PredeclaredId = True\nOption Explicit\nPrivate Sub UserForm_Initialize()\nDebug.Print \"caption side ready\"\nDebug.Print Check1.Alignment,ChoiceA.Alignment\nHeading.Visible=False\nEntry.Visible=False\nChoiceB.Visible=False\nToggle1.Visible=False\nDim c As Object,name As Variant,n As Long\nFor Each name In Array(\"Check1\",\"ChoiceA\")\nSet c=Me.Controls(name)\nc.Caption=\"Caption stays inside its own bounds\"\nc.Left=145\nc.Top=8+n*52\nc.Width=110\nc.Height=42\nc.FontSize=12\nc.WordWrap=True\nn=n+1\nNext name\nEnd Sub\nPrivate Sub Apply_Click()\nCheck1.Alignment=fmAlignmentRight\nChoiceA.Alignment=fmAlignmentRight\nDebug.Print VarType(Check1.Alignment),Check1.Alignment,ChoiceA.Alignment,Check1.Value\nStop\nCheck1.Alignment=fmAlignmentLeft\nChoiceA.Alignment=fmAlignmentLeft\nDebug.Print Check1.Alignment,ChoiceA.Alignment\nMe.Hide\nEnd Sub\n".replace('\n',"\r\n");
         text = String::from_utf8(fixture::export())?.replace(fixture::SOURCE, &code);
@@ -228,7 +234,9 @@ End Sub
     std::fs::write(dir.join("NativeForm.frm"), text)?;
     std::fs::write(
         dir.join("NativeForm.frx"),
-        if caption_alignment {
+        if hide_selection {
+            fixture::combo_companion_flags(3, 1, 0x0c80_481b)
+        } else if caption_alignment {
             fixture::boolean_alignment_companion(true)
         } else if boolean_wrap {
             fixture::boolean_word_wrap_companion(0x2c00_081b)

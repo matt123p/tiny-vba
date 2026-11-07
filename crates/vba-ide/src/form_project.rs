@@ -947,6 +947,12 @@ fn compiled_form(
         }
         source.push_str(&setup);
         if let Some(metadata) = metadata {
+            if crate::form_hide_selection::supported(c.kind) {
+                source.push_str(&format!(
+                    "{temp}.HideSelection={}\n",
+                    boolean(metadata.text_behavior.hide_selection)
+                ));
+            }
             source.push_str(&crate::form_caption_alignment::initial(
                 &temp,
                 c.kind,

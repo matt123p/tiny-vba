@@ -82,6 +82,7 @@ pub(crate) fn control_class(kind: ControlKind, ranges: bool) -> String {
     s.push_str(&crate::form_appearance::members(Some(kind)));
     s.push_str(crate::form_text_align::members(kind));
     s.push_str(crate::form_caption_alignment::members(kind));
+    s.push_str(crate::form_hide_selection::members(kind));
     if crate::form_font::supported(kind) {
         s.push_str(&crate::form_font::members(false));
         s.push_str(&crate::form_font::shortcuts(kind));
@@ -248,6 +249,7 @@ pub(crate) fn control_class(kind: ControlKind, ranges: bool) -> String {
     init.push_str(&crate::form_appearance::initial(kind));
     init.push_str(&crate::form_text_align::initial("", kind, 1));
     init.push_str(&crate::form_caption_alignment::initial("", kind, 1));
+    init.push_str(crate::form_hide_selection::initial(kind));
     if crate::form_font::supported(kind) {
         init.push_str(crate::form_font::INITIAL);
     }

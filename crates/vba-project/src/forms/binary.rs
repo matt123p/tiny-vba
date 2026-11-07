@@ -646,7 +646,7 @@ fn control(bytes: &[u8], site: Site) -> Result<Control> {
         let flags = field(&mut b, m, 0, 4, 0x2c80_081b)?;
         locked = flags & 4 != 0;
         appearance.back_style = u8::from(flags & 8 != 0);
-        let text_flags = if textbox {
+        let mut text_flags = if textbox {
             0x88f0_4000
         } else if combobox {
             0x0820_5000
@@ -663,6 +663,10 @@ fn control(bytes: &[u8], site: Site) -> Result<Control> {
         } else {
             0
         };
+        if site.kind == Kind::TextBox || combobox {
+            text_flags |= 1 << 29;
+            text_behavior.hide_selection = flags & (1 << 29) != 0;
+        }
         if flags & !(14 | text_flags) != 0x2c80_0819 & !(8 | text_flags) {
             return Err(unsupported("TextBox behavior flags"));
         }

@@ -59,6 +59,9 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let caption_alignment = std::env::args()
         .nth(2)
         .is_some_and(|o| o == "--caption-alignment");
+    let hide_selection = std::env::args()
+        .nth(2)
+        .is_some_and(|o| o == "--hide-selection");
     let colors = std::env::args().nth(2).is_some_and(|o| o == "--colors");
     for (name, theme, width, scale) in [
         ("light", Theme::light(), 1400., 1.),
@@ -74,7 +77,9 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             1252,
             &[NativeFormResource {
                 name: "NativeForm.frx".into(),
-                bytes: if caption_alignment {
+                bytes: if hide_selection {
+                    fixture::combo_companion_flags(3, 1, 0x0c80_481b)
+                } else if caption_alignment {
                     fixture::boolean_alignment_companion(true)
                 } else if boolean_wrap {
                     fixture::boolean_word_wrap_companion(0x2c00_081b)
@@ -107,7 +112,9 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                 },
             }],
         )?;
-        let main = if caption_alignment {
+        let main = if hide_selection {
+            "Sub Main()\nDim a As New NativeForm,b As New NativeForm\na.Caption=\"Selection remains visible\"\nb.Caption=\"Selection hides without focus\"\nSetup a,False\nSetup b,True\na.Show 0\nb.Show 0\nb.Apply.SetFocus\nEnd Sub\nPrivate Sub Setup(ByVal f As MSForms.UserForm,ByVal hide As Boolean)\nf.Height=200\nf.Controls(\"Heading\").Visible=False\nf.Controls(\"Apply\").Top=155\nDim c As Object\nSet c=f.Controls(\"Entry\")\nc.Left=16\nc.Top=12\nc.Width=190\nc.Height=36\nc.FontSize=12\nc.EnterFieldBehavior=1\nc.Text=\"ALPHA BRAVO\"\nc.HideSelection=hide\nc.SelStart=1\nc.SelLength=4\nSet c=f.Controls(\"Combo1\")\nc.Left=16\nc.Top=65\nc.Width=190\nc.Height=28\nc.FontSize=12\nc.EnterFieldBehavior=1\nc.Text=\"ALPHA BRAVO\"\nc.HideSelection=hide\nc.SelStart=1\nc.SelLength=4\nSet c=f.Controls.Add(\"Forms.ComboBox.1\",\"Fixed\")\nc.Left=16\nc.Top=106\nc.Width=190\nc.Height=28\nc.FontSize=12\nc.Style=2\nc.AddItem \"ALPHA BRAVO\"\nc.ListIndex=0\nc.EnterFieldBehavior=1\nc.HideSelection=hide\nc.SelStart=1\nc.SelLength=4\nEnd Sub"
+        } else if caption_alignment {
             "Sub Main()\nDim a As New NativeForm,b As New NativeForm\na.Caption=\"Caption left of indicator\"\nb.Caption=\"Caption right of indicator\"\nSetup a,fmAlignmentLeft\nSetup b,fmAlignmentRight\na.Show 0\nb.Show 0\nEnd Sub\nPrivate Sub Setup(ByVal f As MSForms.UserForm,ByVal side As Long)\nf.Height=230\nf.Controls(\"Heading\").Visible=False\nf.Controls(\"Entry\").Visible=False\nf.Controls(\"Apply\").Visible=False\nf.Controls(\"Toggle1\").Visible=False\nDim name As Variant,c As Object,n As Long\nFor Each name In Array(\"Check1\",\"ChoiceA\",\"ChoiceB\")\nSet c=f.Controls(name)\nc.Caption=\"Caption stays inside its own bounds\"\nc.Left=16\nc.Top=12+n*68\nc.Width=145\nc.Height=60\nc.FontSize=12\nc.Alignment=side\nc.WordWrap=n<>1\nn=n+1\nNext name\nEnd Sub"
         } else if boolean_wrap {
             "Sub Main()\nDim a As New NativeForm,b As New NativeForm\na.Caption=\"Boolean WordWrap enabled\"\nb.Caption=\"Boolean WordWrap disabled\"\nSetup a,True\nSetup b,False\na.Show 0\nb.Show 0\nEnd Sub\nPrivate Sub Setup(ByVal f As MSForms.UserForm,ByVal wrap As Boolean)\nf.Height=230\nf.Controls(\"Heading\").Visible=False\nf.Controls(\"Entry\").Visible=False\nf.Controls(\"Apply\").Visible=False\nf.Controls(\"ChoiceB\").Visible=False\nDim name As Variant,c As Object,n As Long\nFor Each name In Array(\"Check1\",\"ChoiceA\",\"Toggle1\")\nSet c=f.Controls(name)\nc.Caption=\"Caption wraps inside fixed bounds\"\nc.Left=16\nc.Top=12+n*68\nc.Width=110\nc.Height=60\nc.FontSize=12\nc.WordWrap=wrap\nn=n+1\nNext name\nEnd Sub"
@@ -215,7 +222,9 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                 return Err("expected native tooltip".into());
             }
         }
-        let prefix = if caption_alignment {
+        let prefix = if hide_selection {
+            "m7a4-native-hide-selection"
+        } else if caption_alignment {
             "m7a4-native-caption-alignment"
         } else if boolean_wrap {
             "m7a4-boolean-word-wrap"

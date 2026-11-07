@@ -86,12 +86,36 @@ impl ComboBox<'_> {
                 egui::StrokeKind::Inside,
             );
             let value = self.field("VbaText").map(control_text).unwrap_or_default();
-            super::text_align::paint(
+            let alignment = super::text_align::read(self.ide, self.instance, self.control.id);
+            let mut galley = super::text_align::layout(
+                ui,
+                alignment,
+                &value,
+                super::fonts::read(self.ide, self.instance, self.control.id, ui, self.theme),
+                self.theme.text,
+            );
+            if response.has_focus() || self.field("HideSelection") == Some(Value::Boolean(false)) {
+                let start = usize::try_from(self.long("VbaSelStart", 0)).unwrap_or(0);
+                let length = usize::try_from(self.long("VbaSelLength", 0)).unwrap_or(0);
+                let range = egui::text::CCursorRange::two(
+                    egui::text::CCursor::new(text::chars_before(&value, start)),
+                    egui::text::CCursor::new(text::chars_before(
+                        &value,
+                        start.saturating_add(length),
+                    )),
+                );
+                egui::text_selection::visuals::paint_text_selection(
+                    &mut galley,
+                    ui.visuals(),
+                    &range,
+                    None,
+                );
+            }
+            super::text_align::paint_galley(
                 ui,
                 edit.shrink2(egui::vec2(4., 0.)),
-                super::text_align::read(self.ide, self.instance, self.control.id),
-                value,
-                super::fonts::read(self.ide, self.instance, self.control.id, ui, self.theme),
+                alignment,
+                galley,
                 self.theme.text,
                 edit.shrink(3.).intersect(ui.clip_rect()),
             );

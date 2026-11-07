@@ -399,3 +399,9 @@ Keep caption text left aligned and clipped independently of the indicator using
 local paint atoms, real widgets, full accessible labels/state and runtime-name
 fallback for empty captions. Preserve inert inspection, canonical Value/Null/
 groups/events/resources, global style and all budgets. Full M7A.4 stays open.
+
+ADR 0091 adds native TextBox/ComboBox HideSelection and True defaults. Preserve
+canonical text/ranges/events and inert resources/inspection. Paint inactive ranges
+only in local clipped galley copies; query focus/style and decorate outside font
+locks. Retain caller style/font caches, edit permission, non-applicable flag
+refusals and all budgets. Full M7A.4/fresh Office acceptance remains separate.

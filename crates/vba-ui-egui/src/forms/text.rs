@@ -207,6 +207,8 @@ impl TextBox<'_> {
             super::fonts::read(self.ide, self.instance, self.control.id, ui, self.theme);
         let font = font_style.id.clone();
         let alignment = super::text_align::read(self.ide, self.instance, self.control.id);
+        let persistent_selection =
+            self.field("HideSelection") == Some(vba_ide::Value::Boolean(false));
         let mut layouter = |ui: &egui::Ui, buffer: &dyn egui::TextBuffer, width: f32| {
             let display = buffer
                 .as_str()
@@ -219,7 +221,7 @@ impl TextBox<'_> {
                     }
                 })
                 .collect::<String>();
-            ui.fonts_mut(|fonts| {
+            let mut galley = ui.fonts_mut(|fonts| {
                 let mut job = egui::text::LayoutJob::simple(
                     display,
                     font.clone(),
@@ -246,7 +248,18 @@ impl TextBox<'_> {
                     galley.rect.max.x = left + width;
                 }
                 galley
-            })
+            });
+            if persistent_selection && !ui.memory(|memory| memory.has_focus(self.widget)) {
+                // Query focus outside the font lock; paint only a local galley clone.
+                // The range remains canonical and passive drawing executes no VBA.
+                egui::text_selection::visuals::paint_text_selection(
+                    &mut galley,
+                    ui.visuals(),
+                    &desired,
+                    None,
+                );
+            }
+            galley
         };
         let copy = text.clone();
         let mut readonly = copy.as_str();
