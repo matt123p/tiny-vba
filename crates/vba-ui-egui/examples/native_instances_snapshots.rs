@@ -89,7 +89,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             }],
         )?;
         let main = if fonts {
-            "Sub Main()\nDim a As New NativeForm,b As New NativeForm\na.Caption=\"Native font attributes\"\nb.Caption=\"Independent default font\"\na.Entry.Height=48\na.Apply.Top=120\na.Entry.EnterFieldBehavior=1\na.Entry.Font.Size=18.5\na.Entry.Font.Italic=True\na.Entry.Font.Underline=True\na.Entry.Font.Strikethrough=True\na.Apply.Font.Size=14\na.Heading.Font.Size=12\na.Heading.Font.Underline=True\na.Show 0\nb.Show 0\nEnd Sub"
+            "Sub Main()\nDim a As New NativeForm,b As New NativeForm\na.Caption=\"Native font attributes\"\nb.Caption=\"Independent default font\"\na.Entry.Height=48\na.Apply.Top=120\na.Entry.EnterFieldBehavior=1\na.Entry.Font.Size=18.5\na.Entry.Font.Italic=True\na.Entry.Font.Underline=True\na.Entry.Font.Strikethrough=True\na.Apply.Font.Size=14\nSet a.Heading.Font=a.Font\na.Heading.Font.Size=12\na.Heading.Font.Underline=True\na.Show 0\nb.Show 0\nEnd Sub"
         } else if colors {
             "Sub Main()\nDim a As New NativeForm,b As New NativeForm\na.Caption=\"Native RGB colours\"\nb.Caption=\"Separate colour state\"\na.BackColor=RGB(230,240,250)\na.Heading.BackColor=RGB(200,230,190)\na.Heading.ForeColor=RGB(70,20,90)\na.Entry.BackColor=RGB(250,230,200)\na.Entry.ForeColor=RGB(80,30,20)\na.Entry.EnterFieldBehavior=1\na.Apply.BackColor=RGB(190,220,240)\na.Apply.ForeColor=RGB(10,50,100)\na.Show 0\nb.Show 0\nEnd Sub"
         } else if runtime_controls {

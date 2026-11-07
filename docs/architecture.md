@@ -556,3 +556,9 @@ styles/fonts. The static nominal metadata ceiling is 8,192, with the existing
 ADR 0073 event regression still stays below 4,096. Replacement/ambient/platform
 font behavior and the unchanged full M7A.4 checklist remain open; fresh Office
 comparisons remain M8.5 NOT_RUN. See [ADR 0081](decisions/0081-native-form-fonts.md).
+
+Native Font assignment follows [ADR 0082](decisions/0082-native-font-assignment.md):
+typed ordinary setters preserve explicit reference identity, old aliases and root
+lazy reload; new controls still copy independent defaults. No VM, permission or
+budget change is needed. Nothing/external/other-assignment and ambient/platform
+font cases and the full remaining M7A.4 checklist stay open.

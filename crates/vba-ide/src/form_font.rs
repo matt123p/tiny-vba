@@ -13,7 +13,7 @@ pub(crate) fn members(root: bool) -> String {
         ""
     };
     format!(
-        "Public VbaFont As Object\nPublic Property Get Font() As MSForms.NewFont\n{load}Set Font=VbaFont\nEnd Property\n"
+        "Public VbaFont As Object\nPublic Property Get Font() As MSForms.NewFont\n{load}Set Font=VbaFont\nEnd Property\nPublic Property Set Font(ByVal value As MSForms.NewFont)\n{load}Set VbaFont=value\nEnd Property\n"
     )
 }
 pub(crate) const INITIAL: &str = "Set VbaFont=New VbaFormFont\n";

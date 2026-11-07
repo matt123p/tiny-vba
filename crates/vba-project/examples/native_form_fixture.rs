@@ -91,7 +91,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     };
     let mut text = String::from_utf8(fixture::export())?.replace("Debug.Print Entry.Text", body);
     if fonts {
-        let code="Attribute VB_Name = \"NativeForm\"\nAttribute VB_PredeclaredId = True\nOption Explicit\nPrivate Sub UserForm_Initialize()\nHeading.Font.Size=12\nEntry.Font.Size=12.25\nEntry.Font.Italic=True\nEntry.Font.Underline=True\nEntry.EnterFieldBehavior=1\nApply.Font.Size=11\nDebug.Print \"fonts ready\"\nEnd Sub\nPrivate Sub Apply_Click()\nEntry.Font.Weight=700\nDebug.Print Entry.Font.Weight\nStop\nEntry.Font.Size=14.5\nDebug.Print Entry.Font.Size\nMe.Hide\nEnd Sub\n".replace('\n',"\r\n");
+        let code="Attribute VB_Name = \"NativeForm\"\nAttribute VB_PredeclaredId = True\nOption Explicit\nPrivate Sub UserForm_Initialize()\nHeading.Font.Size=12\nSet Entry.Font=Heading.Font\nEntry.Font.Size=12.25\nEntry.Font.Italic=True\nEntry.Font.Underline=True\nEntry.EnterFieldBehavior=1\nApply.Font.Size=11\nDebug.Print \"fonts ready\"\nEnd Sub\nPrivate Sub Apply_Click()\nEntry.Font.Weight=700\nDebug.Print Entry.Font.Weight\nStop\nEntry.Font.Size=14.5\nDebug.Print Entry.Font.Size\nDebug.Print Entry.Font Is Heading.Font\nMe.Hide\nEnd Sub\n".replace('\n',"\r\n");
         text = String::from_utf8(fixture::export())?.replace(fixture::SOURCE, &code);
     }
     if colors {

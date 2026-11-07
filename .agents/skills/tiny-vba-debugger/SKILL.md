@@ -242,3 +242,9 @@ continuation through Stop and debugger shortcut ownership. Context invalidation
 clears unapplied prefixes; modal redirection cancels only the later document
 gesture, preserving its executing keyboard receipt. The host API and all budgets
 stay unchanged; full M7A.4/platform acceptance remains open.
+
+ADR 0082 adds ordinary typed Font property setters. Preserve explicit reference
+identity, old aliases, root lazy reload and independent copied container defaults;
+inspection stays inert and no budget/VM/permission change is made. Font-specific
+Nothing/external/other-assignment and ambient/platform comparisons and full M7A.4
+remain open; reference-derived tests are not fresh Office observations.

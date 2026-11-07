@@ -53,13 +53,13 @@ const assert = require('node:assert/strict');
     await page.screenshot({path:path.join(report,'m7a4-native-fonts-break.png')});
     await page.keyboard.press('F5');
     await page.waitForFunction(() => document.querySelector('#vba-status').textContent === 'Completed');
-    assert.equal((await page.locator('#vba-output').textContent()).trim(), 'fonts ready\n700\n14.5');
+    assert.equal((await page.locator('#vba-output').textContent()).trim(), 'fonts ready\n700\n14.5\nTrue');
     await page.screenshot({path:path.join(report,'m7a4-native-fonts-completed.png')});
     // Native edited saving is a separate milestone and must not create a custom archive.
     await page.keyboard.press('Control+e'); await settle();
     assert.equal(await page.locator('#vba-source').textContent(), source);
     assert.deepEqual(errors, []);
-    console.log('NATIVE_FONTS_BROWSER_PASS: inert native import; Font properties; modal Stop/resume without replay; exact source; no page errors');
+    console.log('NATIVE_FONTS_BROWSER_PASS: inert native import; Font properties and assigned identity; modal Stop/resume without replay; exact source; no page errors');
   } finally {
     if (browser) await browser.close();
     await new Promise(resolve => server.close(resolve));

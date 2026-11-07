@@ -147,3 +147,49 @@ fn unavailable_resolver_faces_keep_the_host_fallback_and_italic_decoration() -> 
     assert_eq!(a, b);
     Ok(())
 }
+
+#[test]
+fn assigned_font_objects_drive_the_same_pixels_as_direct_attributes() -> R {
+    let base = "NativeForm.Entry.Height=48\nNativeForm.Apply.Top=120\nNativeForm.Entry.EnterFieldBehavior=1\nNativeForm.Entry.ForeColor=RGB(80,30,20)\n";
+    let mut direct = app(
+        &format!(
+            "{base}NativeForm.Entry.Font.Size=18\nNativeForm.Entry.Font.Italic=True\nNativeForm.Entry.Font.Underline=True"
+        ),
+        Theme::light(),
+    )?;
+    let mut assigned = app(
+        &format!(
+            "{base}NativeForm.Heading.Font.Size=18\nNativeForm.Heading.Font.Italic=True\nNativeForm.Heading.Font.Underline=True\nSet NativeForm.Entry.Font=NativeForm.Heading.Font"
+        ),
+        Theme::light(),
+    )?;
+    let a = direct
+        .render()?
+        .pixels()
+        .filter(|p| p.0 == [80, 30, 20, 255])
+        .count();
+    let b = assigned
+        .render()?
+        .pixels()
+        .filter(|p| p.0 == [80, 30, 20, 255])
+        .count();
+    assert!(a > 0);
+    assert_eq!(a, b);
+    let owner = *assigned
+        .state()
+        .ide
+        .form_instances()?
+        .first()
+        .ok_or("form")?;
+    assert_eq!(
+        assigned
+            .state()
+            .ide
+            .form_instance_font(owner, Some(12))?
+            .size,
+        180000
+    );
+    assert_eq!(assigned.ctx.global_style().override_font_id, None);
+    assert_eq!(assigned.state().ide.output(), vec!["initialized"]);
+    Ok(())
+}

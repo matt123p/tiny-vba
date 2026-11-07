@@ -343,3 +343,8 @@ rendering and an injected UI palette resolver. Invalid assignments preserve prio
 state; import/source/resources and inert inspection remain separate. Runtime Page
 lookup searches the existing MultiPage collections. Font/border/transparency,
 ambient/platform appearance and the full M7A.4 checklist remain open.
+
+ADR 0082 adds ordinary typed Font setters, reference assignment, retained old
+aliases and root lazy reload. Runtime-added controls keep independent copied
+defaults. Nothing/external/other-assignment, ambient/platform, appearance and the
+remaining member audit stay open; this does not complete P01 or M7A.4.

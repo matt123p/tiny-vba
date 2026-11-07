@@ -1,5 +1,23 @@
 # Implementation progress
 
+## M7A.4 continued — native Font assignment (2026-11-07)
+
+ADR 0082 adds ordinary typed Font setters on UserForms and the 13 Font-capable
+control families. Explicit assignments share references while preexisting aliases
+survive replacement and unload. Root setters preserve lazy loading/reload; new
+controls still copy independent container defaults. Wrong objects fail normal
+nominal checks before mutation. Canonical inspection/rendering and original
+source/resources remain inert. No VM, host authorization or budget changes.
+
+Ten model tests, including 16 per-family subcases, and four real GPU cases pass.
+Shared CI, strict workspace Clippy, WASM/WASI, UI/native/web and repository
+gates pass. Chromium editor, legacy-form and assigned-Font modal Stop/Continue
+cases pass. Five native theme/scale views and the browser breakpoint view were
+inspected. Affected host acceptance is in progress. Font-specific
+Nothing/external/other-assignment behavior, ambient/platform defaults and the
+unchanged appearance/lifecycle/binding/control checklist remain open. Full M7A.4
+is IN PROGRESS; fresh Office comparisons remain M8.5 NOT_RUN.
+
 ## M7A.4 continued — native fonts (2026-11-07)
 
 ADR 0081 retains native StdFont/TextProps and bounded VBFrame Font blocks,
