@@ -206,15 +206,21 @@ impl ListBox<'_> {
                         egui::vec2(width, row_height),
                     )
                     .shrink2(egui::vec2(5., 0.));
-                    ui.painter()
-                        .with_clip_rect(cell.intersect(ui.clip_rect()))
-                        .text(
-                            cell.left_center(),
-                            egui::Align2::LEFT_CENTER,
-                            value,
-                            egui::TextStyle::Body.resolve(ui.style()),
-                            foreground,
-                        );
+                    super::fonts::paint(
+                        ui,
+                        cell.left_center(),
+                        egui::Align2::LEFT_CENTER,
+                        value,
+                        super::fonts::read(
+                            self.ide,
+                            self.instance,
+                            self.control.id,
+                            ui,
+                            self.theme,
+                        ),
+                        foreground,
+                        cell.intersect(ui.clip_rect()),
+                    );
                 }
                 if index == row as i32 && ui.memory(|m| m.has_focus(self.widget)) {
                     ui.painter().rect_stroke(

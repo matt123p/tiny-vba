@@ -452,7 +452,7 @@ impl<H: Host> Host for FormHost<'_, H> {
 fn quoted(s: &str) -> String {
     format!("\"{}\"", s.replace('"', "\"\""))
 }
-fn vba_string(s: &str) -> String {
+pub(super) fn vba_string(s: &str) -> String {
     // Newlines are expressions rather than literal statement boundaries.
     s.split('\n')
         .map(|line| {
@@ -522,7 +522,7 @@ pub(crate) fn checked_handlers(
         ]
         .contains(&d.name.key().as_str())
             || native
-                && ["tag", "helpcontextid", "backcolor", "forecolor"]
+                && ["tag", "helpcontextid", "backcolor", "forecolor", "font"]
                     .contains(&d.name.key().as_str())
             || d.name.spelling.to_ascii_lowercase().starts_with("vba")
             || form
@@ -538,7 +538,7 @@ pub(crate) fn checked_handlers(
     for c in &form.controls {
         if c.name.to_ascii_lowercase().starts_with("vba")
             || native
-                && ["tag", "helpcontextid", "backcolor", "forecolor"]
+                && ["tag", "helpcontextid", "backcolor", "forecolor", "font"]
                     .contains(&c.name.to_ascii_lowercase().as_str())
             || [
                 "show",
@@ -567,7 +567,9 @@ pub(crate) fn checked_handlers(
     for p in &parsed.module.procedures {
         let key = p.name.key();
         if key.starts_with("vba")
-            || native && ["tag", "helpcontextid", "backcolor", "forecolor"].contains(&key.as_str())
+            || native
+                && ["tag", "helpcontextid", "backcolor", "forecolor", "font"]
+                    .contains(&key.as_str())
             || [
                 "class_initialize",
                 "class_terminate",
@@ -762,6 +764,7 @@ fn compiled_form(
     if native.is_some() {
         source.push_str(&crate::form_dynamic::root(&handlers));
         source.push_str(&crate::form_colors::members(true, true));
+        source.push_str(&crate::form_font::members(true));
     }
     let parsed = parse(&module.source()?, ModuleKind::Class)?;
     let has = |name: &str| {
@@ -831,6 +834,10 @@ fn compiled_form(
         form.height
     ));
     if let Some(native) = native {
+        source.push_str(crate::form_font::INITIAL);
+        if let Some(font) = &native.design.font {
+            source.push_str(&crate::form_font::initialize("VbaFont", font));
+        }
         source.push_str(&format!(
             "VbaBackColor={}\nVbaForeColor={}\n",
             crate::form_colors::literal(native.design.colors.back),
@@ -907,6 +914,21 @@ fn compiled_form(
         }
         source.push_str(&setup);
         if let Some(metadata) = metadata {
+            if crate::form_font::supported(c.kind) {
+                if let Some(font) = &metadata.font {
+                    source.push_str(&crate::form_font::initialize(
+                        &format!("{temp}.VbaFont"),
+                        font,
+                    ));
+                } else {
+                    let owner = c
+                        .parent
+                        .and_then(|id| form.controls.iter().find(|p| p.id == id))
+                        .map(|p| format!("Vba{}.Font", p.name))
+                        .unwrap_or_else(|| "VbaFont".into());
+                    source.push_str(&format!("VbaCopyFont {temp}.VbaFont,{owner}\n"));
+                }
+            }
             source.push_str(&format!(
                 "{temp}.VbaBackColor={}\n",
                 crate::form_colors::literal(metadata.colors.back)
@@ -1833,6 +1855,7 @@ impl Ide {
                         "helpcontextid",
                         "backcolor",
                         "forecolor",
+                        "font",
                         "click",
                         "change",
                         "class_initialize",
@@ -1889,6 +1912,11 @@ impl Ide {
                     u64::MAX - 45,
                     "VbaFormTabState",
                     crate::form_tab_state::STATE.to_owned(),
+                ),
+                (
+                    u64::MAX - 49,
+                    "VbaFormFont",
+                    crate::form_font::CLASS.to_owned(),
                 ),
                 (u64::MAX - 40, "VbaFormTab", crate::form_tabs::tab_class()),
                 (
@@ -1960,6 +1988,7 @@ impl Ide {
             let mut support =
                 String::from("Public Const vbModal As Long=1\nPublic Const vbModeless As Long=0\n");
             support.push_str(crate::form_colors::VALIDATE);
+            support.push_str(crate::form_font::COPY);
             support.push_str(crate::form_dynamic::INITIALIZE);
             if self.form_range_import().is_some() {
                 support.push_str(&crate::form_bindings::support(true));
@@ -2208,6 +2237,7 @@ impl Ide {
             "helpcontextid" => "VbaHelpContextID",
             "backcolor" if self.native_forms.contains_key(&id) => "VbaBackColor",
             "forecolor" if self.native_forms.contains_key(&id) => "VbaForeColor",
+            "font" if self.native_forms.contains_key(&id) => "VbaFont",
             "visible" if control.is_none() => "VbaVisible",
             "left" => "VbaLeft",
             "top" => "VbaTop",

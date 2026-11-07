@@ -161,7 +161,12 @@ impl Tabs<'_> {
             } else {
                 self.theme.muted
             };
-            let job = super::accelerator::job(&caption, self.tab(i, "Accelerator"), font, color);
+            let job = super::accelerator::job(
+                &caption,
+                self.tab(i, "Accelerator"),
+                super::fonts::read(self.ide, self.instance, self.control.id, ui, self.theme),
+                color,
+            );
             let galley = ui.fonts_mut(|fonts| fonts.layout_job(job));
             ui.painter()
                 .galley(rect.center() - galley.size() / 2., galley, color);

@@ -67,7 +67,7 @@ pub(super) fn control(bytes: &[u8], site: Site) -> Result<Control> {
     let tags = strings(&mut b, tags_size)?;
     let accelerators = strings(&mut b, accelerators_size)?;
     b.end()?;
-    text_props(&mut r)?;
+    let font = Some(text_props(&mut r)?);
     if selected < -1
         || selected >= count as i32
         || tab_data > count as u32
@@ -105,6 +105,7 @@ pub(super) fn control(bytes: &[u8], site: Site) -> Result<Control> {
     }
     r.end()?;
     Ok(Control {
+        font,
         colors,
         accelerator: String::new(),
         id: site.id,

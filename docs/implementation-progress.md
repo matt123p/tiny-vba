@@ -1,5 +1,27 @@
 # Implementation progress
 
+## M7A.4 continued — native fonts (2026-11-07)
+
+ADR 0081 retains native StdFont/TextProps and bounded VBFrame Font blocks,
+including exact fractional sizes, effects, charset, weight and original resources.
+Ordinary Font objects expose typed attributes and default Name, preserve aliases
+and Stop/Continue/Reset, and copy container defaults for runtime-added controls
+and Pages. Inert snapshots drive local font rendering and caller-owned face
+selection without replacing host fonts or global styles. Five model cases, three
+decode cases, three real GPU typography/display-limit/fallback cases and compiler/verifier ceiling checks
+pass. Shared CI, strict workspace Clippy, WASM, WASI, UI/native/web and
+repository gates pass. Actual Chromium editor, legacy-form and native-font
+Stop/Continue cases pass; five theme/scale renders were inspected. Affected host
+validation is in progress.
+
+The compiler/verifier static nominal-entry limit is 8,192; this supersedes the
+older 4,096 profile ceiling while preserving the 64 MiB metadata/work bounds,
+all VM limits and 4,096 host permissions. The existing event-compaction regression
+still asserts its own 4,096 bound and unchanged aliases/types/events. Full M7A.4
+remains open, including font replacement, ambient/platform realization, borders/
+effects/transparency and the unchanged lifecycle/binding/platform checklist.
+Fresh Office observations remain M8.5 NOT_RUN.
+
 ## M7A.4 continued — native form/control colours (2026-11-07)
 
 ADR 0080 retains native BackColor/ForeColor defaults and OLE_COLOR bits, reconciles

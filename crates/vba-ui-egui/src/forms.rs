@@ -3,6 +3,7 @@ use super::*;
 mod accelerator;
 mod colors;
 mod combo;
+mod fonts;
 mod images;
 pub(super) mod keyboard;
 mod list;
@@ -1504,6 +1505,14 @@ impl EditorUi {
                 // BackColor paints only the form client canvas below it.
                 window_theme(ui, system_theme);
                 if native
+                    && form
+                        .controls
+                        .iter()
+                        .any(|c| fonts::limited(ide, instance, c.id))
+                {
+                    ui.label(system_theme.label("Some form font sizes exceed the display limit."));
+                }
+                if native
                     && (colors::unresolved(ide, instance, None, system_theme)
                         || form
                             .controls
@@ -1634,6 +1643,8 @@ impl EditorUi {
                             let theme = if native { colors::theme(ide,instance,Some(c.id),system_theme) } else {system_theme};
                             if native {
                                 window_theme(&mut control_ui,theme);
+                                let font=fonts::read(ide,instance,c.id,&control_ui,system_theme);
+                                fonts::apply(&mut control_ui,&font);
                                 let widgets = &mut control_ui.visuals_mut().widgets;
                                 for visual in [&mut widgets.inactive, &mut widgets.hovered, &mut widgets.active] {
                                     visual.bg_fill=theme.editor;
@@ -1647,7 +1658,7 @@ impl EditorUi {
                                     let response=ui.interact(bounds,widget_id,if c.kind==ControlKind::Page {egui::Sense::hover()}else{egui::Sense::click()});
                                     ui.painter().rect_filled(bounds,2.,theme.chrome);
                                     ui.painter().rect_stroke(bounds.shrink(1.),2.,egui::Stroke::new(1.,theme.border),egui::StrokeKind::Inside);
-                                    if c.kind==ControlKind::Frame {ui.painter().text(bounds.left_top()+egui::vec2(6.,3.),egui::Align2::LEFT_TOP,&caption,egui::TextStyle::Body.resolve(ui.style()),theme.text);}
+                                    if c.kind==ControlKind::Frame {fonts::paint(ui,bounds.left_top()+egui::vec2(6.,3.),egui::Align2::LEFT_TOP,caption.clone(),fonts::read(ide,instance,c.id,ui,system_theme),theme.text,bounds.intersect(ui.clip_rect()));}
                                     response.widget_info(||egui::WidgetInfo::labeled(egui::accesskit::Role::Group,enabled,&c.name));
                                     if response.clicked() {commands.push(Command::Form(FormCommand::InstanceEvent(instance,Some(c.id),None)));}
                                 }
@@ -1727,18 +1738,18 @@ impl EditorUi {
                                             match c.kind {
                                                 ControlKind::CheckBox => ui.put(
                                                     bounds,
-                                                    egui::Checkbox::new(&mut selected, accelerator::job(&caption,ide.form_instance_field(instance,Some(c.id),"Accelerator").ok(),egui::TextStyle::Body.resolve(ui.style()),theme.text))
+                                                    egui::Checkbox::new(&mut selected, accelerator::job(&caption,ide.form_instance_field(instance,Some(c.id),"Accelerator").ok(),fonts::read(ide,instance,c.id,ui,system_theme),theme.text))
                                                         .indeterminate(
                                                             value == vba_ide::Value::Null,
                                                         ),
                                                 ),
                                                 ControlKind::OptionButton => ui.put(
                                                     bounds,
-                                                    egui::RadioButton::new(selected, accelerator::job(&caption,ide.form_instance_field(instance,Some(c.id),"Accelerator").ok(),egui::TextStyle::Body.resolve(ui.style()),theme.text)),
+                                                    egui::RadioButton::new(selected, accelerator::job(&caption,ide.form_instance_field(instance,Some(c.id),"Accelerator").ok(),fonts::read(ide,instance,c.id,ui,system_theme),theme.text)),
                                                 ),
                                                 _ => ui.put(
                                                     bounds,
-                                                    egui::Button::new(accelerator::job(&caption,ide.form_instance_field(instance,Some(c.id),"Accelerator").ok(),egui::TextStyle::Button.resolve(ui.style()),theme.text)).selected(selected),
+                                                    egui::Button::new(accelerator::job(&caption,ide.form_instance_field(instance,Some(c.id),"Accelerator").ok(),fonts::read(ide,instance,c.id,ui,system_theme),theme.text)).selected(selected),
                                                 ),
                                             }
                                         })
@@ -1759,7 +1770,7 @@ impl EditorUi {
                                 ControlKind::Label | ControlKind::CommandButton => {
                                     let response = ui.put(
                                         bounds,
-                                        egui::Button::new(accelerator::job(&caption,ide.form_instance_field(instance,Some(c.id),"Accelerator").ok(),egui::TextStyle::Button.resolve(ui.style()),theme.text))
+                                        egui::Button::new(accelerator::job(&caption,ide.form_instance_field(instance,Some(c.id),"Accelerator").ok(),fonts::read(ide,instance,c.id,ui,system_theme),theme.text))
                                             .frame(c.kind == ControlKind::CommandButton),
                                     );
                                     if let Some(target) =

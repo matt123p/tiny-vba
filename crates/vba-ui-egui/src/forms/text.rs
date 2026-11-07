@@ -198,7 +198,9 @@ impl TextBox<'_> {
             state.cursor.set_char_range(Some(desired));
             state.store(ui.ctx(), self.widget);
         }
-        let font = egui::TextStyle::Body.resolve(ui.style());
+        let font_style =
+            super::fonts::read(self.ide, self.instance, self.control.id, ui, self.theme);
+        let font = font_style.id.clone();
         let mut layouter = |ui: &egui::Ui, buffer: &dyn egui::TextBuffer, width: f32| {
             let display = buffer
                 .as_str()
@@ -212,12 +214,14 @@ impl TextBox<'_> {
                 })
                 .collect::<String>();
             ui.fonts_mut(|fonts| {
-                fonts.layout(
+                let mut job = egui::text::LayoutJob::simple(
                     display,
                     font.clone(),
                     self.theme.text,
                     if wrap { width } else { f32::INFINITY },
-                )
+                );
+                super::fonts::decorate(&mut job, &font_style);
+                fonts.layout_job(job)
             })
         };
         let copy = text.clone();

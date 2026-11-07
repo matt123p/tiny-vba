@@ -231,3 +231,12 @@ Long to an optional Color32. Leave it None for standard RGB and injected theme
 roles. Supply it for exact platform or client palette entries; returning None
 keeps the default projection or displays the unavailable-client-palette message.
 Explicit RGB values bypass this resolver. It never authorizes execution or changes the canonical value.
+
+
+ADR 0081: Theme.form_font optionally maps an inert FormFont snapshot to an
+already installed egui FontId family for the requested face/weight/style. The
+renderer owns the native point-size conversion and validates returned families
+against the caller's atlas; it never acquires font files. Return None to use a
+matching installed named family or the host's existing fallback. The callback
+can select an italic face; when it resolves a face the renderer does not add
+synthetic italics. Underline/strikethrough remain local text decorations.

@@ -8,7 +8,7 @@ mod views;
 use egui::{Color32, FontId, RichText, TextEdit, Vec2};
 use std::sync::atomic::{AtomicU32, Ordering};
 static NEXT_VIEW: AtomicU32 = AtomicU32::new(1);
-pub use theme::{FormColor, Localizer, Theme, contrast};
+pub use theme::{FormColor, FormFontResolver, Localizer, Theme, contrast};
 use vba_ide::{Action, Ide, Mode, SourceId, SyntaxClass, display_value};
 #[derive(Clone, Debug)]
 pub enum Command {

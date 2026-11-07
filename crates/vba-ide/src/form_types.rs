@@ -4,6 +4,8 @@ use crate::{forms::ControlKind, *};
 use vba_foreign::{ReferenceLibrary, ReferenceSet, ReferenceType, ReferenceTypeKind};
 const TYPES: &[&str] = &[
     "UserForm",
+    "Font",
+    "NewFont",
     "Control",
     "Controls",
     "Label",
@@ -222,7 +224,7 @@ impl Ide {
         let library = libraries
             .get_mut(index)
             .ok_or_else(|| error("picture reference index"))?;
-        for name in ["StdPicture", "IPictureDisp"] {
+        for name in ["StdPicture", "IPictureDisp", "Font", "StdFont", "IFontDisp"] {
             if let Some(existing) = library
                 .types
                 .iter()
@@ -417,6 +419,17 @@ impl Ide {
             });
         }
         bindings.insert("VbaFormPicture".into(), pictures);
+        let mut fonts = vec![claim("Font", false)?, claim("NewFont", false)?];
+        for name in ["Font", "StdFont", "IFontDisp"] {
+            fonts.push(vba_ir::ClassInterface {
+                ty: references
+                    .object_type(&format!("stdole.{name}"))?
+                    .ok_or_else(|| error("font reference missing"))?,
+                events: false,
+                event_names: None,
+            });
+        }
+        bindings.insert("VbaFormFont".into(), fonts);
 
         for name in ["ReturnBoolean", "ReturnInteger"] {
             bindings.insert(format!("VbaForm{name}"), vec![claim(name, false)?]);

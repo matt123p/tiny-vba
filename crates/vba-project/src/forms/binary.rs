@@ -3,6 +3,8 @@ use super::{Control, Design, Format, Kind, MAX_CONTROLS, NativeForm, Resource, f
 use crate::{Reader, Result, budget, corrupt, text, unsupported};
 use std::collections::BTreeSet;
 mod classes;
+mod fonts;
+use fonts::{font, text_props};
 mod images;
 mod pages;
 mod tabs;
@@ -68,46 +70,6 @@ fn size(r: &mut Reader<'_>) -> Result<(i32, i32)> {
         return Err(unsupported("native size outside shared profile"));
     }
     Ok((w, h))
-}
-fn text_props(r: &mut Reader<'_>) -> Result<()> {
-    let mut b = block(r, 0x0200)?;
-    let m = mask(&mut b, 0xf7, 0)? as u64;
-    let name = field(&mut b, m, 0, 4, 0)?;
-    field(&mut b, m, 1, 4, 0)?;
-    field(&mut b, m, 2, 4, 0)?;
-    field(&mut b, m, 4, 1, 0)?;
-    field(&mut b, m, 5, 1, 0)?;
-    field(&mut b, m, 6, 1, 0)?;
-    field(&mut b, m, 7, 2, 0)?;
-    align(&mut b, 4)?;
-    string(&mut b, name)?;
-    b.end()
-}
-fn font(r: &mut Reader<'_>) -> Result<()> {
-    let guid = r.take(16)?;
-    if guid
-        == [
-            0x03, 0x52, 0xe3, 0x0b, 0x91, 0x8f, 0xce, 0x11, 0x9d, 0xe3, 0, 0xaa, 0, 0x4b, 0xb8,
-            0x51,
-        ]
-    {
-        if r.u8()? != 1 {
-            return Err(unsupported("StdFont version"));
-        }
-        r.take(9)?;
-        let n = r.u8()? as usize;
-        r.take(n)?;
-        Ok(())
-    } else if guid
-        == [
-            0x20, 0x09, 0xc2, 0xaf, 0x4e, 0xda, 0xce, 0x11, 0xb9, 0x43, 0, 0xaa, 0, 0x68, 0x87,
-            0xb4,
-        ]
-    {
-        text_props(r)
-    } else {
-        Err(unsupported("Office Forms font resource"))
-    }
 }
 fn stream<'a>(resources: &'a [Resource], name: &str) -> Result<&'a [u8]> {
     let mut matches = resources
@@ -264,8 +226,23 @@ fn container(
     if !native_caption.is_empty() && caption != native_caption {
         return Err(corrupt("conflicting native form captions"));
     }
-    if has_font != 0 {
-        font(&mut r)?;
+    let mut font = if has_font != 0 {
+        Some(font(&mut r)?)
+    } else {
+        None
+    };
+    if let Some(frame_font) = &header.font {
+        if font.as_ref().is_some_and(|f| {
+            f.name != frame_font.name
+                || f.size != frame_font.size
+                || f.charset != frame_font.charset
+                || f.weight != frame_font.weight
+                || f.effects & 14 != frame_font.effects & 14
+                || f.bold() != frame_font.bold()
+        }) {
+            return Err(corrupt("conflicting native form fonts"));
+        }
+        font = Some(frame_font.clone());
     }
     let classes = if flags & 0x8000 == 0 {
         classes::read(&mut r)?
@@ -328,6 +305,7 @@ fn container(
             }
             let child_root = format!("{root}/i{:02}", site.id);
             let child_header = frame::Header {
+                font: None,
                 name: site.name.clone(),
                 properties: Default::default(),
                 source_start: 0,
@@ -347,6 +325,7 @@ fn container(
             children.push(child_root);
             let frame_id = site.id;
             controls.push(Control {
+                font: child.design.font,
                 colors: child.design.colors,
                 accelerator: String::new(),
                 id: site.id,
@@ -443,7 +422,7 @@ fn container(
     {
         return Err(corrupt("invalid native OLE_COLOR"));
     }
-    Ok(NativeForm { format: Format::Embedded, name: header.name.clone(), code_page: 1252, source: String::new(), attributes: vec![], design: Design { colors, caption, enabled: flags&4!=0, tag: frame::metadata(header)?.0, help_context_id: frame::metadata(header)?.1, width,height,controls }, resources: vec![], diagnostics: vec!["Native resources retained; fonts, decoration and window placement remain partial. Palette-indexed colours require the embedding's colour resolver; native RGB/system colours are rendered. Full Office presentation/lifecycle parity is tracked separately in M7A.4.".into()] })
+    Ok(NativeForm { format: Format::Embedded, name: header.name.clone(), code_page: 1252, source: String::new(), attributes: vec![], design: Design { font, colors, caption, enabled: flags&4!=0, tag: frame::metadata(header)?.0, help_context_id: frame::metadata(header)?.1, width,height,controls }, resources: vec![], diagnostics: vec!["Native resources retained; fonts, decoration and window placement remain partial. Palette-indexed colours require the embedding's colour resolver; native RGB/system colours are rendered. Full Office presentation/lifecycle parity is tracked separately in M7A.4.".into()] })
 }
 struct Site {
     id: u32,
@@ -797,9 +776,10 @@ fn control(bytes: &[u8], site: Site) -> Result<Control> {
         (caption, String::new(), w, h, flags & 2 != 0)
     };
     b.end()?;
-    text_props(&mut r)?;
+    let font = Some(text_props(&mut r)?);
     r.end()?;
     Ok(Control {
+        font,
         colors,
         accelerator,
         id: site.id,
@@ -885,6 +865,7 @@ fn numeric_control(r: Reader<'_>, mut b: Reader<'_>, site: Site) -> Result<Contr
     b.end()?;
     r.end()?;
     Ok(Control {
+        font: None,
         colors,
         accelerator: String::new(),
         id: site.id,

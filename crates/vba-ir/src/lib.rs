@@ -1,5 +1,7 @@
 //! Versioned immutable programs, bounded structural verification and diagnostic disassembly.
 #![forbid(unsafe_code)]
+/// Static nominal declarations remain charged to the verifier's metadata/work caps.
+pub const MAX_NOMINAL_LOCALS: usize = 8192;
 mod disasm;
 mod verify;
 pub use disasm::disassemble;

@@ -347,5 +347,17 @@ existing representation, independently of the ANSI character contract (ADR 0070)
 ADR 0073 keeps Event declarations as typed signatures without unused class-field
 local aliases. Preserve nominal event parameters, receiver metadata, class fields
 and all aliases/checks in executable methods. Regress large typed field/event
-projects under unchanged 4,096 nominal-local entries; do not raise budgets or omit
-public events to hide compiler metadata expansion.
+projects with at most 4,096 nominal-local entries in the event-compaction regression;
+do not weaken that benchmark or omit public events to hide metadata expansion.
+ADR 0081 supersedes the global numeric ceiling for the later Font profile only;
+the event-size and executable alias/type-check invariants remain unchanged.
+
+
+ADR 0081 adds selected native Font import and ordinary MSForms.Font/NewFont
+properties with Currency sizes, typed attributes and independent container defaults.
+Font inspection stays inert; UI uses local styles and caller-owned face selection.
+The static nominal table ceiling is now 8,192 under unchanged metadata/work and VM
+limits; host permissions stay 4,096. The ADR 0073 event-compaction regression must
+still stay below 4,096 and retain its no-unused-field-alias checks. Do not use the
+new ceiling to conceal Event metadata regression or omit public events. Full
+M7A.4 and fresh Office font/platform acceptance remain open.

@@ -115,6 +115,15 @@ impl Ide {
             return Err(error("native form metadata outside supported limits"));
         }
         let point = |n: i32| n as f32 * (72.0 / 2540.0);
+        if native.design.font.as_ref().is_some_and(|f| !f.valid())
+            || native
+                .design
+                .controls
+                .iter()
+                .any(|c| c.font.as_ref().is_some_and(|f| !f.valid()))
+        {
+            return Err(error("invalid native font metadata"));
+        }
         if !vba_project::forms::valid_color(native.design.colors.back)
             || !vba_project::forms::valid_color(native.design.colors.fore)
             || native.design.controls.iter().any(|c| {

@@ -302,3 +302,13 @@ only referenced elements and ByRef actuals, retaining source-order argument
 capture and index evaluation once. Set targets and whole-array reads stay inert.
 Older capabilities reject array metadata/instructions. No intrinsic or ambient
 host authority is added. Scalar auto-instancing retains IR 10 selection.
+
+
+ADR 0081 adds selected native font metadata, ordinary typed Font objects, copied
+container defaults and inert UI snapshots. Font sizes retain Currency precision;
+local typography and optional caller-owned face selection preserve global host
+styles/fonts. The static nominal metadata ceiling is 8,192, with the existing
+64 MiB metadata/work bounds and VM/4,096-permission limits unchanged. The separate
+ADR 0073 event regression still stays below 4,096. Replacement/ambient/platform
+font behavior and the unchanged full M7A.4 checklist remain open; fresh Office
+comparisons remain M8.5 NOT_RUN. See [ADR 0081](decisions/0081-native-form-fonts.md).

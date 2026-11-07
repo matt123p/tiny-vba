@@ -156,6 +156,13 @@ End If
 If Len(key)=0 Or Len(key)>128 Then Err.Raise 380
 If VbaAllControls.VbaFind(key)>=0 Then Err.Raise 380
 VbaInitializeControl control,True,data(2),True,collection.Count,0,0,72,18,key,VbaNextPageId(),parentKey,0,"","",0,key,"",False,False,False,False,"",VbaContext
+If control.VbaKind<>7 And control.VbaKind<>8 And control.VbaKind<>15 Then
+If parentKey=0 Then
+VbaCopyFont control.VbaFont,VbaFont
+Else
+VbaCopyFont control.VbaFont,parent.Font
+End If
+End If
 control.VbaRuntime=True
 If control.VbaKind=11 Then control.VbaConfigureChildren
 VbaAllControls.VbaAdd control

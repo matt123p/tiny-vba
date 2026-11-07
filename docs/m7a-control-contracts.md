@@ -30,7 +30,8 @@ are file-format defaults from MS-OFORMS, not undocumented VBE toolbox defaults.
 | Form Caption / size | Native FormExtraDataBlock + VBFrame; v5 VBFrame caption supported | D |
 | Form scrolling / Zoom / Enabled | Import requires unscrolled matching physical/logical size, zoom 100, enabled form | Other values U |
 | ForeColor / BackColor | Native OLE_COLOR fields and VBFrame reconciliation; canonical Long properties, RGB/system-theme rendering and optional caller palette resolution | D; ADR 0080, full platform/ambient appearance remains open |
-| Font / border / effect | Known native property fields, StdFont/TextProps and original resources; no font file acquisition | P; remaining renderer/member parity M7A.4 |
+| Font | ADR 0081 retains StdFont/TextProps and VBFrame data; typed attributes, independent objects/defaults, inert inspection and local rendering | D selected; replacement/ambient/platform realization P |
+| Border / effect / transparency | Known native fields and original resources | P; remaining renderer/member parity M7A.4 |
 | Tag / HelpContextID / ControlTipText | Known frame/site strings/scalars; ordinary per-instance metadata and runtime tips | D; Help/F1 routing remains U (ADR 0055) |
 | Window placement / StartUpPosition / ShowModal | VBFrame metadata retained; enabled/default-modal form required; explicit show modes use existing runtime | P for placement; disabled/default-modeless metadata U; parity M7A.4 |
 | Default / Cancel / Accelerator / TakeFocusOnClick changes | Native site/control flags or fields | Default/Cancel decoded and executed; other fields U |

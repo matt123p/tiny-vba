@@ -286,3 +286,13 @@ resolution uses injected theme/palette policy and reports unresolved client
 entries. Preserve typed errors, inert inspection, instance/lifetime/Stop/Reset and
 original resources. Existing collections own runtime MultiPage/Page lookup.
 Font/border/transparency, ambient/platform appearance and full M7A.4 stay open.
+
+
+ADR 0081 adds selected native Font import and ordinary MSForms.Font/NewFont
+properties with Currency sizes, typed attributes and independent container defaults.
+Font inspection stays inert; UI uses local styles and caller-owned face selection.
+The static nominal table ceiling is now 8,192 under unchanged metadata/work and VM
+limits; host permissions stay 4,096. The ADR 0073 event-compaction regression must
+still stay below 4,096 and retain its no-unused-field-alias checks. Do not use the
+new ceiling to conceal Event metadata regression or omit public events. Full
+M7A.4 and fresh Office font/platform acceptance remain open.

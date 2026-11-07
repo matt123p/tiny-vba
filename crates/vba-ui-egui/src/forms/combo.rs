@@ -74,15 +74,15 @@ impl ComboBox<'_> {
                 egui::StrokeKind::Inside,
             );
             let value = self.field("VbaText").map(control_text).unwrap_or_default();
-            ui.painter()
-                .with_clip_rect(edit.shrink(3.).intersect(ui.clip_rect()))
-                .text(
-                    edit.left_center() + egui::vec2(4., 0.),
-                    egui::Align2::LEFT_CENTER,
-                    value,
-                    egui::TextStyle::Body.resolve(ui.style()),
-                    self.theme.text,
-                );
+            super::fonts::paint(
+                ui,
+                edit.left_center() + egui::vec2(4., 0.),
+                egui::Align2::LEFT_CENTER,
+                value,
+                super::fonts::read(self.ide, self.instance, self.control.id, ui, self.theme),
+                self.theme.text,
+                edit.shrink(3.).intersect(ui.clip_rect()),
+            );
             toggle = response.clicked();
             if response.has_focus() {
                 ui.painter().rect_stroke(

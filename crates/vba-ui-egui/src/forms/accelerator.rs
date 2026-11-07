@@ -1,17 +1,18 @@
 //! Inert caption decoration; canonical accelerator values stay in VBA fields.
 use egui::{
-    Color32, FontId, Stroke,
+    Color32, Stroke,
     text::{LayoutJob, TextFormat},
 };
 use vba_ide::Value;
 pub(super) fn job(
     caption: &str,
     accelerator: Option<Value>,
-    font: FontId,
+    font: impl Into<super::fonts::Style>,
     color: Color32,
 ) -> LayoutJob {
+    let font = font.into();
     let format = TextFormat {
-        font_id: font,
+        font_id: font.id.clone(),
         color,
         ..Default::default()
     };
@@ -40,5 +41,6 @@ pub(super) fn job(
     } else {
         job.append(caption, 0., format);
     }
+    super::fonts::decorate(&mut job, &font);
     job
 }

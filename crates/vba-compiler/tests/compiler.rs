@@ -699,6 +699,10 @@ fn event_signatures_keep_nominal_arguments_without_unused_class_field_aliases()
         .ok_or("publisher")?;
     assert_eq!(class.fields.len(), 256);
     assert_eq!(class.events.len(), 20);
+    assert!(
+        program.nominal_locals.len() <= 4096,
+        "Event field aliases must not consume the expanded ceiling"
+    );
     assert!(class.fields.iter().all(|field| {
         field
             .nominal
@@ -733,6 +737,66 @@ fn event_signatures_keep_nominal_arguments_without_unused_class_field_aliases()
             .filter(|local| matches!(local.role, ir::SlotRole::InstanceField(_)))
             .count(),
         256
+    );
+    Ok(())
+}
+
+#[test]
+fn nominal_metadata_accepts_larger_ordinary_classes_but_keeps_a_fixed_ceiling()
+-> Result<(), Box<dyn Error>> {
+    use vba_syntax::{ModuleKind, parse};
+    let build = |methods: usize| -> Result<ir::VerifiedProgram, vba_diagnostics::Diagnostic> {
+        let mut class = String::from(
+            "Attribute VB_Name = \"Node\"\nPublic first As Node,second As Node,third As Node\n",
+        );
+        for i in 0..methods {
+            class.push_str(&format!("Public Sub Method{i}()\nEnd Sub\n"));
+        }
+        let modules = vec![
+            parse(
+                &SourceFile::new(SourceId(1), "Node.cls".into(), class)?,
+                ModuleKind::Class,
+            )?,
+            parse(
+                &SourceFile::new(
+                    SourceId(2),
+                    "Main.bas".into(),
+                    "Function Answer() As Long\nDim value As Node\nAnswer=1\nEnd Function".into(),
+                )?,
+                ModuleKind::Standard,
+            )?,
+        ];
+        compile_modules(&modules, &CompileOptions::default())
+    };
+    let accepted = build(1500)?;
+    assert!(accepted.program().nominal_locals.len() > 4096);
+    assert!(accepted.program().nominal_locals.len() <= ir::MAX_NOMINAL_LOCALS);
+    assert_eq!(
+        build(2731)
+            .err()
+            .ok_or("over-budget program accepted")?
+            .code,
+        "VBA0121"
+    );
+    let mut invalid = accepted.program().clone();
+    let item = invalid
+        .nominal_locals
+        .first()
+        .ok_or("nominal entry")?
+        .clone();
+    invalid
+        .nominal_locals
+        .resize(ir::MAX_NOMINAL_LOCALS + 1, item);
+    assert_eq!(
+        ir::verify(
+            invalid,
+            &ir::Capabilities::ir7_structural(),
+            &ir::VerifyLimits::default()
+        )
+        .err()
+        .ok_or("over-budget IR accepted")?
+        .code,
+        "VBA0021"
     );
     Ok(())
 }

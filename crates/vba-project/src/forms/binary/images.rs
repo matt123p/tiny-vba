@@ -119,6 +119,7 @@ pub(super) fn control(bytes: &[u8], site: Site) -> Result<Control> {
     };
     r.end()?;
     Ok(Control {
+        font: None,
         colors: crate::forms::Colors {
             back,
             ..Default::default()

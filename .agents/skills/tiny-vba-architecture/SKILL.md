@@ -336,3 +336,13 @@ VBA focus and callbacks, bounded raw held-key ownership, root widget identities,
 paused character/release continuation and non-text Space ordering. Debugger
 F5/F8 releases must not become form KeyUp callbacks. Root input eligibility
 requires more than a missing TabStop. Full M7A.4 remains in progress.
+
+
+ADR 0081 adds selected native Font import and ordinary MSForms.Font/NewFont
+properties with Currency sizes, typed attributes and independent container defaults.
+Font inspection stays inert; UI uses local styles and caller-owned face selection.
+The static nominal table ceiling is now 8,192 under unchanged metadata/work and VM
+limits; host permissions stay 4,096. The ADR 0073 event-compaction regression must
+still stay below 4,096 and retain its no-unused-field-alias checks. Do not use the
+new ceiling to conceal Event metadata regression or omit public events. Full
+M7A.4 and fresh Office font/platform acceptance remain open.

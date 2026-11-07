@@ -164,7 +164,7 @@ fn validate(
     budget.table(p.sources.len() + p.procedures.len() + p.constants.len())?;
     budget.text(&p.profile)?;
     budget.text(&p.revision)?;
-    bound(p.nominal_locals.len(), 4096)?;
+    bound(p.nominal_locals.len(), MAX_NOMINAL_LOCALS)?;
     if !p.nominal_locals.is_empty() {
         if p.ir_version < IR5_VERSION {
             return Err(incompatible("nominal metadata requires IR 5"));

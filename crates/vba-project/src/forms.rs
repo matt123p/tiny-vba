@@ -1,7 +1,9 @@
 //! Inert native Office UserForm data. No filesystem, control activation or executable cache.
 mod binary;
+mod fonts;
 mod frame;
 use crate::{Attribute, Limits, Metered, Result, budget, container_error, read_stream};
+pub use fonts::Font;
 pub use frame::{companion_name, decode_export};
 use std::io::Cursor;
 
@@ -81,6 +83,7 @@ pub fn valid_color(value: i32) -> bool {
 /// Coordinates are original signed HIMETRIC units, not pixels or points.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Control {
+    pub font: Option<Font>,
     pub colors: Colors,
     pub id: u32,
     /// Immediate native container site ID; None denotes the UserForm.
@@ -190,6 +193,7 @@ impl Default for TextBehavior {
 }
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Design {
+    pub font: Option<Font>,
     pub colors: Colors,
     pub caption: String,
     pub enabled: bool,

@@ -107,6 +107,55 @@ fn streams_with_controls(
 pub fn companion() -> Vec<u8> {
     companion_with_properties(0, false, false)
 }
+/// Authored TextProps and StdFont with the same fractional point size and effects.
+pub fn font_companion() -> Vec<u8> {
+    let mut body = u32s(&[0xf7, 0x80000000 | 14, 15, 225]);
+    body.extend([128, 0x22, 2, 0]);
+    body.extend(700u16.to_le_bytes());
+    body.extend([0, 0]);
+    body.extend(string("Authored face!"));
+    let text = record(0x200, &body);
+    let controls = controls()
+        .into_iter()
+        .map(|mut c| {
+            c.truncate(c.len() - 8);
+            c.extend(&text);
+            c
+        })
+        .collect();
+    let mut streams = streams_with_controls(controls, false, false);
+    let f = &mut streams[0].1;
+    let n = u16::from_le_bytes([f[2], f[3]]) as usize;
+    let mask = u32::from_le_bytes(f[4..8].try_into().unwrap());
+    let mut body = u32s(&[mask | 1 << 20]);
+    body.extend_from_slice(&f[8..12]);
+    body.extend([0xff, 0xff, 0, 0]);
+    body.extend_from_slice(&f[12..n + 4]);
+    let mut encoded = record(0x400, &body);
+    encoded.extend([
+        0x03, 0x52, 0xe3, 0x0b, 0x91, 0x8f, 0xce, 0x11, 0x9d, 0xe3, 0, 0xaa, 0, 0x4b, 0xb8, 0x51,
+    ]);
+    encoded.push(1);
+    encoded.extend(128u16.to_le_bytes());
+    encoded.push(14);
+    encoded.extend(700u16.to_le_bytes());
+    encoded.extend(112500u32.to_le_bytes());
+    encoded.push(14);
+    encoded.extend(b"Authored face!");
+    encoded.extend_from_slice(&f[n + 4..]);
+    *f = encoded;
+    let mut file = cfb::CompoundFile::create(Cursor::new(Vec::new())).unwrap();
+    for (name, bytes) in streams {
+        file.create_stream(format!("/{name}"))
+            .unwrap()
+            .write_all(&bytes)
+            .unwrap();
+    }
+    let bytes = file.into_inner().into_inner();
+    let mut out = (bytes.len() as u32).to_le_bytes().to_vec();
+    out.extend(bytes);
+    out
+}
 /// Authored RGB/palette cases; colours are the only added persisted properties.
 pub fn color_companion(back: i32, fore: i32) -> Vec<u8> {
     let leaf = |caption: &str| {

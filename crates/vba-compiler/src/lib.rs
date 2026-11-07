@@ -332,7 +332,7 @@ pub fn compile_modules(
     for (procedure, bound) in program.procedures.iter().enumerate() {
         for (slot, local) in bound.locals.iter().enumerate() {
             if let Some(ty) = &local.nominal {
-                if nominal_locals.len() >= 4096 {
+                if nominal_locals.len() >= ir::MAX_NOMINAL_LOCALS {
                     return Err(resource());
                 }
                 features.insert("nominal-objects-v5".into());
@@ -930,7 +930,7 @@ impl Builder<'_> {
                 } => {
                     let slot = self.scratch(*kind)?;
                     if let Some(ty) = nominal {
-                        if self.nominal_locals.len() >= 4096 {
+                        if self.nominal_locals.len() >= ir::MAX_NOMINAL_LOCALS {
                             return Err(resource());
                         }
                         push(

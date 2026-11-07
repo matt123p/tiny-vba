@@ -19,6 +19,108 @@ fn decode(bytes: &[u8]) -> Result<forms::NativeForm, vba_diagnostics::Diagnostic
     )
 }
 #[test]
+fn native_fonts_keep_fractional_sizes_effects_defaults_and_original_resources() {
+    let default = decode(&fixture::companion()).unwrap();
+    assert_eq!(default.design.font, None);
+    assert_eq!(
+        default.design.controls[1].font,
+        Some(forms::Font::default())
+    );
+    let bytes = fixture::font_companion();
+    let f = decode(&bytes).unwrap();
+    let root = f.design.font.as_ref().unwrap();
+    assert_eq!(
+        (
+            &*root.name,
+            root.size,
+            root.charset,
+            root.weight,
+            root.effects
+        ),
+        ("Authored face!", 112500, 128, 700, 14)
+    );
+    let leaf = f.design.controls[1].font.as_ref().unwrap();
+    assert_eq!(
+        (
+            &*leaf.name,
+            leaf.size,
+            leaf.charset,
+            leaf.weight,
+            leaf.effects
+        ),
+        ("Authored face!", 112500, 128, 700, 15)
+    );
+    assert_eq!((leaf.pitch_family, leaf.paragraph_align), (0x22, 2));
+    assert!(
+        f.resources
+            .iter()
+            .any(|r| r.name == "NativeForm.frx" && r.bytes == bytes)
+    );
+}
+#[test]
+fn frame_font_blocks_are_bounded_reconciled_and_never_execute_source() {
+    let fields = " BeginProperty Font {0BE35203-8F91-11CE-9DE3-00AA004BB851}\r\n Name = \"Authored face!\"\r\n Size = 11.25\r\n Charset = 128\r\n Weight = 700\r\n Italic = -1\r\n Underline = -1\r\n Strikethrough = -1\r\n EndProperty\r\n";
+    let export = String::from_utf8(fixture::export()).unwrap().replacen(
+        " StartUpPosition",
+        &format!("{fields} StartUpPosition"),
+        1,
+    );
+    let bytes = fixture::font_companion();
+    let f = forms::decode_export(
+        "NativeForm.frm",
+        export.as_bytes(),
+        1252,
+        &[Resource {
+            name: "NativeForm.frx".into(),
+            bytes: bytes.clone(),
+        }],
+        &Limits::default(),
+    )
+    .unwrap();
+    assert_eq!(f.source, fixture::SOURCE);
+    assert_eq!(f.design.font.as_ref().unwrap().size, 112500);
+    assert!(
+        forms::decode_export(
+            "NativeForm.frm",
+            export.replace("Size = 11.25", "Size = 12.25").as_bytes(),
+            1252,
+            &[Resource {
+                name: "NativeForm.frx".into(),
+                bytes
+            }],
+            &Limits::default()
+        )
+        .is_err()
+    );
+}
+#[test]
+fn malformed_stdfont_flags_sizes_names_and_weights_refuse_before_attachment() {
+    use std::io::{Cursor, Read, Write};
+    let guid = [
+        0x03, 0x52, 0xe3, 0x0b, 0x91, 0x8f, 0xce, 0x11, 0x9d, 0xe3, 0, 0xaa, 0, 0x4b, 0xb8, 0x51,
+    ];
+    for (offset, replacement) in [
+        (3, vec![1]),
+        (6, 0u32.to_le_bytes().to_vec()),
+        (6, 655350001u32.to_le_bytes().to_vec()),
+        (10, vec![32]),
+        (11, vec![128]),
+        (4, 1001u16.to_le_bytes().to_vec()),
+    ] {
+        let original = fixture::font_companion();
+        let mut file = cfb::CompoundFile::open(Cursor::new(original[4..].to_vec())).unwrap();
+        let mut f = Vec::new();
+        file.open_stream("/f").unwrap().read_to_end(&mut f).unwrap();
+        let at = f.windows(16).position(|w| w == guid).unwrap() + 16 + offset;
+        f[at..at + replacement.len()].copy_from_slice(&replacement);
+        file.create_stream("/f").unwrap().write_all(&f).unwrap();
+        let bytes = file.into_inner().into_inner();
+        let mut output = (bytes.len() as u32).to_le_bytes().to_vec();
+        output.extend(bytes);
+        assert_eq!(decode(&output).unwrap_err().code, "VBA_PROJECT_CORRUPT");
+    }
+}
+#[test]
 fn native_export_decodes_three_controls_and_keeps_exact_source_and_resources() {
     let bytes = fixture::companion();
     let f = decode(&bytes).unwrap();

@@ -79,6 +79,9 @@ pub(crate) fn control_class(kind: ControlKind, ranges: bool) -> String {
         false,
         kind != ControlKind::Image,
     ));
+    if crate::form_font::supported(kind) {
+        s.push_str(&crate::form_font::members(false));
+    }
     if !matches!(kind, ControlKind::Label | ControlKind::Image) {
         s.push_str("Public VbaFocusConfirmed As Boolean\nPublic Event VbaFocusRequested(ByVal target As Object)\nPublic Sub SetFocus()\nVbaFocusConfirmed=False\nRaiseEvent VbaFocusRequested(Me)\nIf Not VbaFocusConfirmed Then Err.Raise 2110\nEnd Sub\n");
     }
@@ -232,6 +235,9 @@ pub(crate) fn control_class(kind: ControlKind, ranges: bool) -> String {
     }
     let mut init = format!("VbaKind={kind_code}\n");
     init.push_str(&crate::form_colors::initial(kind));
+    if crate::form_font::supported(kind) {
+        init.push_str(crate::form_font::INITIAL);
+    }
     if matches!(kind, ControlKind::TextBox | ControlKind::RefEdit) {
         init.push_str("AutoWordSelect=True\n");
     }

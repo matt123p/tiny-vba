@@ -7,6 +7,7 @@ pub(super) struct Header {
     pub name: String,
     pub properties: BTreeMap<String, String>,
     pub source_start: usize,
+    pub font: Option<super::Font>,
 }
 pub(super) fn color(header: &Header, name: &str) -> Result<Option<i32>> {
     let Some(value) = header.properties.get(name) else {
@@ -91,7 +92,8 @@ pub(super) fn parse(input: &str, export: bool) -> Result<Header> {
         .len()
         .saturating_sub(lines.clone().map(str::len).sum::<usize>());
     let mut properties = BTreeMap::new();
-    for line in lines {
+    let mut font = None;
+    while let Some(line) = lines.next() {
         pos = pos.checked_add(line.len()).ok_or_else(budget)?;
         let line = clean(line);
         if line == "End" {
@@ -102,9 +104,26 @@ pub(super) fn parse(input: &str, export: bool) -> Result<Header> {
                 name,
                 properties,
                 source_start: pos,
+                font,
             });
         }
         if line.is_empty() {
+            continue;
+        }
+        if line.starts_with("BeginProperty Font") {
+            let suffix = line.strip_prefix("BeginProperty Font").unwrap_or("").trim();
+            if !suffix.is_empty()
+                && !suffix.eq_ignore_ascii_case("{0BE35203-8F91-11CE-9DE3-00AA004BB851}")
+            {
+                return Err(unsupported("frame font class"));
+            }
+            if font.is_some() {
+                return Err(corrupt("duplicate frame font"));
+            }
+            font = Some(super::fonts::frame_font(&mut lines)?);
+            pos = input
+                .len()
+                .saturating_sub(lines.clone().map(str::len).sum::<usize>());
             continue;
         }
         if properties.len() >= 32 {
@@ -345,6 +364,7 @@ pub fn decode_export(
             source: String::new(),
             attributes: vec![],
             design: Design {
+                font: header.font.clone(),
                 colors: super::Colors {
                     back: color(&header, "backcolor")?.unwrap_or(super::Colors::default().back),
                     fore: color(&header, "forecolor")?.unwrap_or(super::Colors::default().fore),
