@@ -1,6 +1,6 @@
 # ADR 0089: Restricted WASI callback forwarding
 
-Date: 2026-11-07. Status: adopted runner change; full shared/browser/Node 18/22 acceptance passed, host acceptance in progress.
+Date: 2026-11-07. Status: adopted runner change; full shared/browser/Node 18/22 and both pinned host acceptance gates passed.
 
 The unchanged default-stack debug form-instance module exits with SIGSEGV under
 Node 22.23.4 when linked directly to native WASI imports. The identified designer

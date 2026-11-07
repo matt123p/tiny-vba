@@ -74,6 +74,18 @@ barrier, Stop/Continue, Reset/identity/geometry invalidation, repaint acknowledg
 and native keyboard ownership. RefEdit keeps its existing modal selection path.
 The complete K/M/property/binding/platform requirements above remain open.
 
+Next P01 property packet: native CheckBox/OptionButton `Alignment`. The public
+`fmAlignmentLeft=0`/`fmAlignmentRight=1` values (default Right) are the inverse of
+the persisted VariousPropertiesBitfield Alignment bit. Keep caption text physically
+left aligned and clip it to its own rectangle on either side of the indicator;
+an unwrapped caption must not paint over a right-side indicator. Cover native and
+dynamic defaults, typed errors, inert inspection, stopped callbacks, Null/groups,
+accessible labels/state, both caption sides and original resource retention.
+ToggleButton's property is documented as disabled; do not infer an enabled member
+from its presence in a type library. No part of this packet is marked implemented.
+See Microsoft's [Alignment property](https://learn.microsoft.com/en-us/office/vba/language/reference/user-interface-help/alignment-property)
+and [VariousPropertiesBitfield](https://learn.microsoft.com/en-us/openspecs/office_file_formats/ms-oforms/c38cc3f9-969b-45da-ab41-b361c044431e).
+
 ADR 0078 implements the selected pre-document input barrier and debugger/Reset/
 identity continuation cases described above. Broader lifecycle/binding/collection,
 all-key/mixed-input and platform acceptance remain open; this does not narrow any

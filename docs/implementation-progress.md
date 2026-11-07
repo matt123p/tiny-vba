@@ -15,8 +15,19 @@ runtime/Break views were inspected. The original default-stack ADR 0086
 accelerator module also passes all eight cases through the new runner. The
 five runner guests pass on both Node versions; the import-dictionary regression
 fails with an ordinary object and passes with the null-prototype dictionary.
-Affected host acceptance follows. No broader Office compatibility or M7A.4
-completion is implied.
+Shared product revision: `b7010bd2738bbcac87a018b94bd261c2d8533f24`.
+Gridcraft pins that revision and passes all 10 CI steps, strict optional VBA/UI
+Clippy, five native-form UI cases, the VBA-enabled web build and all 33 native/33
+Node 22 WASM package cases. Its light canvas was inspected; the 13 shared lockfile
+packages changed by revision only. Published Gridcraft integration:
+`dd7d06e5634b39620067857e7670605fe8fda421`.
+Wordcraft pins the same revision and passes all eight CI steps in isolation with
+one test thread, strict optional VBA/UI Clippy, 13 VBA UI cases plus hidden-VBE
+and document-canvas cases, the VBA-enabled web build and all 28 native/28 Node 22
+WASM package cases. Its dark canvas was inspected and all 13 shared lockfile
+packages changed by revision only. Published Wordcraft integration:
+`f5bf57126fd128182a45cedd5071e4a339aec794`.
+No broader Office compatibility or M7A.4 completion is implied.
 
 ## M7A.4 continued — Boolean-control WordWrap (2026-11-07)
 
@@ -31,8 +42,11 @@ No VM, host protocol, second mutable state store or budget change occurs.
 Six new model cases pass (12 total WordWrap cases). Four real GPU/input cases
 cover rows, newlines, fixed bounds/accessibility, ToggleButton centring and a
 real checkbox Change callback that changes wrapping, stops and resumes once.
-Full shared/browser and affected host acceptance is in progress. Remaining
-common properties, Alignment/TextAlign, AutoSize/scrolling, lifecycle/input,
+Full shared CI, strict all-targets Clippy, WASM, WASI on Node 18/22, UI/native/web,
+repository checks and all seven Chromium flows pass. All five theme/scale/host
+snapshots, browser runtime/Break views and both host canvas renders were inspected.
+Shared/host revision receipts are recorded above; both host full CI gates pass.
+Remaining common properties, Alignment/TextAlign, AutoSize/scrolling, lifecycle/input,
 binding and image/RefEdit/ActiveX/platform cases and full M7A.4 stay open.
 Fresh Office observations remain M8.5 NOT_RUN.
 

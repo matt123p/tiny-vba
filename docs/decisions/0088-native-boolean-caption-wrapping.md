@@ -1,6 +1,6 @@
 # ADR 0088: Native Boolean-control caption wrapping
 
-Date: 2026-11-07. Status: implementation; shared/browser acceptance passed, host acceptance in progress. M7A.4 remains open.
+Date: 2026-11-07. Status: adopted; shared, browser and both pinned host acceptance gates passed. M7A.4 remains open.
 
 CheckBox, OptionButton and ToggleButton admit the native VariousPropertyBits
 WordWrap bit and ordinary Boolean WordWrap state. File and dynamic defaults are
