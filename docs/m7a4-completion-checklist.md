@@ -91,5 +91,5 @@ Selected P01 HideSelection follows ADR 0091: TextBox/ComboBox file/runtime True
 defaults and native False flags, ordinary Boolean coercion/errors, inert stopped
 inspection and range/resource/event preservation. GPU cases cover both ComboBox
 styles, active/inactive highlights, emoji/CRLF ranges and real focus transfer.
-Full shared/browser acceptance passes; host acceptance is in progress. Remaining selection,
+Full shared/browser and both pinned host acceptance gates pass. Remaining selection,
 AutoSize/scrolling and the unchanged member/platform audit stay open.

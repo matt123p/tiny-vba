@@ -1,6 +1,6 @@
 # ADR 0091: Native HideSelection and inactive text highlights
 
-Date: 2026-11-07. Status: implementation; shared/browser acceptance passed, host acceptance in progress. Full M7A.4 remains open.
+Date: 2026-11-07. Status: adopted; shared/browser and both pinned host acceptance gates passed. Full M7A.4 remains open.
 
 TextBox and ComboBox expose ordinary Boolean HideSelection state. File and dynamic
 defaults are True. Native VariousPropertiesBitfield bit 29 seeds that value before
