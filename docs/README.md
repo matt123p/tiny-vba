@@ -420,3 +420,16 @@ unwrapped text retains fixed horizontal interaction bounds with complete UTF-16
 cursor rows. Canonical state, original source/resources, global font/style policy
 and all VM/permission budgets remain unchanged. Broader Boolean-control wrap,
 AutoSize/scrolling and full M7A.4 acceptance remain open.
+
+[ADR 0088](decisions/0088-native-boolean-caption-wrapping.md) extends selected
+native WordWrap flags/defaults and ordinary Boolean state to CheckBox, OptionButton
+and ToggleButton. Rendering keeps widget input/accessibility, local bounded
+captions and physical ToggleButton centring. Value/Null/groups/events, original
+source/resources, global font/style policy and all VM/host budgets are unchanged.
+Other properties, Alignment/TextAlign, AutoSize/scrolling and full M7A.4 stay open.
+
+[ADR 0089](decisions/0089-restricted-wasi-callback-forwarding.md) keeps a plain JS
+forwarding boundary around native WASI callbacks to avoid a reproduced Node 22
+runner crash. Guest bytes, stack, budgets, args/env/preopens and error/exit behavior
+remain unchanged; five independent runner guests accompany full native/WASI
+acceptance. This does not extend Office APIs or complete M7A.4.

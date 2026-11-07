@@ -53,6 +53,9 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let appearance = std::env::args().nth(2).is_some_and(|o| o == "--appearance");
     let text_align = std::env::args().nth(2).is_some_and(|o| o == "--text-align");
     let word_wrap = std::env::args().nth(2).is_some_and(|o| o == "--word-wrap");
+    let boolean_wrap = std::env::args()
+        .nth(2)
+        .is_some_and(|o| o == "--boolean-word-wrap");
     let colors = std::env::args().nth(2).is_some_and(|o| o == "--colors");
     for (name, theme, width, scale) in [
         ("light", Theme::light(), 1400., 1.),
@@ -68,7 +71,9 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             1252,
             &[NativeFormResource {
                 name: "NativeForm.frx".into(),
-                bytes: if word_wrap {
+                bytes: if boolean_wrap {
+                    fixture::boolean_word_wrap_companion(0x2c00_081b)
+                } else if word_wrap {
                     fixture::companion()
                 } else if text_align {
                     fixture::alignment_companion(2)
@@ -97,7 +102,9 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                 },
             }],
         )?;
-        let main = if word_wrap {
+        let main = if boolean_wrap {
+            "Sub Main()\nDim a As New NativeForm,b As New NativeForm\na.Caption=\"Boolean WordWrap enabled\"\nb.Caption=\"Boolean WordWrap disabled\"\nSetup a,True\nSetup b,False\na.Show 0\nb.Show 0\nEnd Sub\nPrivate Sub Setup(ByVal f As MSForms.UserForm,ByVal wrap As Boolean)\nf.Height=230\nf.Controls(\"Heading\").Visible=False\nf.Controls(\"Entry\").Visible=False\nf.Controls(\"Apply\").Visible=False\nf.Controls(\"ChoiceB\").Visible=False\nDim name As Variant,c As Object,n As Long\nFor Each name In Array(\"Check1\",\"ChoiceA\",\"Toggle1\")\nSet c=f.Controls(name)\nc.Caption=\"Caption wraps inside fixed bounds\"\nc.Left=16\nc.Top=12+n*68\nc.Width=110\nc.Height=60\nc.FontSize=12\nc.WordWrap=wrap\nn=n+1\nNext name\nEnd Sub"
+        } else if word_wrap {
             "Sub Main()\nDim a As New NativeForm,b As New NativeForm,c As Object\na.Caption=\"Native WordWrap enabled\"\nb.Caption=\"Native WordWrap disabled\"\nFor Each c In a.Controls\nc.FontSize=12\nNext c\nFor Each c In b.Controls\nc.FontSize=12\nNext c\na.Heading.Caption=\"Caption wraps inside fixed bounds\"\nb.Heading.Caption=a.Heading.Caption\na.Heading.Top=12\nb.Heading.Top=12\na.Heading.Width=110\nb.Heading.Width=110\na.Heading.Height=40\nb.Heading.Height=40\na.Heading.WordWrap=True\nb.Heading.WordWrap=False\na.Entry.Text=\"Text wraps inside fixed bounds\"\nb.Entry.Text=a.Entry.Text\na.Entry.Top=65\nb.Entry.Top=65\na.Entry.Width=168\nb.Entry.Width=168\na.Entry.Height=55\nb.Entry.Height=55\na.Entry.MultiLine=True\nb.Entry.MultiLine=True\na.Entry.WordWrap=True\nb.Entry.WordWrap=False\na.Apply.Caption=\"Wrapped button caption\"\nb.Apply.Caption=a.Apply.Caption\na.Apply.Top=140\nb.Apply.Top=140\na.Apply.Width=110\nb.Apply.Width=110\na.Apply.Height=40\nb.Apply.Height=40\na.Apply.WordWrap=True\nb.Apply.WordWrap=False\na.Show 0\nb.Show 0\nEnd Sub"
         } else if text_align {
             "Sub Main()\nDim a As New NativeForm,b As New NativeForm,rows As MSForms.ListBox,choices As MSForms.ComboBox\na.Caption=\"Left and centre\"\nb.Caption=\"Right and popup rows\"\na.Heading.Caption=\"Left aligned caption\"\na.Heading.Width=168\na.Heading.TextAlign=1\na.Entry.Text=\"Centred text\"\na.Entry.Width=168\na.Entry.FontSize=12\na.Entry.TextAlign=2\nb.Heading.Caption=\"Right aligned caption\"\nb.Heading.Width=168\nb.Heading.TextAlign=3\nb.Entry.Text=\"Right aligned text\"\nb.Entry.Width=168\nb.Entry.FontSize=12\nb.Entry.TextAlign=3\nSet rows=a.Controls.Add(\"Forms.ListBox.1\",\"Rows\")\nrows.Left=16\nrows.Top=110\nrows.Width=250\nrows.Height=60\nrows.ColumnCount=2\nrows.FontSize=12\nrows.AddItem \"First column\"\nrows.List(0,1)=\"Second column\"\nrows.TextAlign=2\nSet choices=b.Controls.Add(\"Forms.ComboBox.1\",\"Choices\")\nchoices.Left=16\nchoices.Top=125\nchoices.Width=250\nchoices.Style=2\nchoices.FontSize=12\nchoices.AddItem \"Right edit value\"\nchoices.AddItem \"Left popup row\"\nchoices.ListIndex=0\nchoices.TextAlign=3\na.Show 0\nb.Show 0\nchoices.SetFocus\nchoices.DropDown\nEnd Sub"
@@ -201,7 +208,9 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                 return Err("expected native tooltip".into());
             }
         }
-        let prefix = if word_wrap {
+        let prefix = if boolean_wrap {
+            "m7a4-boolean-word-wrap"
+        } else if word_wrap {
             "m7a4-native-word-wrap"
         } else if text_align {
             "m7a4-native-text-align"

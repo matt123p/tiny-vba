@@ -191,3 +191,155 @@ fn caption_wrapping_does_not_create_api_on_unrelated_forms_or_controls() -> R {
     );
     Ok(())
 }
+
+#[test]
+fn boolean_wrap_native_flags_and_dynamic_defaults_are_independent_typed_state() -> R {
+    for wrap in [false, true] {
+        let flags = 0x2c80_081b & !(1 << 23) | if wrap { 1 << 23 } else { 0 };
+        let ide = app(
+            "Option Explicit\nSub Main()\nDebug.Print NativeForm.Check1.WordWrap,NativeForm.ChoiceA.WordWrap,NativeForm.Toggle1.WordWrap\nDim kind As Variant,c As Object\nFor Each kind In Array(\"Forms.CheckBox.1\",\"Forms.OptionButton.1\",\"Forms.ToggleButton.1\")\nSet c=NativeForm.Controls.Add(kind)\nDebug.Print TypeName(c),c.WordWrap,VarType(c.WordWrap)\nc.WordWrap=False\nNext kind\nNativeForm.Check1.WordWrap=Not NativeForm.Check1.WordWrap\nEnd Sub",
+            fixture::boolean_word_wrap_companion(flags),
+            fixture::export(),
+        )?;
+        assert_eq!(ide.mode(), Mode::Completed, "{:?}", ide.diagnostics);
+        let value = if wrap { "True" } else { "False" };
+        assert_eq!(
+            ide.output(),
+            vec![
+                "initialized".to_owned(),
+                format!("{value}\t{value}\t{value}"),
+                "CheckBox\tTrue\t11".into(),
+                "OptionButton\tTrue\t11".into(),
+                "ToggleButton\tTrue\t11".into()
+            ]
+        );
+        let owner = *ide.form_instances()?.first().ok_or("form")?;
+        let native = ide.native_form(owner.source).ok_or("native")?;
+        assert!(
+            native
+                .design
+                .controls
+                .iter()
+                .filter(|c| c.id >= 14)
+                .all(|c| c.text_behavior.word_wrap == wrap)
+        );
+        assert_eq!(
+            ide.form_instance_field(owner, Some(14), "WordWrap")?,
+            Value::Boolean(!wrap)
+        );
+    }
+    Ok(())
+}
+
+#[test]
+fn boolean_wrap_coercions_preserve_values_and_do_not_raise_change_or_click() -> R {
+    let mut export = String::from_utf8(fixture::export())?;
+    for name in ["Check1", "ChoiceA", "Toggle1"] {
+        for event in ["Change", "Click"] {
+            export.push_str(&format!("\r\nPrivate Sub {name}_{event}()\r\nDebug.Print \"unexpected {event}\"\r\nEnd Sub\r\n"));
+        }
+    }
+    let ide = app(
+        "Option Explicit\nSub Main()\nDim name As Variant,c As Object\nFor Each name In Array(\"Check1\",\"ChoiceA\",\"Toggle1\")\nSet c=NativeForm.Controls(name)\nOn Error Resume Next\nc.WordWrap=Null\nDebug.Print Err.Number,c.WordWrap\nErr.Clear\nc.WordWrap=\"wrong\"\nDebug.Print Err.Number,c.WordWrap\nErr.Clear\nc.WordWrap=Empty\nDebug.Print c.WordWrap\nc.WordWrap=-2\nDebug.Print c.WordWrap,c.Value,VarType(c.WordWrap)\nOn Error GoTo 0\nNext name\nEnd Sub",
+        fixture::boolean_companion(),
+        export.into_bytes(),
+    )?;
+    assert_eq!(ide.mode(), Mode::Completed, "{:?}", ide.diagnostics);
+    let mut expected = vec!["initialized"];
+    for _ in 0..3 {
+        expected.extend(["94\tTrue", "13\tTrue", "False", "True\tFalse\t11"]);
+    }
+    assert_eq!(ide.output(), expected);
+    Ok(())
+}
+
+#[test]
+fn boolean_wrap_change_stop_inspects_inertly_and_resumes_once_without_resource_edits() -> R {
+    let mut export = String::from_utf8(fixture::export())?;
+    export.push_str("\r\nPrivate Sub Check1_Change()\r\nDebug.Print Check1.WordWrap\r\nStop\r\nDebug.Print \"change resumed\"\r\nEnd Sub\r\n");
+    let mut ide = app(
+        "Sub Main()\nNativeForm.Check1.WordWrap=False\nNativeForm.Check1.Value=True\nDebug.Print \"done\"\nEnd Sub",
+        fixture::boolean_companion(),
+        export.into_bytes(),
+    )?;
+    assert_eq!(ide.mode(), Mode::Break, "{:?}", ide.diagnostics);
+    let owner = *ide.form_instances()?.first().ok_or("form")?;
+    let native = ide.native_form(owner.source).ok_or("native")?.clone();
+    let source = ide.modules.first().ok_or("source")?.text.clone();
+    for _ in 0..3 {
+        assert_eq!(
+            ide.form_instance_field(owner, Some(14), "WordWrap")?,
+            Value::Boolean(false)
+        );
+    }
+    assert_eq!(ide.output(), vec!["initialized", "False"]);
+    ide.dispatch(Action::Run, &mut NoHost)?;
+    settle(&mut ide)?;
+    assert_eq!(
+        ide.output(),
+        vec!["initialized", "False", "change resumed", "done"]
+    );
+    ide.dispatch(Action::Reset, &mut NoHost)?;
+    assert_eq!(ide.modules.first().ok_or("source")?.text, source);
+    assert_eq!(ide.native_form(owner.source), Some(&native));
+    Ok(())
+}
+
+#[test]
+fn boolean_wrap_does_not_admit_other_inapplicable_morph_flags() -> R {
+    for flags in [
+        0x2c80_081b | (1 << 31),
+        0x2c80_081b | (1 << 24),
+        0x2c80_081b & !(1 << 27),
+    ] {
+        let mut ide = Ide::new();
+        assert!(
+            ide.import_native_form_export(
+                "NativeForm.frm",
+                &fixture::export(),
+                1252,
+                &[NativeFormResource {
+                    name: "NativeForm.frx".into(),
+                    bytes: fixture::boolean_word_wrap_companion(flags)
+                }]
+            )
+            .is_err()
+        );
+        assert!(ide.modules.is_empty());
+        assert!(ide.output().is_empty());
+    }
+    Ok(())
+}
+
+#[test]
+fn boolean_wrap_keeps_null_triple_state_and_option_groups_unchanged() -> R {
+    let ide = app(
+        "Sub Main()\nNativeForm.Check1.TripleState=True\nNativeForm.Check1.Value=Null\nNativeForm.ChoiceA.Value=True\nNativeForm.Toggle1.Value=True\nDim c As Object,name As Variant\nFor Each name In Array(\"Check1\",\"ChoiceA\",\"ChoiceB\",\"Toggle1\")\nSet c=NativeForm.Controls(name)\nc.WordWrap=False\nNext name\nDebug.Print VarType(NativeForm.Check1.Value),NativeForm.ChoiceA.Value,NativeForm.ChoiceB.Value,NativeForm.Toggle1.Value\nEnd Sub",
+        fixture::boolean_companion(),
+        fixture::export(),
+    )?;
+    assert_eq!(ide.mode(), Mode::Completed, "{:?}", ide.diagnostics);
+    assert_eq!(ide.output(), vec!["initialized", "1\tTrue\tFalse\tTrue"]);
+    Ok(())
+}
+
+#[test]
+fn boolean_wrap_does_not_shadow_an_authored_form_member() -> R {
+    let export = String::from_utf8(fixture::export())?.replace(
+        "Option Explicit\r\n",
+        "Option Explicit\r\nPublic WordWrap As String\r\n",
+    );
+    let ide = app(
+        "Sub Main()\nNativeForm.WordWrap=\"authored\"\nNativeForm.Check1.WordWrap=False\nDebug.Print NativeForm.WordWrap,NativeForm.Check1.WordWrap\nEnd Sub",
+        fixture::boolean_companion(),
+        export.into_bytes(),
+    )?;
+    assert_eq!(ide.mode(), Mode::Completed, "{:?}", ide.diagnostics);
+    assert_eq!(ide.output(), vec!["initialized", "authored\tFalse"]);
+    let owner = *ide.form_instances()?.first().ok_or("form")?;
+    assert_eq!(
+        ide.form_instance_field(owner, None, "WordWrap")?,
+        Value::String(vba_ide::VbaString::from_utf8("authored")?)
+    );
+    Ok(())
+}

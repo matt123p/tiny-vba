@@ -648,6 +648,11 @@ fn control(bytes: &[u8], site: Site) -> Result<Control> {
             0x88f0_4000
         } else if combobox {
             0x0820_5000
+        } else if matches!(
+            site.kind,
+            Kind::CheckBox | Kind::OptionButton | Kind::ToggleButton
+        ) {
+            1 << 23
         } else {
             0
         };
@@ -657,9 +662,9 @@ fn control(bytes: &[u8], site: Site) -> Result<Control> {
         if textbox || combobox {
             text_behavior.auto_word_select = flags & (1 << 27) == 0;
         }
+        text_behavior.word_wrap = flags & (1 << 23) != 0;
         if textbox {
             text_behavior.multi_line = flags & (1 << 31) != 0;
-            text_behavior.word_wrap = flags & (1 << 23) != 0;
             text_behavior.enter_key = flags & (1 << 20) != 0;
             text_behavior.recall_selection = flags & (1 << 21) != 0;
             text_behavior.tab_key = flags & (1 << 22) != 0;

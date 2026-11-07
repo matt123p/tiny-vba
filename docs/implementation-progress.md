@@ -1,5 +1,41 @@
 # Implementation progress
 
+## M7A.4 validation — restricted WASI callback forwarding (2026-11-07)
+
+ADR 0089 addresses Node 22.23.4's direct-native-import SIGSEGV in the existing
+99-case form-instance module. The same guest bytes pass all 99 cases through
+ordinary JS forwarding imports, with no stack/memory/VM/permission changes and
+no added WASI arguments, environment or preopened directories. Exit codes,
+results and traps propagate unchanged. Five independently authored tiny WASM
+runner cases pass on Node 18/22 and are part of wasm-run. Exact native fault
+causality remains unconfirmed. Full shared CI, strict all-targets Clippy, WASM,
+UI/native/web, repository checks, seven Chromium flows and full WASI suites on
+Node 18.19.1/22.23.4 pass. Five theme/scale/host views and the native browser
+runtime/Break views were inspected. The original default-stack ADR 0086
+accelerator module also passes all eight cases through the new runner. The
+five runner guests pass on both Node versions; the import-dictionary regression
+fails with an ordinary object and passes with the null-prototype dictionary.
+Affected host acceptance follows. No broader Office compatibility or M7A.4
+completion is implied.
+
+## M7A.4 continued — Boolean-control WordWrap (2026-11-07)
+
+ADR 0088 extends native WordWrap import, ordinary Boolean state and rendering to
+CheckBox/OptionButton/ToggleButton. Explicit flags and True file/runtime defaults
+seed canonical state; other flags remain validated. Value, Null/TripleState,
+option groups, events and original source/resources remain independent. Local
+shaping preserves widget style/id, icon gaps and full accessible text/state.
+ToggleButton retains selected styling and physically centred caption painting.
+No VM, host protocol, second mutable state store or budget change occurs.
+
+Six new model cases pass (12 total WordWrap cases). Four real GPU/input cases
+cover rows, newlines, fixed bounds/accessibility, ToggleButton centring and a
+real checkbox Change callback that changes wrapping, stops and resumes once.
+Full shared/browser and affected host acceptance is in progress. Remaining
+common properties, Alignment/TextAlign, AutoSize/scrolling, lifecycle/input,
+binding and image/RefEdit/ActiveX/platform cases and full M7A.4 stay open.
+Fresh Office observations remain M8.5 NOT_RUN.
+
 ## M7A.4 continued — native caption WordWrap (2026-11-07)
 
 ADR 0087 adds selected native Label/CommandButton WordWrap flags, ordinary

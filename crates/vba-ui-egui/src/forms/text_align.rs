@@ -18,10 +18,25 @@ pub(super) fn caption(
     alignment: Align,
     wrap: bool,
     frame: bool,
+    selected: Option<bool>,
 ) -> egui::Response {
-    let button = Button::new("").frame(frame);
+    let button = if let Some(selected) = selected {
+        Button::new("").selected(selected)
+    } else {
+        Button::new("").frame(frame)
+    };
     let classes = button.classes().clone();
     let response = ui.put(bounds, button);
+    if let Some(selected) = selected {
+        response.widget_info(|| {
+            egui::WidgetInfo::selected(
+                egui::accesskit::Role::Button,
+                ui.is_enabled(),
+                selected,
+                &job.text,
+            )
+        });
+    }
     let style = ui
         .widget_style::<egui::widget_style::ButtonStyle>(response.id, &classes)
         .atom_layout;

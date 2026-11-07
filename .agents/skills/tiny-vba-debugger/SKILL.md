@@ -271,3 +271,15 @@ rows when measuring unwrapped multiline TextBox viewports; do not mutate font
 caches or canonical values to size widgets. Dynamic TextBox defaults to True.
 Other flags, Boolean-control wrap, AutoSize/scrolling and broader M7A.4 acceptance
 remain open; no VM/host budget, .tvform or native persistence change is implied.
+
+ADR 0088 extends native Boolean-control WordWrap through ordinary canonical fields
+and validated flags. Preserve Value/Null/groups/events and inert source/resources.
+Keep real widget styling/id, checked/mixed accessibility and bounded caption layout;
+ToggleButton centring must be checked with actual pixels, not only row counts.
+Other Alignment/TextAlign, AutoSize/scrolling and full M7A.4 remain open. No VM,
+foreign, budget, persistence or legacy-format change is implied.
+
+ADR 0089 forwards native WASI imports through plain JS functions in the test
+runner. Preserve exact values/errors/exit status, args/env/preopens isolation and
+all guest/VM/stack budgets. Run the five independent runner guests plus full WASI
+suites; never substitute a larger diagnostic stack or claim a confirmed V8 cause.

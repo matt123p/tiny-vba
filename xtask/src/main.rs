@@ -97,6 +97,7 @@ fn run() -> Result<(), Box<dyn Error>> {
             command(python(), &["tools/check_repository.py"])?;
         }
         Some("wasm-run") => {
+            command("node", &["--test", "tools/run_wasi.test.cjs"])?;
             command(
                 "cargo",
                 &["run", "-p", "vba-cli", "--example", "m3_smoke", "--locked"],

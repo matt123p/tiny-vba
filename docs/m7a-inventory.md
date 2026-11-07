@@ -393,3 +393,10 @@ unwrapped text retains fixed horizontal interaction bounds with complete UTF-16
 cursor rows. Canonical state, original source/resources, global font/style policy
 and all VM/permission budgets remain unchanged. Broader Boolean-control wrap,
 AutoSize/scrolling and full M7A.4 acceptance remain open.
+
+[ADR 0088](decisions/0088-native-boolean-caption-wrapping.md) extends selected
+native WordWrap flags/defaults and ordinary Boolean state to CheckBox, OptionButton
+and ToggleButton. Rendering keeps widget input/accessibility, local bounded
+captions and physical ToggleButton centring. Value/Null/groups/events, original
+source/resources, global font/style policy and all VM/host budgets are unchanged.
+Other properties, Alignment/TextAlign, AutoSize/scrolling and full M7A.4 stay open.

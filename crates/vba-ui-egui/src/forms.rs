@@ -2,6 +2,7 @@
 use super::*;
 mod accelerator;
 mod appearance;
+mod boolean_caption;
 mod colors;
 mod combo;
 mod fonts;
@@ -1754,23 +1755,9 @@ impl EditorUi {
                                                 visual.bg_stroke =
                                                     egui::Stroke::new(1., theme.text);
                                             }
-                                            match c.kind {
-                                                ControlKind::CheckBox => ui.put(
-                                                    bounds,
-                                                    egui::Checkbox::new(&mut selected, accelerator::job(&caption,ide.form_instance_field(instance,Some(c.id),"Accelerator").ok(),fonts::read(ide,instance,c.id,ui,system_theme),theme.text))
-                                                        .indeterminate(
-                                                            value == vba_ide::Value::Null,
-                                                        ),
-                                                ),
-                                                ControlKind::OptionButton => ui.put(
-                                                    bounds,
-                                                    egui::RadioButton::new(selected, accelerator::job(&caption,ide.form_instance_field(instance,Some(c.id),"Accelerator").ok(),fonts::read(ide,instance,c.id,ui,system_theme),theme.text)),
-                                                ),
-                                                _ => ui.put(
-                                                    bounds,
-                                                    egui::Button::new(accelerator::job(&caption,ide.form_instance_field(instance,Some(c.id),"Accelerator").ok(),fonts::read(ide,instance,c.id,ui,system_theme),theme.text)).selected(selected),
-                                                ),
-                                            }
+                                            let job=accelerator::job(&caption,ide.form_instance_field(instance,Some(c.id),"Accelerator").ok(),fonts::read(ide,instance,c.id,ui,system_theme),theme.text);
+                                            let wrap=native.then(||ide.form_instance_field(instance,Some(c.id),"WordWrap").ok()==Some(vba_ide::Value::Boolean(true)));
+                                            boolean_caption::show(ui,bounds,c.kind,&mut selected,value==vba_ide::Value::Null,job,wrap)
                                         })
                                         .inner;
                                     if native {appearance.boolean(ui,response.rect,c.kind);}
@@ -1792,7 +1779,7 @@ impl EditorUi {
                                     let wrap=ide.form_instance_field(instance,Some(c.id),"WordWrap").ok()==Some(vba_ide::Value::Boolean(true));
                                     let response=if native {
                                         let alignment=if c.kind==ControlKind::Label {text_align::read(ide,instance,c.id)}else{egui::Align::Center};
-                                        text_align::caption(ui,bounds,job,alignment,wrap,c.kind==ControlKind::CommandButton)
+                                        text_align::caption(ui,bounds,job,alignment,wrap,c.kind==ControlKind::CommandButton,None)
                                     }else{ui.put(bounds,egui::Button::new(job).frame(c.kind==ControlKind::CommandButton))};
                                     if let Some(target) =
                                         focus.iter_mut().find(|(_, control, _)| *control == c.id)

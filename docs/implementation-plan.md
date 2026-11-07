@@ -115,6 +115,9 @@ and native save/reopen. See [ADR 0041](decisions/0041-worksheet-form-controls.md
   ADR 0087 adds selected caption WordWrap, native/file defaults, dynamic TextBox
   True defaults and fixed horizontal text allocation; broader wrapping, AutoSize
   and the full M7A.4 checklist remain open.
+  ADR 0088 extends native WordWrap to Boolean controls, preserving value/group/
+  event state and bounded accessible captions; broader properties and the
+  remaining checklist still require implementation.
   ADR 0076 adds selected nested modal mouse/keyboard input continuations with
   shared raw-input bounds, held release, parent unload and Reset regressions. L02
   remains partial; all remaining lifecycle and control contracts stay open.

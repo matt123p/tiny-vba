@@ -32,7 +32,7 @@ are file-format defaults from MS-OFORMS, not undocumented VBE toolbox defaults.
 | ForeColor / BackColor | Native OLE_COLOR fields and VBFrame reconciliation; canonical Long properties, RGB/system-theme rendering and optional caller palette resolution | D; ADR 0080, full platform/ambient appearance remains open |
 | Font | ADR 0081 retains StdFont/TextProps and VBFrame data; typed attributes, independent objects/defaults, inert inspection and local rendering | D selected; replacement/ambient/platform realization P |
 | Border / effect / transparency | Applicable native fields, original resources and typed runtime members | D selected (ADR 0084); remaining member/ambient/platform parity M7A.4 |
-| WordWrap | VariousPropertyBits bit 23; distinct Label/CommandButton file defaults and typed runtime state | D selected captions/TextBox (ADR 0087); Boolean-control, AutoSize/scrolling and broader presentation cases remain open |
+| WordWrap | VariousPropertyBits bit 23; distinct Label/CommandButton file defaults and typed runtime state | D selected captions/TextBox (ADRs 0087/0088), including Boolean captions; AutoSize/scrolling and broader presentation cases remain open |
 | Tag / HelpContextID / ControlTipText | Known frame/site strings/scalars; ordinary per-instance metadata and runtime tips | D; Help/F1 routing remains U (ADR 0055) |
 | Window placement / StartUpPosition / ShowModal | VBFrame metadata retained; enabled/default-modal form required; explicit show modes use existing runtime | P for placement; disabled/default-modeless metadata U; parity M7A.4 |
 | Default / Cancel / Accelerator / TakeFocusOnClick changes | Native site/control flags or fields | Default/Cancel and selected applicable accelerators decoded and executed (ADR 0072); TakeFocusOnClick changes U |
@@ -373,3 +373,10 @@ unwrapped text retains fixed horizontal interaction bounds with complete UTF-16
 cursor rows. Canonical state, original source/resources, global font/style policy
 and all VM/permission budgets remain unchanged. Broader Boolean-control wrap,
 AutoSize/scrolling and full M7A.4 acceptance remain open.
+
+[ADR 0088](decisions/0088-native-boolean-caption-wrapping.md) extends selected
+native WordWrap flags/defaults and ordinary Boolean state to CheckBox, OptionButton
+and ToggleButton. Rendering keeps widget input/accessibility, local bounded
+captions and physical ToggleButton centring. Value/Null/groups/events, original
+source/resources, global font/style policy and all VM/host budgets are unchanged.
+Other properties, Alignment/TextAlign, AutoSize/scrolling and full M7A.4 stay open.
