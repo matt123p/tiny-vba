@@ -293,13 +293,17 @@ pub fn boolean_companion() -> Vec<u8> {
     boolean_accelerator_companion(false)
 }
 pub fn boolean_accelerator_companion(accelerators: bool) -> Vec<u8> {
-    boolean_flags_companion(accelerators, None)
+    boolean_flags_companion(accelerators, None, false)
 }
 /// Authored explicit VariousPropertyBits for all four Boolean controls.
 pub fn boolean_word_wrap_companion(flags: u32) -> Vec<u8> {
-    boolean_flags_companion(false, Some(flags))
+    boolean_flags_companion(false, Some(flags), false)
 }
-fn boolean_flags_companion(accelerators: bool, flags: Option<u32>) -> Vec<u8> {
+/// Native Alignment applies only to CheckBox/OptionButton, never ToggleButton.
+pub fn boolean_alignment_companion(caption_left: bool) -> Vec<u8> {
+    boolean_flags_companion(false, Some(0x2c80_081b), caption_left)
+}
+fn boolean_flags_companion(accelerators: bool, flags: Option<u32>, caption_left: bool) -> Vec<u8> {
     let mut all = controls();
     for (display, caption, group) in [
         (4u8, "Check", ""),
@@ -312,7 +316,12 @@ fn boolean_flags_companion(accelerators: bool, flags: Option<u32>) -> Vec<u8> {
             u32::from(!group.is_empty()),
         ]);
         if let Some(flags) = flags {
-            body.extend(u32s(&[flags]));
+            let alignment = if caption_left && display != 6 {
+                1 << 13
+            } else {
+                0
+            };
+            body.extend(u32s(&[flags | alignment]));
         }
         body.extend([display, 0, 0, 0]);
         body.extend(u32s(&[0x80000001, 0x80000000 | caption.len() as u32]));

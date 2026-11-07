@@ -113,6 +113,9 @@ pub struct Control {
     pub cancel: bool,
     pub max_length: i32,
     pub group_name: String,
+    /// Public fmAlignment value; the native flag has the inverse meaning.
+    /// Applicable only to CheckBox and OptionButton. Right (1) is the default.
+    pub caption_alignment: u8,
     pub locked: bool,
     pub text_behavior: TextBehavior,
     pub numeric: Option<NumericBehavior>,

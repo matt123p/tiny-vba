@@ -17,7 +17,7 @@ reference-based expectations and fresh Office observations remain distinct.
 | K02 | Held-key repeat; modifiers; Tab/navigation focus transitions; Default/Cancel Enter/Escape exceptions; ANSI input versus Unicode/IME/paste | PARTIAL: raw-input barrier and ADR 0071 focus/default ordering; remaining platform/shortcut/focus/IME cases open |
 | K03 | Accelerators select/focus/activate the appropriate eligible control and preserve keyboard/event ordering | PARTIAL: ADR 0072 selected Label/button/boolean/Tab/Page actions; duplicate, non-ASCII/platform and further ordering cases open |
 | M01 | Applicable MouseDown/MouseMove/MouseUp/Click/DblClick, typed button/modifier/coordinate/cancellation arguments, event order and container-relative coordinates | PARTIAL: ADR 0073 typed callbacks and selected simple-control capture/defaults; ADR 0074 selected TextBox caret/drag/word selection; ADR 0075 selected ComboBox/RefEdit/list/numeric/tab-header defaults; further ordering, background/drag/wheel/mutation and platform cases open |
-| P01 | Remaining common properties, defaults, exact errors/coercions, text/selection edge cases | PARTIAL: ADR 0080 adds selected BackColor/ForeColor import, typed state and palette rendering; ADR 0081 adds selected Font data/objects/rendering; ADR 0082 adds typed Font reference assignment and reload; Nothing/external/other-assignment/ambient/platform font behavior remain open; ADR 0083 corrects Page ownership; ADR 0084 adds selected borders/effects/transparency and fixed-bound clipping; ADR 0085 adds published Font aliases; ADR 0086 adds selected TextAlign and matching pointer geometry; ADR 0087 adds selected caption WordWrap, file/runtime defaults and fixed horizontal text allocation; ADR 0088 adds Boolean-control WordWrap with accessible bounded captions; defaults and remaining member/platform audit open |
+| P01 | Remaining common properties, defaults, exact errors/coercions, text/selection edge cases | PARTIAL: ADR 0080 adds selected BackColor/ForeColor import, typed state and palette rendering; ADR 0081 adds selected Font data/objects/rendering; ADR 0082 adds typed Font reference assignment and reload; Nothing/external/other-assignment/ambient/platform font behavior remain open; ADR 0083 corrects Page ownership; ADR 0084 adds selected borders/effects/transparency and fixed-bound clipping; ADR 0085 adds published Font aliases; ADR 0086 adds selected TextAlign and matching pointer geometry; ADR 0087 adds selected caption WordWrap, file/runtime defaults and fixed horizontal text allocation; ADR 0088 adds Boolean-control WordWrap with accessible bounded captions; ADR 0090 adds CheckBox/OptionButton Alignment with separate caption clipping; defaults and remaining member/platform audit open |
 | B01 | List/Column array shape/loading, binding value types and update timing, protected failures and reentrant handlers | PARTIAL: current selected array/binding packets implemented |
 | W01 | Frame, TabStrip/Tabs, MultiPage/Pages: remaining storage/resource/property/presentation cases, transitions, focus and lifecycle | PARTIAL: ADR 0080 adds selected container colours and runtime Page lookup; ADR 0083 corrects Page appearance ownership; remaining cases open |
 | W02 | Image/picture: remaining formats, metadata, loading/platform services and events/presentation | PARTIAL |
@@ -74,17 +74,13 @@ barrier, Stop/Continue, Reset/identity/geometry invalidation, repaint acknowledg
 and native keyboard ownership. RefEdit keeps its existing modal selection path.
 The complete K/M/property/binding/platform requirements above remain open.
 
-Next P01 property packet: native CheckBox/OptionButton `Alignment`. The public
-`fmAlignmentLeft=0`/`fmAlignmentRight=1` values (default Right) are the inverse of
-the persisted VariousPropertiesBitfield Alignment bit. Keep caption text physically
-left aligned and clip it to its own rectangle on either side of the indicator;
-an unwrapped caption must not paint over a right-side indicator. Cover native and
-dynamic defaults, typed errors, inert inspection, stopped callbacks, Null/groups,
-accessible labels/state, both caption sides and original resource retention.
-ToggleButton's property is documented as disabled; do not infer an enabled member
-from its presence in a type library. No part of this packet is marked implemented.
-See Microsoft's [Alignment property](https://learn.microsoft.com/en-us/office/vba/language/reference/user-interface-help/alignment-property)
-and [VariousPropertiesBitfield](https://learn.microsoft.com/en-us/openspecs/office_file_formats/ms-oforms/c38cc3f9-969b-45da-ab41-b361c044431e).
+Selected P01 Alignment follows ADR 0090 for native CheckBox/OptionButton. The
+persisted flag is translated inversely to the public values; ToggleButton stays
+disabled. Authored default/type/error, inert Stop/Continue/Reset, resource,
+Value/Null/group and actual clipped-caption/input cases pass. Full shared/browser acceptance passes;
+host acceptance is in progress. This does not close the rest of P01.
+Next P01 work is the remaining applicable member/default audit, AutoSize,
+scrolling, selection and platform behavior. No refusal counts as implementation.
 
 ADR 0078 implements the selected pre-document input barrier and debugger/Reset/
 identity continuation cases described above. Broader lifecycle/binding/collection,

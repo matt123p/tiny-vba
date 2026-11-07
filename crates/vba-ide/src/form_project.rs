@@ -947,6 +947,11 @@ fn compiled_form(
         }
         source.push_str(&setup);
         if let Some(metadata) = metadata {
+            source.push_str(&crate::form_caption_alignment::initial(
+                &temp,
+                c.kind,
+                metadata.caption_alignment,
+            ));
             if crate::form_word_wrap::caption(c.kind) {
                 source.push_str(&format!(
                     "{temp}.WordWrap={}\n",
@@ -2252,6 +2257,12 @@ impl Ide {
                 return Err(error("control kind"));
             };
             let kind = crate::form_dynamic::kind(code)?;
+            if self.native_forms.contains_key(&instance.source)
+                && field.eq_ignore_ascii_case("Alignment")
+                && crate::form_caption_alignment::supported(kind)
+            {
+                return session.read_instance_field(object, "VbaAlignment");
+            }
             if self.native_forms.contains_key(&instance.source)
                 && field.eq_ignore_ascii_case("TextAlign")
                 && crate::form_text_align::supported(kind)

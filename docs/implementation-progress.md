@@ -1,5 +1,28 @@
 # Implementation progress
 
+## M7A.4 continued — CheckBox/OptionButton caption Alignment (2026-11-07)
+
+ADR 0090 adds native bit-13/public-value translation, ordinary Long Alignment
+state, Right defaults and published MSForms constants. Only CheckBox/OptionButton
+admit this flag/member; ToggleButton's property stays disabled. Canonical Value,
+Null/TripleState, groups, WordWrap and events remain independent. Inert queries
+preserve authored root members, source/resources and all existing budgets.
+
+Caption paint atoms clip text separately from real indicators on either side,
+retaining full accessible labels/state, existing input/focus, font caches and
+embedding style. Empty captions use the runtime control name for accessibility.
+Seven model cases and eight GPU/input cases pass (four new, four retained).
+Snapshot review exposed a decorative bevel left behind on the caption side; its
+new pixel regression fails before the fix and passes with aligned decoration.
+Full shared CI, strict workspace/all-targets Clippy, WASM, UI, Xvfb native, web,
+repository checks and all eight Chromium flows pass. Full WASI passes on
+Node 22.23.4; all seven new Alignment cases also pass on Node 18.19.1. Corrected
+five-theme/scale/host snapshots and browser runtime/Break views were inspected.
+Affected host acceptance is in progress. The unchanged
+completion checklist, AutoSize/scrolling and remaining properties/lifecycle/
+input/binding/ActiveX/platform work remain open. Fresh Office evidence is
+M8.5 NOT_RUN. This does not complete M7A.4.
+
 ## M7A.4 validation — restricted WASI callback forwarding (2026-11-07)
 
 ADR 0089 addresses Node 22.23.4's direct-native-import SIGSEGV in the existing

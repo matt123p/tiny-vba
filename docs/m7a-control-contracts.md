@@ -32,6 +32,7 @@ are file-format defaults from MS-OFORMS, not undocumented VBE toolbox defaults.
 | ForeColor / BackColor | Native OLE_COLOR fields and VBFrame reconciliation; canonical Long properties, RGB/system-theme rendering and optional caller palette resolution | D; ADR 0080, full platform/ambient appearance remains open |
 | Font | ADR 0081 retains StdFont/TextProps and VBFrame data; typed attributes, independent objects/defaults, inert inspection and local rendering | D selected; replacement/ambient/platform realization P |
 | Border / effect / transparency | Applicable native fields, original resources and typed runtime members | D selected (ADR 0084); remaining member/ambient/platform parity M7A.4 |
+| Alignment / CheckBox, OptionButton | VariousPropertyBits bit 13 is inverse to public fmAlignmentLeft=0/Right=1; ordinary Long state/defaults/errors; ToggleButton disabled | D selected side/layout (ADR 0090); broader property/platform audit remains open |
 | WordWrap | VariousPropertyBits bit 23; distinct Label/CommandButton file defaults and typed runtime state | D selected captions/TextBox (ADRs 0087/0088), including Boolean captions; AutoSize/scrolling and broader presentation cases remain open |
 | Tag / HelpContextID / ControlTipText | Known frame/site strings/scalars; ordinary per-instance metadata and runtime tips | D; Help/F1 routing remains U (ADR 0055) |
 | Window placement / StartUpPosition / ShowModal | VBFrame metadata retained; enabled/default-modal form required; explicit show modes use existing runtime | P for placement; disabled/default-modeless metadata U; parity M7A.4 |
@@ -380,3 +381,12 @@ and ToggleButton. Rendering keeps widget input/accessibility, local bounded
 captions and physical ToggleButton centring. Value/Null/groups/events, original
 source/resources, global font/style policy and all VM/host budgets are unchanged.
 Other properties, Alignment/TextAlign, AutoSize/scrolling and full M7A.4 stay open.
+
+[ADR 0090](decisions/0090-native-caption-alignment.md) adds selected native
+CheckBox/OptionButton Alignment: inverse persisted flag translation, ordinary
+Long state and published constants, Right defaults, typed errors and inert
+inspection. Caption text stays physically left aligned in a separate clipped
+rectangle beside the real indicator widget. Input, full accessible labels/state,
+Value/Null/groups/events, source/resources, global style and all budgets remain
+unchanged. ToggleButton's disabled property is not enabled. Other properties,
+AutoSize/scrolling and full M7A.4 remain open; fresh Office evidence is NOT_RUN.

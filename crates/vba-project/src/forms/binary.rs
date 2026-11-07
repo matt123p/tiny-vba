@@ -378,6 +378,7 @@ fn container(
                 cancel: false,
                 max_length: 0,
                 group_name: String::new(),
+                caption_alignment: 1,
                 locked: false,
                 text_behavior: super::TextBehavior::default(),
                 numeric: None,
@@ -589,6 +590,7 @@ fn control(bytes: &[u8], site: Site) -> Result<Control> {
     let mut list = None;
     let mut max_length = 0;
     let mut group_name = String::new();
+    let mut caption_alignment = 1;
     let mut locked = false;
     let accelerator;
     let mut text_behavior = super::TextBehavior::default();
@@ -652,7 +654,12 @@ fn control(bytes: &[u8], site: Site) -> Result<Control> {
             site.kind,
             Kind::CheckBox | Kind::OptionButton | Kind::ToggleButton
         ) {
-            1 << 23
+            (1 << 23)
+                | if matches!(site.kind, Kind::CheckBox | Kind::OptionButton) {
+                    1 << 13
+                } else {
+                    0
+                }
         } else {
             0
         };
@@ -663,6 +670,9 @@ fn control(bytes: &[u8], site: Site) -> Result<Control> {
             text_behavior.auto_word_select = flags & (1 << 27) == 0;
         }
         text_behavior.word_wrap = flags & (1 << 23) != 0;
+        if matches!(site.kind, Kind::CheckBox | Kind::OptionButton) {
+            caption_alignment = u8::from(flags & (1 << 13) == 0);
+        }
         if textbox {
             text_behavior.multi_line = flags & (1 << 31) != 0;
             text_behavior.enter_key = flags & (1 << 20) != 0;
@@ -855,6 +865,7 @@ fn control(bytes: &[u8], site: Site) -> Result<Control> {
         cancel: site.flags & 8 != 0,
         max_length,
         group_name,
+        caption_alignment,
         locked,
         text_behavior,
         numeric: None,
@@ -942,6 +953,7 @@ fn numeric_control(r: Reader<'_>, mut b: Reader<'_>, site: Site) -> Result<Contr
         cancel: false,
         max_length: 0,
         group_name: String::new(),
+        caption_alignment: 1,
         locked: false,
         text_behavior: super::TextBehavior::default(),
         list: None,

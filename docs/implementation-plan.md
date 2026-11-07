@@ -118,6 +118,9 @@ and native save/reopen. See [ADR 0041](decisions/0041-worksheet-form-controls.md
   ADR 0088 extends native WordWrap to Boolean controls, preserving value/group/
   event state and bounded accessible captions; broader properties and the
   remaining checklist still require implementation.
+  ADR 0090 adds CheckBox/OptionButton Alignment flags, ordinary Long state,
+  published constants and independently clipped captions beside real indicators.
+  Other properties and the full remaining checklist stay open.
   ADR 0076 adds selected nested modal mouse/keyboard input continuations with
   shared raw-input bounds, held release, parent unload and Reset regressions. L02
   remains partial; all remaining lifecycle and control contracts stay open.

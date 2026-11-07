@@ -56,6 +56,9 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let boolean_wrap = std::env::args()
         .nth(2)
         .is_some_and(|o| o == "--boolean-word-wrap");
+    let caption_alignment = std::env::args()
+        .nth(2)
+        .is_some_and(|o| o == "--caption-alignment");
     let colors = std::env::args().nth(2).is_some_and(|o| o == "--colors");
     for (name, theme, width, scale) in [
         ("light", Theme::light(), 1400., 1.),
@@ -71,7 +74,9 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             1252,
             &[NativeFormResource {
                 name: "NativeForm.frx".into(),
-                bytes: if boolean_wrap {
+                bytes: if caption_alignment {
+                    fixture::boolean_alignment_companion(true)
+                } else if boolean_wrap {
                     fixture::boolean_word_wrap_companion(0x2c00_081b)
                 } else if word_wrap {
                     fixture::companion()
@@ -102,7 +107,9 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                 },
             }],
         )?;
-        let main = if boolean_wrap {
+        let main = if caption_alignment {
+            "Sub Main()\nDim a As New NativeForm,b As New NativeForm\na.Caption=\"Caption left of indicator\"\nb.Caption=\"Caption right of indicator\"\nSetup a,fmAlignmentLeft\nSetup b,fmAlignmentRight\na.Show 0\nb.Show 0\nEnd Sub\nPrivate Sub Setup(ByVal f As MSForms.UserForm,ByVal side As Long)\nf.Height=230\nf.Controls(\"Heading\").Visible=False\nf.Controls(\"Entry\").Visible=False\nf.Controls(\"Apply\").Visible=False\nf.Controls(\"Toggle1\").Visible=False\nDim name As Variant,c As Object,n As Long\nFor Each name In Array(\"Check1\",\"ChoiceA\",\"ChoiceB\")\nSet c=f.Controls(name)\nc.Caption=\"Caption stays inside its own bounds\"\nc.Left=16\nc.Top=12+n*68\nc.Width=145\nc.Height=60\nc.FontSize=12\nc.Alignment=side\nc.WordWrap=n<>1\nn=n+1\nNext name\nEnd Sub"
+        } else if boolean_wrap {
             "Sub Main()\nDim a As New NativeForm,b As New NativeForm\na.Caption=\"Boolean WordWrap enabled\"\nb.Caption=\"Boolean WordWrap disabled\"\nSetup a,True\nSetup b,False\na.Show 0\nb.Show 0\nEnd Sub\nPrivate Sub Setup(ByVal f As MSForms.UserForm,ByVal wrap As Boolean)\nf.Height=230\nf.Controls(\"Heading\").Visible=False\nf.Controls(\"Entry\").Visible=False\nf.Controls(\"Apply\").Visible=False\nf.Controls(\"ChoiceB\").Visible=False\nDim name As Variant,c As Object,n As Long\nFor Each name In Array(\"Check1\",\"ChoiceA\",\"Toggle1\")\nSet c=f.Controls(name)\nc.Caption=\"Caption wraps inside fixed bounds\"\nc.Left=16\nc.Top=12+n*68\nc.Width=110\nc.Height=60\nc.FontSize=12\nc.WordWrap=wrap\nn=n+1\nNext name\nEnd Sub"
         } else if word_wrap {
             "Sub Main()\nDim a As New NativeForm,b As New NativeForm,c As Object\na.Caption=\"Native WordWrap enabled\"\nb.Caption=\"Native WordWrap disabled\"\nFor Each c In a.Controls\nc.FontSize=12\nNext c\nFor Each c In b.Controls\nc.FontSize=12\nNext c\na.Heading.Caption=\"Caption wraps inside fixed bounds\"\nb.Heading.Caption=a.Heading.Caption\na.Heading.Top=12\nb.Heading.Top=12\na.Heading.Width=110\nb.Heading.Width=110\na.Heading.Height=40\nb.Heading.Height=40\na.Heading.WordWrap=True\nb.Heading.WordWrap=False\na.Entry.Text=\"Text wraps inside fixed bounds\"\nb.Entry.Text=a.Entry.Text\na.Entry.Top=65\nb.Entry.Top=65\na.Entry.Width=168\nb.Entry.Width=168\na.Entry.Height=55\nb.Entry.Height=55\na.Entry.MultiLine=True\nb.Entry.MultiLine=True\na.Entry.WordWrap=True\nb.Entry.WordWrap=False\na.Apply.Caption=\"Wrapped button caption\"\nb.Apply.Caption=a.Apply.Caption\na.Apply.Top=140\nb.Apply.Top=140\na.Apply.Width=110\nb.Apply.Width=110\na.Apply.Height=40\nb.Apply.Height=40\na.Apply.WordWrap=True\nb.Apply.WordWrap=False\na.Show 0\nb.Show 0\nEnd Sub"
@@ -208,7 +215,9 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                 return Err("expected native tooltip".into());
             }
         }
-        let prefix = if boolean_wrap {
+        let prefix = if caption_alignment {
+            "m7a4-native-caption-alignment"
+        } else if boolean_wrap {
             "m7a4-boolean-word-wrap"
         } else if word_wrap {
             "m7a4-native-word-wrap"

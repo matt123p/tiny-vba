@@ -1756,11 +1756,11 @@ impl EditorUi {
                                                     egui::Stroke::new(1., theme.text);
                                             }
                                             let job=accelerator::job(&caption,ide.form_instance_field(instance,Some(c.id),"Accelerator").ok(),fonts::read(ide,instance,c.id,ui,system_theme),theme.text);
-                                            let wrap=native.then(||ide.form_instance_field(instance,Some(c.id),"WordWrap").ok()==Some(vba_ide::Value::Boolean(true)));
+                                            let wrap=native.then(||boolean_caption::NativeCaption::read(ide,instance,c.id,&c.name));
                                             boolean_caption::show(ui,bounds,c.kind,&mut selected,value==vba_ide::Value::Null,job,wrap)
                                         })
                                         .inner;
-                                    if native {appearance.boolean(ui,response.rect,c.kind);}
+                                    if native {appearance.boolean(ui,response.rect,c.kind,ide.form_instance_field(instance,Some(c.id),"Alignment").ok()==Some(vba_ide::Value::Long(0)));}
                                     if let Some(target) =
                                         focus.iter_mut().find(|(_, control, _)| *control == c.id)
                                     {

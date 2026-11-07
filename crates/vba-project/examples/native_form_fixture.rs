@@ -21,6 +21,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let text_align = option.as_deref() == Some("--text-align");
     let word_wrap = option.as_deref() == Some("--word-wrap");
     let boolean_wrap = option.as_deref() == Some("--boolean-word-wrap");
+    let caption_alignment = option.as_deref() == Some("--caption-alignment");
     let colors = option.as_deref() == Some("--colors");
     let nested_mouse = option.as_deref() == Some("--nested-mouse");
     let composite_mouse = option.as_deref() == Some("--composite-mouse");
@@ -66,7 +67,8 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             | "--appearance"
             | "--text-align"
             | "--word-wrap"
-            | "--boolean-word-wrap",
+            | "--boolean-word-wrap"
+            | "--caption-alignment",
         ) => false,
         Some(_) => return Err("unknown fixture option".into()),
     };
@@ -98,6 +100,10 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         "Stop\r\nDebug.Print Entry.Text"
     };
     let mut text = String::from_utf8(fixture::export())?.replace("Debug.Print Entry.Text", body);
+    if caption_alignment {
+        let code="Attribute VB_Name = \"NativeForm\"\nAttribute VB_PredeclaredId = True\nOption Explicit\nPrivate Sub UserForm_Initialize()\nDebug.Print \"caption side ready\"\nDebug.Print Check1.Alignment,ChoiceA.Alignment\nHeading.Visible=False\nEntry.Visible=False\nChoiceB.Visible=False\nToggle1.Visible=False\nDim c As Object,name As Variant,n As Long\nFor Each name In Array(\"Check1\",\"ChoiceA\")\nSet c=Me.Controls(name)\nc.Caption=\"Caption stays inside its own bounds\"\nc.Left=145\nc.Top=8+n*52\nc.Width=110\nc.Height=42\nc.FontSize=12\nc.WordWrap=True\nn=n+1\nNext name\nEnd Sub\nPrivate Sub Apply_Click()\nCheck1.Alignment=fmAlignmentRight\nChoiceA.Alignment=fmAlignmentRight\nDebug.Print VarType(Check1.Alignment),Check1.Alignment,ChoiceA.Alignment,Check1.Value\nStop\nCheck1.Alignment=fmAlignmentLeft\nChoiceA.Alignment=fmAlignmentLeft\nDebug.Print Check1.Alignment,ChoiceA.Alignment\nMe.Hide\nEnd Sub\n".replace('\n',"\r\n");
+        text = String::from_utf8(fixture::export())?.replace(fixture::SOURCE, &code);
+    }
     if boolean_wrap {
         let code="Attribute VB_Name = \"NativeForm\"\nAttribute VB_PredeclaredId = True\nOption Explicit\nPrivate Sub UserForm_Initialize()\nDebug.Print \"boolean wrap ready\"\nDebug.Print Check1.WordWrap,ChoiceA.WordWrap,Toggle1.WordWrap\nHeading.Visible=False\nEntry.Visible=False\nChoiceB.Visible=False\nDim c As Object,name As Variant,n As Long\nFor Each name In Array(\"Check1\",\"ChoiceA\",\"Toggle1\")\nSet c=Me.Controls(name)\nc.Caption=\"Caption wraps inside fixed bounds\"\nc.Left=145\nc.Top=8+n*52\nc.Width=110\nc.Height=42\nc.FontSize=12\nc.WordWrap=True\nn=n+1\nNext name\nEnd Sub\nPrivate Sub Apply_Click()\nCheck1.WordWrap=False\nChoiceA.WordWrap=False\nToggle1.WordWrap=False\nDebug.Print VarType(Check1.WordWrap),Check1.WordWrap,ChoiceA.WordWrap,Toggle1.WordWrap,Check1.Value\nStop\nCheck1.WordWrap=True\nChoiceA.WordWrap=True\nToggle1.WordWrap=True\nDebug.Print Check1.WordWrap,ChoiceA.WordWrap,Toggle1.WordWrap\nMe.Hide\nEnd Sub\n".replace('\n',"\r\n");
         text = String::from_utf8(fixture::export())?.replace(fixture::SOURCE, &code);
@@ -222,7 +228,9 @@ End Sub
     std::fs::write(dir.join("NativeForm.frm"), text)?;
     std::fs::write(
         dir.join("NativeForm.frx"),
-        if boolean_wrap {
+        if caption_alignment {
+            fixture::boolean_alignment_companion(true)
+        } else if boolean_wrap {
             fixture::boolean_word_wrap_companion(0x2c00_081b)
         } else if word_wrap {
             fixture::caption_flags_companion(0x1b, 0x0080_001b)

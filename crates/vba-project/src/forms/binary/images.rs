@@ -158,6 +158,7 @@ pub(super) fn control(bytes: &[u8], site: Site) -> Result<Control> {
         cancel: false,
         max_length: 0,
         group_name: String::new(),
+        caption_alignment: 1,
         locked: false,
         text_behavior: Default::default(),
         numeric: None,

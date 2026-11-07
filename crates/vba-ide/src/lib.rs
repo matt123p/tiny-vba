@@ -13,6 +13,7 @@ pub use vba_project::forms::{NativeForm, Resource as NativeFormResource};
 mod form_accelerator;
 mod form_appearance;
 mod form_bindings;
+mod form_caption_alignment;
 mod form_colors;
 mod form_font;
 mod form_text_align;

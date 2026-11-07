@@ -687,3 +687,12 @@ forwarding boundary around native WASI callbacks to avoid a reproduced Node 22
 runner crash. Guest bytes, stack, budgets, args/env/preopens and error/exit behavior
 remain unchanged; five independent runner guests accompany full native/WASI
 acceptance. This does not extend Office APIs or complete M7A.4.
+
+[ADR 0090](decisions/0090-native-caption-alignment.md) adds selected native
+CheckBox/OptionButton Alignment: inverse persisted flag translation, ordinary
+Long state and published constants, Right defaults, typed errors and inert
+inspection. Caption text stays physically left aligned in a separate clipped
+rectangle beside the real indicator widget. Input, full accessible labels/state,
+Value/Null/groups/events, source/resources, global style and all budgets remain
+unchanged. ToggleButton's disabled property is not enabled. Other properties,
+AutoSize/scrolling and full M7A.4 remain open; fresh Office evidence is NOT_RUN.

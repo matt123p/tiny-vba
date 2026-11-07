@@ -130,12 +130,23 @@ impl Appearance {
                 .line_segment([a, b], egui::Stroke::new(1., color));
         }
     }
-    pub(super) fn boolean(&self, ui: &egui::Ui, bounds: egui::Rect, kind: ControlKind) {
+    pub(super) fn boolean(
+        &self,
+        ui: &egui::Ui,
+        bounds: egui::Rect,
+        kind: ControlKind,
+        caption_left: bool,
+    ) {
         if self.effect != 2 || !matches!(kind, ControlKind::CheckBox | ControlKind::OptionButton) {
             return;
         }
         let (icon, _) = ui.spacing().icon_rectangles(bounds);
-        let icon = icon.shrink(0.5);
+        let icon = if caption_left {
+            icon.translate(egui::vec2(2. * (bounds.center().x - icon.center().x), 0.))
+        } else {
+            icon
+        }
+        .shrink(0.5);
         if kind == ControlKind::CheckBox {
             self.edge(ui, icon, true);
         } else {

@@ -400,3 +400,12 @@ and ToggleButton. Rendering keeps widget input/accessibility, local bounded
 captions and physical ToggleButton centring. Value/Null/groups/events, original
 source/resources, global font/style policy and all VM/host budgets are unchanged.
 Other properties, Alignment/TextAlign, AutoSize/scrolling and full M7A.4 stay open.
+
+[ADR 0090](decisions/0090-native-caption-alignment.md) adds selected native
+CheckBox/OptionButton Alignment: inverse persisted flag translation, ordinary
+Long state and published constants, Right defaults, typed errors and inert
+inspection. Caption text stays physically left aligned in a separate clipped
+rectangle beside the real indicator widget. Input, full accessible labels/state,
+Value/Null/groups/events, source/resources, global style and all budgets remain
+unchanged. ToggleButton's disabled property is not enabled. Other properties,
+AutoSize/scrolling and full M7A.4 remain open; fresh Office evidence is NOT_RUN.

@@ -392,3 +392,10 @@ ADR 0089 forwards native WASI imports through plain JS functions in the test
 runner. Preserve exact values/errors/exit status, args/env/preopens isolation and
 all guest/VM/stack budgets. Run the five independent runner guests plus full WASI
 suites; never substitute a larger diagnostic stack or claim a confirmed V8 cause.
+
+ADR 0090 adds native CheckBox/OptionButton Alignment. Translate bit 13 inversely
+into ordinary Long state/defaults; do not enable ToggleButton's disabled member.
+Keep caption text left aligned and clipped independently of the indicator using
+local paint atoms, real widgets, full accessible labels/state and runtime-name
+fallback for empty captions. Preserve inert inspection, canonical Value/Null/
+groups/events/resources, global style and all budgets. Full M7A.4 stays open.
