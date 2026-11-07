@@ -1789,7 +1789,11 @@ impl EditorUi {
                                 }
                                 ControlKind::Label | ControlKind::CommandButton => {
                                     let job=accelerator::job(&caption,ide.form_instance_field(instance,Some(c.id),"Accelerator").ok(),fonts::read(ide,instance,c.id,ui,system_theme),theme.text);
-                                    let response=if native && c.kind==ControlKind::Label {text_align::label(ui,bounds,job,text_align::read(ide,instance,c.id))}else{ui.put(bounds,egui::Button::new(job).frame(c.kind==ControlKind::CommandButton))};
+                                    let wrap=ide.form_instance_field(instance,Some(c.id),"WordWrap").ok()==Some(vba_ide::Value::Boolean(true));
+                                    let response=if native {
+                                        let alignment=if c.kind==ControlKind::Label {text_align::read(ide,instance,c.id)}else{egui::Align::Center};
+                                        text_align::caption(ui,bounds,job,alignment,wrap,c.kind==ControlKind::CommandButton)
+                                    }else{ui.put(bounds,egui::Button::new(job).frame(c.kind==ControlKind::CommandButton))};
                                     if let Some(target) =
                                         focus.iter_mut().find(|(_, control, _)| *control == c.id)
                                     {

@@ -229,7 +229,23 @@ impl TextBox<'_> {
                 super::fonts::decorate(&mut job, &font_style);
                 job.halign = alignment;
                 job.halign_min_is_start = false;
-                fonts.layout_job(job)
+                let mut galley = fonts.layout_job(job);
+                if multi && !wrap && width.is_finite() && width > 0. && galley.rect.width() > width
+                {
+                    // TextEdit sizes multiline widgets from the galley's rectangle.
+                    // Native controls keep their authored viewport even without wrapping.
+                    // Only the local allocation rectangle changes: shaped glyphs and
+                    // cursor rows remain complete, and the shared font cache stays intact.
+                    let galley = std::sync::Arc::make_mut(&mut galley);
+                    let left = match alignment {
+                        egui::Align::Min => 0.,
+                        egui::Align::Center => -width * 0.5,
+                        egui::Align::Max => -width,
+                    };
+                    galley.rect.min.x = left;
+                    galley.rect.max.x = left + width;
+                }
+                galley
             })
         };
         let copy = text.clone();

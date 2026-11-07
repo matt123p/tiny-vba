@@ -405,3 +405,10 @@ inert and preserve authored form fields. Local text and caret geometry must agre
 ComboBox popup rows do not inherit edit alignment. No new VM/protocol/format,
 canonical store or budget is added. Other applicability, wrap/AutoSize/platform
 cases and full M7A.4 remain open; fresh Office observations remain M8.5 NOT_RUN.
+
+Native caption WordWrap follows ADR 0087: ordinary Boolean state, distinct native
+file/runtime defaults and fixed-bound local rendering. Keep complete text/cursor
+rows when measuring unwrapped multiline TextBox viewports; do not mutate font
+caches or canonical values to size widgets. Dynamic TextBox defaults to True.
+Other flags, Boolean-control wrap, AutoSize/scrolling and broader M7A.4 acceptance
+remain open; no VM/host budget, .tvform or native persistence change is implied.

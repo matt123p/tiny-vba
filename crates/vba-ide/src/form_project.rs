@@ -947,6 +947,12 @@ fn compiled_form(
         }
         source.push_str(&setup);
         if let Some(metadata) = metadata {
+            if crate::form_word_wrap::caption(c.kind) {
+                source.push_str(&format!(
+                    "{temp}.WordWrap={}\n",
+                    boolean(metadata.text_behavior.word_wrap)
+                ));
+            }
             source.push_str(&crate::form_text_align::initial(
                 &temp,
                 c.kind,

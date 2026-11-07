@@ -19,6 +19,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let fonts = option.as_deref() == Some("--fonts");
     let appearance = option.as_deref() == Some("--appearance");
     let text_align = option.as_deref() == Some("--text-align");
+    let word_wrap = option.as_deref() == Some("--word-wrap");
     let colors = option.as_deref() == Some("--colors");
     let nested_mouse = option.as_deref() == Some("--nested-mouse");
     let composite_mouse = option.as_deref() == Some("--composite-mouse");
@@ -62,7 +63,8 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             | "--colors"
             | "--fonts"
             | "--appearance"
-            | "--text-align",
+            | "--text-align"
+            | "--word-wrap",
         ) => false,
         Some(_) => return Err("unknown fixture option".into()),
     };
@@ -94,6 +96,10 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         "Stop\r\nDebug.Print Entry.Text"
     };
     let mut text = String::from_utf8(fixture::export())?.replace("Debug.Print Entry.Text", body);
+    if word_wrap {
+        let code="Attribute VB_Name = \"NativeForm\"\nAttribute VB_PredeclaredId = True\nOption Explicit\nPrivate Sub UserForm_Initialize()\nDebug.Print \"wrap ready\"\nDebug.Print Heading.WordWrap,Apply.WordWrap,Entry.WordWrap\nHeading.Caption=\"Caption wraps inside fixed bounds\"\nHeading.Width=110\nHeading.Top=8\nHeading.Height=32\nHeading.WordWrap=True\nEntry.Width=168\nEntry.Top=44\nEntry.Height=30\nEntry.FontSize=12\nEntry.MultiLine=True\nEntry.WordWrap=True\nEntry.Text=\"Text wraps inside fixed bounds\"\nApply.Caption=\"Wrapped button caption\"\nApply.WordWrap=True\nEnd Sub\nPrivate Sub Apply_Click()\nHeading.WordWrap=False\nEntry.WordWrap=False\nApply.WordWrap=False\nDebug.Print VarType(Heading.WordWrap),Heading.WordWrap,Entry.WordWrap,Apply.WordWrap\nStop\nHeading.WordWrap=True\nEntry.WordWrap=True\nDebug.Print Heading.WordWrap,Entry.WordWrap\nMe.Hide\nEnd Sub\n".replace('\n',"\r\n");
+        text = String::from_utf8(fixture::export())?.replace(fixture::SOURCE, &code);
+    }
     if text_align {
         let code="Attribute VB_Name = \"NativeForm\"\nAttribute VB_PredeclaredId = True\nOption Explicit\nPrivate Sub UserForm_Initialize()\nDebug.Print \"alignment ready\"\nDebug.Print Heading.TextAlign,Entry.TextAlign\nHeading.Caption=\"Left / centre / right\"\nHeading.Width=168\nHeading.TextAlign=fmTextAlignLeft\nEntry.Width=168\nEntry.FontSize=12\nEntry.TextAlign=fmTextAlignCenter\nEnd Sub\nPrivate Sub Apply_Click()\nEntry.TextAlign=fmTextAlignRight\nDebug.Print VarType(Entry.TextAlign),Entry.TextAlign\nStop\nHeading.TextAlign=fmTextAlignRight\nEntry.TextAlign=fmTextAlignLeft\nDebug.Print Entry.TextAlign\nMe.Hide\nEnd Sub\n".replace('\n',"\r\n");
         text = String::from_utf8(fixture::export())?.replace(fixture::SOURCE, &code);
@@ -210,7 +216,9 @@ End Sub
     std::fs::write(dir.join("NativeForm.frm"), text)?;
     std::fs::write(
         dir.join("NativeForm.frx"),
-        if text_align {
+        if word_wrap {
+            fixture::caption_flags_companion(0x1b, 0x0080_001b)
+        } else if text_align {
             fixture::alignment_companion(2)
         } else if appearance {
             fixture::appearance_companion()

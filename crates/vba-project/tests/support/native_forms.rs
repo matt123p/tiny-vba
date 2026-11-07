@@ -107,6 +107,31 @@ fn streams_with_controls(
 pub fn companion() -> Vec<u8> {
     companion_with_properties(0, false, false)
 }
+/// Independently authored VariousPropertyBits on the two caption controls.
+pub fn caption_flags_companion(label_flags: u32, button_flags: u32) -> Vec<u8> {
+    fn caption(caption: &str, flags: u32) -> Vec<u8> {
+        let mut body = u32s(&[0x2c, flags, 0x80000000 | caption.len() as u32]);
+        body.extend(string(caption));
+        body.extend(u32s(&[2540, 635]));
+        let mut bytes = record(0x200, &body);
+        bytes.extend(record(0x200, &[0; 4]));
+        bytes
+    }
+    let mut controls = controls();
+    controls[0] = caption("Authored label", label_flags);
+    controls[2] = caption("Apply", button_flags);
+    let mut file = cfb::CompoundFile::create(Cursor::new(Vec::new())).unwrap();
+    for (name, bytes) in streams_with_controls(controls, false, false) {
+        file.create_stream(format!("/{name}"))
+            .unwrap()
+            .write_all(&bytes)
+            .unwrap();
+    }
+    let bytes = file.into_inner().into_inner();
+    let mut out = (bytes.len() as u32).to_le_bytes().to_vec();
+    out.extend(bytes);
+    out
+}
 /// Authored paragraph-only TextProps; all actual font attributes use file defaults.
 pub fn alignment_companion(paragraph: u8) -> Vec<u8> {
     let text = record(0x200, &[0x40, 0, 0, 0, paragraph, 0, 0, 0]);

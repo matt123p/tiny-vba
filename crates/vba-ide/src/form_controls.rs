@@ -237,6 +237,12 @@ pub(crate) fn control_class(kind: ControlKind, ranges: bool) -> String {
         s.push_str("Public Event AddControl(ByVal index As Long,ByVal control As MSForms.Control)\nPublic Event RemoveControl(ByVal index As Long,ByVal control As MSForms.Control)\nPublic Sub VbaNotifyControl(ByVal added As Boolean,ByVal index As Long,ByVal control As MSForms.Control)\nIf added Then\nRaiseEvent AddControl(index,control)\nElse\nRaiseEvent RemoveControl(index,control)\nEnd If\nEnd Sub\n");
     }
     let mut init = format!("VbaKind={kind_code}\n");
+    if crate::form_word_wrap::caption(kind) {
+        s.push_str("Public WordWrap As Boolean\n");
+    }
+    if crate::form_word_wrap::supported(kind) {
+        init.push_str("WordWrap=True\n");
+    }
     init.push_str(&crate::form_colors::initial(kind));
     init.push_str(&crate::form_appearance::initial(kind));
     init.push_str(&crate::form_text_align::initial("", kind, 1));

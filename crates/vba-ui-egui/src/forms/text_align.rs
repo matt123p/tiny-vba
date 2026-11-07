@@ -11,13 +11,15 @@ pub(super) fn read(ide: &Ide, owner: FormInstance, control: u32) -> Align {
         _ => Align::Min,
     }
 }
-pub(super) fn label(
+pub(super) fn caption(
     ui: &mut egui::Ui,
     bounds: Rect,
     mut job: LayoutJob,
     alignment: Align,
+    wrap: bool,
+    frame: bool,
 ) -> egui::Response {
-    let button = Button::new("").frame(false);
+    let button = Button::new("").frame(frame);
     let classes = button.classes().clone();
     let response = ui.put(bounds, button);
     let style = ui
@@ -29,7 +31,7 @@ pub(super) fn label(
     }
     job.halign = alignment;
     job.halign_min_is_start = false;
-    job.wrap.max_width = content.width();
+    job.wrap.max_width = if wrap { content.width() } else { f32::INFINITY };
     let galley = ui.fonts_mut(|fonts| fonts.layout_job(job));
     let x = match alignment {
         Align::Min => content.left(),

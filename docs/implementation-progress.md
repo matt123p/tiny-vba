@@ -1,5 +1,33 @@
 # Implementation progress
 
+## M7A.4 continued — native caption WordWrap (2026-11-07)
+
+ADR 0087 adds selected native Label/CommandButton WordWrap flags, ordinary
+Boolean state and local fixed-bound caption layout. File defaults remain distinct
+from runtime defaults; dynamic TextBox now starts with WordWrap=True. Existing
+TextBox multiline policy remains authoritative. The GPU audit also fixes an
+unwrapped multiline TextBox interaction/accessibility width expansion using local
+viewport measurement with complete glyph/cursor rows and unchanged font caches.
+Text, selection, events, source/resources and all VM/host budgets are unchanged.
+
+Six model and three new GPU/input cases pass, along with strict affected
+all-targets Clippy, all 34 pointer and four alignment cases and existing appearance,
+Font and colour regressions. The default regression fails with the prior dynamic
+TextBox False default and passes with the restored exact fixed source. The pixel
+regression likewise exposed the original expanded TextBox rectangle before its
+viewport fix. Full shared/browser and both host gates are in progress. Boolean-control and broader
+wrap/AutoSize/scrolling/member/platform requirements and full M7A.4 remain open.
+Fresh Office observations remain M8.5 NOT_RUN.
+
+Shared CI, strict workspace/all-targets Clippy, WASM, UI, Xvfb native, web,
+repository checks and all six Chromium flows pass. The corrected five theme/
+scale/host snapshots and browser runtime/Break views were inspected. Full WASI
+runs on Node 18.19.1 and 22.23.4 and both host integrations are pending. The current
+default accelerator module passes all eight cases on Node 22; the older ADR 0086
+failure is not reproduced there. Both old/current default modules retain a
+1,048,576 initial stack pointer (the separate diagnostic module has 8,388,608).
+No shipping stack/VM/WASI settings changed; no root-cause fix is claimed.
+
 ## M7A.4 continued — native TextAlign (2026-11-07)
 
 ADR 0086 adds selected native Label/TextBox/ListBox/ComboBox TextAlign through

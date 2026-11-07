@@ -31,14 +31,15 @@ are file-format defaults from MS-OFORMS, not undocumented VBE toolbox defaults.
 | Form scrolling / Zoom / Enabled | Import requires unscrolled matching physical/logical size, zoom 100, enabled form | Other values U |
 | ForeColor / BackColor | Native OLE_COLOR fields and VBFrame reconciliation; canonical Long properties, RGB/system-theme rendering and optional caller palette resolution | D; ADR 0080, full platform/ambient appearance remains open |
 | Font | ADR 0081 retains StdFont/TextProps and VBFrame data; typed attributes, independent objects/defaults, inert inspection and local rendering | D selected; replacement/ambient/platform realization P |
-| Border / effect / transparency | Known native fields and original resources | P; remaining renderer/member parity M7A.4 |
+| Border / effect / transparency | Applicable native fields, original resources and typed runtime members | D selected (ADR 0084); remaining member/ambient/platform parity M7A.4 |
+| WordWrap | VariousPropertyBits bit 23; distinct Label/CommandButton file defaults and typed runtime state | D selected captions/TextBox (ADR 0087); Boolean-control, AutoSize/scrolling and broader presentation cases remain open |
 | Tag / HelpContextID / ControlTipText | Known frame/site strings/scalars; ordinary per-instance metadata and runtime tips | D; Help/F1 routing remains U (ADR 0055) |
 | Window placement / StartUpPosition / ShowModal | VBFrame metadata retained; enabled/default-modal form required; explicit show modes use existing runtime | P for placement; disabled/default-modeless metadata U; parity M7A.4 |
-| Default / Cancel / Accelerator / TakeFocusOnClick changes | Native site/control flags or fields | Default/Cancel decoded and executed; other fields U |
+| Default / Cancel / Accelerator / TakeFocusOnClick changes | Native site/control flags or fields | Default/Cancel and selected applicable accelerators decoded and executed (ADR 0072); TakeFocusOnClick changes U |
 | Locked / multiline / password / MaxLength / scrolling changes | MorphData behavior fields or nondefault flags | Locked/MaxLength, multiline, password and selected Enter/Tab/field behavior decoded and executed; scrolling remains U |
 | ControlSource / RowSource / list metadata | Native binding/site fields retained without resolution | D for value/list families; selected runtime links through explicit host Range capability (ADR 0065) |
-| Pictures / MouseIcon / custom pointers / non-cached class table | Native binary resource or reference-specific class | U; no resource execution/loading |
-| Container children | Native immediate sites and separate Frame parent storage | D for selected bounded Frame packet (ADR 0056); other container variants U |
+| Pictures / MouseIcon / custom pointers / non-cached class table | Native binary resource or reference-specific class | D selected Image raster resources (ADR 0059) and RefEdit class identity (ADR 0060); MouseIcon/custom pointers and arbitrary activation U |
+| Container children | Native immediate sites and separate parent storage | D selected bounded Frame/MultiPage/Page packets (ADRs 0056/0058); remaining storage/resource variants open |
 
 Selected textual properties are strings, control dimensions are exposed as Single
 points, and Enabled/Visible/TabStop are Boolean in the existing shared runtime.
@@ -91,7 +92,7 @@ into permission to load a library.
 | Native non-label Enter/Exit | Private Sub `control_Enter()` / `control_Exit(ByVal Cancel As MSForms.ReturnBoolean)` | Selected canonical focus and typed cancellation under ADR 0048 | Additional activation/container/redirection observations remain open |
 | Native TextBox validation | Private Sub `control_BeforeUpdate(ByVal Cancel As MSForms.ReturnBoolean)` / `control_AfterUpdate()` | User-input update/cancellation on focus transition; ordinary frames and mutable ByVal identity | Broader binding/coercion/update cases remain open |
 | Native KeyDown / KeyPress / KeyUp | Private Sub with ByVal MSForms.ReturnInteger; Down/Up add typed Shift | ADR 0070: ordinary callbacks, static/dynamic WithEvents, cancellation/replacement and Stop/Reset receipts; bounded raw-input UI barrier | Full platform/shortcut/root-window/focus/IME acceptance remains partial |
-| Mouse / additional events | Microsoft Forms signatures, including ReturnBoolean/ReturnInteger where applicable | U; never approximate event argument objects | Exact typed packet and independent reference evidence required |
+| Mouse / additional events | Microsoft Forms signatures, including ReturnBoolean/ReturnInteger where applicable | ADRs 0073–0075: selected typed mouse callbacks, capture and native text/composite defaults | Remaining order, wheel/drag/mutation and platform cases stay open; never approximate event argument objects |
 
 Unknown handlers, wrong supported signatures and generated-support/member name
 collisions refuse attachment. Native export attributes are retained; generated
@@ -364,3 +365,11 @@ selection. Inert inspection preserves authored form fields, local layout matches
 pointer/caret geometry, and ComboBox popup alignment stays independent. Source/
 resources, global styles/fonts and all budgets are unchanged. Broader member,
 wrap/AutoSize, Boolean/RefEdit and platform cases and full M7A.4 remain open.
+
+[ADR 0087](decisions/0087-native-caption-word-wrap.md) adds selected native
+Label/CommandButton WordWrap flags, typed Boolean state, distinct file/runtime
+defaults and fixed-bound captions. Dynamic TextBox defaults to True; multiline
+unwrapped text retains fixed horizontal interaction bounds with complete UTF-16
+cursor rows. Canonical state, original source/resources, global font/style policy
+and all VM/permission budgets remain unchanged. Broader Boolean-control wrap,
+AutoSize/scrolling and full M7A.4 acceptance remain open.

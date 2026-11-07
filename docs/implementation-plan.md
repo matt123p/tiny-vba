@@ -112,6 +112,9 @@ and native save/reopen. See [ADR 0041](decisions/0041-worksheet-form-controls.md
   ADR 0086 adds selected TextAlign, native/public value translation, independent
   ordinary state and matching text/caret geometry; ComboBox popup rows retain
   independent alignment. The remaining checklist and full milestone stay open.
+  ADR 0087 adds selected caption WordWrap, native/file defaults, dynamic TextBox
+  True defaults and fixed horizontal text allocation; broader wrapping, AutoSize
+  and the full M7A.4 checklist remain open.
   ADR 0076 adds selected nested modal mouse/keyboard input continuations with
   shared raw-input bounds, held release, parent unload and Reset regressions. L02
   remains partial; all remaining lifecycle and control contracts stay open.

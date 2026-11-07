@@ -343,3 +343,11 @@ selection. Inert inspection preserves authored form fields, local layout matches
 pointer/caret geometry, and ComboBox popup alignment stays independent. Source/
 resources, global styles/fonts and all budgets are unchanged. Broader member,
 wrap/AutoSize, Boolean/RefEdit and platform cases and full M7A.4 remain open.
+
+[ADR 0087](decisions/0087-native-caption-word-wrap.md) adds selected native
+Label/CommandButton WordWrap flags, typed Boolean state, distinct file/runtime
+defaults and fixed-bound captions. Dynamic TextBox defaults to True; multiline
+unwrapped text retains fixed horizontal interaction bounds with complete UTF-16
+cursor rows. Canonical state, original source/resources, global font/style policy
+and all VM/permission budgets remain unchanged. Broader Boolean-control wrap,
+AutoSize/scrolling and full M7A.4 acceptance remain open.

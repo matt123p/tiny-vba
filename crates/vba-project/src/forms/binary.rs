@@ -791,9 +791,10 @@ fn control(bytes: &[u8], site: Site) -> Result<Control> {
             0x1b
         };
         let flags = field(&mut b, m, 2, 4, default)?;
-        if flags & !10 != default & !10 {
+        if flags & !(10 | (1 << 23)) != default & !(10 | (1 << 23)) {
             return Err(unsupported("native control behavior flags"));
         }
+        text_behavior.word_wrap = flags & (1 << 23) != 0;
         appearance.back_style = u8::from(flags & 8 != 0);
         let caption = field(&mut b, m, 3, 4, 0)?;
         field(&mut b, m, 4, 4, 0)?;
