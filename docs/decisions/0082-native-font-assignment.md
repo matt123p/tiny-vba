@@ -1,6 +1,6 @@
 # ADR 0082: Native Font property assignment
 
-Date: 2026-11-07. Status: implemented; acceptance in progress. M7A.4 remains open.
+Date: 2026-11-07. Status: implemented and verified for the selected profile. M7A.4 remains open.
 
 The IDE provider emits a typed `Property Set Font(ByVal value As MSForms.NewFont)`
 for the UserForm and each existing Font-capable native control class. It uses

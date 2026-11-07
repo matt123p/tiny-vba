@@ -13,10 +13,32 @@ Ten model tests, including 16 per-family subcases, and four real GPU cases pass.
 Shared CI, strict workspace Clippy, WASM/WASI, UI/native/web and repository
 gates pass. Chromium editor, legacy-form and assigned-Font modal Stop/Continue
 cases pass. Five native theme/scale views and the browser breakpoint view were
-inspected. Affected host acceptance is in progress. Font-specific
-Nothing/external/other-assignment behavior, ambient/platform defaults and the
+inspected. Both hosts pin shared product
+`38dacbd178dd8f25c98b4da8338f575e85df8171`. GridCraft passes full CI (10 steps),
+strict optional VBA/UI Clippy, five form UI cases, VBA web and 31 native/31 actual
+Node-WASM package cases (integration `4cd7f186854aa391dc994fabbc877c1e8842b5f9`).
+WordCraft passes all eight full CI steps with isolated serial tests, strict
+optional VBA/UI Clippy, 13 VBA UI cases, the hidden-editor form, the canvas-prefix/
+Reset flow, VBA web and 26 native/26 actual Node-WASM package cases (integration
+`1f07512aa3470f5b1e866367573a5a37c88a296f`). Both document renders were inspected.
+Final shared, browser and host gate runs exited zero; both host integrations are
+committed and pushed. Lockfile updates change only the 13 shared package revisions.
+
+Shared commands: `cargo xtask ci`, `cargo xtask wasm`, `cargo xtask wasm-run`,
+`cargo xtask ui`, `xvfb-run -a cargo xtask ui-native`, `cargo xtask web`, strict
+workspace/all-target Clippy, `cargo test -p vba-ide --test native_fonts`,
+`cargo test -p vba-ui-egui --test native_fonts`, repository checks and actual
+Chromium `smoke.cjs`, `forms.cjs`, `native-fonts.cjs` runs. Hosts use their full
+`xtask ci`, locked native/Node-WASM `native_forms`, optional VBA/UI Clippy, VBA
+web and the UI suites above.
+
+Font-specific Nothing/external/other-assignment behavior, ambient/platform defaults and the
 unchanged appearance/lifecycle/binding/control checklist remain open. Full M7A.4
 is IN PROGRESS; fresh Office comparisons remain M8.5 NOT_RUN.
+
+Next implementation packet: retain native BorderColor/BorderStyle/SpecialEffect/
+BackStyle and implement their documented typed interactions and local rendering.
+The remaining Font comparison cases and full completion checklist remain open.
 
 ## M7A.4 continued — native fonts (2026-11-07)
 
