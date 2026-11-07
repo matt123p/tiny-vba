@@ -10,7 +10,19 @@ background, foreground and requested border pixels. Appearance snapshots and the
 modal browser fixture include runtime-created lists. Six appearance GPU cases
 pass. Full shared CI, strict Clippy, WASM/WASI, UI/native/web, repository and all
 four Chromium flows pass. Five theme/scale views and the modal browser view
-were inspected. Affected host follow-up acceptance is in progress. This is a
+were inspected. The regression fails against the previous unconditional stroke
+and passes with the restored fixed code. Both hosts pin product
+`0bc169c5dd38f57634a77515a45a58370b1220b3`. GridCraft passes all 10 full CI
+steps, strict optional VBA/UI Clippy, five form UI cases, VBA web and 33 native/
+33 actual Node-WASM package cases (integration
+`219941d1bc3798a15e3a10935e66850684fdb3c9`). WordCraft passes all eight full
+CI steps with isolated serial tests, strict optional VBA/UI Clippy, 13 VBA UI
+cases, hidden-editor and canvas-prefix/Reset flows, VBA web and 28 native/
+28 actual Node-WASM package cases (integration
+`ef729fab30490240d688b15616c6a8a5bec3c643`). Both updated host document renders
+were inspected. Final shared/browser/host runs exited zero; both integrations
+are committed and pushed. Lockfiles still change only the 13 shared revisions.
+This is a
 correction within ADR 0084, with no new API, canonical store, VM or budget change.
 Full M7A.4 and its unchanged remaining checklist remain open.
 
