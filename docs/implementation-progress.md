@@ -2,25 +2,39 @@
 
 ## M7A.4 continued — native form/control colours (2026-11-07)
 
-ADR 0080 retains native BackColor/ForeColor defaults and OLE_COLOR bits, joins
-VBFrame/binary properties and exposes ordinary typed properties without another
-value store. Native UI paints authored RGB values and theme-projected system
-colours; a caller-owned resolver supports exact platform/client palettes. Missing
-client entries keep their value and show an unavailable-palette message. Generated
-properties preserve coercion, errors, instance identity and Stop/Continue/Reset.
-The tests also fix Page lookup under runtime-created MultiPages through existing
-collections. Eight model cases (including 14 dynamic-family subcases), two decode
-cases and two actual pixel/palette UI cases cover the selected implementation.
-Shared CI/strict Clippy, WASM, UI/native/web, repository checks and actual Chromium
-editor/modal-form/native-colour checks pass. Five theme/scale views and browser
-Stop/Continue output were inspected. The initial full WASI run passed. Host validation exposed a generated nominal
-metadata overflow in existing GridCraft MultiPage cases. A shared ordinary colour
-validator and direct Controls/Pages attachment remove redundant generated methods;
-the local GridCraft package suite now passes all 29 cases without increasing limits.
-Final shared gates and both published host pins are being validated. P01/W01 and
-M7A.4 remain incomplete; fonts, borders/effects, transparency, further ambient/
-platform/default/selection cases and the unchanged completion checklist stay open.
-Fresh Office comparisons remain M8.5 NOT_RUN.
+ADR 0080 retains native BackColor/ForeColor defaults and OLE_COLOR bits, reconciles
+VBFrame/binary properties and exposes ordinary typed properties. Native UI paints
+authored RGB values and theme-projected system colours; a caller-owned resolver
+supports exact platform/client palettes. Missing client entries retain their
+canonical value and show an unavailable-palette message. Properties preserve
+coercion, errors, instance identity and Stop/Continue/Reset. Runtime-created
+MultiPage children now resolve their Page parents through existing collections.
+A shared ordinary validator and direct Controls/Pages attachment keep generated
+support within the existing 4,096 nominal-entry cap without weakening typed
+fields or raising execution, memory, callback or permission limits.
+
+Eight model cases (including 14 dynamic-family subcases), two decode cases and
+two actual GPU pixel/palette cases cover the selected implementation. Shared
+CI/strict Clippy, WASM, UI/native/web, repository checks and actual Chromium
+editor/modal-form/native-colour checks pass. Final WASI case coverage completed
+across the main run and a resumed final IDE-test batch after wrapper exit 143;
+the resumed batch exited zero. Five native theme/scale views, browser paused/
+completed output and both host document views were inspected.
+
+Both hosts pin shared product `d3c99baab86fad9e33333fd4204066757baec63d`.
+GridCraft full CI (10 steps), strict optional VBA/UI Clippy, five form UI cases,
+VBA web and all 29 native/29 actual Node-WASM package cases pass (integration
+`384b66ea`). WordCraft strict optional VBA/UI Clippy, 13 VBA UI cases, the hidden-
+editor form, the canvas-prefix/Reset flow, VBA web and all 24 native/24 actual
+Node-WASM package cases pass. Its full CI passes all eight steps with isolated
+serial tests (integration `a3dc31e9`). Both host integrations are committed and
+pushed. Final native/UI/web and host gate reruns exited zero; the WASI wrapper
+interruption and resumed coverage are distinguished above.
+
+P01/W01 and full M7A.4 remain IN PROGRESS. Fonts, borders/effects, transparency,
+further ambient/platform/default/selection cases and the unchanged
+[completion checklist](m7a4-completion-checklist.md) remain open. Fresh Office
+comparisons remain M8.5 NOT_RUN.
 
 ## M7A.4 continued — form input before document activation (2026-11-07)
 

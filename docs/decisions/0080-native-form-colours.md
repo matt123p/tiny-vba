@@ -1,6 +1,6 @@
 # ADR 0080: Native form and control colours
 
-Status: implemented; acceptance in progress.
+Status: implemented and verified for the selected colour profile; full M7A.4 remains in progress.
 Date: 2026-11-07.
 
 ## Ownership and representation
@@ -75,6 +75,24 @@ resource preservation. Eight model cases also check attachment-time member-name
 collisions and preservation of legacy authored inspection fields. Actual GPU-rendered tests assert authored pixels, local
 style ownership and unresolved/injected palettes. Final native/WASM/WASI/browser
 and consumer receipts belong in implementation progress.
+
+Shared verification: cargo xtask ci (strict Clippy and native tests), wasm, ui,
+Xvfb ui-native, web, repository checks, native colour snapshots and actual Chromium
+smoke/forms/native-colors all pass. Five theme/scale views and both host document
+views were inspected. The final wasm-run wrapper exited 143 during its last IDE
+suite; all preceding suites passed and the remaining native_colors, native_forms,
+nominal, projection, references, search, suspended_calls and workflows WASI suites
+were rerun successfully with cargo test on wasm32-wasip1. This records complete
+case coverage across runs, not a zero exit for the interrupted wrapper.
+
+Both consumers pin shared product d3c99baab86fad9e33333fd4204066757baec63d.
+GridCraft integration 384b66ea passes full CI (10 steps), strict optional VBA/UI
+Clippy, five form UI cases, VBA web and 29 native/29 Node-WASM package cases.
+WordCraft integration a3dc31e9 passes full CI (8 steps, isolated serial tests),
+strict optional VBA/UI Clippy, 13 VBA UI cases, hidden-editor and canvas-prefix/
+Reset flows, VBA web and 24 native/24 Node-WASM package cases. Final full host CI
+used each checkout's native target/debug/xtask ci entry point after terminated
+cargo wrappers; the task implementations and checks are the same.
 
 P01/W01 and full M7A.4 remain IN PROGRESS. No refusal or themed approximation
 closes an unimplemented member/platform requirement. Fresh Office build/OS/locale
