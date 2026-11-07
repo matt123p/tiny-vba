@@ -1,6 +1,7 @@
 # ADR 0087: Native caption wrapping and TextBox defaults
 
-Date: 2026-11-07. Status: selected implementation; acceptance in progress.
+Date: 2026-11-07. Status: selected implementation; shared/browser and both host
+acceptance recorded in implementation progress.
 M7A.4 remains open.
 
 ## Contract and ownership

@@ -22,11 +22,27 @@ Fresh Office observations remain M8.5 NOT_RUN.
 Shared CI, strict workspace/all-targets Clippy, WASM, UI, Xvfb native, web,
 repository checks and all six Chromium flows pass. The corrected five theme/
 scale/host snapshots and browser runtime/Break views were inspected. Full WASI
-runs on Node 18.19.1 and 22.23.4 and both host integrations are pending. The current
+runs pass on both Node 18.19.1 and 22.23.4. Both hosts pin shared product
+`2be3f2dcbf96b3798adb348649a131fe73436061`; integration receipts follow. The current
 default accelerator module passes all eight cases on Node 22; the older ADR 0086
 failure is not reproduced there. Both old/current default modules retain a
 1,048,576 initial stack pointer (the separate diagnostic module has 8,388,608).
 No shipping stack/VM/WASI settings changed; no root-cause fix is claimed.
+
+GridCraft passes all 10 full CI steps, strict optional VBA/UI Clippy, five form
+UI cases, VBA web and 33 native/33 actual Node 22-WASM package cases. Its updated
+document/form render was inspected; integration
+`e3c9167f9da417b83bcb7f670510603b48bb8618` is committed and pushed. The
+lockfile changes only the 13 shared revisions. WordCraft passes all eight full CI
+steps with isolated serial tests, strict optional VBA/UI Clippy, 13 VBA UI cases,
+hidden-editor and canvas-prefix/Reset flows, VBA web and 28 native/28 actual
+Node 22-WASM package cases. Its updated document/form render was inspected;
+integration `88cd71fa12e640c3ec59038cf282104657833d82` is committed and pushed.
+Its lockfile likewise changes only the 13 shared revisions. All final shared,
+browser and host runs exited zero. Full M7A.4 remains open; the next smallest P01
+task is Boolean-control WordWrap flags/defaults and caption rendering. The full
+completion checklist, including lifecycle/input/binding and platform work, is
+unchanged.
 
 ## M7A.4 continued — native TextAlign (2026-11-07)
 
