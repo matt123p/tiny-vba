@@ -1,6 +1,6 @@
 # ADR 0090: Native CheckBox/OptionButton caption alignment
 
-Date: 2026-11-07. Status: implementation; shared/browser acceptance passed, host acceptance in progress. Full M7A.4 remains open.
+Date: 2026-11-07. Status: adopted; shared/browser and both pinned host acceptance gates passed. Full M7A.4 remains open.
 
 CheckBox/OptionButton expose ordinary Long Alignment state and the published
 fmAlignmentLeft=0/fmAlignmentRight=1 constants. File and dynamic defaults are

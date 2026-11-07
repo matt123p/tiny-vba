@@ -18,7 +18,17 @@ Full shared CI, strict workspace/all-targets Clippy, WASM, UI, Xvfb native, web,
 repository checks and all eight Chromium flows pass. Full WASI passes on
 Node 22.23.4; all seven new Alignment cases also pass on Node 18.19.1. Corrected
 five-theme/scale/host snapshots and browser runtime/Break views were inspected.
-Affected host acceptance is in progress. The unchanged
+Shared product revision: `b8d203dd00bef56acce74deeb0d25d13811fbe1e`.
+Both hosts pin it. Gridcraft passes all 10 CI steps, strict optional VBA/UI
+Clippy, five native-form UI cases, the VBA-enabled web build and all 33 native/33
+Node 22 WASM package cases. Its light canvas was inspected; 13 shared lockfile
+packages changed by revision only. Published Gridcraft integration:
+`f991921f22ac466477adc9390bb11b312341918a`.
+Wordcraft passes all eight CI steps in isolation with one test thread, all 28
+native/28 Node 22 WASM package cases, 13 VBA UI cases plus hidden-VBE/canvas cases,
+strict optional Clippy and the VBA-enabled web build. Its dark canvas was
+inspected; 13 shared lockfile packages changed by revision only. Published
+Wordcraft integration: `dc5fd424d4a970c55bd4ec6609ae5cb19bb93140`. The unchanged
 completion checklist, AutoSize/scrolling and remaining properties/lifecycle/
 input/binding/ActiveX/platform work remain open. Fresh Office evidence is
 M8.5 NOT_RUN. This does not complete M7A.4.

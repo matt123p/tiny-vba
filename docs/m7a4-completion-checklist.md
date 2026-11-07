@@ -77,8 +77,8 @@ The complete K/M/property/binding/platform requirements above remain open.
 Selected P01 Alignment follows ADR 0090 for native CheckBox/OptionButton. The
 persisted flag is translated inversely to the public values; ToggleButton stays
 disabled. Authored default/type/error, inert Stop/Continue/Reset, resource,
-Value/Null/group and actual clipped-caption/input cases pass. Full shared/browser acceptance passes;
-host acceptance is in progress. This does not close the rest of P01.
+Value/Null/group and actual clipped-caption/input cases pass. Full shared/browser
+and both pinned host acceptance gates pass. This does not close the rest of P01.
 Next P01 work is the remaining applicable member/default audit, AutoSize,
 scrolling, selection and platform behavior. No refusal counts as implementation.
 
