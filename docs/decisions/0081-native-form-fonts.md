@@ -1,6 +1,6 @@
 # ADR 0081: Native form fonts and bounded nominal metadata
 
-Date: 2026-11-07. Status: implemented; acceptance in progress. M7A.4 remains open.
+Date: 2026-11-07. Status: implemented and verified for the selected profile. M7A.4 remains open.
 
 ## Ownership and values
 
@@ -78,9 +78,10 @@ Independently authored binary/frame cases cover defaults, fractional size/effect
 retention, reconciliation, conflicts and original resources. Five runtime cases
 cover typed/default properties, independent objects, Bold/Weight, coercion/errors,
 dynamic container/Page defaults, aliases after unload, Stop/Continue, inert
-inspection and Reset. Three GPU-rendered cases check authored typography, a bounded-size notice, injected
-face selection, missing-face fallback, canonical values and global-style isolation. Final shared and
-consumer acceptance receipts belong in implementation progress.
+inspection and Reset. Three GPU-rendered cases check authored typography, a
+bounded-size notice, injected face selection, missing-face fallback, canonical
+values and global-style isolation. Final shared and consumer acceptance receipts
+belong in implementation progress.
 
 Full M7A.4 remains IN PROGRESS. Fresh Office build/OS/locale observations remain
 M8.5 NOT_RUN. Native edited saving remains M7A.5 and .tvform removal M7A.6.

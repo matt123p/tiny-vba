@@ -8,11 +8,30 @@ Ordinary Font objects expose typed attributes and default Name, preserve aliases
 and Stop/Continue/Reset, and copy container defaults for runtime-added controls
 and Pages. Inert snapshots drive local font rendering and caller-owned face
 selection without replacing host fonts or global styles. Five model cases, three
-decode cases, three real GPU typography/display-limit/fallback cases and compiler/verifier ceiling checks
-pass. Shared CI, strict workspace Clippy, WASM, WASI, UI/native/web and
+decode cases, three real GPU typography/display-limit/fallback cases and
+compiler/verifier ceiling checks pass. Shared CI, strict workspace Clippy, WASM, WASI, UI/native/web and
 repository gates pass. Actual Chromium editor, legacy-form and native-font
-Stop/Continue cases pass; five theme/scale renders were inspected. Affected host
-validation is in progress.
+Stop/Continue cases pass; five theme/scale renders were inspected. The final
+shared CI rerun exited zero after the missing-face fallback regression.
+
+Both hosts pin shared product `f899c9925de3e2d4ef838f8ac78287ec9b2f4c2b`.
+GridCraft full CI (all 10 steps), strict optional VBA/UI Clippy, five form UI cases,
+VBA web and all 30 native/30 actual Node-WASM package cases pass (integration
+`5ff58b01c0361713f9a9ab84ee1411abc69e8817`). WordCraft full CI passes all eight
+steps with isolated serial tests. Strict optional VBA/UI Clippy, 13 VBA UI cases,
+the hidden-editor form, the canvas-prefix/Reset flow, VBA web and all 25 native/
+25 actual Node-WASM package cases pass (integration
+`e9bf39e02e97ae51120bdca4cd71f79eeb65f94a`). Both document views were inspected.
+The integrations are committed and pushed; lockfile updates change only the 13
+shared package revisions.
+
+Shared acceptance commands: `cargo xtask ci`, `cargo xtask wasm`,
+`cargo xtask wasm-run`, `cargo xtask ui`, `xvfb-run -a cargo xtask ui-native`,
+`cargo xtask web`, strict workspace/all-target Clippy, the GPU `native_fonts`
+suite, and `tools/check_repository.py all`. Chromium runs use `smoke.cjs`,
+`forms.cjs` and `native-fonts.cjs`. Each host runs its full `xtask ci`, locked
+native and Node-WASM `native_forms` suites, optional VBA/UI Clippy, VBA web checks
+and the UI cases recorded above.
 
 The compiler/verifier static nominal-entry limit is 8,192; this supersedes the
 older 4,096 profile ceiling while preserving the 64 MiB metadata/work bounds,
