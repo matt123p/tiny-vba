@@ -1,6 +1,6 @@
 # ADR 0078: Document activation before document input
 
-Status: shared implementation; final consumer acceptance in progress.
+Status: implemented and validated in shared runtime/UI and both pinned consumers.
 Date: 2026-11-07.
 
 ## Ownership and contract
@@ -83,3 +83,12 @@ egui form focus after document activation. Pending key receipts and retained mod
 ownership keep their existing exceptions. The eleventh regression injects an old
 native focus bookmark after the document click and verifies no native text edit
 or window reactivation. Existing modeless transfer and keyboard suites still pass.
+
+Final shared CI/WASM/WASI/UI/native/web and Chromium checks pass. Both hosts pin
+`ce6482640332cb67ccfe3372886a4039c832437e`. GridCraft full CI (10 steps), strict
+optional VBA/UI Clippy, five form UI cases, web and 28 native/28 Node-WASM package
+cases pass. WordCraft full CI (8 steps, isolated serial tests), strict optional
+VBA/UI Clippy, 13 VBA UI cases, the hidden-editor and document-focus/Reset cases,
+web and 23 native/23 Node-WASM cases pass. Host document views and five native
+views were inspected. This accepts the canvas continuation change; the complete
+M7A.4 checklist remains open.

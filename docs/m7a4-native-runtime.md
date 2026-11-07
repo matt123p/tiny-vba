@@ -1,6 +1,6 @@
 # M7A.4 native runtime — current implementation and remaining work
 
-Updated 2026-11-06. **IN PROGRESS. M7A.4 is not complete.** This record extends
+Updated 2026-11-07. **IN PROGRESS. M7A.4 is not complete.** This record extends
 [the first instance increment](m7a4-userform-instances.md) under
 [ADR 0043](decisions/0043-native-controls-and-project-inspection.md).
 

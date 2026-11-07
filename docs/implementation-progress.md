@@ -7,11 +7,17 @@ ordinary, authorized Deactivate callbacks before canvas input. Non-reused
 SessionInstance/document/window identity, geometry, Reset/source/trust loss and
 reentrant activation invalidate stale input. Hidden/unapplied passes require a
 fresh acknowledged canvas paint; F5/F8 and debugger input remain available.
-Eleven shared input regressions and both local canvas/Reset flows pass. Full
-shared CI, strict WASM, WASI, native/web and Chromium checks pass; native/browser
-and five native theme/scale views were inspected. UI tests/renders passed, with
-a clean wrapper exit being rechecked after a signal-143 termination. Pinned
-consumer acceptance is in progress. L01/L02 and the full M7A.4 checklist remain partial.
+Eleven shared input regressions and both pinned canvas/Reset flows pass. Full
+shared CI, strict WASM, WASI, UI/native/web and actual Chromium editor/modal-form/
+native-window checks pass with clean final gate exits. Native/browser output,
+both host document views and five native theme/scale views were inspected.
+Both consumers pin shared product `ce6482640332cb67ccfe3372886a4039c832437e`.
+GridCraft full CI (10 steps), strict optional VBA/UI Clippy, all five form UI cases,
+VBA web and all 28 native/28 Node-WASM package cases pass (integration `af4b0ae1`).
+WordCraft full CI (8 steps, isolated serial tests), strict optional VBA/UI Clippy,
+13 VBA UI cases, the hidden-editor form, the new document-focus/Reset flow,
+VBA web and all 23 native/23 Node-WASM package cases pass (integration `58cb1d87`).
+All three repositories are committed and pushed. L01/L02 and the full M7A.4 checklist remain partial.
 
 ## M7A.4 continued — native window activation (2026-11-06)
 

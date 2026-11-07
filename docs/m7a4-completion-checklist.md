@@ -1,6 +1,6 @@
 # M7A.4 completion checklist
 
-Updated 2026-11-06. M7A.4 remains IN PROGRESS. This makes the existing runtime
+Updated 2026-11-07. M7A.4 remains IN PROGRESS. This makes the existing runtime
 ledger actionable; it does not replace or reduce the native control contracts,
 inventory, or implementation plan. PASS below requires executable evidence;
 reference-based expectations and fresh Office observations remain distinct.
@@ -65,12 +65,12 @@ ADR 0073 implements the callback and selected simple-control capture/default pat
 ADR 0074 adds selected TextBox defaults without deferring the remaining K03
 accelerator/platform or lifecycle cases.
 
-Next lifecycle acceptance packet: automatic GridCraft/WordCraft document-canvas
-activation with an authorized pre-document raw-input barrier, stopped/reentrant
-Deactivate continuation, Reset/document replacement cancellation and RefEdit
-modal selection preservation. ADR 0077 supplies canonical native activation and
-the explicit executable command; a host calling it after a document action is
-not sufficient. Remaining K/M/property/binding/platform cases above stay open.
+Next lifecycle acceptance packet: coalesced form-key/IME input before the document
+press, activation through other chrome/keyboard routes and further reentrant
+focus/collection/binding cases. ADR 0078 implements the selected authorized canvas
+barrier, Stop/Continue, Reset/identity/geometry invalidation, repaint acknowledgment
+and native keyboard ownership. RefEdit keeps its existing modal selection path.
+The complete K/M/property/binding/platform requirements above remain open.
 
 ADR 0078 implements the selected pre-document input barrier and debugger/Reset/
 identity continuation cases described above. Broader lifecycle/binding/collection,
