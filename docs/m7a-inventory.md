@@ -377,3 +377,11 @@ background data and adds applicable typed properties, local effects/transparency
 and fixed-bound clipping. [ADR 0085](decisions/0085-native-font-attribute-aliases.md)
 adds published Font aliases forwarding to canonical objects. Full member, platform
 and M7A.4 acceptance remains open; no VM/permission/budget increase is made.
+
+[ADR 0086](decisions/0086-native-text-alignment.md) adds selected native TextAlign
+on Label/TextBox/ListBox/ComboBox. Native ParagraphAlign swaps centre/right values
+relative to the public enum; ordinary Long state is independent of Font/text/
+selection. Inert inspection preserves authored form fields, local layout matches
+pointer/caret geometry, and ComboBox popup alignment stays independent. Source/
+resources, global styles/fonts and all budgets are unchanged. Broader member,
+wrap/AutoSize, Boolean/RefEdit and platform cases and full M7A.4 remain open.

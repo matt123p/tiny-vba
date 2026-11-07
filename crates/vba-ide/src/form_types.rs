@@ -87,6 +87,14 @@ impl Ide {
         }
         for (enum_name, constants) in [
             (
+                "fmTextAlign",
+                &[
+                    ("fmTextAlignLeft", 1),
+                    ("fmTextAlignCenter", 2),
+                    ("fmTextAlignRight", 3),
+                ][..],
+            ),
+            (
                 "fmBorderStyle",
                 &[("fmBorderStyleNone", 0), ("fmBorderStyleSingle", 1)][..],
             ),

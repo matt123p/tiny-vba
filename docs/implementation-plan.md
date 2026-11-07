@@ -199,3 +199,8 @@ For each change, run the repository's required CI/WASM gates and affected UI/hos
 checks; update [progress](implementation-progress.md), [compatibility](compatibility-matrix.md)
 and the owning contract/ADR. The [UI scope index](ui/post-m8-roadmap.md) points
 to the remaining UI/host requirements without duplicating this plan.
+
+M7A.4 also includes selected native TextAlign (ADR 0086): native/public enum
+translation, ordinary independent control state, local text/caret geometry and
+ComboBox edit/popup separation. This does not reduce the remaining checklist or
+claim milestone completion.

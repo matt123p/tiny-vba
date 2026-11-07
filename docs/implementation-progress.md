@@ -1,5 +1,21 @@
 # Implementation progress
 
+## M7A.4 continued — native TextAlign (2026-11-07)
+
+ADR 0086 adds selected native Label/TextBox/ListBox/ComboBox TextAlign through
+ordinary typed state, published enums, existing ParagraphAlign metadata and local
+view policy. Native and public centre/right values are explicitly translated.
+Font assignment, text, selection and events stay independent. Inert field aliases
+preserve authored form members. Physical text layout and pointer/caret geometry
+agree, including UTF-16; ComboBox popup rows remain independent of edit alignment.
+No VM/protocol, global style/font, format, resource or budget change occurs.
+
+Seven model and four real GPU/input cases pass, along with existing appearance
+and Font GPU cases. Strict affected Clippy, all 34 pointer and three colour
+regressions pass. Full shared/browser/affected host acceptance is in progress. Boolean/
+RefEdit and remaining member/wrap/AutoSize/bidi/platform behavior, and the unchanged
+full M7A.4 checklist remain open. Fresh Office observations remain M8.5 NOT_RUN.
+
 ## M7A.4 continued — native list border ownership (2026-11-07)
 
 The subsequent renderer audit found an unconditional ListBox outline underneath
@@ -26,12 +42,9 @@ This is a
 correction within ADR 0084, with no new API, canonical store, VM or budget change.
 Full M7A.4 and its unchanged remaining checklist remain open.
 
-Next smallest common-property task: audit and implement applicable native
-[TextAlign](https://learn.microsoft.com/en-us/office/vba/language/reference/user-interface-help/textalign-property)
-from the already retained ParagraphAlign metadata, through ordinary typed state,
-local text layout and pointer/caret geometry. ComboBox edit-region alignment must
-remain independent of popup list alignment. This does not replace the remaining
-lifecycle, input, binding, other members, image/RefEdit and ActiveX/platform work.
+The subsequent selected TextAlign packet follows ADR 0086 above. Remaining
+lifecycle, input, binding, other members, image/RefEdit and ActiveX/platform work
+continues under the unchanged full completion checklist.
 
 ## M7A.4 continued — native appearance and member audit (2026-11-07)
 

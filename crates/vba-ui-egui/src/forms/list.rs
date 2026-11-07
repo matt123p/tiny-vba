@@ -212,10 +212,14 @@ impl ListBox<'_> {
                         egui::vec2(width, row_height),
                     )
                     .shrink2(egui::vec2(5., 0.));
-                    super::fonts::paint(
+                    super::text_align::paint(
                         ui,
-                        cell.left_center(),
-                        egui::Align2::LEFT_CENTER,
+                        cell,
+                        if self.control.kind == ControlKind::ListBox {
+                            super::text_align::read(self.ide, self.instance, self.control.id)
+                        } else {
+                            egui::Align::Min
+                        },
                         value,
                         super::fonts::read(
                             self.ide,

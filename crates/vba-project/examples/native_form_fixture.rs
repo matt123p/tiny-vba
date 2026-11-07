@@ -18,6 +18,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let window_activation = option.as_deref() == Some("--window-activation");
     let fonts = option.as_deref() == Some("--fonts");
     let appearance = option.as_deref() == Some("--appearance");
+    let text_align = option.as_deref() == Some("--text-align");
     let colors = option.as_deref() == Some("--colors");
     let nested_mouse = option.as_deref() == Some("--nested-mouse");
     let composite_mouse = option.as_deref() == Some("--composite-mouse");
@@ -60,7 +61,8 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             | "--window-activation"
             | "--colors"
             | "--fonts"
-            | "--appearance",
+            | "--appearance"
+            | "--text-align",
         ) => false,
         Some(_) => return Err("unknown fixture option".into()),
     };
@@ -92,6 +94,10 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         "Stop\r\nDebug.Print Entry.Text"
     };
     let mut text = String::from_utf8(fixture::export())?.replace("Debug.Print Entry.Text", body);
+    if text_align {
+        let code="Attribute VB_Name = \"NativeForm\"\nAttribute VB_PredeclaredId = True\nOption Explicit\nPrivate Sub UserForm_Initialize()\nDebug.Print \"alignment ready\"\nDebug.Print Heading.TextAlign,Entry.TextAlign\nHeading.Caption=\"Left / centre / right\"\nHeading.Width=168\nHeading.TextAlign=fmTextAlignLeft\nEntry.Width=168\nEntry.FontSize=12\nEntry.TextAlign=fmTextAlignCenter\nEnd Sub\nPrivate Sub Apply_Click()\nEntry.TextAlign=fmTextAlignRight\nDebug.Print VarType(Entry.TextAlign),Entry.TextAlign\nStop\nHeading.TextAlign=fmTextAlignRight\nEntry.TextAlign=fmTextAlignLeft\nDebug.Print Entry.TextAlign\nMe.Hide\nEnd Sub\n".replace('\n',"\r\n");
+        text = String::from_utf8(fixture::export())?.replace(fixture::SOURCE, &code);
+    }
     if appearance {
         let code="Attribute VB_Name = \"NativeForm\"\nAttribute VB_PredeclaredId = True\nOption Explicit\nPrivate Sub UserForm_Initialize()\nMe.BackColor=RGB(230,240,250)\nHeading.Caption=\"Native appearance\"\nHeading.Width=168\nHeading.BackStyle=0\nHeading.ForeColor=RGB(40,50,60)\nHeading.BorderStyle=0\nEntry.ForeColor=RGB(40,50,60)\nEntry.BackColor=RGB(245,225,205)\nEntry.BackStyle=1\nEntry.BorderColor=RGB(80,30,20)\nEntry.BorderStyle=1\nEntry.FontSize=12.25\nApply.BackStyle=0\nApply.ForeColor=RGB(40,50,60)\nDim rows As MSForms.ListBox\nSet rows=Me.Controls.Add(\"Forms.ListBox.1\",\"Rows\")\nrows.Left=145\nrows.Top=70\nrows.Width=110\nrows.Height=90\nrows.BackColor=RGB(31,53,79)\nrows.ForeColor=RGB(220,230,240)\nrows.SpecialEffect=0\nrows.BorderStyle=0\nrows.AddItem \"Flat list\"\nDebug.Print \"appearance ready\"\nEnd Sub\nPrivate Sub Apply_Click()\nEntry.SpecialEffect=3\nDebug.Print Entry.BorderStyle,Entry.SpecialEffect\nStop\nEntry.BackStyle=0\nDebug.Print Entry.BackStyle\nDebug.Print Entry.FontSize\nMe.Hide\nEnd Sub\n".replace('\n',"\r\n");
         text = String::from_utf8(fixture::export())?.replace(fixture::SOURCE, &code);
@@ -204,7 +210,9 @@ End Sub
     std::fs::write(dir.join("NativeForm.frm"), text)?;
     std::fs::write(
         dir.join("NativeForm.frx"),
-        if appearance {
+        if text_align {
+            fixture::alignment_companion(2)
+        } else if appearance {
             fixture::appearance_companion()
         } else if fonts {
             fixture::font_companion()

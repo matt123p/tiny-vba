@@ -15,6 +15,7 @@ mod form_appearance;
 mod form_bindings;
 mod form_colors;
 mod form_font;
+mod form_text_align;
 pub use form_font::FormFont;
 mod form_combo;
 mod form_container;

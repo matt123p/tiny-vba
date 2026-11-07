@@ -13,6 +13,7 @@ mod numeric;
 mod refedit;
 mod tabs;
 mod text;
+mod text_align;
 use vba_ide::forms::{Align, Bounds, ControlKind, DesignEdit, SameSize};
 #[derive(Clone, Copy)]
 pub(super) struct KeyboardFrame {
@@ -1787,11 +1788,8 @@ impl EditorUi {
                                     }
                                 }
                                 ControlKind::Label | ControlKind::CommandButton => {
-                                    let response = ui.put(
-                                        bounds,
-                                        egui::Button::new(accelerator::job(&caption,ide.form_instance_field(instance,Some(c.id),"Accelerator").ok(),fonts::read(ide,instance,c.id,ui,system_theme),theme.text))
-                                            .frame(c.kind == ControlKind::CommandButton),
-                                    );
+                                    let job=accelerator::job(&caption,ide.form_instance_field(instance,Some(c.id),"Accelerator").ok(),fonts::read(ide,instance,c.id,ui,system_theme),theme.text);
+                                    let response=if native && c.kind==ControlKind::Label {text_align::label(ui,bounds,job,text_align::read(ide,instance,c.id))}else{ui.put(bounds,egui::Button::new(job).frame(c.kind==ControlKind::CommandButton))};
                                     if let Some(target) =
                                         focus.iter_mut().find(|(_, control, _)| *control == c.id)
                                     {

@@ -1,6 +1,7 @@
 //! Rendering adapters translate the existing TextBox object's UTF-16 state to egui cursors.
 use super::*;
 use egui::{
+    class::HasClasses,
     text::{CCursor, CCursorRange},
     widgets::text_edit::TextEditState,
 };
@@ -41,6 +42,7 @@ pub(super) struct Geometry {
     pub origin: egui::Pos2,
     pub width: f32,
     pub font: egui::FontId,
+    pub alignment: egui::Align,
 }
 impl Geometry {
     pub(super) fn cursor(
@@ -74,12 +76,15 @@ impl Geometry {
             })
             .collect();
         let galley = ctx.fonts_mut(|fonts| {
-            fonts.layout(
+            let mut job = egui::text::LayoutJob::simple(
                 display,
                 self.font.clone(),
                 egui::Color32::WHITE,
                 if wrap { self.width } else { f32::INFINITY },
-            )
+            );
+            job.halign = self.alignment;
+            job.halign_min_is_start = false;
+            fonts.layout_job(job)
         });
         let mut point = pos - self.origin;
         // Single-line editors select horizontally even when capture leaves the
@@ -201,6 +206,7 @@ impl TextBox<'_> {
         let font_style =
             super::fonts::read(self.ide, self.instance, self.control.id, ui, self.theme);
         let font = font_style.id.clone();
+        let alignment = super::text_align::read(self.ide, self.instance, self.control.id);
         let mut layouter = |ui: &egui::Ui, buffer: &dyn egui::TextBuffer, width: f32| {
             let display = buffer
                 .as_str()
@@ -221,6 +227,8 @@ impl TextBox<'_> {
                     if wrap { width } else { f32::INFINITY },
                 );
                 super::fonts::decorate(&mut job, &font_style);
+                job.halign = alignment;
+                job.halign_min_is_start = false;
                 fonts.layout_job(job)
             })
         };
@@ -232,12 +240,21 @@ impl TextBox<'_> {
         } else {
             TextEdit::singleline(buffer)
         };
+        let mut classes = builder.classes().clone();
+        classes.add_class_if(TextEdit::CLASS_READ_ONLY, locked);
+        let mut align = ui
+            .widget_style::<egui::widget_style::TextEditStyle>(self.widget, &classes)
+            .atom_layout
+            .align2
+            .unwrap_or_else(|| ui.layout().align2());
+        align.set_x(alignment);
         let mut child = ui.new_child(egui::UiBuilder::new().max_rect(self.bounds));
         child.set_clip_rect(ui.clip_rect().intersect(self.bounds));
         let output = builder
             .id(self.widget)
             .min_size(self.bounds.size())
             .desired_width(self.bounds.width())
+            .align(align)
             .char_limit(maximum)
             .password(mask.is_some())
             .layouter(&mut layouter)
@@ -283,9 +300,10 @@ impl TextBox<'_> {
         }
         Some(Geometry {
             widget: self.widget,
-            origin: output.galley_pos,
+            origin: output.galley_pos - egui::vec2(output.galley.rect.left(), 0.),
             width: output.galley.job.wrap.max_width,
             font,
+            alignment,
         })
     }
 }

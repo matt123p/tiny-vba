@@ -51,6 +51,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let metadata = std::env::args().nth(2).is_some_and(|o| o == "--metadata");
     let fonts = std::env::args().nth(2).is_some_and(|o| o == "--fonts");
     let appearance = std::env::args().nth(2).is_some_and(|o| o == "--appearance");
+    let text_align = std::env::args().nth(2).is_some_and(|o| o == "--text-align");
     let colors = std::env::args().nth(2).is_some_and(|o| o == "--colors");
     for (name, theme, width, scale) in [
         ("light", Theme::light(), 1400., 1.),
@@ -66,7 +67,9 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             1252,
             &[NativeFormResource {
                 name: "NativeForm.frx".into(),
-                bytes: if appearance {
+                bytes: if text_align {
+                    fixture::alignment_companion(2)
+                } else if appearance {
                     fixture::appearance_companion()
                 } else if refedit {
                     fixture::refedit_companion()
@@ -91,7 +94,9 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                 },
             }],
         )?;
-        let main = if appearance {
+        let main = if text_align {
+            "Sub Main()\nDim a As New NativeForm,b As New NativeForm,rows As MSForms.ListBox,choices As MSForms.ComboBox\na.Caption=\"Left and centre\"\nb.Caption=\"Right and popup rows\"\na.Heading.Caption=\"Left aligned caption\"\na.Heading.Width=168\na.Heading.TextAlign=1\na.Entry.Text=\"Centred text\"\na.Entry.Width=168\na.Entry.FontSize=12\na.Entry.TextAlign=2\nb.Heading.Caption=\"Right aligned caption\"\nb.Heading.Width=168\nb.Heading.TextAlign=3\nb.Entry.Text=\"Right aligned text\"\nb.Entry.Width=168\nb.Entry.FontSize=12\nb.Entry.TextAlign=3\nSet rows=a.Controls.Add(\"Forms.ListBox.1\",\"Rows\")\nrows.Left=16\nrows.Top=110\nrows.Width=250\nrows.Height=60\nrows.ColumnCount=2\nrows.FontSize=12\nrows.AddItem \"First column\"\nrows.List(0,1)=\"Second column\"\nrows.TextAlign=2\nSet choices=b.Controls.Add(\"Forms.ComboBox.1\",\"Choices\")\nchoices.Left=16\nchoices.Top=125\nchoices.Width=250\nchoices.Style=2\nchoices.FontSize=12\nchoices.AddItem \"Right edit value\"\nchoices.AddItem \"Left popup row\"\nchoices.ListIndex=0\nchoices.TextAlign=3\na.Show 0\nb.Show 0\nchoices.SetFocus\nchoices.DropDown\nEnd Sub"
+        } else if appearance {
             "Sub Main()\nDim a As New NativeForm,b As New NativeForm\na.Caption=\"Native borders and transparency\"\nb.Caption=\"Native system-colour effects\"\na.BackColor=RGB(230,240,250)\na.Heading.Caption=\"Transparent label\"\na.Heading.Width=168\na.Heading.BackStyle=0\na.Heading.ForeColor=RGB(40,50,60)\na.Heading.BorderStyle=0\na.Entry.BackStyle=1\na.Entry.BackColor=RGB(250,230,200)\na.Entry.ForeColor=RGB(40,50,60)\na.Entry.BorderColor=RGB(80,30,20)\na.Entry.BorderStyle=1\na.Entry.FontSize=12.25\na.Entry.FontItalic=True\na.Apply.BackStyle=0\na.Apply.ForeColor=RGB(40,50,60)\nb.BorderStyle=0\nb.Heading.Width=168\nb.Heading.Caption=\"Etched and raised edges\"\nb.Heading.SpecialEffect=1\nb.Heading.BackStyle=1\nb.Entry.BackStyle=1\nb.Entry.SpecialEffect=3\nb.Entry.FontSize=12.25\nDim flat As MSForms.ListBox,edged As MSForms.ListBox\nSet flat=a.Controls.Add(\"Forms.ListBox.1\",\"FlatRows\")\nflat.Left=145\nflat.Top=70\nflat.Width=110\nflat.Height=90\nflat.BackColor=RGB(31,53,79)\nflat.ForeColor=RGB(220,230,240)\nflat.SpecialEffect=0\nflat.BorderStyle=0\nflat.AddItem \"Flat list\"\nflat.AddItem \"No outside outline\"\nSet edged=b.Controls.Add(\"Forms.ListBox.1\",\"EdgedRows\")\nedged.Left=145\nedged.Top=70\nedged.Width=110\nedged.Height=90\nedged.SpecialEffect=2\nedged.AddItem \"Sunken list\"\na.Show 0\nb.Show 0\nEnd Sub"
         } else if fonts {
             "Sub Main()\nDim a As New NativeForm,b As New NativeForm\na.Caption=\"Native font attributes\"\nb.Caption=\"Independent default font\"\na.Entry.Height=48\na.Apply.Top=120\na.Entry.EnterFieldBehavior=1\na.Entry.Font.Size=18.5\na.Entry.Font.Italic=True\na.Entry.Font.Underline=True\na.Entry.Font.Strikethrough=True\na.Apply.Font.Size=14\nSet a.Heading.Font=a.Font\na.Heading.Font.Size=12\na.Heading.Font.Underline=True\na.Show 0\nb.Show 0\nEnd Sub"
@@ -191,7 +196,9 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                 return Err("expected native tooltip".into());
             }
         }
-        let prefix = if appearance {
+        let prefix = if text_align {
+            "m7a4-native-text-align"
+        } else if appearance {
             "m7a4-native-appearance"
         } else if fonts {
             "m7a4-native-fonts"

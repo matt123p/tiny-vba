@@ -107,10 +107,36 @@ fn streams_with_controls(
 pub fn companion() -> Vec<u8> {
     companion_with_properties(0, false, false)
 }
+/// Authored paragraph-only TextProps; all actual font attributes use file defaults.
+pub fn alignment_companion(paragraph: u8) -> Vec<u8> {
+    let text = record(0x200, &[0x40, 0, 0, 0, paragraph, 0, 0, 0]);
+    let controls = controls()
+        .into_iter()
+        .map(|mut control| {
+            control.truncate(control.len() - 8);
+            control.extend(&text);
+            control
+        })
+        .collect();
+    let mut file = cfb::CompoundFile::create(Cursor::new(Vec::new())).unwrap();
+    for (name, bytes) in streams_with_controls(controls, false, false) {
+        file.create_stream(format!("/{name}"))
+            .unwrap()
+            .write_all(&bytes)
+            .unwrap();
+    }
+    let bytes = file.into_inner().into_inner();
+    let mut out = (bytes.len() as u32).to_le_bytes().to_vec();
+    out.extend(bytes);
+    out
+}
 /// Authored TextProps and StdFont with the same fractional point size and effects.
 pub fn font_companion() -> Vec<u8> {
+    font_companion_with_paragraph_align(2)
+}
+pub fn font_companion_with_paragraph_align(paragraph_align: u8) -> Vec<u8> {
     let mut body = u32s(&[0xf7, 0x80000000 | 14, 15, 225]);
-    body.extend([128, 0x22, 2, 0]);
+    body.extend([128, 0x22, paragraph_align, 0]);
     body.extend(700u16.to_le_bytes());
     body.extend([0, 0]);
     body.extend(string("Authored face!"));

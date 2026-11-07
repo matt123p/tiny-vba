@@ -947,6 +947,14 @@ fn compiled_form(
         }
         source.push_str(&setup);
         if let Some(metadata) = metadata {
+            source.push_str(&crate::form_text_align::initial(
+                &temp,
+                c.kind,
+                metadata
+                    .font
+                    .as_ref()
+                    .map_or(1, |font| font.paragraph_align),
+            ));
             source.push_str(&crate::form_appearance::initialize(
                 &temp,
                 Some(c.kind),
@@ -2238,6 +2246,12 @@ impl Ide {
                 return Err(error("control kind"));
             };
             let kind = crate::form_dynamic::kind(code)?;
+            if self.native_forms.contains_key(&instance.source)
+                && field.eq_ignore_ascii_case("TextAlign")
+                && crate::form_text_align::supported(kind)
+            {
+                return session.read_instance_field(object, "VbaTextAlign");
+            }
             let rows = field.eq_ignore_ascii_case("RowSource");
             if field.eq_ignore_ascii_case("ControlSource") && crate::form_bindings::supported(kind)
                 || rows && matches!(kind, ControlKind::ListBox | ControlKind::ComboBox)
@@ -2302,10 +2316,14 @@ impl Ide {
             "picture" => "VbaPicture",
             "picturesizemode" => "VbaPictureSizeMode",
             "picturealignment" => "VbaPictureAlignment",
-            "autosize" => "VbaAutoSize",
+            "autosize" if control.is_some() => "VbaAutoSize",
             "borderstyle" if self.native_forms.contains_key(&instance.source) => "VbaBorderStyle",
             "bordercolor" if self.native_forms.contains_key(&instance.source) => "VbaBorderColor",
-            "backstyle" if self.native_forms.contains_key(&instance.source) => "VbaBackStyle",
+            "backstyle"
+                if control.is_some() && self.native_forms.contains_key(&instance.source) =>
+            {
+                "VbaBackStyle"
+            }
             "specialeffect" if self.native_forms.contains_key(&instance.source) => {
                 "VbaSpecialEffect"
             }

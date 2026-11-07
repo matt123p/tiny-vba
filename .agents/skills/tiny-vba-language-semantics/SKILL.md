@@ -375,3 +375,11 @@ MultiPage-owned defaults, canonical objects, file versus insertion defaults, roo
 lazy loading, exact types/errors and inert inspection/resources. Do not add disabled
 or non-applicable members or raise any budget. Full M7A.4/platform acceptance and
 fresh Office observations remain open.
+
+ADR 0086 adds selected Label/TextBox/ListBox/ComboBox TextAlign. Translate native
+PARAFORMAT centre/right values to the different public fmTextAlign values; keep
+ordinary Long state independent of Font, text, selection and events. Queries stay
+inert and preserve authored form fields. Local text and caret geometry must agree;
+ComboBox popup rows do not inherit edit alignment. No new VM/protocol/format,
+canonical store or budget is added. Other applicability, wrap/AutoSize/platform
+cases and full M7A.4 remain open; fresh Office observations remain M8.5 NOT_RUN.

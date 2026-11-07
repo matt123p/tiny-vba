@@ -86,10 +86,10 @@ impl ComboBox<'_> {
                 egui::StrokeKind::Inside,
             );
             let value = self.field("VbaText").map(control_text).unwrap_or_default();
-            super::fonts::paint(
+            super::text_align::paint(
                 ui,
-                edit.left_center() + egui::vec2(4., 0.),
-                egui::Align2::LEFT_CENTER,
+                edit.shrink2(egui::vec2(4., 0.)),
+                super::text_align::read(self.ide, self.instance, self.control.id),
                 value,
                 super::fonts::read(self.ide, self.instance, self.control.id, ui, self.theme),
                 self.theme.text,
