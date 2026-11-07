@@ -152,6 +152,9 @@ pub(super) fn parse(input: &str, export: bool) -> Result<Header> {
             "tag",
             "backcolor",
             "forecolor",
+            "bordercolor",
+            "borderstyle",
+            "specialeffect",
         ]
         .contains(&key.as_str())
         {
@@ -168,7 +171,7 @@ pub(super) fn parse(input: &str, export: bool) -> Result<Header> {
                 return Err(unsupported("external blob reference in embedded VBFrame"));
             }
             "oleobjectblob" => {}
-            "backcolor" | "forecolor" => {
+            "backcolor" | "forecolor" | "bordercolor" => {
                 color_value(value)?;
             }
             "enabled" | "showmodal" => {
@@ -364,6 +367,22 @@ pub fn decode_export(
             source: String::new(),
             attributes: vec![],
             design: Design {
+                appearance: super::Appearance {
+                    border_color: color(&header, "bordercolor")?.unwrap_or(0x80000012u32 as i32),
+                    border_style: header
+                        .properties
+                        .get("borderstyle")
+                        .map(|s| s.parse::<u8>().map_err(|_| corrupt("frame BorderStyle")))
+                        .transpose()?
+                        .unwrap_or(0),
+                    special_effect: header
+                        .properties
+                        .get("specialeffect")
+                        .map(|s| s.parse::<u8>().map_err(|_| corrupt("frame SpecialEffect")))
+                        .transpose()?
+                        .unwrap_or(0),
+                    back_style: 1,
+                },
                 font: header.font.clone(),
                 colors: super::Colors {
                     back: color(&header, "backcolor")?.unwrap_or(super::Colors::default().back),
@@ -389,6 +408,9 @@ pub fn decode_export(
             diagnostics: vec![],
         }
     };
+    if !result.design.appearance.valid(None) {
+        return Err(corrupt("invalid frame appearance"));
+    }
     result.format = Format::Export;
     result.code_page = code_page;
     result.source = source;

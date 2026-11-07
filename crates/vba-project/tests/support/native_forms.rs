@@ -1111,3 +1111,47 @@ pub fn accelerator_companion() -> Vec<u8> {
     result.extend(bytes);
     result
 }
+/// Authored native borders, transparent backgrounds and retained OLE colours.
+pub fn appearance_companion() -> Vec<u8> {
+    let mut label = u32s(&[
+        (1 << 2) | (1 << 3) | (1 << 5) | (1 << 7) | (1 << 8) | (1 << 9),
+        0x00800013,
+        0x8000000e,
+        0x001e140a,
+    ]);
+    label.extend(1u16.to_le_bytes());
+    label.extend(0u16.to_le_bytes());
+    label.extend(string("Authored label"));
+    label.extend(u32s(&[2540, 635]));
+    let mut label = record(0x200, &label);
+    label.extend(record(0x200, &[0; 4]));
+    let mut text = u32s(&[
+        0x86400111, 0, 0x2c800813, 1, 0x80000007, 0x00665544, 0, 2540, 635,
+    ]);
+    text.extend(string("initial"));
+    let mut text = record(0x200, &text);
+    text.extend(record(0x200, &[0; 4]));
+    let button = controls().remove(2);
+    let mut streams = streams_with_controls(vec![label, text, button], false, false);
+    let f = &mut streams[0].1;
+    let n = u16::from_le_bytes(f[2..4].try_into().unwrap()) as usize;
+    let mask = u32::from_le_bytes(f[4..8].try_into().unwrap());
+    let mut body = u32s(&[mask | (1 << 7) | (1 << 17) | (1 << 18)]);
+    body.extend([1, 0, 0, 0]);
+    body.extend(0x00332211u32.to_le_bytes());
+    body.extend_from_slice(&f[8..n + 4]);
+    let mut encoded = record(0x400, &body);
+    encoded.extend_from_slice(&f[n + 4..]);
+    *f = encoded;
+    let mut file = cfb::CompoundFile::create(Cursor::new(Vec::new())).unwrap();
+    for (name, bytes) in streams {
+        file.create_stream(format!("/{name}"))
+            .unwrap()
+            .write_all(&bytes)
+            .unwrap();
+    }
+    let bytes = file.into_inner().into_inner();
+    let mut out = (bytes.len() as u32).to_le_bytes().to_vec();
+    out.extend(bytes);
+    out
+}

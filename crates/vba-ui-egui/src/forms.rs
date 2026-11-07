@@ -1,6 +1,7 @@
 //! Reusable form designer and real runtime controls. All edits/events are explicit IDE commands.
 use super::*;
 mod accelerator;
+mod appearance;
 mod colors;
 mod combo;
 mod fonts;
@@ -1262,6 +1263,27 @@ impl EditorUi {
                                     part: mouse::Part::Body,
                                 });
                             }
+                            let control_theme = if native {
+                                colors::theme(ide, instance, Some(c.id), system_theme)
+                            } else {
+                                system_theme
+                            };
+                            let decoration = appearance::read(
+                                ide,
+                                instance,
+                                Some(c.id),
+                                Some(c.kind),
+                                system_theme,
+                            );
+                            if native {
+                                window_theme(ui, control_theme);
+                                let font = fonts::read(ide, instance, c.id, ui, system_theme);
+                                fonts::apply(ui, &font);
+                                decoration.configure(ui, c.kind, control_theme, system_theme);
+                                if decoration.opaque {
+                                    ui.painter().rect_filled(bounds, 0., control_theme.editor);
+                                }
+                            }
                             let regions = refedit::RefEdit {
                                 text: text::TextBox {
                                     ide,
@@ -1270,16 +1292,15 @@ impl EditorUi {
                                     bounds,
                                     widget,
                                     enabled: true,
-                                    theme: if native {
-                                        colors::theme(ide, instance, Some(c.id), system_theme)
-                                    } else {
-                                        system_theme
-                                    },
+                                    theme: control_theme,
                                 },
                                 picker: true,
                             }
                             .show(ui, commands);
                             self.form_mouse.regions(instance, c.id, regions);
+                            if native {
+                                decoration.paint(ui, bounds, Some(c.kind));
+                            }
                             if idle
                                 && ui.input_mut(|i| {
                                     i.consume_key(egui::Modifiers::NONE, egui::Key::Escape)
@@ -1641,23 +1662,20 @@ impl EditorUi {
                         {
                             let mut control_ui=ui.new_child(control_scope.max_rect(bounds));
                             let theme = if native { colors::theme(ide,instance,Some(c.id),system_theme) } else {system_theme};
+                            let appearance=appearance::read(ide,instance,Some(c.id),Some(c.kind),system_theme);
                             if native {
+                                control_ui.set_clip_rect(control_ui.clip_rect().intersect(bounds));
                                 window_theme(&mut control_ui,theme);
                                 let font=fonts::read(ide,instance,c.id,&control_ui,system_theme);
                                 fonts::apply(&mut control_ui,&font);
-                                let widgets = &mut control_ui.visuals_mut().widgets;
-                                for visual in [&mut widgets.inactive, &mut widgets.hovered, &mut widgets.active] {
-                                    visual.bg_fill=theme.editor;
-                                    visual.weak_bg_fill=theme.editor;
-                                    visual.fg_stroke.color=theme.text;
-                                }
-                                control_ui.painter().rect_filled(bounds,0.,theme.editor);
+                                appearance.configure(&mut control_ui,c.kind,theme,system_theme);
+                                if appearance.opaque {control_ui.painter().rect_filled(bounds,0.,theme.editor);}
                             }
                             control_ui.add_enabled_ui(enabled, |ui| match c.kind {
                                 ControlKind::Frame | ControlKind::Page=> {
                                     let response=ui.interact(bounds,widget_id,if c.kind==ControlKind::Page {egui::Sense::hover()}else{egui::Sense::click()});
                                     ui.painter().rect_filled(bounds,2.,theme.chrome);
-                                    ui.painter().rect_stroke(bounds.shrink(1.),2.,egui::Stroke::new(1.,theme.border),egui::StrokeKind::Inside);
+                                    if !native || c.kind==ControlKind::Page {ui.painter().rect_stroke(bounds.shrink(1.),2.,egui::Stroke::new(1.,theme.border),egui::StrokeKind::Inside);}
                                     if c.kind==ControlKind::Frame {fonts::paint(ui,bounds.left_top()+egui::vec2(6.,3.),egui::Align2::LEFT_TOP,caption.clone(),fonts::read(ide,instance,c.id,ui,system_theme),theme.text,bounds.intersect(ui.clip_rect()));}
                                     response.widget_info(||egui::WidgetInfo::labeled(egui::accesskit::Role::Group,enabled,&c.name));
                                     if response.clicked() {commands.push(Command::Form(FormCommand::InstanceEvent(instance,Some(c.id),None)));}
@@ -1754,6 +1772,7 @@ impl EditorUi {
                                             }
                                         })
                                         .inner;
+                                    if native {appearance.boolean(ui,response.rect,c.kind);}
                                     if let Some(target) =
                                         focus.iter_mut().find(|(_, control, _)| *control == c.id)
                                     {
@@ -1797,6 +1816,7 @@ impl EditorUi {
                                     }
                                 }
                             });
+                            if native {appearance.paint(&control_ui,bounds,Some(c.kind));}
                         }
                         if native && !matches!(c.kind,ControlKind::TabStrip|ControlKind::MultiPage) && enabled && ui.rect_contains_pointer(bounds)
                             && !ui.input(|i| i.pointer.any_down())
@@ -1806,6 +1826,7 @@ impl EditorUi {
                         }
                         ui.set_clip_rect(previous_clip);
                     }
+                    if native {appearance::read(ide,instance,None,None,system_theme).paint(ui,rect,None);}
                     if native && idle && keyboard_owner == Some(instance) {
                         let focused = ui.ctx().memory(|m| m.focused());
                         let active = ide.form_instance_field(instance, None, "VbaActiveControl").ok();

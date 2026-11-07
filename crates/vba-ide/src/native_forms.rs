@@ -115,6 +115,15 @@ impl Ide {
             return Err(error("native form metadata outside supported limits"));
         }
         let point = |n: i32| n as f32 * (72.0 / 2540.0);
+        if !native.design.appearance.valid(None)
+            || native
+                .design
+                .controls
+                .iter()
+                .any(|c| !c.appearance.valid(Some(c.kind)))
+        {
+            return Err(error("invalid native appearance metadata"));
+        }
         if native.design.font.as_ref().is_some_and(|f| !f.valid())
             || native
                 .design
@@ -149,11 +158,7 @@ impl Ide {
                 return Err(error("Image metadata/kind mismatch"));
             }
             if let Some(image) = &c.image {
-                if ![0, 1, 3].contains(&image.size_mode)
-                    || image.alignment > 4
-                    || image.border_style > 1
-                    || ![0, 1, 2, 3, 6].contains(&image.special_effect)
-                {
+                if ![0, 1, 3].contains(&image.size_mode) || image.alignment > 4 {
                     return Err(error("Image metadata"));
                 }
                 if let Some(p) = &image.picture {

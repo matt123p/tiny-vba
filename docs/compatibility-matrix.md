@@ -327,3 +327,11 @@ typed ordinary setters preserve explicit reference identity, old aliases and roo
 lazy reload; new controls still copy independent defaults. No VM, permission or
 budget change is needed. Nothing/external/other-assignment and ambient/platform
 font cases and the full remaining M7A.4 checklist stay open.
+
+[ADR 0083](decisions/0083-page-appearance-ownership.md) corrects Page appearance
+ownership: no Page Font/BackColor/ForeColor APIs; MultiPage owns defaults/painting.
+[ADR 0084](decisions/0084-native-control-appearance.md) retains native border/effect/
+background data and adds applicable typed properties, local effects/transparency
+and fixed-bound clipping. [ADR 0085](decisions/0085-native-font-attribute-aliases.md)
+adds published Font aliases forwarding to canonical objects. Full member, platform
+and M7A.4 acceptance remains open; no VM/permission/budget increase is made.

@@ -69,8 +69,20 @@ impl ComboBox<'_> {
             ui.painter().rect(
                 edit,
                 0.,
-                self.theme.editor,
-                egui::Stroke::new(1., self.theme.text),
+                if super::appearance::read(
+                    self.ide,
+                    self.instance,
+                    Some(self.control.id),
+                    Some(self.control.kind),
+                    self.theme,
+                )
+                .opaque
+                {
+                    self.theme.editor
+                } else {
+                    egui::Color32::TRANSPARENT
+                },
+                egui::Stroke::NONE,
                 egui::StrokeKind::Inside,
             );
             let value = self.field("VbaText").map(control_text).unwrap_or_default();

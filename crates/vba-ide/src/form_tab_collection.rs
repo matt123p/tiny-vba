@@ -175,7 +175,6 @@ Set member=New VbaFormPage
 member.VbaId=VbaNextPageId()
 Dim owner As Object,model As Object
 Set owner=VbaState.VbaOwner()
-VbaCopyFont member.VbaFont,owner.Font
 If Count>0 Then Set model=Me.Item(0)
 member.VbaConfigureRuntime owner,model
 Set Add=VbaStorage.VbaCreate(member,"Page",name,caption,index)

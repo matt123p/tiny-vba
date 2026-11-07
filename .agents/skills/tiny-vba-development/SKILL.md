@@ -389,3 +389,11 @@ identity, old aliases, root lazy reload and independent copied container default
 inspection stays inert and no budget/VM/permission change is made. Font-specific
 Nothing/external/other-assignment and ambient/platform comparisons and full M7A.4
 remain open; reference-derived tests are not fresh Office observations.
+
+ADRs 0083–0085 correct Page appearance ownership (no Font/BackColor/ForeColor),
+retain native borders/effects/backgrounds, add typed ordinary property interactions
+and published Font aliases, and paint local clipped edges/transparency. Preserve
+MultiPage-owned defaults, canonical objects, file versus insertion defaults, root
+lazy loading, exact types/errors and inert inspection/resources. Do not add disabled
+or non-applicable members or raise any budget. Full M7A.4/platform acceptance and
+fresh Office observations remain open.

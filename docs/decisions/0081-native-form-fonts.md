@@ -93,3 +93,7 @@ References: [Forms Font](https://learn.microsoft.com/en-us/office/vba/language/r
 [StdFont](https://learn.microsoft.com/en-us/openspecs/office_file_formats/ms-oforms/e219ce61-420f-403b-8216-63890c935aa1),
 [FontHeight](https://learn.microsoft.com/en-us/openspecs/office_file_formats/ms-oforms/012f7562-a80c-4b5b-96c0-8b9c36319b34),
 [FontCharSet](https://learn.microsoft.com/en-us/openspecs/office_file_formats/ms-oforms/6771b963-fd57-45a6-8c71-e124da4d460c).
+
+Correction: [ADR 0083](0083-page-appearance-ownership.md) removes the earlier
+non-Office Page Font/BackColor/ForeColor exposure. Page children and client painting
+use the owning MultiPage; the Font-capable control count is twelve, excluding Page.

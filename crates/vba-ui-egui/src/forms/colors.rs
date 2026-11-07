@@ -25,6 +25,24 @@ pub(super) fn resolve(value: i32, theme: Theme) -> Option<egui::Color32> {
     }
 }
 fn field(ide: &Ide, owner: vba_ide::FormInstance, control: Option<u32>, name: &str) -> Option<i32> {
+    // A Page has no colour properties. Its client surface belongs to MultiPage.
+    // Read the existing parent key; never call the executable Parent getter.
+    let control = if control.is_some()
+        && ide.form_instance_field(owner, control, "VbaKind").ok()
+            == Some(vba_ide::Value::Integer(14))
+    {
+        match ide
+            .form_instance_field(owner, control, "VbaParentKey")
+            .ok()?
+        {
+            vba_ide::Value::Long(parent) if parent != 0 => {
+                Some(u32::from_ne_bytes(parent.to_ne_bytes()))
+            }
+            _ => return None,
+        }
+    } else {
+        control
+    };
     match ide.form_instance_field(owner, control, name).ok()? {
         vba_ide::Value::Long(value) => Some(value),
         _ => None,
@@ -56,7 +74,27 @@ pub(super) fn unresolved(
     control: Option<u32>,
     theme: Theme,
 ) -> bool {
-    ["BackColor", "ForeColor"].into_iter().any(|name| {
-        field(ide, owner, control, name).is_some_and(|value| resolve(value, theme).is_none())
-    })
+    ["BackColor", "ForeColor", "BorderColor"]
+        .into_iter()
+        .any(|name| {
+            if name == "BackColor"
+                && ide.form_instance_field(owner, control, "BackStyle").ok()
+                    == Some(vba_ide::Value::Long(0))
+            {
+                return false;
+            }
+            if name == "BorderColor"
+                && (ide.form_instance_field(owner, control, "VbaKind").ok()
+                    == Some(vba_ide::Value::Integer(11))
+                    || ide.form_instance_field(owner, control, "BorderStyle").ok()
+                        != Some(vba_ide::Value::Long(1))
+                    || ide
+                        .form_instance_field(owner, control, "SpecialEffect")
+                        .ok()
+                        != Some(vba_ide::Value::Long(0)))
+            {
+                return false;
+            }
+            field(ide, owner, control, name).is_some_and(|value| resolve(value, theme).is_none())
+        })
 }

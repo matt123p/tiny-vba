@@ -1,5 +1,7 @@
 //! Inert native Office UserForm data. No filesystem, control activation or executable cache.
+mod appearance;
 mod binary;
+pub use appearance::Appearance;
 mod fonts;
 mod frame;
 use crate::{Attribute, Limits, Metered, Result, budget, container_error, read_stream};
@@ -83,6 +85,7 @@ pub fn valid_color(value: i32) -> bool {
 /// Coordinates are original signed HIMETRIC units, not pixels or points.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Control {
+    pub appearance: Appearance,
     pub font: Option<Font>,
     pub colors: Colors,
     pub id: u32,
@@ -193,6 +196,7 @@ impl Default for TextBehavior {
 }
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Design {
+    pub appearance: Appearance,
     pub font: Option<Font>,
     pub colors: Colors,
     pub caption: String,
@@ -337,6 +341,4 @@ pub struct ImageBehavior {
     pub alignment: u8,
     pub tiling: bool,
     pub auto_size: bool,
-    pub border_style: u8,
-    pub special_effect: u8,
 }

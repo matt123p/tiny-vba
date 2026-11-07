@@ -181,15 +181,41 @@ fn container(
     if flags & !0xc004 != 0 || depth == 0 && flags & 4 == 0 {
         return Err(unsupported("disabled or unknown form flags"));
     }
-    field(&mut b, m, 7, 1, 0)?;
+    let mut appearance = super::Appearance {
+        border_style: field(&mut b, m, 7, 1, 0)? as u8,
+        ..Default::default()
+    };
     field(&mut b, m, 8, 1, 0)?;
     if field(&mut b, m, 9, 1, 0)? != 0 {
         return Err(unsupported("scrolling UserForm"));
     }
     field(&mut b, m, 13, 4, 0)?;
     field(&mut b, m, 16, 1, 0)?;
-    field(&mut b, m, 17, 1, 0)?;
-    field(&mut b, m, 18, 4, 0)?;
+    appearance.special_effect = field(&mut b, m, 17, 1, 0)? as u8;
+    appearance.border_color = field(&mut b, m, 18, 4, 0x80000012)? as i32;
+    for (name, bit, target) in [
+        ("borderstyle", 7, &mut appearance.border_style),
+        ("specialeffect", 17, &mut appearance.special_effect),
+    ] {
+        if let Some(value) = header.properties.get(name) {
+            let value = value
+                .parse::<u8>()
+                .map_err(|_| corrupt("frame appearance"))?;
+            if m & (1 << bit) != 0 && *target != value {
+                return Err(corrupt("conflicting native frame appearance"));
+            }
+            *target = value;
+        }
+    }
+    if let Some(color) = frame::color(header, "bordercolor")? {
+        if m & (1 << 18) != 0 && appearance.border_color != color {
+            return Err(corrupt("conflicting native BorderColor"));
+        }
+        appearance.border_color = color;
+    }
+    if !appearance.valid(role) {
+        return Err(corrupt("native container appearance"));
+    }
     let caption = field(&mut b, m, 19, 4, 0)?;
     let has_font = field(&mut b, m, 20, 2, 0)?;
     if m & (1 << 20) != 0 && has_font != 0xffff {
@@ -326,6 +352,7 @@ fn container(
             let frame_id = site.id;
             controls.push(Control {
                 font: child.design.font,
+                appearance: child.design.appearance,
                 colors: child.design.colors,
                 accelerator: String::new(),
                 id: site.id,
@@ -422,7 +449,7 @@ fn container(
     {
         return Err(corrupt("invalid native OLE_COLOR"));
     }
-    Ok(NativeForm { format: Format::Embedded, name: header.name.clone(), code_page: 1252, source: String::new(), attributes: vec![], design: Design { font, colors, caption, enabled: flags&4!=0, tag: frame::metadata(header)?.0, help_context_id: frame::metadata(header)?.1, width,height,controls }, resources: vec![], diagnostics: vec!["Native resources retained; fonts, decoration and window placement remain partial. Palette-indexed colours require the embedding's colour resolver; native RGB/system colours are rendered. Full Office presentation/lifecycle parity is tracked separately in M7A.4.".into()] })
+    Ok(NativeForm { format: Format::Embedded, name: header.name.clone(), code_page: 1252, source: String::new(), attributes: vec![], design: Design { appearance, font, colors, caption, enabled: flags&4!=0, tag: frame::metadata(header)?.0, help_context_id: frame::metadata(header)?.1, width,height,controls }, resources: vec![], diagnostics: vec!["Native resources retained; fonts, decoration and window placement remain partial. Palette-indexed colours require the embedding's colour resolver; native RGB/system colours are rendered. Full Office presentation/lifecycle parity is tracked separately in M7A.4.".into()] })
 }
 struct Site {
     id: u32,
@@ -566,6 +593,7 @@ fn control(bytes: &[u8], site: Site) -> Result<Control> {
     let accelerator;
     let mut text_behavior = super::TextBehavior::default();
     let mut colors = super::Colors::for_kind(site.kind);
+    let mut appearance = super::Appearance::for_kind(Some(site.kind));
     let (caption, text, width, height, enabled) = if matches!(
         site.kind,
         Kind::TextBox
@@ -615,6 +643,7 @@ fn control(bytes: &[u8], site: Site) -> Result<Control> {
         let m = u64::from(lo);
         let flags = field(&mut b, m, 0, 4, 0x2c80_081b)?;
         locked = flags & 4 != 0;
+        appearance.back_style = u8::from(flags & 8 != 0);
         let text_flags = if textbox {
             0x88f0_4000
         } else if combobox {
@@ -622,7 +651,7 @@ fn control(bytes: &[u8], site: Site) -> Result<Control> {
         } else {
             0
         };
-        if flags & !(6 | text_flags) != 0x2c80_0819 & !text_flags {
+        if flags & !(14 | text_flags) != 0x2c80_0819 & !(8 | text_flags) {
             return Err(unsupported("TextBox behavior flags"));
         }
         if textbox || combobox {
@@ -639,7 +668,7 @@ fn control(bytes: &[u8], site: Site) -> Result<Control> {
         colors.fore = field(&mut b, m, 2, 4, colors.fore as u32)? as i32;
         max_length = i32::try_from(field(&mut b, m, 3, 4, 0)?)
             .map_err(|_| unsupported("TextBox MaxLength exceeds Long"))?;
-        field(&mut b, m, 4, 1, 0)?;
+        appearance.border_style = field(&mut b, m, 4, 1, 0)? as u8;
         let scroll = field(&mut b, m, 5, 1, 0)?;
         let display = field(&mut b, m, 6, 1, 1)?;
         let expected = match site.kind {
@@ -718,8 +747,16 @@ fn control(bytes: &[u8], site: Site) -> Result<Control> {
         }
         let value = field(&mut b, m, 22, 4, 0)?;
         let caption = field(&mut b, m, 23, 4, 0)?;
-        field(&mut b, m, 25, 4, 0)?;
-        field(&mut b, m, 26, 4, 0)?;
+        appearance.border_color = field(&mut b, m, 25, 4, 0x80000006)? as i32;
+        appearance.special_effect = u8::try_from(field(&mut b, m, 26, 4, 2)?)
+            .map_err(|_| corrupt("native SpecialEffect"))?;
+        if matches!(
+            site.kind,
+            Kind::CheckBox | Kind::OptionButton | Kind::ToggleButton
+        ) && m & ((1 << 4) | (1 << 25)) != 0
+        {
+            return Err(corrupt("inapplicable native border property"));
+        }
         accelerator = accelerator_character(field(&mut b, m, 29, 2, 0)?)?;
         let group = if high & 1 != 0 {
             align(&mut b, 4)?;
@@ -754,18 +791,21 @@ fn control(bytes: &[u8], site: Site) -> Result<Control> {
             0x1b
         };
         let flags = field(&mut b, m, 2, 4, default)?;
-        if flags & !2 != default & !2 {
+        if flags & !10 != default & !10 {
             return Err(unsupported("native control behavior flags"));
         }
+        appearance.back_style = u8::from(flags & 8 != 0);
         let caption = field(&mut b, m, 3, 4, 0)?;
         field(&mut b, m, 4, 4, 0)?;
         if field(&mut b, m, 6, 1, 0)? != 0 {
             return Err(unsupported("custom native mouse pointer"));
         }
         if site.kind == Kind::Label {
-            field(&mut b, m, 7, 4, 0)?;
-            field(&mut b, m, 8, 2, 0)?;
-            field(&mut b, m, 9, 2, 0)?;
+            appearance.border_color = field(&mut b, m, 7, 4, 0x80000006)? as i32;
+            appearance.border_style = u8::try_from(field(&mut b, m, 8, 2, 0)?)
+                .map_err(|_| corrupt("Label BorderStyle"))?;
+            appearance.special_effect = u8::try_from(field(&mut b, m, 9, 2, 0)?)
+                .map_err(|_| corrupt("Label SpecialEffect"))?;
             accelerator = accelerator_character(field(&mut b, m, 11, 2, 0)?)?;
         } else {
             accelerator = accelerator_character(field(&mut b, m, 8, 2, 0)?)?;
@@ -776,9 +816,13 @@ fn control(bytes: &[u8], site: Site) -> Result<Control> {
         (caption, String::new(), w, h, flags & 2 != 0)
     };
     b.end()?;
+    if !appearance.valid(Some(site.kind)) {
+        return Err(corrupt("native control appearance"));
+    }
     let font = Some(text_props(&mut r)?);
     r.end()?;
     Ok(Control {
+        appearance,
         font,
         colors,
         accelerator,
@@ -865,6 +909,7 @@ fn numeric_control(r: Reader<'_>, mut b: Reader<'_>, site: Site) -> Result<Contr
     b.end()?;
     r.end()?;
     Ok(Control {
+        appearance: super::Appearance::for_kind(Some(site.kind)),
         font: None,
         colors,
         accelerator: String::new(),

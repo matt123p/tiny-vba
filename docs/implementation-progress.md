@@ -1,5 +1,26 @@
 # Implementation progress
 
+## M7A.4 continued — native appearance and member audit (2026-11-07)
+
+ADRs 0083–0085 correct Page appearance ownership, retain native border/effect/
+background values, add applicable typed ordinary properties and published Font
+aliases, and paint local borders, system-colour effects and transparency. A Page
+has no Font/BackColor/ForeColor; child defaults and client painting use its owning
+MultiPage. This corrects earlier Page exposure, rather than retaining a custom API.
+Font aliases share the actual object and exact Currency/Integer/Boolean/String
+values. Native clipping keeps fixed-size control glyphs inside authored bounds.
+Original source/resources, global styles/fonts, authorization and all static/VM
+budgets remain unchanged. Native edited saving is still M7A.5.
+
+32 project cases (two new appearance groups), five appearance model cases,
+13 Font cases (including Page ownership and aliases), eight colour cases,
+five appearance/three colour/four Font GPU cases and 34 pointer cases pass.
+Shared CI, strict workspace Clippy, WASM/WASI, UI, Xvfb native launch, web,
+repository checks and all four Chromium flows pass. Five theme/scale views and
+browser runtime/breakpoint views were inspected. Affected host acceptance is in progress. Full M7A.4,
+remaining member/default/selection, image/RefEdit, lifecycle/binding/keyboard/
+mouse/platform cases stay open. Fresh Office observations remain M8.5 NOT_RUN.
+
 ## M7A.4 continued — native Font assignment (2026-11-07)
 
 ADR 0082 adds ordinary typed Font setters on UserForms and the 13 Font-capable
@@ -36,8 +57,7 @@ Font-specific Nothing/external/other-assignment behavior, ambient/platform defau
 unchanged appearance/lifecycle/binding/control checklist remain open. Full M7A.4
 is IN PROGRESS; fresh Office comparisons remain M8.5 NOT_RUN.
 
-Next implementation packet: retain native BorderColor/BorderStyle/SpecialEffect/
-BackStyle and implement their documented typed interactions and local rendering.
+The subsequent appearance packet is implemented under ADRs 0083–0085 above.
 The remaining Font comparison cases and full completion checklist remain open.
 
 ## M7A.4 continued — native fonts (2026-11-07)

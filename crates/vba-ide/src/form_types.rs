@@ -87,6 +87,28 @@ impl Ide {
         }
         for (enum_name, constants) in [
             (
+                "fmBorderStyle",
+                &[("fmBorderStyleNone", 0), ("fmBorderStyleSingle", 1)][..],
+            ),
+            (
+                "fmSpecialEffect",
+                &[
+                    ("fmSpecialEffectFlat", 0),
+                    ("fmSpecialEffectRaised", 1),
+                    ("fmSpecialEffectSunken", 2),
+                    ("fmSpecialEffectEtched", 3),
+                    ("fmSpecialEffectBump", 6),
+                ][..],
+            ),
+            (
+                "fmButtonEffect",
+                &[("fmButtonEffectFlat", 0), ("fmButtonEffectSunken", 2)][..],
+            ),
+            (
+                "fmBackStyle",
+                &[("fmBackStyleTransparent", 0), ("fmBackStyleOpaque", 1)][..],
+            ),
+            (
                 "fmButton",
                 &[
                     ("fmButtonLeft", 1),

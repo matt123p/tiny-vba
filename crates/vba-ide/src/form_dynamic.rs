@@ -160,7 +160,11 @@ If control.VbaKind<>7 And control.VbaKind<>8 And control.VbaKind<>15 Then
 If parentKey=0 Then
 VbaCopyFont control.VbaFont,VbaFont
 Else
+If parent.VbaKind=14 Then
+VbaCopyFont control.VbaFont,parent.Parent.Font
+Else
 VbaCopyFont control.VbaFont,parent.Font
+End If
 End If
 End If
 control.VbaRuntime=True

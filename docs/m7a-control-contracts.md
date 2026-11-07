@@ -348,3 +348,11 @@ ADR 0082 adds ordinary typed Font setters, reference assignment, retained old
 aliases and root lazy reload. Runtime-added controls keep independent copied
 defaults. Nothing/external/other-assignment, ambient/platform, appearance and the
 remaining member audit stay open; this does not complete P01 or M7A.4.
+
+[ADR 0083](decisions/0083-page-appearance-ownership.md) corrects Page appearance
+ownership: no Page Font/BackColor/ForeColor APIs; MultiPage owns defaults/painting.
+[ADR 0084](decisions/0084-native-control-appearance.md) retains native border/effect/
+background data and adds applicable typed properties, local effects/transparency
+and fixed-bound clipping. [ADR 0085](decisions/0085-native-font-attribute-aliases.md)
+adds published Font aliases forwarding to canonical objects. Full member, platform
+and M7A.4 acceptance remains open; no VM/permission/budget increase is made.

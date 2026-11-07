@@ -105,6 +105,7 @@ pub(super) fn control(bytes: &[u8], site: Site) -> Result<Control> {
     }
     r.end()?;
     Ok(Control {
+        appearance: crate::forms::Appearance::for_kind(Some(Kind::TabStrip)),
         font,
         colors,
         accelerator: String::new(),

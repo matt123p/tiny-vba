@@ -128,3 +128,45 @@ fn palette_indices_are_reported_when_unresolved_and_resolved_by_injected_ui_poli
     missing.run_steps(2);
     Ok(())
 }
+#[test]
+fn page_client_surface_uses_live_multipage_colour_without_page_colour_properties() -> R {
+    let mut h = app(
+        "Dim m As Object,p As Object\nSet m=NativeForm.Controls.Add(\"Forms.MultiPage.1\",\"Multi\")\nm.Top=80\nm.Width=180\nm.Height=120\nm.BackColor=RGB(70,80,90)\nSet p=m.Pages.Add(\"Surface\",\"Surface\")\nm.BackColor=RGB(11,22,33)",
+        Theme::light(),
+    )?;
+    let center = h
+        .get(
+            egui_kittest::kittest::By::new()
+                .label("Surface")
+                .role(egui::accesskit::Role::Group),
+        )
+        .rect()
+        .center();
+    let image = h.render()?;
+    assert_eq!(
+        image.get_pixel(center.x as u32, center.y as u32).0,
+        [11, 22, 33, 255]
+    );
+    let owner = *h.state().ide.form_instances()?.first().ok_or("form")?;
+    let design = h.state().ide.form_instance_design(owner)?;
+    let page = design
+        .controls
+        .iter()
+        .find(|c| c.kind == vba_ide::forms::ControlKind::Page)
+        .ok_or("page")?;
+    assert!(
+        h.state()
+            .ide
+            .form_instance_field(owner, Some(page.id), "BackColor")
+            .is_err()
+    );
+    assert!(
+        h.state()
+            .ide
+            .form_instance_font(owner, Some(page.id))
+            .is_err()
+    );
+    assert_eq!(h.state().ide.output(), vec!["initialized"]);
+    assert_eq!(h.ctx.global_style().visuals.override_text_color, None);
+    Ok(())
+}

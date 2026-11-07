@@ -50,6 +50,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         .is_some_and(|o| o == "--frame-controls");
     let metadata = std::env::args().nth(2).is_some_and(|o| o == "--metadata");
     let fonts = std::env::args().nth(2).is_some_and(|o| o == "--fonts");
+    let appearance = std::env::args().nth(2).is_some_and(|o| o == "--appearance");
     let colors = std::env::args().nth(2).is_some_and(|o| o == "--colors");
     for (name, theme, width, scale) in [
         ("light", Theme::light(), 1400., 1.),
@@ -65,7 +66,9 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             1252,
             &[NativeFormResource {
                 name: "NativeForm.frx".into(),
-                bytes: if refedit {
+                bytes: if appearance {
+                    fixture::appearance_companion()
+                } else if refedit {
                     fixture::refedit_companion()
                 } else if images {
                     fixture::image_companion()
@@ -88,7 +91,9 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                 },
             }],
         )?;
-        let main = if fonts {
+        let main = if appearance {
+            "Sub Main()\nDim a As New NativeForm,b As New NativeForm\na.Caption=\"Native borders and transparency\"\nb.Caption=\"Native system-colour effects\"\na.BackColor=RGB(230,240,250)\na.Heading.Caption=\"Transparent label\"\na.Heading.Width=168\na.Heading.BackStyle=0\na.Heading.ForeColor=RGB(40,50,60)\na.Heading.BorderStyle=0\na.Entry.BackStyle=1\na.Entry.BackColor=RGB(250,230,200)\na.Entry.ForeColor=RGB(40,50,60)\na.Entry.BorderColor=RGB(80,30,20)\na.Entry.BorderStyle=1\na.Entry.FontSize=12.25\na.Entry.FontItalic=True\na.Apply.BackStyle=0\na.Apply.ForeColor=RGB(40,50,60)\nb.BorderStyle=0\nb.Heading.Width=168\nb.Heading.Caption=\"Etched and raised edges\"\nb.Heading.SpecialEffect=1\nb.Heading.BackStyle=1\nb.Entry.BackStyle=1\nb.Entry.SpecialEffect=3\nb.Entry.FontSize=12.25\na.Show 0\nb.Show 0\nEnd Sub"
+        } else if fonts {
             "Sub Main()\nDim a As New NativeForm,b As New NativeForm\na.Caption=\"Native font attributes\"\nb.Caption=\"Independent default font\"\na.Entry.Height=48\na.Apply.Top=120\na.Entry.EnterFieldBehavior=1\na.Entry.Font.Size=18.5\na.Entry.Font.Italic=True\na.Entry.Font.Underline=True\na.Entry.Font.Strikethrough=True\na.Apply.Font.Size=14\nSet a.Heading.Font=a.Font\na.Heading.Font.Size=12\na.Heading.Font.Underline=True\na.Show 0\nb.Show 0\nEnd Sub"
         } else if colors {
             "Sub Main()\nDim a As New NativeForm,b As New NativeForm\na.Caption=\"Native RGB colours\"\nb.Caption=\"Separate colour state\"\na.BackColor=RGB(230,240,250)\na.Heading.BackColor=RGB(200,230,190)\na.Heading.ForeColor=RGB(70,20,90)\na.Entry.BackColor=RGB(250,230,200)\na.Entry.ForeColor=RGB(80,30,20)\na.Entry.EnterFieldBehavior=1\na.Apply.BackColor=RGB(190,220,240)\na.Apply.ForeColor=RGB(10,50,100)\na.Show 0\nb.Show 0\nEnd Sub"
@@ -186,7 +191,9 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                 return Err("expected native tooltip".into());
             }
         }
-        let prefix = if fonts {
+        let prefix = if appearance {
+            "m7a4-native-appearance"
+        } else if fonts {
             "m7a4-native-fonts"
         } else if colors {
             "m7a4-native-colors"

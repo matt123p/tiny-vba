@@ -105,3 +105,7 @@ References: [MSForms BackColor](https://learn.microsoft.com/en-us/office/vba/lan
 [OLE_COLOR](https://learn.microsoft.com/en-us/openspecs/office_file_formats/ms-oforms/4b8f4be0-3fff-4e42-9fc1-b9fd00251e8e),
 [OLE colour types](https://learn.microsoft.com/en-us/openspecs/office_file_formats/ms-oforms/55b9612d-3a9a-4e62-9f68-27af8e479210),
 [system-colour indices](https://learn.microsoft.com/en-us/windows/win32/api/winuser/nf-winuser-getsyscolor).
+
+Correction: [ADR 0083](0083-page-appearance-ownership.md) removes the earlier
+non-Office Page Font/BackColor/ForeColor exposure. Page children and client painting
+use the owning MultiPage; the Font-capable control count is twelve, excluding Page.

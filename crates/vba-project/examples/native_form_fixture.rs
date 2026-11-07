@@ -17,6 +17,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let metadata = option.as_deref() == Some("--metadata");
     let window_activation = option.as_deref() == Some("--window-activation");
     let fonts = option.as_deref() == Some("--fonts");
+    let appearance = option.as_deref() == Some("--appearance");
     let colors = option.as_deref() == Some("--colors");
     let nested_mouse = option.as_deref() == Some("--nested-mouse");
     let composite_mouse = option.as_deref() == Some("--composite-mouse");
@@ -58,7 +59,8 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             | "--nested-mouse"
             | "--window-activation"
             | "--colors"
-            | "--fonts",
+            | "--fonts"
+            | "--appearance",
         ) => false,
         Some(_) => return Err("unknown fixture option".into()),
     };
@@ -90,6 +92,10 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         "Stop\r\nDebug.Print Entry.Text"
     };
     let mut text = String::from_utf8(fixture::export())?.replace("Debug.Print Entry.Text", body);
+    if appearance {
+        let code="Attribute VB_Name = \"NativeForm\"\nAttribute VB_PredeclaredId = True\nOption Explicit\nPrivate Sub UserForm_Initialize()\nMe.BackColor=RGB(230,240,250)\nHeading.Caption=\"Native appearance\"\nHeading.Width=168\nHeading.BackStyle=0\nHeading.ForeColor=RGB(40,50,60)\nHeading.BorderStyle=0\nEntry.ForeColor=RGB(40,50,60)\nEntry.BackColor=RGB(245,225,205)\nEntry.BackStyle=1\nEntry.BorderColor=RGB(80,30,20)\nEntry.BorderStyle=1\nEntry.FontSize=12.25\nApply.BackStyle=0\nApply.ForeColor=RGB(40,50,60)\nDebug.Print \"appearance ready\"\nEnd Sub\nPrivate Sub Apply_Click()\nEntry.SpecialEffect=3\nDebug.Print Entry.BorderStyle,Entry.SpecialEffect\nStop\nEntry.BackStyle=0\nDebug.Print Entry.BackStyle\nDebug.Print Entry.FontSize\nMe.Hide\nEnd Sub\n".replace('\n',"\r\n");
+        text = String::from_utf8(fixture::export())?.replace(fixture::SOURCE, &code);
+    }
     if fonts {
         let code="Attribute VB_Name = \"NativeForm\"\nAttribute VB_PredeclaredId = True\nOption Explicit\nPrivate Sub UserForm_Initialize()\nHeading.Font.Size=12\nSet Entry.Font=Heading.Font\nEntry.Font.Size=12.25\nEntry.Font.Italic=True\nEntry.Font.Underline=True\nEntry.EnterFieldBehavior=1\nApply.Font.Size=11\nDebug.Print \"fonts ready\"\nEnd Sub\nPrivate Sub Apply_Click()\nEntry.Font.Weight=700\nDebug.Print Entry.Font.Weight\nStop\nEntry.Font.Size=14.5\nDebug.Print Entry.Font.Size\nDebug.Print Entry.Font Is Heading.Font\nMe.Hide\nEnd Sub\n".replace('\n',"\r\n");
         text = String::from_utf8(fixture::export())?.replace(fixture::SOURCE, &code);
@@ -198,7 +204,9 @@ End Sub
     std::fs::write(dir.join("NativeForm.frm"), text)?;
     std::fs::write(
         dir.join("NativeForm.frx"),
-        if fonts {
+        if appearance {
+            fixture::appearance_companion()
+        } else if fonts {
             fixture::font_companion()
         } else if refedit {
             fixture::refedit_companion()

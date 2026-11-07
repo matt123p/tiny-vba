@@ -3,7 +3,10 @@ use crate::*;
 pub(crate) fn supported(kind: forms::ControlKind) -> bool {
     !matches!(
         kind,
-        forms::ControlKind::Image | forms::ControlKind::SpinButton | forms::ControlKind::ScrollBar
+        forms::ControlKind::Image
+            | forms::ControlKind::SpinButton
+            | forms::ControlKind::ScrollBar
+            | forms::ControlKind::Page
     )
 }
 pub(crate) fn members(root: bool) -> String {
@@ -161,4 +164,37 @@ impl Ide {
             strikethrough: field("Strikethrough")? == Value::Boolean(true),
         })
     }
+}
+/// Published legacy Font* properties forward to the canonical Font object.
+/// IOptionFrame (UserForm/Frame) and IPage do not expose these aliases.
+pub(crate) fn shortcuts(kind: forms::ControlKind) -> String {
+    use forms::ControlKind::*;
+    if !matches!(
+        kind,
+        Label
+            | TextBox
+            | CommandButton
+            | CheckBox
+            | OptionButton
+            | ToggleButton
+            | ListBox
+            | ComboBox
+            | TabStrip
+            | MultiPage
+    ) {
+        return String::new();
+    }
+    let mut source = String::new();
+    for (alias, member, ty) in [
+        ("FontName", "Name", "String"),
+        ("FontSize", "Size", "Currency"),
+        ("FontWeight", "Weight", "Integer"),
+        ("FontBold", "Bold", "Boolean"),
+        ("FontItalic", "Italic", "Boolean"),
+        ("FontUnderline", "Underline", "Boolean"),
+        ("FontStrikethru", "Strikethrough", "Boolean"),
+    ] {
+        source.push_str(&format!("Public Property Get {alias}() As {ty}\n{alias}=VbaFont.{member}\nEnd Property\nPublic Property Let {alias}(ByVal value As {ty})\nVbaFont.{member}=value\nEnd Property\n"));
+    }
+    source
 }

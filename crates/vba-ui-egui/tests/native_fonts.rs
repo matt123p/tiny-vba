@@ -149,11 +149,11 @@ fn unavailable_resolver_faces_keep_the_host_fallback_and_italic_decoration() -> 
 }
 
 #[test]
-fn assigned_font_objects_drive_the_same_pixels_as_direct_attributes() -> R {
+fn font_aliases_and_assigned_objects_drive_the_same_canonical_pixels() -> R {
     let base = "NativeForm.Entry.Height=48\nNativeForm.Apply.Top=120\nNativeForm.Entry.EnterFieldBehavior=1\nNativeForm.Entry.ForeColor=RGB(80,30,20)\n";
     let mut direct = app(
         &format!(
-            "{base}NativeForm.Entry.Font.Size=18\nNativeForm.Entry.Font.Italic=True\nNativeForm.Entry.Font.Underline=True"
+            "{base}NativeForm.Entry.FontSize=18\nNativeForm.Entry.FontItalic=True\nNativeForm.Entry.FontUnderline=True"
         ),
         Theme::light(),
     )?;

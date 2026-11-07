@@ -75,7 +75,7 @@ pub(super) fn control(bytes: &[u8], site: Site) -> Result<Control> {
     let mut r = Reader::new(bytes);
     let mut b = block(&mut r, 0x0200)?;
     let m = mask(&mut b, 0x3ffc, 1 << 9)? as u64;
-    field(&mut b, m, 3, 4, 0x80000006)?;
+    let border_color = field(&mut b, m, 3, 4, 0x80000006)? as i32;
     let back = field(&mut b, m, 4, 4, 0x8000000f)? as i32;
     let border_style = field(&mut b, m, 5, 1, 1)?;
     let pointer = field(&mut b, m, 6, 1, 0)?;
@@ -89,7 +89,7 @@ pub(super) fn control(bytes: &[u8], site: Site) -> Result<Control> {
         || ![0, 1, 3].contains(&size_mode)
         || alignment > 4
         || ![0, 1, 2, 3, 6].contains(&special_effect)
-        || flags & !2 != 0x19
+        || flags & !10 != 0x11
     {
         return Err(unsupported("Image properties"));
     }
@@ -118,7 +118,17 @@ pub(super) fn control(bytes: &[u8], site: Site) -> Result<Control> {
         None
     };
     r.end()?;
+    let appearance = crate::forms::Appearance {
+        border_color,
+        border_style: border_style as u8,
+        special_effect: special_effect as u8,
+        back_style: u8::from(flags & 8 != 0),
+    };
+    if !appearance.valid(Some(Kind::Image)) {
+        return Err(corrupt("Image appearance"));
+    }
     Ok(Control {
+        appearance,
         font: None,
         colors: crate::forms::Colors {
             back,
@@ -160,8 +170,6 @@ pub(super) fn control(bytes: &[u8], site: Site) -> Result<Control> {
             alignment: alignment as u8,
             tiling: m & (1 << 12) != 0,
             auto_size: m & (1 << 2) != 0,
-            border_style: border_style as u8,
-            special_effect: special_effect as u8,
         }),
     })
 }

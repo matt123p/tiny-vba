@@ -39,3 +39,7 @@ References:
 - [Forms TextBox Font property](https://learn.microsoft.com/en-us/dotnet/api/microsoft.vbe.interop.forms.textboxclass.font?view=office-pia)
 - [VBA Set statement](https://learn.microsoft.com/en-us/office/vba/language/reference/user-interface-help/set-statement)
 - [ADR 0081](0081-native-form-fonts.md)
+
+Correction: [ADR 0083](0083-page-appearance-ownership.md) removes the earlier
+non-Office Page Font/BackColor/ForeColor exposure. Page children and client painting
+use the owning MultiPage; the Font-capable control count is twelve, excluding Page.

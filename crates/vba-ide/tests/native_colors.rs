@@ -91,7 +91,7 @@ fn rgb_palette_and_system_values_keep_their_exact_long_bits_including_long_minim
 #[test]
 fn runtime_multipage_children_resolve_their_page_parent_and_keep_colours_through_stop() -> R {
     let mut ide = app(
-        "Sub Main()\nDim m As Object,p As Object,c As Object\nSet m=NativeForm.Controls.Add(\"Forms.MultiPage.1\")\nSet p=m.Pages.Add(\"Added\",\"Added page\")\nSet c=p.Controls.Add(\"Forms.TextBox.1\",\"Nested\")\np.BackColor=12\np.ForeColor=34\nc.BackColor=RGB(1,2,3)\nDebug.Print c.Parent Is p,p.Parent Is m\nDebug.Print p.BackColor,p.ForeColor,c.BackColor\nStop\nc.ForeColor=RGB(4,5,6)\nDebug.Print c.ForeColor\nEnd Sub",
+        "Sub Main()\nDim m As Object,p As Object,c As Object\nSet m=NativeForm.Controls.Add(\"Forms.MultiPage.1\")\nSet p=m.Pages.Add(\"Added\",\"Added page\")\nSet c=p.Controls.Add(\"Forms.TextBox.1\",\"Nested\")\nm.BackColor=12\nm.ForeColor=34\nc.BackColor=RGB(1,2,3)\nDebug.Print c.Parent Is p,p.Parent Is m\nDebug.Print m.BackColor,m.ForeColor,c.BackColor\nStop\nc.ForeColor=RGB(4,5,6)\nDebug.Print c.ForeColor\nEnd Sub",
         "",
         77,
         88,
@@ -214,7 +214,7 @@ fn dynamic_controls_and_pages_use_the_same_colour_properties_and_image_has_no_fo
         let extra = match kind {
             "Image" => "On Error Resume Next\nDebug.Print p.ForeColor\nDebug.Print Err.Number\n",
             "MultiPage" => {
-                "p.ForeColor=44\nSet p=p.Pages.Add()\np.BackColor=12\np.ForeColor=34\nDebug.Print p.BackColor,p.ForeColor\n"
+                "p.ForeColor=44\nSet p=p.Pages.Add()\nOn Error Resume Next\nDebug.Print p.BackColor\nDebug.Print Err.Number\nErr.Clear\np.ForeColor=34\nDebug.Print Err.Number\n"
             }
             _ => "p.ForeColor=44\nDebug.Print p.ForeColor\n",
         };
@@ -223,18 +223,17 @@ fn dynamic_controls_and_pages_use_the_same_colour_properties_and_image_has_no_fo
         );
         let ide = app(&main, "", 77, 88)?;
         assert_eq!(ide.mode(), Mode::Completed, "{kind}: {:?}", ide.diagnostics);
-        assert_eq!(
-            ide.output(),
-            vec![
-                "197121",
-                match kind {
-                    "Image" => "438",
-                    "MultiPage" => "12\t34",
-                    _ => "44",
-                }
-            ],
-            "{kind}"
-        );
+        let mut expected = vec![
+            "197121",
+            match kind {
+                "Image" | "MultiPage" => "438",
+                _ => "44",
+            },
+        ];
+        if kind == "MultiPage" {
+            expected.push("438");
+        }
+        assert_eq!(ide.output(), expected, "{kind}");
     }
     Ok(())
 }

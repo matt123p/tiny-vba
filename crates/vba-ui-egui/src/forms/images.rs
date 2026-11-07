@@ -30,7 +30,11 @@ impl Image<'_> {
         response.widget_info(|| {
             egui::WidgetInfo::labeled(egui::accesskit::Role::Image, ui.is_enabled(), &control.name)
         });
-        ui.painter().rect_filled(bounds, 0., theme.editor);
+        if super::appearance::read(ide, instance, Some(control.id), Some(control.kind), theme)
+            .opaque
+        {
+            ui.painter().rect_filled(bounds, 0., theme.editor);
+        }
         let integer = |name: &str, default: i16| match ide.form_instance_field(
             instance,
             Some(control.id),
@@ -134,14 +138,6 @@ impl Image<'_> {
                     draw(origin);
                 }
             }
-        }
-        if integer("BorderStyle", 1) != 0 || integer("SpecialEffect", 0) != 0 {
-            ui.painter().rect_stroke(
-                bounds,
-                0.,
-                egui::Stroke::new(1., theme.border),
-                egui::StrokeKind::Inside,
-            );
         }
         if response.clicked() {
             commands.push(Command::Form(FormCommand::InstanceEvent(

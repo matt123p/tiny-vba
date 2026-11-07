@@ -105,6 +105,10 @@ and native save/reopen. See [ADR 0041](decisions/0041-worksheet-form-controls.md
   ADR 0082 adds typed Font reference assignment, old aliases and root lazy reload;
   Nothing/external/other-assignment, ambient/platform and remaining property cases
   stay open.
+  ADR 0083 removes non-Office Page appearance members and uses MultiPage-owned
+  defaults/painting. ADR 0084 retains native borders/effects/background styles and
+  implements selected typed interactions/local rendering; ADR 0085 adds published
+  Font attribute aliases. Full appearance/member/platform acceptance stays open.
   ADR 0076 adds selected nested modal mouse/keyboard input continuations with
   shared raw-input bounds, held release, parent unload and Reset regressions. L02
   remains partial; all remaining lifecycle and control contracts stay open.

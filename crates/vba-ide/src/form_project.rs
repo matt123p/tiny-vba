@@ -522,8 +522,17 @@ pub(crate) fn checked_handlers(
         ]
         .contains(&d.name.key().as_str())
             || native
-                && ["tag", "helpcontextid", "backcolor", "forecolor", "font"]
-                    .contains(&d.name.key().as_str())
+                && [
+                    "tag",
+                    "helpcontextid",
+                    "backcolor",
+                    "forecolor",
+                    "font",
+                    "bordercolor",
+                    "borderstyle",
+                    "specialeffect",
+                ]
+                .contains(&d.name.key().as_str())
             || d.name.spelling.to_ascii_lowercase().starts_with("vba")
             || form
                 .controls
@@ -538,8 +547,17 @@ pub(crate) fn checked_handlers(
     for c in &form.controls {
         if c.name.to_ascii_lowercase().starts_with("vba")
             || native
-                && ["tag", "helpcontextid", "backcolor", "forecolor", "font"]
-                    .contains(&c.name.to_ascii_lowercase().as_str())
+                && [
+                    "tag",
+                    "helpcontextid",
+                    "backcolor",
+                    "forecolor",
+                    "font",
+                    "bordercolor",
+                    "borderstyle",
+                    "specialeffect",
+                ]
+                .contains(&c.name.to_ascii_lowercase().as_str())
             || [
                 "show",
                 "hide",
@@ -568,8 +586,17 @@ pub(crate) fn checked_handlers(
         let key = p.name.key();
         if key.starts_with("vba")
             || native
-                && ["tag", "helpcontextid", "backcolor", "forecolor", "font"]
-                    .contains(&key.as_str())
+                && [
+                    "tag",
+                    "helpcontextid",
+                    "backcolor",
+                    "forecolor",
+                    "font",
+                    "bordercolor",
+                    "borderstyle",
+                    "specialeffect",
+                ]
+                .contains(&key.as_str())
             || [
                 "class_initialize",
                 "class_terminate",
@@ -765,6 +792,7 @@ fn compiled_form(
         source.push_str(&crate::form_dynamic::root(&handlers));
         source.push_str(&crate::form_colors::members(true, true));
         source.push_str(&crate::form_font::members(true));
+        source.push_str(&crate::form_appearance::members(None));
     }
     let parsed = parse(&module.source()?, ModuleKind::Class)?;
     let has = |name: &str| {
@@ -835,6 +863,11 @@ fn compiled_form(
     ));
     if let Some(native) = native {
         source.push_str(crate::form_font::INITIAL);
+        source.push_str(&crate::form_appearance::initialize(
+            "",
+            None,
+            &native.design.appearance,
+        ));
         if let Some(font) = &native.design.font {
             source.push_str(&crate::form_font::initialize("VbaFont", font));
         }
@@ -914,6 +947,11 @@ fn compiled_form(
         }
         source.push_str(&setup);
         if let Some(metadata) = metadata {
+            source.push_str(&crate::form_appearance::initialize(
+                &temp,
+                Some(c.kind),
+                &metadata.appearance,
+            ));
             if crate::form_font::supported(c.kind) {
                 if let Some(font) = &metadata.font {
                     source.push_str(&crate::form_font::initialize(
@@ -921,19 +959,29 @@ fn compiled_form(
                         font,
                     ));
                 } else {
-                    let owner = c
+                    let parent = c
                         .parent
-                        .and_then(|id| form.controls.iter().find(|p| p.id == id))
+                        .and_then(|id| form.controls.iter().find(|p| p.id == id));
+                    let parent = if let Some(page) = parent.filter(|p| p.kind == ControlKind::Page)
+                    {
+                        page.parent
+                            .and_then(|id| form.controls.iter().find(|p| p.id == id))
+                    } else {
+                        parent
+                    };
+                    let owner = parent
                         .map(|p| format!("Vba{}.Font", p.name))
                         .unwrap_or_else(|| "VbaFont".into());
                     source.push_str(&format!("VbaCopyFont {temp}.VbaFont,{owner}\n"));
                 }
             }
-            source.push_str(&format!(
-                "{temp}.VbaBackColor={}\n",
-                crate::form_colors::literal(metadata.colors.back)
-            ));
-            if c.kind != ControlKind::Image {
+            if c.kind != ControlKind::Page {
+                source.push_str(&format!(
+                    "{temp}.VbaBackColor={}\n",
+                    crate::form_colors::literal(metadata.colors.back)
+                ));
+            }
+            if !matches!(c.kind, ControlKind::Image | ControlKind::Page) {
                 source.push_str(&format!(
                     "{temp}.VbaForeColor={}\n",
                     crate::form_colors::literal(metadata.colors.fore)
@@ -984,7 +1032,7 @@ fn compiled_form(
                 ));
             }
             if let Some(image) = &control.image {
-                source.push_str(&format!("{temp}.VbaPictureSizeMode={}\n{temp}.VbaPictureAlignment={}\n{temp}.PictureTiling={}\n{temp}.VbaAutoSize={}\n{temp}.VbaBorderStyle={}\n{temp}.VbaSpecialEffect={}\n",image.size_mode,image.alignment,boolean(image.tiling),boolean(image.auto_size),image.border_style,image.special_effect));
+                source.push_str(&format!("{temp}.VbaPictureSizeMode={}\n{temp}.VbaPictureAlignment={}\n{temp}.PictureTiling={}\n{temp}.VbaAutoSize={}\n",image.size_mode,image.alignment,boolean(image.tiling),boolean(image.auto_size)));
                 if let Some(picture) = &image.picture {
                     let source_id = i32::try_from(module.id.0)
                         .map_err(|_| error("picture source identity budget"))?;
@@ -1856,6 +1904,13 @@ impl Ide {
                         "backcolor",
                         "forecolor",
                         "font",
+                        "fontname",
+                        "fontsize",
+                        "fontweight",
+                        "fontbold",
+                        "fontitalic",
+                        "fontunderline",
+                        "fontstrikethru",
                         "click",
                         "change",
                         "class_initialize",
@@ -2248,8 +2303,12 @@ impl Ide {
             "picturesizemode" => "VbaPictureSizeMode",
             "picturealignment" => "VbaPictureAlignment",
             "autosize" => "VbaAutoSize",
-            "borderstyle" => "VbaBorderStyle",
-            "specialeffect" => "VbaSpecialEffect",
+            "borderstyle" if self.native_forms.contains_key(&instance.source) => "VbaBorderStyle",
+            "bordercolor" if self.native_forms.contains_key(&instance.source) => "VbaBorderColor",
+            "backstyle" if self.native_forms.contains_key(&instance.source) => "VbaBackStyle",
+            "specialeffect" if self.native_forms.contains_key(&instance.source) => {
+                "VbaSpecialEffect"
+            }
             "tabfixedwidth" => "VbaTabFixedWidth",
             "tabfixedheight" => "VbaTabFixedHeight",
             "taborientation" => "VbaTabOrientation",

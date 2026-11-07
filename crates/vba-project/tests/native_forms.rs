@@ -838,3 +838,79 @@ fn malformed_native_accelerator_character_is_rejected() {
     result.extend(bytes);
     assert!(decode(&result).is_err());
 }
+#[test]
+fn native_appearance_defaults_and_authored_fields_keep_source_resources_and_exact_colours() {
+    let defaults = decode(&fixture::companion()).unwrap();
+    assert_eq!(defaults.design.appearance, forms::Appearance::default());
+    assert_eq!(defaults.design.controls[0].appearance.special_effect, 0);
+    assert_eq!(defaults.design.controls[1].appearance.special_effect, 2);
+    let bytes = fixture::appearance_companion();
+    let native = decode(&bytes).unwrap();
+    assert_eq!(native.design.appearance.border_style, 1);
+    assert_eq!(native.design.appearance.border_color, 0x00332211);
+    let label = native.design.controls[0].appearance;
+    assert_eq!(
+        (
+            label.border_style,
+            label.special_effect,
+            label.back_style,
+            label.border_color
+        ),
+        (1, 0, 0, 0x001e140a)
+    );
+    let text = native.design.controls[1].appearance;
+    assert_eq!(
+        (
+            text.border_style,
+            text.special_effect,
+            text.back_style,
+            text.border_color
+        ),
+        (1, 0, 0, 0x00665544)
+    );
+    assert_eq!(native.source, fixture::SOURCE);
+    assert!(native.resources.iter().any(|r| r.bytes == bytes));
+}
+#[test]
+fn native_frame_appearance_reconciles_and_refuses_invalid_values_before_attachment() {
+    let bytes = fixture::appearance_companion();
+    for (property, value, ok) in [
+        ("BorderColor", "&H00332211&", true),
+        ("BorderStyle", "1", true),
+        ("SpecialEffect", "0", true),
+        ("BorderColor", "&H00332210&", false),
+        ("BorderStyle", "0", false),
+        ("SpecialEffect", "7", false),
+    ] {
+        let source = String::from_utf8(fixture::export()).unwrap().replace(
+            " Caption =",
+            &format!(" {property} = {value}\r\n Caption ="),
+        );
+        let result = forms::decode_export(
+            "NativeForm.frm",
+            source.as_bytes(),
+            1252,
+            &[Resource {
+                name: "NativeForm.frx".into(),
+                bytes: bytes.clone(),
+            }],
+            &Limits::default(),
+        );
+        assert_eq!(result.is_ok(), ok, "{property} {value}: {result:?}");
+    }
+    let empty = format!(
+        "{}{}",
+        fixture::frame(false).replace(" Caption =", " BorderStyle = 9\r\n Caption ="),
+        fixture::SOURCE
+    );
+    assert!(
+        forms::decode_export(
+            "NativeForm.frm",
+            empty.as_bytes(),
+            1252,
+            &[],
+            &Limits::default()
+        )
+        .is_err()
+    );
+}

@@ -22,8 +22,6 @@ Public VbaPictureSizeMode As Integer
 Public VbaPictureAlignment As Integer
 Public PictureTiling As Boolean
 Public VbaAutoSize As Boolean
-Public VbaBorderStyle As Integer
-Public VbaSpecialEffect As Integer
 Public Property Get Picture() As stdole.IPictureDisp
 Attribute Picture.VB_UserMemId = 0
 Set Picture=VbaPicture
@@ -69,20 +67,6 @@ End Property
 Public Property Let PictureAlignment(ByVal value As Integer)
 If value<0 Or value>4 Then Err.Raise 380
 VbaPictureAlignment=value
-End Property
-Public Property Get BorderStyle() As Integer
-BorderStyle=VbaBorderStyle
-End Property
-Public Property Let BorderStyle(ByVal value As Integer)
-If value<0 Or value>1 Then Err.Raise 380
-VbaBorderStyle=value
-End Property
-Public Property Get SpecialEffect() As Integer
-SpecialEffect=VbaSpecialEffect
-End Property
-Public Property Let SpecialEffect(ByVal value As Integer)
-If value<>0 And value<>1 And value<>2 And value<>3 And value<>6 Then Err.Raise 380
-VbaSpecialEffect=value
 End Property
 Public Event Click
 Public Sub VbaClick()

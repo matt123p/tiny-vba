@@ -92,7 +92,7 @@ fn font_aliases_survive_stop_and_inspection_is_inert_and_reset_preserves_origina
 #[test]
 fn dynamic_fonts_copy_container_defaults_without_sharing_state_and_outlive_form_unload() -> R {
     let ide = app(
-        "Sub Main()\nDim f As New NativeForm,g As Object,c As Object,m As Object,p As Object,t As Object,font As MSForms.NewFont\nf.Font.Name=\"Container face\"\nf.Font.Size=14.5\nSet g=f.Controls.Add(\"Forms.Frame.1\",\"Group\")\nDebug.Print g.Font.Name,g.Font.Size,g.Font Is f.Font\ng.Font.Size=16\nSet c=g.Controls.Add(\"Forms.TextBox.1\",\"Nested\")\nDebug.Print c.Font.Size,c.Font Is g.Font\nSet m=f.Controls.Add(\"Forms.MultiPage.1\",\"Multi\")\nm.Font.Size=18\nSet p=m.Pages.Add()\nSet t=p.Controls.Add(\"Forms.TextBox.1\",\"PageChild\")\nDebug.Print p.Font.Size,t.Font.Size,t.Parent Is p\nSet font=t.Font\nUnload f\nfont.Size=19.25\nDebug.Print font.Size\nEnd Sub",
+        "Sub Main()\nDim f As New NativeForm,g As Object,c As Object,m As Object,p As Object,t As Object,font As MSForms.NewFont\nf.Font.Name=\"Container face\"\nf.Font.Size=14.5\nSet g=f.Controls.Add(\"Forms.Frame.1\",\"Group\")\nDebug.Print g.Font.Name,g.Font.Size,g.Font Is f.Font\ng.Font.Size=16\nSet c=g.Controls.Add(\"Forms.TextBox.1\",\"Nested\")\nDebug.Print c.Font.Size,c.Font Is g.Font\nSet m=f.Controls.Add(\"Forms.MultiPage.1\",\"Multi\")\nm.Font.Size=18\nSet p=m.Pages.Add()\nSet t=p.Controls.Add(\"Forms.TextBox.1\",\"PageChild\")\nDebug.Print m.Font.Size,t.Font.Size,t.Parent Is p\nSet font=t.Font\nUnload f\nfont.Size=19.25\nDebug.Print font.Size\nEnd Sub",
     )?;
     assert_eq!(ide.mode(), Mode::Completed, "{:?}", ide.diagnostics);
     assert_eq!(
@@ -217,7 +217,7 @@ fn font_setters_are_exposed_only_by_the_native_font_control_families() -> R {
         } else {
             format!("Set c=f.Controls.Add(\"Forms.{family}.1\")")
         };
-        let supported = !matches!(family, "Image" | "ScrollBar" | "SpinButton");
+        let supported = !matches!(family, "Image" | "ScrollBar" | "SpinButton" | "Page");
         let check = if supported {
             "Debug.Print Err.Number,c.Font Is shared"
         } else {
@@ -254,6 +254,87 @@ fn root_font_assignment_loads_once_and_reloads_an_unloaded_referenced_form() -> 
             "10.25\tTrue",
             "initialized",
             "10.25\tTrue"
+        ]
+    );
+    Ok(())
+}
+#[test]
+fn pages_use_the_owning_multipage_font_without_exposing_non_office_appearance_members() -> R {
+    let mut ide = app(
+        "Sub Main()\nDim m As Object,p As Object,a As Object,b As Object\nSet m=NativeForm.Controls.Add(\"Forms.MultiPage.1\",\"Multi\")\nSet p=m.Pages.Add(\"Added\")\nm.Font.Size=17.25\nSet a=p.Controls.Add(\"Forms.TextBox.1\",\"First\")\nm.Font.Size=19.5\nSet b=p.Controls.Add(\"Forms.TextBox.1\",\"Second\")\nDebug.Print a.Font.Size,b.Font.Size,a.Parent Is p,p.Parent Is m,a.Font Is m.Font\nOn Error Resume Next\nDebug.Print p.Font.Name\nDebug.Print Err.Number\nErr.Clear\nSet p.Font=m.Font\nDebug.Print Err.Number\nErr.Clear\np.BackColor=12\nDebug.Print Err.Number\nErr.Clear\nDebug.Print p.ForeColor\nDebug.Print Err.Number\nOn Error GoTo 0\nStop\nDebug.Print a.Font.Size,b.Font.Size\nEnd Sub",
+    )?;
+    assert_eq!(ide.mode(), Mode::Break, "{:?}", ide.diagnostics);
+    assert_eq!(
+        ide.output(),
+        vec![
+            "initialized",
+            "17.25\t19.5\tTrue\tTrue\tFalse",
+            "438",
+            "438",
+            "438",
+            "438"
+        ]
+    );
+    let owner = *ide.form_instances()?.first().ok_or("form")?;
+    let design = ide.form_instance_design(owner)?;
+    let page = design
+        .controls
+        .iter()
+        .find(|c| c.kind == vba_ide::forms::ControlKind::Page)
+        .ok_or("page")?;
+    assert!(ide.form_instance_font(owner, Some(page.id)).is_err());
+    assert!(
+        ide.form_instance_field(owner, Some(page.id), "BackColor")
+            .is_err()
+    );
+    let original = ide.native_form(owner.source).ok_or("native")?.clone();
+    ide.dispatch(Action::Run, &mut NoHost)?;
+    settle(&mut ide)?;
+    assert_eq!(ide.mode(), Mode::Completed, "{:?}", ide.diagnostics);
+    assert_eq!(ide.output().last().map(String::as_str), Some("17.25\t19.5"));
+    ide.dispatch(Action::Reset, &mut NoHost)?;
+    assert_eq!(ide.native_form(owner.source), Some(&original));
+    Ok(())
+}
+
+#[test]
+fn published_font_aliases_forward_exact_types_and_follow_replaced_font_objects() -> R {
+    let mut ide = app(
+        "Sub Main()\nDim c As Object,old As MSForms.NewFont\nSet c=NativeForm.Entry\nSet old=c.Font\nc.FontName=\"Alias face\"\nc.FontSize=12.25\nc.FontWeight=551\nc.FontItalic=True\nc.FontUnderline=True\nc.FontStrikethru=True\nDebug.Print c.Font.Name,c.Font.Size,c.Font.Bold,c.Font.Italic,c.Font.Underline,c.Font.Strikethrough\nDebug.Print VarType(c.FontName),VarType(c.FontSize),VarType(c.FontWeight),VarType(c.FontBold)\nStop\nSet c.Font=NativeForm.Heading.Font\nc.FontBold=True\nDebug.Print c.FontWeight,NativeForm.Heading.Font.Weight,old.Name,old.Size\nEnd Sub",
+    )?;
+    assert_eq!(ide.mode(), Mode::Break, "{:?}", ide.diagnostics);
+    assert_eq!(
+        ide.output(),
+        vec![
+            "initialized",
+            "Alias face\t12.25\tTrue\tTrue\tTrue\tTrue",
+            "8\t6\t2\t11"
+        ]
+    );
+    ide.dispatch(Action::Run, &mut NoHost)?;
+    settle(&mut ide)?;
+    assert_eq!(ide.mode(), Mode::Completed, "{:?}", ide.diagnostics);
+    assert_eq!(
+        ide.output().last().map(String::as_str),
+        Some("700\t700\tAlias face\t12.25")
+    );
+    Ok(())
+}
+#[test]
+fn font_alias_errors_leave_canonical_values_and_option_frame_aliases_are_not_invented() -> R {
+    let ide = app(
+        "Sub Main()\nDim c As Object,f As Object\nSet c=NativeForm.Entry\nOn Error Resume Next\nc.FontSize=Null\nDebug.Print Err.Number,c.Font.Size\nErr.Clear\nc.FontWeight=1001\nDebug.Print Err.Number,c.Font.Weight\nErr.Clear\nc.FontSize=0\nDebug.Print Err.Number,c.Font.Size\nErr.Clear\nc.FontWeight=32768\nDebug.Print Err.Number,c.Font.Weight\nSet f=NativeForm\nErr.Clear\nf.FontName=\"No alias\"\nDebug.Print Err.Number\nEnd Sub",
+    )?;
+    assert_eq!(ide.mode(), Mode::Completed, "{:?}", ide.diagnostics);
+    assert_eq!(
+        ide.output(),
+        vec![
+            "initialized",
+            "94\t8",
+            "380\t400",
+            "380\t8",
+            "6\t400",
+            "438"
         ]
     );
     Ok(())
