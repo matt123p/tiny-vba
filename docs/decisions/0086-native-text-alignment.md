@@ -1,6 +1,6 @@
 # ADR 0086: Native control text alignment
 
-Date: 2026-11-07. Status: selected runtime/view implemented; acceptance in progress. M7A.4 remains open.
+Date: 2026-11-07. Status: selected runtime/view implemented; shared/browser and both host acceptance recorded in progress, with the WASI runner limitation below. M7A.4 remains open.
 
 ## Contract and ownership
 

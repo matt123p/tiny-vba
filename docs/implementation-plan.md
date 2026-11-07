@@ -109,6 +109,9 @@ and native save/reopen. See [ADR 0041](decisions/0041-worksheet-form-controls.md
   defaults/painting. ADR 0084 retains native borders/effects/background styles and
   implements selected typed interactions/local rendering; ADR 0085 adds published
   Font attribute aliases. Full appearance/member/platform acceptance stays open.
+  ADR 0086 adds selected TextAlign, native/public value translation, independent
+  ordinary state and matching text/caret geometry; ComboBox popup rows retain
+  independent alignment. The remaining checklist and full milestone stay open.
   ADR 0076 adds selected nested modal mouse/keyboard input continuations with
   shared raw-input bounds, held release, parent unload and Reset regressions. L02
   remains partial; all remaining lifecycle and control contracts stay open.
@@ -199,8 +202,3 @@ For each change, run the repository's required CI/WASM gates and affected UI/hos
 checks; update [progress](implementation-progress.md), [compatibility](compatibility-matrix.md)
 and the owning contract/ADR. The [UI scope index](ui/post-m8-roadmap.md) points
 to the remaining UI/host requirements without duplicating this plan.
-
-M7A.4 also includes selected native TextAlign (ADR 0086): native/public enum
-translation, ordinary independent control state, local text/caret geometry and
-ComboBox edit/popup separation. This does not reduce the remaining checklist or
-claim milestone completion.

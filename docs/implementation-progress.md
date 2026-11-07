@@ -12,9 +12,28 @@ No VM/protocol, global style/font, format, resource or budget change occurs.
 
 Seven model and four real GPU/input cases pass, along with existing appearance
 and Font GPU cases. Strict affected Clippy, all 34 pointer and three colour
-regressions pass. Full shared/browser/affected host acceptance is in progress. Boolean/
+regressions pass. Shared/browser and affected host receipts follow below. Boolean/
 RefEdit and remaining member/wrap/AutoSize/bidi/platform behavior, and the unchanged
 full M7A.4 checklist remain open. Fresh Office observations remain M8.5 NOT_RUN.
+
+Shared product `77465858e83c5e59790296b5d2fb1ed3c3b39374` passes full CI,
+strict workspace/all-targets Clippy, WASM, UI, Xvfb native, web, repository checks
+and all five Chromium flows (including native TextAlign). All five theme/scale/
+host views and the browser runtime/Break views were inspected. The full WASI
+gate passes with Node 18.19.1 and unchanged default stack/settings. Node 22.23.4
+SIGSEGVs in the existing boolean accelerator case; the same bytes pass Node 18,
+and a separately linked 8 MiB diagnostic module passes that case on Node 22.
+No shipping stack/VM/WASI setting was changed; the cause remains unconfirmed.
+Both hosts pin that exact product revision, with revision-only changes to the 13
+shared lockfile packages. GridCraft passes all 10 full CI steps, strict optional
+VBA/UI Clippy, five form UI cases, VBA web and 33 native/33 actual Node 22-WASM
+package cases (integration `4bf841c55ed65f818eb9e4c7e1b5d2065bc529cb`).
+WordCraft passes all eight full CI steps with isolated serial tests, strict
+optional VBA/UI Clippy, 13 VBA UI cases, hidden-editor and canvas-prefix/Reset
+flows, VBA web and 28 native/28 actual Node 22-WASM package cases (integration
+`12b6abcb1b5ab912e9dc6daeabcfb19e7d94abe7`). Both document/form renders were
+inspected. These host integrations are committed and pushed. Full M7A.4 remains
+open; the next P01 task is applicable WordWrap import/defaults and caption layout.
 
 ## M7A.4 continued — native list border ownership (2026-11-07)
 
