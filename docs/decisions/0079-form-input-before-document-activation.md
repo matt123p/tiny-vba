@@ -1,6 +1,6 @@
 # ADR 0079: Earlier form input precedes document activation
 
-Status: implemented and validated in shared runtime/UI; consumer integration in progress.
+Status: implemented and validated in shared runtime/UI and both pinned consumers.
 Date: 2026-11-07.
 
 ## Contract and ownership

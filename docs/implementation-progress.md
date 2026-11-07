@@ -14,10 +14,24 @@ existing entry/text budgets discard unapplied input. No budget, VM or host API i
 changed. All 21 document-input, 14 keyboard and 34 mouse regressions pass. Final
 shared CI/strict Clippy, WASM/WASI, UI/native/web, repository checks and Chromium
 editor/modal-form/native-window checks pass. Five native theme/scale views and
-browser paused/modeless output were inspected. Consumer pins and host integration
-are being validated. Full L01/L02/K02/M7A.4 remain partial, including
+browser paused/modeless output were inspected. Both hosts pin shared product
+`231818a4179a6b096bcc66b1d8922ad0282ac7ce`. GridCraft full CI (10 steps), strict
+optional VBA/UI Clippy, five form UI cases, VBA web and all 28 native/28 Node-WASM
+package cases pass (integration `960d39a4`). WordCraft full CI (8 steps, isolated
+serial tests), strict optional VBA/UI Clippy, 13 VBA UI cases, the hidden-editor
+form, the canvas-prefix/Reset flow, VBA web and all 23 native/23 Node-WASM package
+cases pass (integration `60b15594`). Both host document views were inspected.
+All final gates exited zero; the Word canvas gate was rerun after an initial
+wrapper exit 143 following its passing output. All three repositories are
+committed and pushed. Full L01/L02/K02/M7A.4 remain partial, including
 other chrome/keyboard activation, arbitrary mixed pointer order and the unchanged
 control/property/binding/platform checklist. Fresh Office traces stay M8.5 NOT_RUN.
+
+Shared verification used `cargo xtask ci`, `cargo xtask wasm`, `cargo xtask wasm-run`,
+`cargo xtask ui`, `xvfb-run -a cargo xtask ui-native`, `cargo xtask web`, repository
+checks, the native-instance snapshot example and Chromium smoke/forms/native-window
+scripts. Next smallest lifecycle task: authorized document activation through
+other host chrome/keyboard routes, with the same callback and input ownership.
 
 ## M7A.4 continued — document activation input (2026-11-07)
 
