@@ -1,0 +1,388 @@
+{
+  "schema": 1,
+  "profile": "m7a-common-native-v1",
+  "date": "2026-11-08",
+  "evidence_basis": "authored-contract",
+  "office_observations": "NOT_RUN",
+  "office_build": null,
+  "selection_sha256": "41c0c90ab84cbdf6065301cee4cdd5ea988e84c8b667f3d3972c5dfbe3b35fa4",
+  "shared_runtime_revision": "d9431ce4992ee9580acfe2fe0f7276de229bedaf",
+  "runtime_tree_sha256": "a6b1acaa2f6da29d4ef603bfee9c26b285113e52d30bd11c850df1845023e420",
+  "repositories": {
+    "tiny-vba": "43d5e82e4dea94f3389bdfd8cdfb837bc3b47517",
+    "gridcraft": "3273441a540d4962795fd8abe03df6b479553211",
+    "wordcraft": "b19060d19b77406fbd5c72d37345113308922c1a"
+  },
+  "environment": {
+    "os": "Linux 7.0.0-38-generic x86_64",
+    "rustc": "rustc 1.99.1 (58cf8f9c3 2026-10-13)",
+    "cargo": "cargo 1.99.1 (5f94df478 2026-08-27)",
+    "node": "v22.23.4",
+    "comparison_context": "authored invariant/Gregorian/UTF-16; no Office oracle"
+  },
+  "specimens": [
+    {
+      "id": "m7a-xlsm-native-package",
+      "stages": {
+        "load": "PASS",
+        "compile": "PASS",
+        "display": "PASS",
+        "input": "PASS",
+        "run_debugger": "PASS",
+        "edit": "PASS",
+        "native_save": "PASS",
+        "reopen": "PASS",
+        "trust_reset_undo": "PASS",
+        "malformed_bounds": "PASS",
+        "signature_loss": "PASS"
+      },
+      "expected": {
+        "format": ".xlsm",
+        "load_compile": "no output/document mutation or automatic execution; binary export compiles idle authored state",
+        "edit_save_reopen": "edited source and TextBox text survive actual native embedded writeback and package reopen",
+        "signature": "invalidated VBA signature parts/relationships/types removed; cryptographic verification/resigning unsupported",
+        "input_debugger": "Apply_Click stops before document mutation; Continue executes once; output exactly [\"saved initialize\", \"saved embedded\"]",
+        "host_effect": "cell A1 = Text(\"saved embedded\")",
+        "undo_reset": "one completed native undo batch restores pre-callback host state; Reset leaves no live form instances",
+        "malformed": "truncated f/o streams, unknown control class, hostile site length refuse without changing document state or raw project bytes",
+        "M7": "unchanged context/event/trust/original-project regression cases retained"
+      }
+    },
+    {
+      "id": "m7a-docm-native-package",
+      "stages": {
+        "load": "PASS",
+        "compile": "PASS",
+        "display": "PASS",
+        "input": "PASS",
+        "run_debugger": "PASS",
+        "edit": "PASS",
+        "native_save": "PASS",
+        "reopen": "PASS",
+        "trust_reset_undo": "PASS",
+        "malformed_bounds": "PASS",
+        "signature_loss": "PASS"
+      },
+      "expected": {
+        "format": ".docm",
+        "load_compile": "no output/document mutation or automatic execution; binary export compiles idle authored state",
+        "edit_save_reopen": "edited source and TextBox text survive actual native embedded writeback and package reopen",
+        "signature": "invalidated VBA signature parts/relationships/types removed; cryptographic verification/resigning unsupported",
+        "input_debugger": "Apply_Click stops before document mutation; Continue executes once; output exactly [\"saved initialize\", \"saved embedded\"]",
+        "host_effect": "main story = String(\"saved embedded\")",
+        "undo_reset": "one completed native undo batch restores pre-callback host state; Reset leaves no live form instances",
+        "malformed": "truncated f/o streams, unknown control class, hostile site length refuse without changing document state or raw project bytes",
+        "M7": "unchanged context/event/trust/original-project regression cases retained"
+      }
+    }
+  ],
+  "fresh_gates": [
+    {
+      "gate": "common integration",
+      "command": "cargo xtask m7a",
+      "status": "PASS",
+      "count": 130,
+      "log_sha256": "270489d63559291b114e3429d69342b8c598db9cff4aaecfc6e2a0beb28a4b34"
+    },
+    {
+      "gate": "shared native CI",
+      "command": "cargo xtask ci",
+      "status": "PASS",
+      "count": null,
+      "log_sha256": "e4de65c4602414df53ead83ee69a3a442031e476e114b56d73a41f44f9fe4583"
+    },
+    {
+      "gate": "Grid full CI",
+      "command": "CRAFT_FONTS_DIR=<reviewed fonts> CRAFT_FONTS_REQUIRED=1 cargo xtask ci",
+      "status": "PASS",
+      "count": 10,
+      "log_sha256": "3365a3bd2bdeb2c351f287a1096de041dd84131c1896a97a5b827470bf705207"
+    },
+    {
+      "gate": "Word full CI",
+      "command": "RUST_TEST_THREADS=1 cargo xtask ci (isolated)",
+      "status": "PASS",
+      "count": 8,
+      "log_sha256": "8f8a3d101d4b75b189798eed203f4ff7049a22b4db3accbcdcff7a5bd9feaa55"
+    },
+    {
+      "gate": "Grid native packages",
+      "command": "cargo test -p gridcraft-vba --test native_forms --locked",
+      "status": "PASS",
+      "count": 35,
+      "log_sha256": "89d799798b0032d19a0a630e0567cb052113840c2a1e659eda64757104b15116"
+    },
+    {
+      "gate": "Grid WASM packages",
+      "command": "Node 22 wasm-bindgen-test-runner: gridcraft-vba/native_forms",
+      "status": "PASS",
+      "count": 35,
+      "log_sha256": "f9b1760583b9804002ada0771625aa30834dbf5fddc8d7601c662a26e1953e40"
+    },
+    {
+      "gate": "Word native packages",
+      "command": "cargo test -p wordcraft-vba --test native_forms --locked",
+      "status": "PASS",
+      "count": 30,
+      "log_sha256": "274f1db4ee37451280eb31364ec36c4bdb4c3581e80d8f8d7582812401b2ba7b"
+    },
+    {
+      "gate": "Word WASM packages",
+      "command": "Node 22 wasm-bindgen-test-runner: wordcraft-vba/native_forms",
+      "status": "PASS",
+      "count": 30,
+      "log_sha256": "3086bb63d553798c13b45de450896714f59b34e6c99bd9a84179f954f93b924c"
+    },
+    {
+      "gate": "Grid form UI",
+      "command": "gridcraft-ui-egui --features vba --test vba_forms",
+      "status": "PASS",
+      "count": 6,
+      "log_sha256": "1e4b53adc80c2cf8d4ca6b62ec0d99c4aa064f5ec6dc7588a8445b13ba879066"
+    },
+    {
+      "gate": "Grid worksheet UI",
+      "command": "gridcraft-ui-egui --features vba --test worksheet_controls",
+      "status": "PASS",
+      "count": 6,
+      "log_sha256": "b9198d8237470a695edc2393979a3654d2b5bd6afc23b99db6335b4da29b4045"
+    },
+    {
+      "gate": "Word UI",
+      "command": "wordcraft-ui-egui --features vba --lib vba",
+      "status": "PASS",
+      "count": 13,
+      "log_sha256": "899eef9d43d096ef5108e9d04eb9f65b40438e7f29dc0290cd447e71ad2603db"
+    },
+    {
+      "gate": "Word canvas",
+      "command": "wordcraft-ui-egui --features vba --lib native_document_click",
+      "status": "PASS",
+      "count": 1,
+      "log_sha256": "38f1a7f6837ab953a6712a11d4df79514b305a855532f87259b4d0edb193fabd"
+    },
+    {
+      "gate": "Word hidden editor",
+      "command": "wordcraft-ui-egui --features vba --lib native_userform_windows",
+      "status": "PASS",
+      "count": 1,
+      "log_sha256": "7225fe142572a730fa4372ab439f48a97e2fa96190de28f05a43a53be18d2f3b"
+    },
+    {
+      "gate": "Word copy UI",
+      "command": "wordcraft-ui-egui --features vba --lib native_package_copy_ui",
+      "status": "PASS",
+      "count": 1,
+      "log_sha256": "cc8416d993247e875513a33672ac7c4522c46ebb8ddda1eb2d673327b493ebad"
+    },
+    {
+      "gate": "Word workflows",
+      "command": "wordcraft-vba --test word_workflows",
+      "status": "PASS",
+      "count": 29,
+      "log_sha256": "a4594183bd039a9c866d146e7de6a121c25879fbc659f0daffb67de48230f805"
+    },
+    {
+      "gate": "Grid strict optional Clippy",
+      "command": "optional VBA/UI --all-targets -D warnings",
+      "status": "PASS",
+      "count": null,
+      "log_sha256": "485fb3a43f90e649978af04c5b9bb1bfa45fd5986e21b1cac75433a08a16edde"
+    },
+    {
+      "gate": "Word strict optional Clippy",
+      "command": "optional VBA/UI --all-targets -D warnings",
+      "status": "PASS",
+      "count": null,
+      "log_sha256": "310f5592174f45fbed0a8d94151e08e894eb6b5b1137c8e2540a075109fed067"
+    },
+    {
+      "gate": "Grid VBA web",
+      "command": "gridcraft-web --features vba --target wasm32-unknown-unknown",
+      "status": "PASS",
+      "count": null,
+      "log_sha256": "a1759f93bcc1475f19f65f787bedee285c22cc67ae7f983fda5d8b87cf7a2f34"
+    },
+    {
+      "gate": "Word VBA web",
+      "command": "wordcraft-web --features vba --target wasm32-unknown-unknown",
+      "status": "PASS",
+      "count": null,
+      "log_sha256": "43a3a5fb783baf1fb7b8160e85821eed9320aa0f2daead1bd4b5d54cac9e9d52"
+    }
+  ],
+  "retained_unchanged_shared_gates": [
+    {
+      "gate": "WASM target",
+      "command": "cargo xtask wasm",
+      "status": "PASS",
+      "basis": "M7A.6 exact shared implementation/dependency tree and selected inputs unchanged",
+      "log_sha256": "58fb875077f55f31ec55e34d336b9da5f1c386ebaf7e1895ba3091894584a363"
+    },
+    {
+      "gate": "full Node 22 WASI",
+      "command": "cargo xtask wasm-run",
+      "status": "PASS",
+      "basis": "M7A.6 exact shared implementation/dependency tree and selected inputs unchanged",
+      "log_sha256": "d98417b92ace57ba974db0c000391988d57aba1cc5dd36c7306fa4baafb4fe7d"
+    },
+    {
+      "gate": "UI",
+      "command": "cargo xtask ui",
+      "status": "PASS",
+      "basis": "M7A.6 exact shared implementation/dependency tree and selected inputs unchanged",
+      "log_sha256": "e6aa37aa1620ba2ec6fce4829702399dbc639a1315723e32094eb938a8aa1498"
+    },
+    {
+      "gate": "Xvfb native capture",
+      "command": "xvfb-run -a cargo xtask ui-native",
+      "status": "PASS",
+      "basis": "M7A.6 exact shared implementation/dependency tree and selected inputs unchanged",
+      "log_sha256": "4a05c902e1c10fab23ce9880bb84f7eb635713c1acf73204ce3f077a3d4d08a8"
+    },
+    {
+      "gate": "web",
+      "command": "cargo xtask web",
+      "status": "PASS",
+      "basis": "M7A.6 exact shared implementation/dependency tree and selected inputs unchanged",
+      "log_sha256": "6e7a25064e181bd04b47627f4f20513b6869132051dbb0adfdc500af05800170"
+    }
+  ],
+  "limitations": [
+    "P9 uncommon/exhaustive behavior remains deferred after M8",
+    "M8.5 fresh Office comparisons NOT_RUN",
+    "ordinary document Save preserves imported VBA; edited package persistence is explicit copy export",
+    "fixed embedded component identity, unsupported resource/group/code-page edits refuse",
+    "no protection bypass, cryptographic signature verifier/resigning or arbitrary COM/OCX/DLL activation"
+  ],
+  "retained_browser_flows": [
+    {
+      "flow": "smoke",
+      "status": "PASS",
+      "log_sha256": "81777d939bd3b7fef26795ecc39901b5911c39904160a0ef669c5b6e1f4bff8b"
+    },
+    {
+      "flow": "forms",
+      "status": "PASS",
+      "log_sha256": "3f0befa7db12ae9da7dbfbb3245a80400ea27859fc3909938425e0550cbe5af4"
+    },
+    {
+      "flow": "fonts",
+      "status": "PASS",
+      "log_sha256": "d6ac99196b15e9787ce4ba12c2f7f9105d989221d80cfee0d11aa403fe519c58",
+      "input_sha256": {
+        "NativeForm.frm": "7951acf4957d06a19d4ca37de32e2f0530695bf9bea2095ce1cd8a8138dad477",
+        "NativeForm.frx": "ef7627c8aee27f7d8fe623f6b000cc50600a413bfebaee91fe1cc8ae371fb104"
+      }
+    },
+    {
+      "flow": "appearance",
+      "status": "PASS",
+      "log_sha256": "40d7232dfb61618790ec4f6e50a01955e9b1d619753ab57fd32b95fa0b846b25",
+      "input_sha256": {
+        "NativeForm.frm": "7331234f5ebc8729afb3050fd92177ddf561b1cdc805b50faf1a025f7bac1372",
+        "NativeForm.frx": "1c6b36a28bb921f4c1f9865b6c242dbd06f772c836cca402bf36a556ba059e64"
+      }
+    },
+    {
+      "flow": "text-align",
+      "status": "PASS",
+      "log_sha256": "1b333857dee0c64376548c6ef017480b70432938879057330df97378077f690f",
+      "input_sha256": {
+        "NativeForm.frm": "ab36ade92a33f6063c9b1caa5e6653853f59f424d925cd78d6eb6af06e329e00",
+        "NativeForm.frx": "e88a51ba7cac0b197b4153d067107ae5dcf1ae79a36eb30d9b3c192018f8a531"
+      }
+    },
+    {
+      "flow": "word-wrap",
+      "status": "PASS",
+      "log_sha256": "f35770c19927828eff40f3c6851842fc4326941fbdb9831f598a75c07fc94d6a",
+      "input_sha256": {
+        "NativeForm.frm": "d94078a1a8ff64d24a5abce4c4ef29467b88cc5ba4ba7b0417c5a96caa3ab7a1",
+        "NativeForm.frx": "02152a816d6f8057d3e723ef0500bf4bfd37e6c59480ba09c803cfca8811a159"
+      }
+    },
+    {
+      "flow": "boolean-word-wrap",
+      "status": "PASS",
+      "log_sha256": "d1065c6d171ab2aee7eace9e9c37bf0bfc3f00a6f4b4fa271f780cef90eff336",
+      "input_sha256": {
+        "NativeForm.frm": "1bfe75ddc1c69eec5d33d0084f6b0eb12a44aa9da4b8daf6cfbbeadb89b70dbc",
+        "NativeForm.frx": "b7d248fc8a268b676ebe1369da298067b9b292746d98151db7f2d6b027cc6278"
+      }
+    },
+    {
+      "flow": "caption-alignment",
+      "status": "PASS",
+      "log_sha256": "387f639e3414da3daafaa9f17be8c13b44e03c471145fb3607f01f93541b4a6b",
+      "input_sha256": {
+        "NativeForm.frm": "6db01798a6c8414e1af36915fc8ceebcf09cae0f7ea65544d4e4f9a4233f2229",
+        "NativeForm.frx": "0c0b206450c820b9e011de2c0a9076f6d43331afec5fd85ec41f86b8ebc9fa84"
+      }
+    },
+    {
+      "flow": "hide-selection",
+      "status": "PASS",
+      "log_sha256": "f710154a79b1ce52194a560e9ab43d37e846c06acef3ea6875c998625cf34d51",
+      "input_sha256": {
+        "NativeForm.frm": "ef73b7e5cb6d44a5c42306a33e5eecaf5df91b42584357dc24770a70c6ae49e5",
+        "NativeForm.frx": "c5ff0d73683bbb0f8186a23c3d1f98487e961800d697c9db5ad2fdf997a56b62"
+      }
+    },
+    {
+      "flow": "auto-tab",
+      "status": "PASS",
+      "log_sha256": "79748eff98481f30222f8b0079c0f6dee11621ae7279d87e06cca29278a257df",
+      "input_sha256": {
+        "NativeForm.frm": "c4a8bcf80d1ce173853bca04cc66c090b87ffdb531d00195b9e6c375bdbf8492",
+        "NativeForm.frx": "694d02bb0f799000eaed626a97265341cb6889eab38f66827f1d37eb5da43ddd"
+      }
+    },
+    {
+      "flow": "selection-margin",
+      "status": "PASS",
+      "log_sha256": "75880fc2df092c75bbb5a93c1e488c7d4cd8760657a963780415dffb3abe2e31",
+      "input_sha256": {
+        "NativeForm.frm": "0cb4018d270dba63ee3f8f5958e4c64ce5cf59fc90c74d90e6cf719ca6d4cea8",
+        "NativeForm.frx": "32ee723bc9941df5c86c5f501895374503e14411eecfa6cee40ccc4f8b070a52"
+      }
+    },
+    {
+      "flow": "text-scroll",
+      "status": "PASS",
+      "log_sha256": "faf1cf6d27411b2b23b40474f6a76c5c26b1b0ff121bbae3590170bfbceba3e6",
+      "input_sha256": {
+        "NativeForm.frm": "90b9dded267c1dd15632c1f032fe3942a4f063881bb5809f39acf3e78dbbd112",
+        "NativeForm.frx": "3e0d218f96e06caf1a74b527eea3ef328fe527e0f8c37fa86becbfc19546bb8b"
+      }
+    },
+    {
+      "flow": "text-no-bars",
+      "status": "PASS",
+      "log_sha256": "e73bb542ceb0a9cdb16a8a6b1a33126522b74e1f4c6f920aa5611d16b83f0ea6",
+      "input_sha256": {
+        "NativeForm.frm": "ccb60cff3fe36cdec7ad1d1304bd5cc91fc13cecaba0d492a655de651f02ded9",
+        "NativeForm.frx": "2785db3db633f14e71410d10680db0ce1dfa5b9fbdf68311d0e367d17d0237bc"
+      }
+    },
+    {
+      "flow": "button-focus",
+      "status": "PASS",
+      "log_sha256": "a86356f18a1915efd6121e21d3ef29a0f85d04fc163b4601aa97ab7d1449c5f9",
+      "input_sha256": {
+        "NativeForm.frm": "6633c8d90b6928314b662ff90c6fa97ee0b3269a57cfab7da49e27d47b5afeb7",
+        "NativeForm.frx": "c829094070bc1cd24865d33b2e5b4f88ebf6115b89232336da7aea8012f9b1ef"
+      }
+    },
+    {
+      "flow": "native-save",
+      "status": "PASS",
+      "log_sha256": "ac13be313bc5532d5611fcc67b76d1647effc06a71554e2f7441a89bbee59f64",
+      "input_sha256": {
+        "NativeForm.frm": "6633c8d90b6928314b662ff90c6fa97ee0b3269a57cfab7da49e27d47b5afeb7",
+        "NativeForm.frx": "c829094070bc1cd24865d33b2e5b4f88ebf6115b89232336da7aea8012f9b1ef"
+      }
+    }
+  ],
+  "shared_acceptance_changes": "Tooling, reviewed selection and docs accompanying this record; tiny-vba repository revision records their pre-acceptance base head. Shared runtime revision is pinned separately."
+}

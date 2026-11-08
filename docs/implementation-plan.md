@@ -1,7 +1,7 @@
 # Remaining implementation plan
 
-Updated 2026-11-08. This plan contains **remaining work only**: M7A.7, stable M8 IDs and deferred P9,
-after completed M1–M6, M6A and M7 for their declared profiles.
+Updated 2026-11-08. This plan contains **remaining work only**: stable M8 IDs and deferred P9,
+after completed M1–M6, M6A, M7 and common-profile M7A.
 [M7 acceptance](m7-acceptance.md) records the authored unchanged-document/package
 profile and [ADR 0037](decisions/0037-m7-package-preservation-and-writeback.md)
 records the reviewed binary-writeback/signature contract. Completed task definitions
@@ -18,7 +18,6 @@ separate and native host dispatch in Rust.
 
 | Milestone | Remaining work | Prerequisites |
 |---|---|---|
-| M7A | Final common-profile integration acceptance (M7A.7) | Accepted M1–M6, M6A and M7; reviewed native-form/writeback contracts |
 | M8 | Expanded conformance, hardening and release | Accepted M1–M6, M6A, M7 and M7A profiles for the declared release profile |
 | P9 | Extended/uncommon Office forms compatibility | After M8; finite follow-up packets, not a prerequisite of common-profile M7A/M8 |
 
@@ -28,77 +27,17 @@ removal of `.tvform`; see [ADR 0038](decisions/0038-native-office-forms-and-comp
 Tiny-vba must mirror applicable Excel/Word behavior and native formats. Do not
 add custom user-facing language features, formats or control semantics. Unsupported
 Office behavior stays explicit until implemented and verified.
-Fresh Office comparisons remain NOT_RUN under M8.5. Conformance/hardening can
-continue alongside M7A, but release acceptance depends on M7A completion.
+Fresh Office comparisons remain NOT_RUN under M8.5. Common-profile M7A acceptance is complete; release acceptance now depends on
+M8 conformance/hardening and its declared evidence requirements.
 
-## M7A — Native Office forms and removal of .tvform
-
-Status: **IN PROGRESS**, started 2026-11-04 on owner direction.
-The [inventory and work ledger](m7a-inventory.md) records FC0.1's audited paths,
-the completed import/attachment and native worksheet Form Control profiles.
-M7A.4 common semantics and M7A.5 explicit persistence are complete; M7A.6 format
-removal is complete and M7A.7 final integration remains open;
-no full M7A acceptance is claimed.
-Owner: tiny-vba reusable form codecs/model/runtime/editor; GridCraft worksheet
-controls/Excel bindings; both forks' document, trust, event and package integration.
-The [activated work breakdown](office-forms-controls-implementation-plan.md)
-retains FC0–FC5 IDs and adds FC6 for removal. M7A IDs below stay stable.
-
-Completed checkpoints: **M7A.1 — Inventory and contracts (FC0)** and
-**M7A.2 — Native UserForm codecs and attachment (FC3.1–FC3.4)** for the declared
-`native-userform-import-v1` profile: immediate Label/TextBox/CommandButton children,
-separate native export and embedded input, shared designer/debugger attachment,
-and inert package attachment in both forks. See the
-[completed task definitions and evidence](implementation-progress.md#completed-m7a1-and-m7a2-plan-scope)
-and [property/event/format/host contracts](m7a-control-contracts.md).
-M7A.4 is complete for the common profile below. Broader native variants and
-exhaustive lifecycle parity are P9. M7A.5 native persistence is complete for its
-explicit workflows, and M7A.6 format removal is complete. M7A.7 final acceptance
-remains open.
-No full M7A sign-off is claimed.
-
-Completed checkpoint: **M7A.3 — Worksheet forms and controls (FC1–FC2)** for
-[worksheet-form-controls-v1](m7a-worksheet-controls.md): all nine standard families,
-source reconciliation, trusted input, live bindings, selected ControlFormat APIs
-and native save/reopen. See [ADR 0041](decisions/0041-worksheet-form-controls.md).
-
-Completed checkpoint: **M7A.4 — Common Office form/control semantics (FC3.5/FC4)**
-for [native-forms-common-v1](m7a4-common-profile.md), accepted on explicit owner
-scope reduction under [ADR 0097](decisions/0097-common-forms-scope-and-p9.md).
-Common controls/properties, instances and modal/modeless lifecycle, text/list/
-choice/container state, ordinary input/events, appearance, debugger and trust
-behavior pass the [revised checklist](m7a4-completion-checklist.md). Existing
-less common implemented features are retained. The former outstanding checklist
-IDs and exhaustive property/platform/resource/ActiveX work move to
-[P9](p9-forms-compatibility.md); they no longer block M7A.4 or the following gates.
-Bugs in included common workflows remain fixes, not automatic P9 deferrals.
-
-M7A.5 / FC5 is **COMPLETE** for native common-profile Save/Export and explicit
-edited XLSM/DOCM copy workflows under ADR 0098. See the
-[acceptance record](m7a5-acceptance.md) for supported edits, source/cache/signature
-policy, exact receipts and limitations. Ordinary document Save preserves imported
-VBA bytes. M7A.6 is also complete; next is M7A.7, with no full M7A sign-off claimed.
-
-M7A.6 / FC6 is **COMPLETE** under ADR 0099. The custom codec/APIs/routes/filters
-and example are removed, with native replacement workflows and shared/pinned-host
-gates accepted in [the removal record](m7a6-acceptance.md). No legacy importer or
-conversion feature is shipped. Historical format evidence is marked superseded.
-
-- **M7A.7 — Acceptance:** prove load/compile/display/input/run/edit/save/reopen
-  independently against the accepted common profile in both forks; test malformed
-  resources, unsupported controls, bounds, trust loss, Reset/close, debugger waits,
-  cancellation, events, undo/recalculation and signature-loss policy. Run shared
-  CI/WASM/WASI/UI/native/browser and affected fork gates. Check that no shipping
-  `.tvform` support remains. Preserve the M7 regressions and add native-form package
-  cases; M7's unsigned, form-free fixtures alone cannot satisfy M7A.
-
-Acceptance: supported native forms execute unchanged authored handlers and survive
-native editing/export/package save/reopen with verified source/resource ownership.
-The control/host matrix reports remaining gaps accurately. Product behavior and
-formats follow Excel/Word; `.tvform` is removed from shipping workflows. Authored,
-specification and fresh Office evidence remain distinct; required fresh comparisons
-are tracked in M8.5. No arbitrary COM/OCX/DLL loading, P-code execution, protection
-bypass or third-party control support is implied.
+M7A.1–M7A.7 are **COMPLETE** for the owner-approved common profile under
+[ADR 0100](decisions/0100-common-native-forms-acceptance.md). See the
+[acceptance matrix and limits](m7a-acceptance.md), reviewed selection/execution
+records and [completion evidence](implementation-progress.md) for native forms,
+worksheet controls, explicit native file/edited package copies and removal of
+the custom format. Ordinary document Save retains original VBA bytes. Remaining
+uncommon/exhaustive compatibility belongs to P9 after M8; fresh Office comparison
+remains M8.5 NOT_RUN. Next is M8; task IDs below stay stable.
 
 ## M8 — Expanded conformance, hardening and release
 

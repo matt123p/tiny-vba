@@ -75,6 +75,96 @@ fn run() -> Result<(), Box<dyn Error>> {
                 "M7 authored fork acceptance PASS; Office observations and real signature verification NOT_RUN"
             );
         }
+        Some("m7a") => {
+            // Reviewed authored integration only; core CI never needs the siblings.
+            command(python(), &["tools/check_m7a.py"])?;
+            command(python(), &["tools/check_m7.py"])?;
+            command(python(), &["tools/check_repository.py", "native-forms"])?;
+            command(
+                "cargo",
+                &[
+                    "test",
+                    "-p",
+                    "vba-project",
+                    "--test",
+                    "native_form_failures",
+                    "--test",
+                    "native_save",
+                    "--test",
+                    "writeback",
+                    "--locked",
+                ],
+            )?;
+            command(
+                "cargo",
+                &[
+                    "test",
+                    "-p",
+                    "vba-ide",
+                    "--test",
+                    "native_save",
+                    "--test",
+                    "form_execution",
+                    "--locked",
+                ],
+            )?;
+            command(
+                "cargo",
+                &[
+                    "test",
+                    "-p",
+                    "vba-ide-app",
+                    "--test",
+                    "source_io",
+                    "--locked",
+                ],
+            )?;
+            let parent = root
+                .parent()
+                .ok_or_else(|| io::Error::other("M7A requires sibling fork checkouts"))?;
+            for (repo, package, suites) in [
+                (
+                    "gridcraft",
+                    "gridcraft-vba",
+                    &["native_forms", "package_acceptance", "form_controls"][..],
+                ),
+                (
+                    "wordcraft",
+                    "wordcraft-vba",
+                    &["native_forms", "package_acceptance"][..],
+                ),
+            ] {
+                let mut cmd = Command::new("cargo");
+                cmd.current_dir(parent.join(repo))
+                    .args(["test", "--locked", "-p", package]);
+                for suite in suites {
+                    cmd.args(["--test", suite]);
+                }
+                let status = cmd.status()?;
+                if !status.success() {
+                    return Err(io::Error::other(format!(
+                        "M7A {repo} acceptance failed: {status}"
+                    ))
+                    .into());
+                }
+            }
+            for filter in ["m7_vba", "form_controls"] {
+                let status = Command::new("cargo")
+                    .current_dir(parent.join("gridcraft"))
+                    .args(["test", "--locked", "-p", "gridcraft-xlsx", filter])
+                    .status()?;
+                if !status.success() {
+                    return Err(io::Error::other(format!(
+                        "M7A worksheet/package graph acceptance failed: {status}"
+                    ))
+                    .into());
+                }
+            }
+            command(python(), &["tools/check_m7a.py"])?;
+            println!(
+                "M7A authored common-profile integration PASS; fresh Office comparisons NOT_RUN (M8.5); P9 remains deferred"
+            );
+        }
         Some("ci") => {
             command("cargo", &["fmt", "--all", "--check"])?;
             command(
@@ -401,7 +491,7 @@ fn run() -> Result<(), Box<dyn Error>> {
         )?,
         _ => {
             return Err(io::Error::other(
-                "usage: cargo xtask <ci|layers|corpora|m7|wasm|wasm-run|ui|ui-native|web>",
+                "usage: cargo xtask <ci|layers|corpora|m7|m7a|wasm|wasm-run|ui|ui-native|web>",
             )
             .into());
         }

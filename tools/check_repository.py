@@ -162,6 +162,8 @@ def main():
     args = parser.parse_args()
     if args.check in {'native-forms', 'all'}:
         native_forms()
+        from check_m7a import check as check_m7a
+        check_m7a(local=True)
     if args.check in {'layers', 'all'}:
         layers()
     if args.check in {'corpora', 'all'}:

@@ -1,5 +1,13 @@
 # M3/M4 runtime and debugger
 
+M7A.1–M7A.7 are COMPLETE for the owner-approved common native forms profile
+(2026-11-08), under [ADR 0100](decisions/0100-common-native-forms-acceptance.md).
+The [acceptance matrix](m7a-acceptance.md) and reviewed selection/execution records
+cover native forms, worksheet controls, explicit native file/edited package-copy
+persistence and removal of the custom format. Next is M8. P9 remains deferred;
+fresh Office comparisons remain M8.5 NOT_RUN. Earlier incremental scope/status
+entries below retain historical evidence and are superseded for current status.
+
 M7A.6 native-only update (2026-11-08): the custom form codec/APIs, source-file
 routes, file filters and `.tvform` example are removed under
 [ADR 0099](decisions/0099-native-only-form-workflows.md). Insert UserForm now

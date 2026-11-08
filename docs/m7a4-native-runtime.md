@@ -1,5 +1,13 @@
 # M7A.4 native runtime — current implementation and remaining work
 
+M7A.1–M7A.7 are COMPLETE for the owner-approved common native forms profile
+(2026-11-08), under [ADR 0100](decisions/0100-common-native-forms-acceptance.md).
+The [acceptance matrix](m7a-acceptance.md) and reviewed selection/execution records
+cover native forms, worksheet controls, explicit native file/edited package-copy
+persistence and removal of the custom format. Next is M8. P9 remains deferred;
+fresh Office comparisons remain M8.5 NOT_RUN. Earlier incremental scope/status
+entries below retain historical evidence and are superseded for current status.
+
 Updated 2026-11-08. **COMPLETE for the common profile; extended work is P9.**
 Current scope (2026-11-08, [ADR 0097](decisions/0097-common-forms-scope-and-p9.md)):
 **M7A.4 is COMPLETE for [native-forms-common-v1](m7a4-common-profile.md).**

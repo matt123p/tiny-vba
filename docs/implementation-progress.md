@@ -1,5 +1,53 @@
 # Implementation progress
 
+## M7A.7 and M7A complete — common native forms acceptance (2026-11-08)
+
+[ADR 0100](decisions/0100-common-native-forms-acceptance.md) signs off the
+[acceptance matrix](m7a-acceptance.md) for the owner-approved common profile,
+worksheet controls, explicit native file/edited package-copy persistence and custom
+format removal. [Selection](../tests/fixtures/m7a/selection.json) pins 61 original
+artifacts and a shared production/dependency tree digest; [execution evidence](../tests/fixtures/m7a/execution.json)
+records independent stages, commands, exact results and fresh versus retained
+receipts. Integrity output is VALID_FIXTURE / NOT_RUN, never an execution PASS.
+`cargo xtask m7a` is optional real-sibling acceptance; ordinary core CI checks only
+local artifacts and needs no siblings. The gate passes 130 authored cases,
+including Grid's five and Word's six retained M7 package cases and Grid's two M7
+package graph / ten native worksheet format cases.
+
+Both edited-package cases now reopen saved source/resources, stop before actual
+host mutation, Continue exactly once with output `saved initialize`, `saved embedded`,
+write A1/main-story Text/String `saved embedded`, undo to prior host state and
+Reset to no instances. Both forks also reject four malformed native f/o/class/
+size inputs inside packages without changing document state or raw project bytes.
+Signatures, stale receipts, trust/lifetime/cancellation and native source/resource
+ownership remain independently covered. No shipping interpreter, renderer, host
+adapter, dependency, VM/host authority or budget changed.
+
+Shared native CI/strict Clippy passes. Both affected host native/WASM package
+suites pass: Grid 35/35 and Word 30/30. Grid passes six form UI and six worksheet
+UI cases, optional Clippy, VBA web and all 10 CI steps. Word passes 29 workflow
+cases, 13 VBA UI cases plus canvas/hidden-editor/copy checks, optional Clippy,
+VBA web and all eight CI steps in isolation with one test thread. Both current
+host canvases were inspected. The unchanged shared M7A.6 WASM/full Node 22 WASI,
+UI/Xvfb/web and all 15 browser flows are retained by exact source/input hashes;
+they were not represented as fresh M7A.7 executions. The shared runtime pin is
+`d9431ce4992ee9580acfe2fe0f7276de229bedaf`; neither host lockfile changes.
+
+| Repository | Acceptance implementation / receipt |
+|---|---|
+| Shared runtime | `d9431ce4992ee9580acfe2fe0f7276de229bedaf`; M7A.7 tooling/records accompany this entry |
+| GridCraft | `3273441a540d4962795fd8abe03df6b479553211` |
+| WordCraft | `b19060d19b77406fbd5c72d37345113308922c1a` |
+
+M7A.1–M7A.7 are complete for this finite profile, not universal Office parity.
+M7A.5 receipt rules remain: ordinary document Save retains original VBA bytes;
+edited copies retain original editor dirty state; browser downloads do not
+acknowledge disk commits. Unsupported resource/group/code-page edits and fixed
+embedded component identity remain explicit. P9 stays after M8; M8.5 fresh Office
+comparisons remain NOT_RUN. **Next: M8 expanded conformance, hardening and release**.
+No M8/release sign-off or P9 behavior is implied.
+
+
 ## M7A.6 complete — native form files replace the custom format (2026-11-08)
 
 Accepted under [ADR 0099](decisions/0099-native-only-form-workflows.md) and the

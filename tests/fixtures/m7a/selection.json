@@ -1,0 +1,340 @@
+{
+  "schema": 1,
+  "profile": "m7a-common-native-v1",
+  "runtime_profile": "native-forms-common-v1",
+  "evidence_basis": "authored-contract",
+  "office_observations": "NOT_RUN",
+  "deferred": [
+    "P9",
+    "M8.5"
+  ],
+  "shared_runtime_revision": "d9431ce4992ee9580acfe2fe0f7276de229bedaf",
+  "shared": {
+    "id": "m7a-shared-native-boundaries",
+    "repository": "tiny-vba",
+    "license": "MIT OR Apache-2.0",
+    "provenance": "Original repository-authored Rust fixtures/tests; no Office-created binaries, external macros or implementation code.",
+    "execution_review": "original-authored-bounded-host-workflow",
+    "initial_execution_status": "NOT_RUN",
+    "requirements": [
+      "native-forms-common-v1",
+      "native file/persistence snapshots",
+      "M7 original-byte/trust/context regressions"
+    ],
+    "expected": {
+      "native_import": "inert; unsupported/malformed/bounded input refuses before publication",
+      "native_save": "exact authored source/designer; stale/foreign/failed saves do not acknowledge",
+      "lifetime": "common instance/cancel/Reset/close and debugger continuation contracts retained",
+      "browser": "native pair upload; Submit Stop/Continue output 7; exact source/binary pair export and inert reimport"
+    },
+    "artifacts": [
+      {
+        "path": "crates/vba-project/tests/native_form_failures.rs",
+        "sha256": "d64560c69fb5ac1d629e77c3e7b6d2cc61650626a659a6df9619f027efd1d10b"
+      },
+      {
+        "path": "crates/vba-project/tests/native_save.rs",
+        "sha256": "4f3a8ba4e2ad6b261874d43a3caa2f269a0c331109f21528c5e4b3de5b3e22e7"
+      },
+      {
+        "path": "crates/vba-project/tests/writeback.rs",
+        "sha256": "9bbe268eb7f44bd38300ec7f08cc24f5e0fdb6a99ebffe3cc9355b11a1136bb7"
+      },
+      {
+        "path": "crates/vba-project/tests/support/native_forms.rs",
+        "sha256": "1f8782dae8bba842e49b814b093e57bb844363c4d4c52a767c405f431091f648"
+      },
+      {
+        "path": "crates/vba-ide/tests/native_save.rs",
+        "sha256": "628f662ae4a5fced26cd6499fc1d3bdd7775c6aa9f7bf1a5e99fa37352640567"
+      },
+      {
+        "path": "crates/vba-ide/tests/form_execution.rs",
+        "sha256": "6d428cca7a43c1ad38fc569a2aef03d9826a9b84e0e3b8d196f986414103110a"
+      },
+      {
+        "path": "crates/vba-ide/tests/form_instances.rs",
+        "sha256": "7d3aef9b3061f3f64c8c699a5fb2aa6017d1eb448c06800c26a5894439a75e06"
+      },
+      {
+        "path": "apps/vba-ide-app/tests/source_io.rs",
+        "sha256": "a003b6b1ebc47073f0a74b29c62d14256951b752a3fee3dbd9317ca72a9635c0"
+      },
+      {
+        "path": "docs/m7a4-common-profile.md",
+        "sha256": "a3f385fe00f351f43e811015610447f91afe8c1bc91d102b90a10a8e77956eda"
+      },
+      {
+        "path": "docs/p9-forms-compatibility.md",
+        "sha256": "277b8b42037d9f17781ef6ccfd372613e86e996bd47a32b3610649a788724e8e"
+      },
+      {
+        "path": "examples/forms/CustomerForm.frm",
+        "sha256": "718b8b68c544baa4c8e79ec21fc63373d808a97bcf84c400b5a5796c4375c227"
+      },
+      {
+        "path": "examples/forms/CustomerForm.9af671fcecf553d3.frx",
+        "sha256": "a29e918225db4c335f16e41e84b18eee54bb18fbac1bc457c4c63c0e438f36fa"
+      },
+      {
+        "path": "tools/ui-browser/boolean-word-wrap.cjs",
+        "sha256": "279b1e5d8b675f1de2af9fc0314b957c93aaecabdaa90c19e6ce0db34c6558c0"
+      },
+      {
+        "path": "tools/ui-browser/forms.cjs",
+        "sha256": "2beea50bd4eb2fa4a7c80c9e5c5f0ea940ea0249bb943a78ad53d03c38437399"
+      },
+      {
+        "path": "tools/ui-browser/native-accelerator-forms.cjs",
+        "sha256": "d748c01eb2a97cbd7ae618b33e727fc2142c7255902dbc6b7b78a1b314e84217"
+      },
+      {
+        "path": "tools/ui-browser/native-appearance.cjs",
+        "sha256": "90edc5148190ea4466dd0254d40d05f6deec3161af21c91932735182a0edf6e6"
+      },
+      {
+        "path": "tools/ui-browser/native-auto-tab.cjs",
+        "sha256": "dc2cb3d736fdfa3e0175db7caf6b0946d6a5d63ff3f56ff76c68963b7c1296f2"
+      },
+      {
+        "path": "tools/ui-browser/native-boolean-forms.cjs",
+        "sha256": "fd266f6a3a527e6a9d521686d57b39210df7aece98a39dfe5f30cb399af54bec"
+      },
+      {
+        "path": "tools/ui-browser/native-button-focus.cjs",
+        "sha256": "025d31b829be87a0f2cc1cb0acaf7b5bb75a1fffc115623d10872f3fa5c47b54"
+      },
+      {
+        "path": "tools/ui-browser/native-caption-alignment.cjs",
+        "sha256": "7f26cf2fe07b0b6eb6b6c22c63e80011f226010823ea3a556652baa9906d2909"
+      },
+      {
+        "path": "tools/ui-browser/native-colors.cjs",
+        "sha256": "2825536c530c5118b51970ca454145da742daf8fd0e6b5d3a8cbd427a95d84b9"
+      },
+      {
+        "path": "tools/ui-browser/native-combo-forms.cjs",
+        "sha256": "603b95c9607ea52e25af09dde3b015e54a81705aa26c93ca294fb88f0ed962c9"
+      },
+      {
+        "path": "tools/ui-browser/native-composite-mouse.cjs",
+        "sha256": "66e6cd4f2bc835e2eb087b9fc824f67b00d51223092ec57f116d8ef0555e5370"
+      },
+      {
+        "path": "tools/ui-browser/native-focus-forms.cjs",
+        "sha256": "04f422e81acdb198a1469ac07a62e4e10563e1e65b0e62ffaa20cd562c526075"
+      },
+      {
+        "path": "tools/ui-browser/native-fonts.cjs",
+        "sha256": "1e40587bc9feb93e5b3b3be4762cf15fcebd31578ff1dcea52e506dd29d0e30e"
+      },
+      {
+        "path": "tools/ui-browser/native-forms.cjs",
+        "sha256": "73cc2bcc8b59a3f5187317cb33af027052654fc5b414bb5b83b31e07b8c81cc6"
+      },
+      {
+        "path": "tools/ui-browser/native-hide-selection.cjs",
+        "sha256": "7bd0076c905c177a0cb3a23814e0cd357174d886ab83b6a74df025b82bed41b0"
+      },
+      {
+        "path": "tools/ui-browser/native-keyboard-forms.cjs",
+        "sha256": "ea05338b8e190a8bb91cf9a34c1a6475be1a67d53bb86163787403b887eef5af"
+      },
+      {
+        "path": "tools/ui-browser/native-keyboard-routing.cjs",
+        "sha256": "5d0803397053c2eab109c54e681e0d85c0ac5f05c17df1398d2ba0970f2d4d33"
+      },
+      {
+        "path": "tools/ui-browser/native-list-forms.cjs",
+        "sha256": "69c0a9eda2593e14932f5ac8f8da37100071d75e019ceaaa2ec8fe7bc708d407"
+      },
+      {
+        "path": "tools/ui-browser/native-mouse-forms.cjs",
+        "sha256": "1bcdb7092037dc97b691390f52d6b72a5ceeaf97ca5ea0642f1681161980f781"
+      },
+      {
+        "path": "tools/ui-browser/native-multiselect-forms.cjs",
+        "sha256": "df5f484c5d1d5b44504823a39067823a422ba4e6fc9bc9fc6eec873f545aa9f5"
+      },
+      {
+        "path": "tools/ui-browser/native-nested-mouse.cjs",
+        "sha256": "ffdaa19c9e7ed3aacdd5f44ec3bd04a9a95a6703e2985ac9119be90dff3bbcec"
+      },
+      {
+        "path": "tools/ui-browser/native-numeric-forms.cjs",
+        "sha256": "1cf6e0eefbc6f8195c4ac15810058779897980888b3c4143d81cfc7ccb8dcf07"
+      },
+      {
+        "path": "tools/ui-browser/native-save.cjs",
+        "sha256": "1a03ba38ff6d719cd53584ae99023bb52366c3e03662e79a72a752991a643ad3"
+      },
+      {
+        "path": "tools/ui-browser/native-selection-margin.cjs",
+        "sha256": "e4f1eb933e4a49e50ee7c103514c06f12e9c251d72029a19aea9388b4202a07b"
+      },
+      {
+        "path": "tools/ui-browser/native-text-align.cjs",
+        "sha256": "89a8c0510cd03ee3afda9432799acce9a5fe6ad04712e209d39660dd554381d9"
+      },
+      {
+        "path": "tools/ui-browser/native-text-forms.cjs",
+        "sha256": "709ffcd99065532067ff1b1b0786da0a267a44e3c5f4613312a1f93fd1250019"
+      },
+      {
+        "path": "tools/ui-browser/native-text-mouse.cjs",
+        "sha256": "a803a14aa0029fd7a03ad43f03a0555fa8c7f1e1040f3af50290eddf9e2944a6"
+      },
+      {
+        "path": "tools/ui-browser/native-text-no-bars.cjs",
+        "sha256": "65de469d4b9d15036cec1bda9428a053c242a651f540863a27f4bb4883f75ea9"
+      },
+      {
+        "path": "tools/ui-browser/native-text-scroll.cjs",
+        "sha256": "330446e7f47ede77dbf31b94754f3ccbd34b1ee8e704d4c169f94ca4586578cf"
+      },
+      {
+        "path": "tools/ui-browser/native-window-activation.cjs",
+        "sha256": "1f2121e391656978df3be639f46a9800e87c621baef6f5f39d563c67b052f93f"
+      },
+      {
+        "path": "tools/ui-browser/native-word-wrap.cjs",
+        "sha256": "3588aef4e3a218ce05b25d549e2ddedf0ecdba8a9b7f60302e7da5e99ba65262"
+      },
+      {
+        "path": "tools/ui-browser/smoke.cjs",
+        "sha256": "5b5d504489797ca1156e588a14c89ff871e67aafd4bcf4fee92c03bbc7734c3c"
+      },
+      {
+        "path": "crates/vba-project/examples/native_form_fixture.rs",
+        "sha256": "33a668ee5f1a9d1c1fba49baa61d721f419c4c2b7df063a5d38e40cc5630f138"
+      }
+    ]
+  },
+  "specimens": [
+    {
+      "id": "m7a-xlsm-native-package",
+      "repository": "gridcraft",
+      "license": "MIT OR Apache-2.0",
+      "provenance": "Original repository-authored Rust fixtures/tests; no Office-created binaries, external macros or implementation code.",
+      "execution_review": "original-authored-bounded-host-workflow",
+      "initial_execution_status": "NOT_RUN",
+      "requirements": [
+        "native-forms-common-v1",
+        "native file/persistence snapshots",
+        "M7 original-byte/trust/context regressions"
+      ],
+      "expected": {
+        "format": ".xlsm",
+        "load_compile": "no output/document mutation or automatic execution; binary export compiles idle authored state",
+        "edit_save_reopen": "edited source and TextBox text survive actual native embedded writeback and package reopen",
+        "signature": "invalidated VBA signature parts/relationships/types removed; cryptographic verification/resigning unsupported",
+        "input_debugger": "Apply_Click stops before document mutation; Continue executes once; output exactly [\"saved initialize\", \"saved embedded\"]",
+        "host_effect": "cell A1 = Text(\"saved embedded\")",
+        "undo_reset": "one completed native undo batch restores pre-callback host state; Reset leaves no live form instances",
+        "malformed": "truncated f/o streams, unknown control class, hostile site length refuse without changing document state or raw project bytes",
+        "M7": "unchanged context/event/trust/original-project regression cases retained"
+      },
+      "artifacts": [
+        {
+          "path": "crates/vba/tests/native_forms.rs",
+          "sha256": "bd1fb8c01e811af02aa8bff52b720f4ef841ab528211300c3bd13d0ac55f3770",
+          "entrypoints": [
+            "edited_xlsm_native_project_copy_reopens_runs_and_drops_signatures",
+            "malformed_native_package_resources_refuse_without_document_mutation"
+          ]
+        },
+        {
+          "path": "crates/vba/tests/support/native_forms.rs",
+          "sha256": "8153a83331e413323f42dc40f7b543bfa8ec87b3e9a55d7d65b3228fb39a3954"
+        },
+        {
+          "path": "crates/vba/tests/support/mod.rs",
+          "sha256": "a6a0b70949fd6b0fa3e431ff70cf4aa0f983adf60d8b89a1b6e1720d6172beab"
+        },
+        {
+          "path": "crates/vba/tests/package_acceptance.rs",
+          "sha256": "94aaeb0b811ee4cbfdbe0137d955c0983d4df9f9bee9c17b988137769bf25066"
+        },
+        {
+          "path": "crates/vba/tests/form_controls.rs",
+          "sha256": "2d49a3b6891ec6b5106186a988b9fc7a28e32e9f6efc56f0e0ff95c81f5af9c9"
+        },
+        {
+          "path": "crates/ui-egui/tests/vba_forms.rs",
+          "sha256": "0458570c679b76d264a490c31a4db9f6eb53b5d61e47e2298f656e2784b4feb8"
+        },
+        {
+          "path": "crates/xlsx/src/tests/passthrough_tests.rs",
+          "sha256": "f69e959688f9338ca4f6ffff790df824a8b6864393d1b5a2e14c0974dfceeb3e"
+        },
+        {
+          "path": "crates/xlsx/src/tests/form_controls.rs",
+          "sha256": "faeb0d9d8c9dd5e34c4d3d338222cf264017aed2e48dd01ded39bc8ffdb94ff3"
+        },
+        {
+          "path": "crates/ui-egui/tests/worksheet_controls.rs",
+          "sha256": "9341264bdad176c2cd174f797294acff021874c6d62e545f276324bc8e9959c4"
+        }
+      ]
+    },
+    {
+      "id": "m7a-docm-native-package",
+      "repository": "wordcraft",
+      "license": "MIT OR Apache-2.0",
+      "provenance": "Original repository-authored Rust fixtures/tests; no Office-created binaries, external macros or implementation code.",
+      "execution_review": "original-authored-bounded-host-workflow",
+      "initial_execution_status": "NOT_RUN",
+      "requirements": [
+        "native-forms-common-v1",
+        "native file/persistence snapshots",
+        "M7 original-byte/trust/context regressions"
+      ],
+      "expected": {
+        "format": ".docm",
+        "load_compile": "no output/document mutation or automatic execution; binary export compiles idle authored state",
+        "edit_save_reopen": "edited source and TextBox text survive actual native embedded writeback and package reopen",
+        "signature": "invalidated VBA signature parts/relationships/types removed; cryptographic verification/resigning unsupported",
+        "input_debugger": "Apply_Click stops before document mutation; Continue executes once; output exactly [\"saved initialize\", \"saved embedded\"]",
+        "host_effect": "main story = String(\"saved embedded\")",
+        "undo_reset": "one completed native undo batch restores pre-callback host state; Reset leaves no live form instances",
+        "malformed": "truncated f/o streams, unknown control class, hostile site length refuse without changing document state or raw project bytes",
+        "M7": "unchanged context/event/trust/original-project regression cases retained"
+      },
+      "artifacts": [
+        {
+          "path": "crates/vba/tests/native_forms.rs",
+          "sha256": "194d55ae2b0da1e33f8c451284d0aba8a5df9fa148a3cfdb0c03508bf5ddda4c",
+          "entrypoints": [
+            "edited_docm_native_project_copy_reopens_runs_and_drops_signatures",
+            "malformed_native_package_resources_refuse_without_document_mutation"
+          ]
+        },
+        {
+          "path": "crates/vba/tests/support/native_forms.rs",
+          "sha256": "de8e6c010a59447381c5fe4799df0f3ba5c2c68f4af361fa9fcbd1f3ffe60cff"
+        },
+        {
+          "path": "crates/vba/tests/support/mod.rs",
+          "sha256": "a6a0b70949fd6b0fa3e431ff70cf4aa0f983adf60d8b89a1b6e1720d6172beab"
+        },
+        {
+          "path": "crates/vba/tests/package_acceptance.rs",
+          "sha256": "3fbbc1c8a42e73042794fac630180f6d2ea22fb6d3634482e969f510692fb24a"
+        },
+        {
+          "path": "crates/vba/tests/word_workflows.rs",
+          "sha256": "8831a26f7dc433bb4ca6bccb4fcb932f07f48a31520df2ab42a3b49227c10b44"
+        },
+        {
+          "path": "crates/ui-egui/src/tests.rs",
+          "sha256": "6ee0052a84088874d4728512687929dec888503842239592c93a3c7a588088e1"
+        },
+        {
+          "path": "crates/docx/src/vba_writeback.rs",
+          "sha256": "f6db9f68b87a9c5b94cb7d5c967cb541e515609871fdf862c46c8d0c3a039c9f"
+        }
+      ]
+    }
+  ],
+  "runtime_tree_sha256": "a6b1acaa2f6da29d4ef603bfee9c26b285113e52d30bd11c850df1845023e420"
+}

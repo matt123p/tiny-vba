@@ -1,8 +1,9 @@
 # tiny-vba
 
-Native form exchange uses `.frm`/`.frx`; [M7A.6](docs/m7a6-acceptance.md) removes
-the custom format, codec and file routes. All shared and pinned-host gates pass.
-Next is M7A.7 combined acceptance; fresh Office comparisons remain M8.5 NOT_RUN.
+M7A.1–M7A.7 are complete for the [common native forms profile](docs/m7a-acceptance.md).
+Native `.frm`/`.frx` and edited XLSM/DOCM copy workflows are accepted, and the
+custom format is removed. Next is M8; uncommon P9 and M8.5 fresh Office comparison
+remain separate. This is authored acceptance, not universal Office parity.
 
 **A clean-room VBA implementation for the ArtCraft applications: GridCraft, WordCraft and DeckCraft.**
 

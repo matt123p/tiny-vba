@@ -1,5 +1,14 @@
 # tiny-vba — instructions for agents
 
+Current acceptance (2026-11-08): M7A.1–M7A.7 are COMPLETE for the owner-approved
+common native profile under [ADR 0100](docs/decisions/0100-common-native-forms-acceptance.md).
+Read [acceptance](docs/m7a-acceptance.md), reviewed selection/execution receipts and
+current progress. Next is M8 expanded conformance/hardening/release; P9 remains
+after M8 and fresh Office comparisons remain M8.5 NOT_RUN. Earlier incremental
+milestone/status instructions below are historical. Keep common workflow bugs,
+trust/bounds, native persistence receipts and the no-custom-format rule intact.
+Do not infer release acceptance, uncommon parity or fresh Office evidence.
+
 Current owner direction (2026-11-08): [ADR 0097](docs/decisions/0097-common-forms-scope-and-p9.md)
 supersedes historical instructions below that all inventoried forms parity must
 block M7A.4. M7A.4 is COMPLETE for [the common profile](docs/m7a4-common-profile.md).

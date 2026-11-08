@@ -5,6 +5,16 @@ description: Implement or review tiny-vba changes using the project design contr
 
 # tiny-vba development
 
+Current acceptance: ADR 0100 completes M7A.1–M7A.7 for the agreed common native
+profile. Read docs/m7a-acceptance.md and tests/fixtures/m7a selection/execution
+records. `cargo xtask m7a` is optional real-sibling acceptance; ordinary CI checks
+local selection integrity without siblings. Review selected source hashes when
+inputs change; retained gate receipts cover only the same production/dependency
+and input hashes. Next is M8. Do not reopen P9 or imply fresh Office comparisons;
+M8.5 remains NOT_RUN. Earlier milestone/status notes below are historical.
+Native save/copy/browser receipts, original ownership, trust and limits stay intact.
+
+
 Current native-only contract (ADR 0099, 2026-11-08): the custom form codec,
 `import_form`/`export_form` APIs, file routes/filters and example are removed.
 New forms attach inert native templates; all form Save/Export/remove-export
