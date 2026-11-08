@@ -114,5 +114,5 @@ default/constants/errors, measured axes and actual viewports. Deferred track/
 thumb input preserves canonical text/ranges and follows current policy/focus.
 Tagged UI offsets reset with execution/control identity; scrolled hits and caret
 following are covered. Native ListBox stored Both is accepted without a new
-public member. Full shared/browser/pinned host acceptance is in progress;
+public member. Full shared/browser/pinned host acceptance gates pass;
 AutoSize, hidden-bar/repeat/platform and container scrolling remain open.

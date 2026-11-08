@@ -1,6 +1,6 @@
 # ADR 0094: Native TextBox ScrollBars and bounded viewports
 
-Date: 2026-11-08. Status: adopted; acceptance in progress. Full M7A.4 remains open.
+Date: 2026-11-08. Status: adopted; increment accepted. Full M7A.4 remains open.
 
 The project reader retains TextBox MorphData ScrollBars values 0–3 and refuses
 unknown values before attachment. The IDE provides ordinary Long state, None
@@ -41,8 +41,10 @@ callback policy changes, scrolled selection geometry and programmatic selection
 following. The existing 40 mouse, AutoTab and alignment suites pass. Full native CI,
 strict Clippy, WASM/UI/Xvfb/web and twelve Chromium flows pass; the eight new
 model cases also pass on Node 18 WASI. Five theme snapshots and browser
-runtime/Break/scrolled views were inspected. Full Node 22 WASI and pinned host
-acceptance are pending and will be recorded in progress after running.
+runtime/Break/scrolled views were inspected. Full Node 22 WASI passes. Both pinned host
+acceptance suites pass, including full CI, strict optional Clippy, VBA-enabled
+web, native/Node WASM package cases and inspected host canvases. Revisions and
+exact case counts are recorded in implementation progress.
 Fresh Office comparisons remain M8.5 NOT_RUN. Native edited save and legacy
 removal remain M7A.5/.6; the full completion checklist remains authoritative.
 

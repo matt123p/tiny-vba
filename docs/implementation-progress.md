@@ -14,10 +14,24 @@ AutoTab and alignment suites. Full native CI, strict workspace/all-targets
 Clippy, WASM build, UI/Xvfb native and web gates pass. All twelve Chromium flows
 pass, including real track input across Stop/Continue and unchanged ranges.
 Five theme/scale/host snapshots and runtime/Break/scrolled browser views were
-inspected. All eight new model cases pass on Node 18.19.1 WASI. Full Node 22
-WASI and pinned host acceptance are in progress.
+inspected. Full WASI passes on Node 22.23.4; all eight new model cases also pass on
+Node 18.19.1. Shared product revision:
+`05b8862abcf2d3204d26e1226acda372b89b6bb3`. Both hosts pin it. Gridcraft passes
+all 10 CI steps, strict optional VBA/UI Clippy, five form UI cases, the VBA-enabled
+web build and all 33 native/33 Node 22 WASM package cases. Its corrected light
+host canvas was inspected. Published integration:
+`c33b1687a94c67644c1f0fc43c757a853886e16a`. Wordcraft passes all eight CI steps
+in isolation with one test thread, strict optional Clippy, 13 VBA UI cases plus
+hidden-editor/canvas cases, the VBA-enabled web build and all 28 native/28 Node 22
+WASM package cases. Its corrected dark host canvas was inspected. Published
+integration: `8e5a5b8c5091673a9d1ee0299dc05f9f098c93ae`. Both package regressions
+check typed ScrollBars at Stop, trusted continuation and exact original project
+preservation. Each host's 13 shared lockfile packages changed by revision only.
 AutoSize, hidden-bar/repeat/platform and container scrolling, plus the unchanged
 completion checklist, remain open. Fresh Office comparisons are M8.5 NOT_RUN.
+The next smallest viewport task is native TextBox no-bar scrolling and caret
+visibility, with fixed authored bounds, current range authority, Stop/Reset and
+scrolled pointer geometry covered before the separate AutoSize/container audit.
 
 ## M7A.4 continued — native SelectionMargin (2026-11-08)
 
