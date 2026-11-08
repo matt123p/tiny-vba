@@ -219,3 +219,47 @@ fn clipped_multiline_pointer_positions_keep_the_original_utf16_text() -> R {
     }
     Ok(())
 }
+
+#[test]
+fn right_aligned_initial_tail_and_explicit_caret_zero_use_different_viewports() -> R {
+    let mut h = app_with(false, true, "\"A😀BCDEFGHIJKLMNOPQRSTUVWXYZ\"", 3)?;
+    let rect = bounds(&h, "Entry").shrink(2.);
+    let capture = |h: &mut Harness<'_, State>| -> R<Vec<[u8; 4]>> {
+        Ok(h.render()?
+            .enumerate_pixels()
+            .filter(|(x, y, _)| rect.contains(egui::pos2(*x as f32, *y as f32)))
+            .map(|(_, _, p)| p.0)
+            .collect())
+    };
+    let before = capture(&mut h)?;
+    let owner = *h.state().ide.form_instances()?.first().ok_or("form")?;
+    let text = vba_ide::VbaString::from_utf8("A😀BCDEFGHIJKLMNOPQRSTUVWXYZ")?;
+    for start in [u32::try_from(text.units().len())?, 0] {
+        h.state_mut()
+            .ide
+            .form_instance_text(owner, 12, text.clone(), (start, 0), &mut NoHost)?;
+        h.run_steps(30);
+    }
+    assert!(
+        before
+            .iter()
+            .zip(capture(&mut h)?.iter())
+            .filter(|(a, b)| a != b)
+            .count()
+            > 100
+    );
+    assert_eq!(
+        h.state()
+            .ide
+            .form_instance_field(owner, Some(12), "SelStart")?,
+        vba_ide::Value::Long(0)
+    );
+    assert_eq!(
+        h.state()
+            .ide
+            .form_instance_field(owner, Some(12), "VbaText")?,
+        vba_ide::Value::String(text)
+    );
+    assert!(h.state().errors.is_empty(), "{:?}", h.state().errors);
+    Ok(())
+}

@@ -300,6 +300,14 @@ impl TextBox<'_> {
             scroll_style,
             |width| layouter(&child, &measurement, width).rect.size(),
         );
+        let unwrapped_width = if !wrap {
+            layouter(&child, &measurement, viewport.x - margin.sum().x)
+                .rect
+                .width()
+                + margin.sum().x
+        } else {
+            viewport.x
+        };
         let show = |ui: &mut egui::Ui| {
             builder
                 .id(self.widget)
@@ -330,12 +338,23 @@ impl TextBox<'_> {
             if !multi {
                 view.offset.y = 0.;
             }
+            // Preserve initial text alignment for an untouched insertion point.
+            // Later canonical caret moves may reveal either end of the same row.
+            let initial_alignment = view.last_selection.is_none() && canonical == (0, 0) && !wrap;
+            if initial_alignment {
+                view.offset.x = (unwrapped_width - viewport.x).max(0.)
+                    * match alignment {
+                        egui::Align::Min => 0.,
+                        egui::Align::Center => 0.5,
+                        egui::Align::Max => 1.,
+                    };
+            }
             use std::hash::{Hash, Hasher};
             let mut hash = std::collections::hash_map::DefaultHasher::new();
             raw.units().hash(&mut hash);
             let fingerprint = hash.finish();
-            let follow =
-                view.last_selection != Some(canonical) || view.text_fingerprint != fingerprint;
+            let follow = !initial_alignment
+                && (view.last_selection != Some(canonical) || view.text_fingerprint != fingerprint);
             // Visibility and scrolling are independent. The same fixed viewport
             // follows the caret even when a bar is hidden by policy or room.
             let mut viewport_ui = child.new_child(

@@ -26,10 +26,13 @@ completes them once, and Reset discards both the continuation and old viewport.
 The previous local unwrapped-galley rectangle clamp is unnecessary: the viewport
 clips complete glyph/cursor rows without altering shared font caches.
 
-Six new GPU/input cases cover no-bar single/multiline caret movement and return,
+Seven new GPU/input cases cover no-bar single/multiline caret movement and return,
 a hidden horizontal axis alongside a visible vertical bar, astral UTF-16/CRLF
 scrolled margin selection, Stop/Continue/Reset, insufficient bar room, and actual
-Ctrl+End followed by typing. The eight existing viewport cases and retained
+Ctrl+End followed by typing. Untouched initial right/centre-aligned overflow
+keeps its alignment; a later explicit caret move can reveal either end. The
+existing clipped-pointer expectation and a new caret-zero pixel test cover this.
+The eight existing viewport cases and retained
 mouse, alignment, HideSelection and AutoTab suites also pass. Full shared,
 browser/theme and pinned host acceptance will be recorded in progress after running.
 The new Chromium flow already passes stopped Ctrl+End, continuation and typing

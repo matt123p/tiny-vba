@@ -8,8 +8,11 @@ to a visible vertical bar. Caller-themed accessible chrome is painted separately
 track/drag still waits for existing authorized mouse callbacks. Text/ranges/policy
 remain ordinary canonical VBA state; UI offsets are tagged, Reset clears them,
 and pointer/margin geometry follows the displayed text. No API, format or budget
-changes. Six new GPU/input cases and eight retained viewport cases pass, including
-actual Ctrl+End/typing, astral UTF-16/CRLF hits and Stop/Continue/Reset. The retained
+changes. Seven new GPU/input cases and eight retained viewport cases pass, including
+actual Ctrl+End/typing, astral UTF-16/CRLF hits and Stop/Continue/Reset. Initial
+right/centre-aligned overflow retains its alignment until later caret movement;
+the retained clipped-pointer expectation and a new explicit-caret-zero test pass.
+The retained
 40 mouse, alignment, HideSelection and AutoTab suites pass. The new Chromium
 flow passes with inert import, stopped Ctrl+End, one continuation, typing at the
 revealed tail and exact authored source. Five theme/scale/host snapshots and
