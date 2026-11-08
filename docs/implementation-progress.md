@@ -1,5 +1,24 @@
 # Implementation progress
 
+## M7A.4 continued — native TextBox ScrollBars (2026-11-08)
+
+ADR 0094 adds native ScrollBars import, ordinary Long None defaults, constants
+and validated assignment. Native ListBox stored Both is also accepted without
+exposing a public member. The actual text viewport uses theme-local solid bars
+with measured overflow/room and MultiLine/WordWrap rules. Offset/render markers
+are tagged UI state; text, ranges, events and resources remain canonical.
+Track and thumb defaults wait for ordinary mouse callbacks and current policy/
+focus/lifetime. Caret following, Reset and scrolled margin hit geometry are
+covered. Eight model and eight GPU/input cases pass, as do the retained 40 mouse,
+AutoTab and alignment suites. Full native CI, strict workspace/all-targets
+Clippy, WASM build, UI/Xvfb native and web gates pass. All twelve Chromium flows
+pass, including real track input across Stop/Continue and unchanged ranges.
+Five theme/scale/host snapshots and runtime/Break/scrolled browser views were
+inspected. All eight new model cases pass on Node 18.19.1 WASI. Full Node 22
+WASI and pinned host acceptance are in progress.
+AutoSize, hidden-bar/repeat/platform and container scrolling, plus the unchanged
+completion checklist, remain open. Fresh Office comparisons are M8.5 NOT_RUN.
+
 ## M7A.4 continued — native SelectionMargin (2026-11-08)
 
 ADR 0093 adds native bit-26 TextBox/ComboBox import, ordinary Boolean True

@@ -452,3 +452,9 @@ selection/drag. Preserve theme-local padding, canonical UTF-16/CRLF ranges and
 post-callback geometry/policy/focus; selection-only commands stay passive. Empty
 native fields render blank with accessible names. Preserve all trust, resources,
 continuations and budgets; the full M7A.4 checklist stays open.
+
+ADR 0094 adds selected TextBox ScrollBars and UI-only tagged viewport offsets.
+Keep text/ranges in VBA, inspection/resources inert, theme-local chrome, current
+geometry/policy/focus after mouse callbacks, reset and caret following. ListBox
+stored Both does not expose a public member. Preserve all budgets/authority;
+AutoSize/hidden-bar/repeat/platform and full M7A.4 remain open.

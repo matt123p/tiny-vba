@@ -15,6 +15,7 @@ mod refedit;
 mod tabs;
 mod text;
 mod text_align;
+mod text_scroll;
 use vba_ide::forms::{Align, Bounds, ControlKind, DesignEdit, SameSize};
 #[derive(Clone, Copy)]
 pub(super) struct KeyboardFrame {

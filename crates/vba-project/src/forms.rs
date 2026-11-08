@@ -178,6 +178,7 @@ pub struct TextBehavior {
     /// MS-OFORMS stores the inverse of the public AutoWordSelect property.
     pub auto_word_select: bool,
     pub multi_line: bool,
+    pub scroll_bars: u8,
     pub word_wrap: bool,
     pub hide_selection: bool,
     pub selection_margin: bool,
@@ -192,6 +193,7 @@ impl Default for TextBehavior {
         Self {
             auto_word_select: false,
             multi_line: false,
+            scroll_bars: 0,
             word_wrap: true,
             hide_selection: true,
             selection_margin: true,

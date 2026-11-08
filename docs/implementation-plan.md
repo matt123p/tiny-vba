@@ -1,6 +1,6 @@
 # Remaining implementation plan
 
-Updated 2026-11-07. This plan contains **remaining work only**: M7A followed by stable M8 IDs,
+Updated 2026-11-08. This plan contains **remaining work only**: M7A followed by stable M8 IDs,
 after completed M1–M6, M6A and M7 for their declared profiles.
 [M7 acceptance](m7-acceptance.md) records the authored unchanged-document/package
 profile and [ADR 0037](decisions/0037-m7-package-preservation-and-writeback.md)
@@ -121,6 +121,8 @@ and native save/reopen. See [ADR 0041](decisions/0041-worksheet-form-controls.md
   ADR 0090 adds CheckBox/OptionButton Alignment flags, ordinary Long state,
   published constants and independently clipped captions beside real indicators.
   Other properties and the full remaining checklist stay open.
+  ADR 0094 adds native TextBox ScrollBars and actual viewports with deferred
+  pointer defaults, canonical text/ranges and tagged UI offsets. Full acceptance stays open.
   ADR 0093 adds native SelectionMargin flags/defaults and displayed-line selection
   through existing mouse continuation and canonical ranges. Full acceptance stays open.
   ADR 0092 adds selected native AutoTab through ordinary focus/validation,

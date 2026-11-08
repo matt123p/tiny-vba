@@ -22,6 +22,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let word_wrap = option.as_deref() == Some("--word-wrap");
     let boolean_wrap = option.as_deref() == Some("--boolean-word-wrap");
     let caption_alignment = option.as_deref() == Some("--caption-alignment");
+    let text_scroll = option.as_deref() == Some("--text-scroll");
     let selection_margin = option.as_deref() == Some("--selection-margin");
     let auto_tab = option.as_deref() == Some("--auto-tab");
     let hide_selection = option.as_deref() == Some("--hide-selection");
@@ -74,7 +75,8 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             | "--caption-alignment"
             | "--hide-selection"
             | "--auto-tab"
-            | "--selection-margin",
+            | "--selection-margin"
+            | "--text-scroll",
         ) => false,
         Some(_) => return Err("unknown fixture option".into()),
     };
@@ -106,6 +108,10 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         "Stop\r\nDebug.Print Entry.Text"
     };
     let mut text = String::from_utf8(fixture::export())?.replace("Debug.Print Entry.Text", body);
+    if text_scroll {
+        let code = "Attribute VB_Name = \"NativeForm\"\nAttribute VB_PredeclaredId = True\nOption Explicit\nPrivate Paused As Boolean\nPrivate Sub UserForm_Initialize()\nDebug.Print \"scroll ready\",Entry.ScrollBars,VarType(Entry.ScrollBars)\nHeading.Caption=\"Scroll the text viewport\"\nHeading.Width=220\nEntry.Left=16\nEntry.Top=36\nEntry.Width=168\nEntry.Height=90\nEntry.FontSize=12\nEntry.MultiLine=True\nEntry.WordWrap=True\nEntry.EnterFieldBehavior=1\nEntry.HideSelection=False\nEntry.Text=\"FIRST ROW\"\nDim i As Long\nFor i=1 To 30\nEntry.Text=Entry.Text & ChrW(13) & ChrW(10) & \"Row \" & CStr(i) & \" appears after scrolling\"\nNext i\nEntry.SelStart=1\nEntry.SelLength=3\nApply.Left=16\nApply.Top=140\nEnd Sub\nPrivate Sub Entry_MouseDown(ByVal Button As Integer,ByVal Shift As Integer,ByVal X As Single,ByVal Y As Single)\nIf X>=Entry.Left+Entry.Width-12 And Not Paused Then\nPaused=True\nDebug.Print \"bar down\"\nStop\nDebug.Print \"resumed\"\nEnd If\nEnd Sub\nPrivate Sub Entry_MouseUp(ByVal Button As Integer,ByVal Shift As Integer,ByVal X As Single,ByVal Y As Single)\nDebug.Print \"range\",Entry.SelStart,Entry.SelLength\nEnd Sub\nPrivate Sub Apply_Click()\nDebug.Print \"scroll done\",Entry.ScrollBars,Entry.SelStart,Entry.SelLength\nMe.Hide\nEnd Sub\n".replace('\n', "\r\n");
+        text = String::from_utf8(fixture::export())?.replace(fixture::SOURCE, &code);
+    }
     if selection_margin {
         let code = "Attribute VB_Name = \"NativeForm\"\nAttribute VB_PredeclaredId = True\nOption Explicit\nPrivate Sub UserForm_Initialize()\nDebug.Print \"margin ready\",Entry.SelectionMargin\nHeading.Caption=\"Click the left selection margin\"\nHeading.Width=220\nEntry.Left=16\nEntry.Top=48\nEntry.Width=168\nEntry.Height=26\nEntry.FontSize=12\nEntry.EnterFieldBehavior=1\nEntry.Text=\"alpha beta\"\nEntry.SelStart=0\nEntry.SelLength=0\nApply.Left=16\nApply.Top=80\nEnd Sub\nPrivate Sub Entry_MouseDown(ByVal Button As Integer,ByVal Shift As Integer,ByVal X As Single,ByVal Y As Single)\nEntry.Text=\"new value\"\nDebug.Print \"down\"\nStop\nDebug.Print \"resumed\"\nEnd Sub\nPrivate Sub Entry_MouseUp(ByVal Button As Integer,ByVal Shift As Integer,ByVal X As Single,ByVal Y As Single)\nDebug.Print \"selected\",Entry.SelStart,Entry.SelLength\nEnd Sub\nPrivate Sub Apply_Click()\nDebug.Print VarType(Entry.SelectionMargin),Entry.SelectionMargin,Entry.SelLength\nMe.Hide\nEnd Sub\n".replace('\n', "\r\n");
         text = String::from_utf8(fixture::export())?.replace(fixture::SOURCE, &code);
@@ -246,7 +252,9 @@ End Sub
     std::fs::write(dir.join("NativeForm.frm"), text)?;
     std::fs::write(
         dir.join("NativeForm.frx"),
-        if selection_margin {
+        if text_scroll {
+            fixture::text_scroll_companion(0xac80_081b, 0, 2)
+        } else if selection_margin {
             fixture::companion()
         } else if auto_tab {
             fixture::text_companion(0x6c80_081b, 0)

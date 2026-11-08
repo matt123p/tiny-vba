@@ -82,6 +82,9 @@ pub(crate) fn control_class(kind: ControlKind, ranges: bool) -> String {
     s.push_str(&crate::form_appearance::members(Some(kind)));
     s.push_str(crate::form_text_align::members(kind));
     s.push_str(crate::form_caption_alignment::members(kind));
+    if kind == ControlKind::TextBox {
+        s.push_str("Public VbaScrollBars As Long\nPublic Property Get ScrollBars() As Long\nScrollBars=VbaScrollBars\nEnd Property\nPublic Property Let ScrollBars(ByVal value As Long)\nIf value<0 Or value>3 Then Err.Raise 380\nVbaScrollBars=value\nEnd Property\n");
+    }
     s.push_str(crate::form_hide_selection::members(kind));
     if crate::form_hide_selection::supported(kind) {
         s.push_str("Public AutoTab As Boolean\n");

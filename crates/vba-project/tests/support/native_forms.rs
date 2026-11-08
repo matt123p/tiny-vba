@@ -400,10 +400,25 @@ fn boolean_flags_companion(accelerators: bool, flags: Option<u32>, caption_left:
 
 /// Original MorphData TextBox packet; no Office-produced resource is adopted.
 pub fn text_companion(flags: u32, password: u16) -> Vec<u8> {
+    text_companion_options(flags, password, None)
+}
+pub fn text_scroll_companion(flags: u32, password: u16, scroll: u8) -> Vec<u8> {
+    text_companion_options(flags, password, Some(scroll))
+}
+fn text_companion_options(flags: u32, password: u16, scroll: Option<u8>) -> Vec<u8> {
     let mut controls = controls();
-    let mut body = u32s(&[0x80400301, 0, flags]);
-    body.extend(password.to_le_bytes());
-    body.extend([0, 0]);
+    let mut body = u32s(&[
+        0x80400301 | if scroll.is_some() { 1 << 5 } else { 0 },
+        0,
+        flags,
+    ]);
+    if let Some(scroll) = scroll {
+        body.extend([scroll, 0]);
+        body.extend(password.to_le_bytes());
+    } else {
+        body.extend(password.to_le_bytes());
+        body.extend([0, 0]);
+    }
     body.extend(u32s(&[0x80000007, 2540, 635]));
     body.extend(string("initial"));
     let mut text = record(0x200, &body);
@@ -484,10 +499,20 @@ pub fn list_companion() -> Vec<u8> {
 }
 /// Original MultiSelect record, including invalid modes for inert refusal tests.
 pub fn list_selection_companion(mode: u8) -> Vec<u8> {
+    list_scroll_options(mode, None)
+}
+pub fn list_scroll_companion(scroll: u8) -> Vec<u8> {
+    list_scroll_options(0, Some(scroll))
+}
+fn list_scroll_options(mode: u8, scroll: Option<u8>) -> Vec<u8> {
     let mut all = controls();
-    let mut body = u32s(&[0x80203940, 0]);
-    body.push(2); // native fmDisplayStyleList
-    body.push(0); // alignment before BoundColumn
+    let mut body = u32s(&[0x80203940 | if scroll.is_some() { 1 << 5 } else { 0 }, 0]);
+    if let Some(scroll) = scroll {
+        body.extend([scroll, 2]);
+    } else {
+        body.push(2); // native fmDisplayStyleList
+        body.push(0); // alignment before BoundColumn
+    }
     body.extend(2u16.to_le_bytes());
     body.extend(1i16.to_le_bytes());
     body.extend(2i16.to_le_bytes());

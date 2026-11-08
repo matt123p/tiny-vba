@@ -637,6 +637,7 @@ fn control(bytes: &[u8], site: Site) -> Result<Control> {
             || (!matches!(site.kind, Kind::TextBox | Kind::RefEdit | Kind::ComboBox)
                 && lo & (1 << 3) != 0)
             || (!textbox && lo & (1 << 9) != 0)
+            || (!matches!(site.kind, Kind::TextBox | Kind::ListBox) && lo & (1 << 5) != 0)
         {
             return Err(unsupported(
                 "MorphData property not applicable to native control class",
@@ -701,12 +702,20 @@ fn control(bytes: &[u8], site: Site) -> Result<Control> {
             Kind::ToggleButton => 6,
             _ => 1,
         };
-        if scroll != 0
-            || display != expected
+        if (if site.kind == Kind::TextBox {
+            scroll > 3
+        } else if listbox && lo & (1 << 5) != 0 {
+            scroll != 3
+        } else {
+            scroll != 0
+        }) || display != expected
             || (combobox && ![3, 7].contains(&display))
             || field(&mut b, m, 7, 1, 0)? != 0
         {
             return Err(unsupported("native display/scroll/mouse profile"));
+        }
+        if matches!(site.kind, Kind::TextBox | Kind::ListBox) {
+            text_behavior.scroll_bars = scroll as u8;
         }
         if combobox && display == 3 && flags & (1 << 14) == 0 {
             return Err(unsupported("editable ComboBox flags"));

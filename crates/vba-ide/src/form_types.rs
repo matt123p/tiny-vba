@@ -91,6 +91,15 @@ impl Ide {
                 &[("fmAlignmentLeft", 0), ("fmAlignmentRight", 1)][..],
             ),
             (
+                "fmScrollBars",
+                &[
+                    ("fmScrollBarsNone", 0),
+                    ("fmScrollBarsHorizontal", 1),
+                    ("fmScrollBarsVertical", 2),
+                    ("fmScrollBarsBoth", 3),
+                ][..],
+            ),
+            (
                 "fmTextAlign",
                 &[
                     ("fmTextAlignLeft", 1),

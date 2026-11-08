@@ -16,6 +16,8 @@ fn button_mask(button: egui::PointerButton) -> Option<u8> {
 pub(super) enum Part {
     Body,
     Text(text::Geometry),
+    TextScroll(text_scroll::Bar),
+    TextScrollCorner,
     Drop,
     Tab(ObjectRef),
     Row { index: i32, popup: bool },
@@ -73,6 +75,8 @@ impl Hit {
             || matches!(
                 self.part,
                 Part::Drop
+                    | Part::TextScroll(_)
+                    | Part::TextScrollCorner
                     | Part::Tab(_)
                     | Part::Row { .. }
                     | Part::NumericStep { .. }
@@ -81,7 +85,7 @@ impl Hit {
             )
     }
     fn drags(&self) -> bool {
-        self.text() || matches!(self.part, Part::NumericThumb(_))
+        self.text() || matches!(self.part, Part::NumericThumb(_) | Part::TextScroll(_))
     }
 }
 #[derive(Clone)]
@@ -364,7 +368,27 @@ impl MouseScope {
             .rev()
             .find(|h| h.owner == owner && h.control == Some(control))
         {
+            let base = hit.clone();
+            let bars = geometry.scroll.clone();
             hit.part = Part::Text(geometry);
+            if let (Some(horizontal), Some(vertical)) = (
+                bars.iter().find(|bar| !bar.vertical),
+                bars.iter().find(|bar| bar.vertical),
+            ) {
+                let mut corner = base.clone();
+                corner.rect = egui::Rect::from_min_max(
+                    egui::pos2(horizontal.track.right(), vertical.track.bottom()),
+                    base.rect.max,
+                );
+                corner.part = Part::TextScrollCorner;
+                self.hit(corner);
+            }
+            for bar in bars {
+                let mut hit = base.clone();
+                hit.rect = bar.track.intersect(base.rect);
+                hit.part = Part::TextScroll(bar);
+                self.hit(hit);
+            }
         }
     }
     pub(super) fn regions(
@@ -415,6 +439,7 @@ impl MouseScope {
     }
     fn listens(ide: &Ide, hit: &Hit) -> bool {
         hit.text()
+            || matches!(hit.part, Part::TextScroll(_) | Part::TextScrollCorner)
             || [Phase::Down, Phase::Move, Phase::Up, Phase::DoubleClick]
                 .into_iter()
                 .chain(hit.control.is_none().then_some(Phase::Click))
@@ -745,7 +770,11 @@ impl MouseScope {
                     }
                     if allow
                         && p.raw.button & 1 != 0
-                        && ((p.raw.hit.text() || matches!(p.raw.hit.part, Part::NumericThumb(_)))
+                        && ((p.raw.hit.text()
+                            || matches!(
+                                p.raw.hit.part,
+                                Part::NumericThumb(_) | Part::TextScroll(_)
+                            ))
                             && matches!(
                                 p.raw.phase,
                                 Phase::Down | Phase::Move | Phase::DoubleClick
@@ -859,6 +888,60 @@ impl MouseScope {
             != Some(Value::Object(raw.hit.object))
         {
             self.numeric_repeat = None;
+            return false;
+        }
+        if let Part::TextScroll(original) = &raw.hit.part {
+            let Some(bar) = self.hits.iter().rev().find_map(|hit| {
+                if !hit.same(&raw.hit) {
+                    return None;
+                }
+                match &hit.part {
+                    Part::TextScroll(bar) if bar.vertical == original.vertical => Some(bar.clone()),
+                    _ => None,
+                }
+            }) else {
+                return false;
+            };
+            let field = |name| {
+                ide.form_instance_field(raw.hit.owner, Some(control), name)
+                    .ok()
+            };
+            let Some(Value::Long(mode)) = field("VbaScrollBars") else {
+                return false;
+            };
+            if (bar.vertical && (mode & 2 == 0 || field("MultiLine") != Some(Value::Boolean(true))))
+                || (!bar.vertical
+                    && (mode & 1 == 0
+                        || field("MultiLine") == Some(Value::Boolean(true))
+                            && field("WordWrap") == Some(Value::Boolean(true))))
+            {
+                return false;
+            }
+            if matches!(raw.phase, Phase::Down | Phase::DoubleClick) {
+                if bar.thumb.contains(raw.pos) {
+                    self.numeric_anchor = Some(NumericAnchor {
+                        gesture: raw.gesture,
+                        grab: bar.grab(raw.pos),
+                        last: raw.pos,
+                    });
+                } else {
+                    let after = if bar.vertical {
+                        raw.pos.y > bar.thumb.center().y
+                    } else {
+                        raw.pos.x > bar.thumb.center().x
+                    };
+                    bar.apply(
+                        ctx,
+                        bar.offset(ctx) + if after { bar.page } else { -bar.page },
+                    );
+                }
+            } else if let Some(anchor) = self.numeric_anchor.as_mut()
+                && anchor.gesture == raw.gesture
+                && anchor.last != raw.pos
+            {
+                anchor.last = raw.pos;
+                bar.apply(ctx, bar.drag(raw.pos, anchor.grab));
+            }
             return false;
         }
         if matches!(

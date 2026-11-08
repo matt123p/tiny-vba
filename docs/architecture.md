@@ -631,3 +631,11 @@ rows select/drag through the existing mouse continuation, including wrapped text
 and canonical UTF-16/CRLF ranges. Post-callback state remains authoritative;
 selection-only input stays passive and empty edit fields render blank. No VM,
 foreign, budget or persistence change is implied. Full M7A.4 remains open.
+
+[ADR 0094](decisions/0094-native-textbox-scrollbars.md) adds native TextBox
+ScrollBars, ordinary validated Long state/constants and actual bounded viewports.
+Text/ranges remain canonical; offset/render markers are tagged UI-only state.
+Track/drag waits for callbacks, current policy/focus and lifetime. Measured room,
+MultiLine and WordWrap determine axes; reset, caret following and scrolled hits
+are covered. Native ListBox stored Both is accepted without a new public member.
+No VM/foreign/budget/persistence change; full M7A.4 remains open.

@@ -44,6 +44,7 @@ pub(super) struct Geometry {
     pub font: egui::FontId,
     pub alignment: egui::Align,
     pub margin_right: Option<f32>,
+    pub scroll: Vec<super::text_scroll::Bar>,
 }
 impl Geometry {
     pub(super) fn cursor(
@@ -186,6 +187,10 @@ impl TextBox<'_> {
         let multi = self.boolean("MultiLine");
         let wrap = multi && self.boolean("WordWrap");
         let locked = self.boolean("Locked");
+        let bars = self.long("ScrollBars");
+        let horizontal = bars & 1 != 0 && (!multi || !wrap);
+        let scrolling = bars != 0;
+        let measurement = text.clone();
         let mask = self
             .field("PasswordChar")
             .map(control_text)
@@ -241,7 +246,12 @@ impl TextBox<'_> {
                 job.halign = alignment;
                 job.halign_min_is_start = false;
                 let mut galley = fonts.layout_job(job);
-                if multi && !wrap && width.is_finite() && width > 0. && galley.rect.width() > width
+                if multi
+                    && !wrap
+                    && !horizontal
+                    && width.is_finite()
+                    && width > 0.
+                    && galley.rect.width() > width
                 {
                     // TextEdit sizes multiline widgets from the galley's rectangle.
                     // Native controls keep their authored viewport even without wrapping.
@@ -270,8 +280,7 @@ impl TextBox<'_> {
             }
             galley
         };
-        let copy = text.clone();
-        let mut readonly = copy.as_str();
+        let mut readonly = measurement.as_str();
         let buffer: &mut dyn egui::TextBuffer = if locked { &mut readonly } else { &mut text };
         let builder = if multi {
             TextEdit::multiline(buffer)
@@ -294,25 +303,101 @@ impl TextBox<'_> {
         align.set_x(alignment);
         let mut child = ui.new_child(egui::UiBuilder::new().max_rect(self.bounds));
         child.set_clip_rect(ui.clip_rect().intersect(self.bounds));
-        let output = builder
-            .id(self.widget)
-            .min_size(self.bounds.size())
-            .desired_width(self.bounds.width())
-            .align(align)
-            .margin(margin)
-            .char_limit(maximum)
-            .password(mask.is_some())
-            .layouter(&mut layouter)
-            .lock_focus(multi && self.boolean("TabKeyBehavior"))
-            .return_key(if multi {
-                Some(egui::KeyboardShortcut::new(
-                    egui::Modifiers::NONE,
-                    egui::Key::Enter,
-                ))
-            } else {
-                None
-            })
-            .show(&mut child);
+        let mut scroll_style = child.spacing().scroll;
+        scroll_style.floating = false;
+        scroll_style.content_margin = egui::Margin::ZERO;
+        child.spacing_mut().scroll = scroll_style;
+        if scrolling {
+            // Integrated bars use host chrome, independently of TextBox.ForeColor.
+            let visuals = child.visuals_mut();
+            visuals.widgets.inactive.fg_stroke.color = self.theme.muted;
+            visuals.widgets.hovered.fg_stroke.color = self.theme.muted;
+            visuals.widgets.active.fg_stroke.color = self.theme.muted;
+        }
+        let (axes, viewport) = if scrolling {
+            super::text_scroll::axes(
+                self.bounds,
+                margin,
+                bars,
+                [multi, wrap],
+                child.fonts_mut(|fonts| fonts.row_height(&font)),
+                scroll_style,
+                |width| layouter(&child, &measurement, width).rect.size(),
+            )
+        } else {
+            ([false, false], self.bounds.size())
+        };
+        let show = |ui: &mut egui::Ui| {
+            builder
+                .id(self.widget)
+                .clip_text(!multi && !axes[0])
+                .min_size(viewport)
+                .desired_width(viewport.x)
+                .align(align)
+                .margin(margin)
+                .char_limit(maximum)
+                .password(mask.is_some())
+                .layouter(&mut layouter)
+                .lock_focus(multi && self.boolean("TabKeyBehavior"))
+                .return_key(if multi {
+                    Some(egui::KeyboardShortcut::new(
+                        egui::Modifiers::NONE,
+                        egui::Key::Enter,
+                    ))
+                } else {
+                    None
+                })
+                .show(ui)
+        };
+        let mut regions = Vec::new();
+        let mut output = if scrolling {
+            let (key, mut view) = super::text_scroll::load(self, &child);
+            use std::hash::{Hash, Hasher};
+            let mut hash = std::collections::hash_map::DefaultHasher::new();
+            raw.units().hash(&mut hash);
+            let fingerprint = hash.finish();
+            let follow =
+                view.last_selection != Some(canonical) || view.text_fingerprint != fingerprint;
+            let area = egui::ScrollArea::new(axes)
+                .id_salt(self.widget.with("native.text.scroll.area"))
+                .animated(false)
+                .auto_shrink([false, false])
+                .max_width(self.bounds.width())
+                .max_height(self.bounds.height())
+                .scroll_bar_visibility(egui::scroll_area::ScrollBarVisibility::AlwaysVisible)
+                .scroll_source(egui::scroll_area::ScrollSource {
+                    mouse_wheel: true,
+                    ..egui::scroll_area::ScrollSource::NONE
+                })
+                .scroll_offset(view.offset)
+                .show(&mut child, |ui| {
+                    let output = show(ui);
+                    if follow {
+                        let caret = output.galley.pos_from_cursor(desired.primary).translate(
+                            output.galley_pos.to_vec2() - egui::vec2(output.galley.rect.left(), 0.),
+                        );
+                        ui.scroll_to_rect(caret, None);
+                    }
+                    output
+                });
+            view.last_selection = Some(canonical);
+            view.text_fingerprint = fingerprint;
+            view.offset = area.state.clamped_offset();
+            regions = super::text_scroll::geometry(
+                key,
+                self.bounds,
+                area.inner_rect,
+                area.content_size,
+                view.offset,
+                axes,
+                scroll_style,
+            );
+            super::text_scroll::store(ui.ctx(), key, view);
+            area.inner
+        } else {
+            show(&mut child)
+        };
+        output.response.rect = self.bounds;
         output.response.widget_info(|| {
             egui::WidgetInfo::labeled(
                 egui::accesskit::Role::TextInput,
@@ -349,6 +434,7 @@ impl TextBox<'_> {
             font,
             alignment,
             margin_right: margin_enabled.then_some(self.bounds.left() + 6.),
+            scroll: regions,
         })
     }
 }

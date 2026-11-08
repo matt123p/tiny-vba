@@ -951,6 +951,12 @@ fn compiled_form(
         }
         source.push_str(&setup);
         if let Some(metadata) = metadata {
+            if c.kind == ControlKind::TextBox {
+                source.push_str(&format!(
+                    "{temp}.VbaScrollBars={}\n",
+                    metadata.text_behavior.scroll_bars
+                ));
+            }
             if crate::form_hide_selection::supported(c.kind) {
                 source.push_str(&format!(
                     "{temp}.HideSelection={}\n{temp}.AutoTab={}\n{temp}.SelectionMargin={}\n",
@@ -2280,6 +2286,12 @@ impl Ide {
                 && crate::form_text_align::supported(kind)
             {
                 return session.read_instance_field(object, "VbaTextAlign");
+            }
+            if self.native_forms.contains_key(&instance.source)
+                && kind == ControlKind::TextBox
+                && field.eq_ignore_ascii_case("ScrollBars")
+            {
+                return session.read_instance_field(object, "VbaScrollBars");
             }
             let rows = field.eq_ignore_ascii_case("RowSource");
             if field.eq_ignore_ascii_case("ControlSource") && crate::form_bindings::supported(kind)
