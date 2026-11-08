@@ -494,7 +494,7 @@ fn quote(s: &str) -> Result<String> {
     }
     Ok(format!("\"{}\"", s.replace('"', "\"\"")))
 }
-fn header(original: &str, design: &Design, companion: &str) -> Result<String> {
+fn header(original: &str, name: &str, design: &Design, companion: &str) -> Result<String> {
     let parsed = super::frame::parse(original, true)?;
     let mut out = String::new();
     let mut font = false;
@@ -504,6 +504,13 @@ fn header(original: &str, design: &Design, companion: &str) -> Result<String> {
         .split_inclusive('\n')
     {
         let clean = line.trim();
+        if clean.starts_with("Begin ") {
+            out.push_str(&format!(
+                "Begin {{C62A69F0-16DC-11CE-9E98-00AA00574A4F}} {name}\r\n"
+            ));
+            continue;
+        }
+
         if clean.starts_with("BeginProperty") {
             font = true;
         }
@@ -536,7 +543,27 @@ pub fn encode_export(
     source: &str,
     limits: &Limits,
 ) -> Result<Vec<Resource>> {
+    encode_export_named(original, &original.name, design, source, limits)
+}
+/// Export a standalone component under its current designer name. Embedded
+/// project component identity remains checked by the project writeback boundary.
+pub fn encode_export_named(
+    original: &NativeForm,
+    name: &str,
+    design: &Design,
+    source: &str,
+    limits: &Limits,
+) -> Result<Vec<Resource>> {
     limits.validate()?;
+    if name.len() > 64
+        || name.is_empty()
+        || !name
+            .chars()
+            .enumerate()
+            .all(|(i, c)| c == '_' || c.is_ascii_alphabetic() || i > 0 && c.is_ascii_digit())
+    {
+        return Err(unsupported("native component export name"));
+    }
     if original.resources.len() > 512
         || original
             .resources
@@ -549,7 +576,7 @@ pub fn encode_export(
     if source.len() > limits.source_bytes || design.controls.len() > super::MAX_CONTROLS {
         return Err(budget());
     }
-    text::attributes(source, &original.name)?;
+    text::attributes(source, name)?;
     let (frame, mut resources) = resource_streams(original, limits)?;
     rewrite(&mut resources, "", &original.design, design, None, 0)?;
     let mut file = cfb::CompoundFile::create(Cursor::new(Vec::new())).map_err(container_error)?;
@@ -587,23 +614,26 @@ pub fn encode_export(
     }
     let mut companion = (bytes.len() as u32).to_le_bytes().to_vec();
     companion.extend(bytes);
-    let name = format!("{}.frm", original.name);
+    let primary = format!("{name}.frm");
     let hash = companion.iter().fold(0xcbf29ce484222325u64, |hash, b| {
         (hash ^ u64::from(*b)).wrapping_mul(0x100000001b3)
     });
-    let frx = format!("{}.{hash:016x}.frx", original.name);
-    let mut frm = header(&frame, design, &frx)?;
+    let frx = format!("{name}.{hash:016x}.frx");
+    let mut frm = header(&frame, name, design, &frx)?;
     frm.push_str(source);
     let bytes = encode_text(&frm, original.code_page)?;
     let resources = vec![Resource {
         name: frx,
         bytes: companion,
     }];
-    let reopened = super::decode_export(&name, &bytes, original.code_page, &resources, limits)?;
+    let reopened = super::decode_export(&primary, &bytes, original.code_page, &resources, limits)?;
     if reopened.source != source || reopened.design != *design {
         return Err(corrupt("native encode/reopen snapshot mismatch"));
     }
-    let mut out = vec![Resource { name, bytes }];
+    let mut out = vec![Resource {
+        name: primary,
+        bytes,
+    }];
     out.extend(resources);
     Ok(out)
 }

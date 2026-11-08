@@ -105,29 +105,32 @@ fn native_form_file_save_reopen_and_unsupported_resource_refusal_are_lossless() 
             },
         ),
     )?;
-    ide.set_text("' α\r\nOption Explicit\r\n".into())?;
-    let archive = ide.export_form(id)?;
-    let path = std::env::temp_dir().join(format!("vba-ui-form-{}.tvform", std::process::id()));
-    write_source(&path, &archive)?;
-    let (name, text) = read_source(&path)?;
+    ide.set_text("Attribute VB_Name = \"AuthoredForm\"\r\n' é\r\nOption Explicit\r\n".into())?;
+    let snapshot = ide.export_native_form(id)?;
+    let dir = std::env::temp_dir().join(format!("vba-ui-native-new-{}", std::process::id()));
+    std::fs::create_dir_all(&dir)?;
+    let path = dir.join("AuthoredForm.frm");
+    vba_ide_app::write_native_form(&path, &snapshot)?;
+    let files = vba_ide_app::read_source_bundle(&path)?;
     let mut opened = vba_ide::Ide::new();
-    let id = opened.import_source_file(&name, &text)?;
-    assert_eq!(opened.export_form(id)?, archive);
-    let bad = format!("{archive}R\tunsupported.frx\n");
-    assert!(write_source(&path, &bad).is_err());
-    assert_eq!(read_source(&path)?.1, archive);
-    std::fs::remove_file(path)?;
+    let new_id = opened.import_source_bundle(&files, 1252)?;
+    assert_eq!(
+        opened.active_module().ok_or("source")?.text,
+        ide.active_module().ok_or("source")?.text
+    );
+    assert_eq!(opened.form(new_id).ok_or("form")?.form().controls.len(), 1);
+    let removed = dir.join("Removed.tvform");
+    assert!(write_source(&removed, "TINY-VBA-FORM\t1\n").is_err());
+    assert!(read_source(&removed).is_err());
+    assert!(!removed.exists());
+    std::fs::remove_dir_all(dir)?;
     Ok(())
 }
 
 #[test]
 fn invalid_form_open_preserves_the_existing_project() -> R {
-    let mut ide = vba_ide::Ide::new();
-    let id = ide.add_form("InvalidForm")?;
-    ide.set_text("Private Sub UserForm_Initialize(ByVal invalid As Long)\nEnd Sub".into())?;
-    let path =
-        std::env::temp_dir().join(format!("vba-ui-invalid-form-{}.tvform", std::process::id()));
-    write_source(&path, &ide.export_form(id)?)?;
+    let path = std::env::temp_dir().join(format!("vba-ui-invalid-form-{}.frm", std::process::id()));
+    std::fs::write(&path,b"VERSION 5.00\r\nBegin {C62A69F0-16DC-11CE-9E98-00AA00574A4F} InvalidForm\r\nEnd\r\nAttribute VB_Name = \"InvalidForm\"\r\nPrivate Sub UserForm_Initialize(ByVal invalid As Long)\r\nEnd Sub\r\n")?;
     let mut app = vba_ide_app::App::new()?;
     let original = app.ide.active_module().ok_or("original")?.text.clone();
     assert!(app.open(&path).is_err());

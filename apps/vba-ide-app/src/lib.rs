@@ -133,8 +133,22 @@ impl App {
             .is_some_and(|m| self.ide.form(m.id).is_some())
         {
             self.ide = Ide::new();
-            self.ide
-                .import_form(include_str!("../../../examples/forms/CustomerForm.tvform"))?;
+            self.ide.import_source_bundle(
+                &[
+                    vba_ide::NativeFormResource {
+                        name: "CustomerForm.frm".into(),
+                        bytes: include_bytes!("../../../examples/forms/CustomerForm.frm").to_vec(),
+                    },
+                    vba_ide::NativeFormResource {
+                        name: "CustomerForm.9af671fcecf553d3.frx".into(),
+                        bytes: include_bytes!(
+                            "../../../examples/forms/CustomerForm.9af671fcecf553d3.frx"
+                        )
+                        .to_vec(),
+                    },
+                ],
+                65001,
+            )?;
         }
         let id = self
             .ide
@@ -156,12 +170,6 @@ impl App {
                 ),
                 other => {
                     if let HostRequest::NativeForm{snapshot,..}=&other && let Some(file)=snapshot.files().first(){self.path=file.name.clone();}
-                    if let HostRequest::Save { name, .. } | HostRequest::Export { name, .. } =
-                        &other
-                        && name.ends_with(".tvform")
-                    {
-                        self.path = name.clone();
-                    }
                     self.file_request = Some(other);
                 }
             }
@@ -210,10 +218,10 @@ impl App {
             #[cfg(target_arch="wasm32")]
             {ui.label("Browser source transfer");match &mut self.file_request {Some(HostRequest::Import)=>{
                 if ui.button("Choose Source File...").clicked() && let Err(message)=self.browser_files.choose(ctx.clone()) {self.ide.message(message);}
-                ui.label("Paste UTF-8 .bas/.cls source or a .tvform archive:");
+                ui.label("Paste UTF-8 .bas/.cls source:");
                 ui.add(egui::TextEdit::multiline(&mut self.browser_source).desired_rows(12).char_limit(8*1024*1024)).on_hover_text("Source to import");
                 if ui.button("Import Source").clicked(){
-                    if ![".bas",".cls",".tvform"].iter().any(|extension|self.path.to_ascii_lowercase().ends_with(extension)){self.ide.message("Choose a .bas, .cls or .tvform name.");}
+                    if ![".bas",".cls"].iter().any(|extension|self.path.to_ascii_lowercase().ends_with(extension)){self.ide.message("Choose a .bas or .cls name.");}
                     else {match self.ide.import_source_file(&self.path,&self.browser_source){Ok(_)=>{close=true;self.browser_source.clear();},Err(d)=>self.ide.message(d.to_string())}}
                 }
             },Some(HostRequest::NativeForm{snapshot,..})=>{
@@ -430,25 +438,18 @@ pub fn read_source(path: &std::path::Path) -> Result<(String, String), Box<dyn s
         .and_then(|s| s.to_str())
         .unwrap_or_default()
         .to_ascii_lowercase();
-    if !["bas", "cls", "tvform"].contains(&extension.as_str()) {
-        return Err("Choose .bas, .cls or .tvform; binary Office resources are unsupported".into());
+    if !["bas", "cls"].contains(&extension.as_str()) {
+        return Err("Choose .bas or .cls; use native form import for .frm/.frx".into());
     }
-    let limit = if extension == "tvform" {
-        8 * 1024 * 1024
-    } else {
-        vba_ide::SourceFile::MAX_BYTES
-    };
+    let limit = vba_ide::SourceFile::MAX_BYTES;
     let mut bytes = Vec::new();
     std::fs::File::open(path)?
         .take((limit + 1) as u64)
         .read_to_end(&mut bytes)?;
     if bytes.len() > limit {
-        return Err("source/archive size limit exceeded".into());
+        return Err("source size limit exceeded".into());
     }
     let text = String::from_utf8(bytes)?;
-    if extension == "tvform" {
-        vba_ide::form_archive::decode(&text)?;
-    }
     let name = path
         .file_name()
         .and_then(|s| s.to_str())
@@ -463,19 +464,12 @@ pub fn write_source(path: &std::path::Path, text: &str) -> Result<(), Box<dyn st
         .and_then(|s| s.to_str())
         .unwrap_or_default()
         .to_ascii_lowercase();
-    if !["bas", "cls", "tvform"].contains(&extension.as_str()) {
-        return Err("Choose .bas, .cls or .tvform; binary Office writeback is unsupported".into());
+    if !["bas", "cls"].contains(&extension.as_str()) {
+        return Err("Choose .bas or .cls; use native form export for .frm/.frx".into());
     }
-    let limit = if extension == "tvform" {
-        8 * 1024 * 1024
-    } else {
-        vba_ide::SourceFile::MAX_BYTES
-    };
+    let limit = vba_ide::SourceFile::MAX_BYTES;
     if text.len() > limit {
-        return Err("source/archive size limit exceeded".into());
-    }
-    if extension == "tvform" {
-        vba_ide::form_archive::decode(text)?;
+        return Err("source size limit exceeded".into());
     }
     std::fs::write(path, text)?;
     Ok(())

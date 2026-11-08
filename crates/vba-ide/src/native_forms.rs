@@ -449,8 +449,9 @@ impl Ide {
             controls.push(native);
         }
         design.controls = controls;
-        let files = vba_project::forms::encode_export(
+        let files = vba_project::forms::encode_export_named(
             original,
+            &form.name,
             &design,
             &module.text,
             &vba_project::Limits::default(),

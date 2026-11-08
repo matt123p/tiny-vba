@@ -23,7 +23,22 @@ fn main() -> Result<(), Box<dyn Error>> {
         ("m2-form-runtime-dark", Theme::dark(), 1400.0, 1.0, true),
     ] {
         let mut ide = Ide::new();
-        let id = ide.import_form(include_str!("../../../examples/forms/CustomerForm.tvform"))?;
+        let id = ide.import_source_bundle(
+            &[
+                vba_ide::NativeFormResource {
+                    name: "CustomerForm.frm".into(),
+                    bytes: include_bytes!("../../../examples/forms/CustomerForm.frm").to_vec(),
+                },
+                vba_ide::NativeFormResource {
+                    name: "CustomerForm.9af671fcecf553d3.frx".into(),
+                    bytes: include_bytes!(
+                        "../../../examples/forms/CustomerForm.9af671fcecf553d3.frx"
+                    )
+                    .to_vec(),
+                },
+            ],
+            65001,
+        )?;
         ide.select_form_control(id, Some(2), false)?;
         if runtime {
             ide.run_form(id, true, &mut NoHost)?;

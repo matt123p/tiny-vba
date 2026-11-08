@@ -1,5 +1,14 @@
 # Editor and debugger UI contract
 
+M7A.6 native-only update (2026-11-08): the custom form codec/APIs, source-file
+routes, file filters and `.tvform` example are removed under
+[ADR 0099](decisions/0099-native-only-form-workflows.md). Insert UserForm now
+starts from an inert native template, and all form Save/Export/remove-export
+requests use native `.frm`/`.frx` snapshots. The CustomerForm demo and retained
+exchange/host tests use native files. No legacy importer or converter remains.
+Final shared/host gates are in progress; M7A.7 combined acceptance remains next.
+Older incremental format/support notes below are historical and superseded.
+
 Status: M8 complete for its defined scope, with [completion corrections and verification](ui/m8-completion-audit.md), 2026-10-27. See
 [ADR 0016](decisions/0016-m8-embeddable-editor.md), [embedding/running](ui/embedding.md),
 [acceptance and remaining broader-spec features](ui/m8-acceptance.md) and the supplied

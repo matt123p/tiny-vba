@@ -32,7 +32,7 @@ impl BrowserFiles {
             .create_element("input")?
             .dyn_into::<web_sys::HtmlInputElement>()?;
         input.set_type("file");
-        input.set_accept(".bas,.cls,.frm,.frx,.tvform,text/plain");
+        input.set_accept(".bas,.cls,.frm,.frx,text/plain");
         input.set_multiple(true);
         input.set_attribute("hidden", "")?;
         document
@@ -57,7 +57,7 @@ impl BrowserFiles {
                     for index in 0..files.length() {
                         let file = files.get(index).ok_or("Missing selected file")?;
                         let name = file.name();
-                        if ![".bas", ".cls", ".frm", ".frx", ".tvform"]
+                        if ![".bas", ".cls", ".frm", ".frx"]
                             .iter()
                             .any(|e| name.to_ascii_lowercase().ends_with(e))
                             || file.size() > (8 * 1024 * 1024) as f64

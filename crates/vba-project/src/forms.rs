@@ -7,7 +7,7 @@ mod fonts;
 mod frame;
 use crate::{Attribute, Limits, Metered, Result, budget, container_error, read_stream};
 pub use binary::new_designer_control;
-pub use encode::{encode_embedded, encode_export};
+pub use encode::{encode_embedded, encode_export, encode_export_named};
 pub use fonts::Font;
 pub use frame::{companion_name, decode_export};
 use std::io::Cursor;

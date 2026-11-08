@@ -384,10 +384,7 @@ fn native_boolean_families_have_change_click_null_and_group_semantics() -> R {
         settle(&mut ide)?;
         assert_eq!(ide.form_instance_field(f, Some(14), "Value")?, expected);
     }
-    assert!(
-        ide.export_form(id).is_err(),
-        "new native controls must not extend .tvform"
-    );
+    assert!(ide.export_native_form(id).is_ok());
     Ok(())
 }
 

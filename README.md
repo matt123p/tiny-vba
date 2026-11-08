@@ -95,14 +95,14 @@ The reusable editor offers:
 The form designer adds a Toolbox, Properties, drag/resize, alignment, tab order and
 event-handler navigation for the implemented **Label, TextBox and CommandButton**
 profile. Forms run through the real VM and can be debugged during modal or modeless
-interaction. Its current `.tvform` format is legacy code scheduled for removal.
-[M7A](docs/implementation-plan.md) is in progress to replace it with native Office UserForms,
-`.frm`/`.frx` exchange, controls and native persistence before M8. Native UserForm import now supports the declared flat Label/TextBox/CommandButton
-export and embedded profile, attached to the shared designer/runtime and debugger.
-Native saving and `.tvform` removal remain pending. The
-[M7A ledger](docs/m7a-inventory.md) records completed import work and the remaining
-worksheet, semantics and persistence tasks. See the
-[current shared form scope](docs/m2-acceptance.md).
+interaction. Native `.frm`/`.frx` forms are the supported file exchange; the
+custom format and its importer/exporter are removed under
+[ADR 0099](docs/decisions/0099-native-only-form-workflows.md). New forms start from
+native templates. [M7A.5](docs/m7a5-acceptance.md) implements native file Save/Export
+and edited XLSM/DOCM copy export; ordinary document Save preserves original VBA
+bytes. The [common profile](docs/m7a4-common-profile.md) defines supported controls
+and runtime behavior; uncommon extensions remain in P9. M7A.6 final gates are in
+progress, followed by M7A.7 combined acceptance.
 
 ## Debugger
 
@@ -261,7 +261,7 @@ repository checks and Node 18+ runs the WASI smoke gate.
 ```sh
 cargo run -p vba-ide-app
 # Current legacy form example; M7A replaces this format with native Office forms.
-cargo run -p vba-ide-app -- --open examples/forms/CustomerForm.tvform
+cargo run -p vba-ide-app -- --open examples/forms/CustomerForm.frm
 cargo run -p vba-cli -- run examples/pure-vba/Arithmetic.bas --entry Answer
 cargo run -p vba-cli -- debug examples/pure-vba/Arithmetic.bas --entry Answer
 cargo run -p vba-cli -- --help

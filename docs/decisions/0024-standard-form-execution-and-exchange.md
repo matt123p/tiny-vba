@@ -1,5 +1,9 @@
 # ADR 0024 — Standard form execution and exchange
 
+Format support superseded: [ADR 0099](0099-native-only-form-workflows.md) removes
+the custom codec/APIs and file routes. Historical execution/suspension evidence
+remains; native file and package-copy workflows now follow ADR 0098.
+
 Date: 2026-10-29. Status: adopted and implemented; [acceptance](../m2-acceptance.md) passed.
 
 M2 completes the selected Label/TextBox/CommandButton profile above the existing

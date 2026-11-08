@@ -1,9 +1,12 @@
 # M2 class and standard-form acceptance
 
-Planning update, 2026-11-04: this record retains its historical implemented profile.
-[M7A](implementation-plan.md) and [ADR 0038](decisions/0038-native-office-forms-and-compatibility-only.md)
-now schedule native Office forms/persistence and removal of `.tvform` before M8.
-That work is not yet implemented; historical results do not establish native support.
+Format supersession, 2026-11-08: this record retains historical M2 execution and
+custom-codec evidence. The custom format, importer/exporter and example are now
+**removed** under [ADR 0099](decisions/0099-native-only-form-workflows.md); their
+format choice/support below is superseded by ADRs 0038/0098/0099. Current native
+workflows are in [M7A.5 acceptance](m7a5-acceptance.md). Useful execution/designer
+regressions remain; exchange, demo and browser cases now use native files. Historical
+archive assertions do not establish current support. No converter is shipped.
 
 Updated 2026-10-29. **M2.1–M2.4 are complete for the declared profile below.**
 All required final gates pass; executable evidence is mapped below.
@@ -24,7 +27,7 @@ retains the history of incomplete checkpoints.
 ## Running and designing
 
 ```sh
-cargo run -p vba-ide-app -- --open examples/forms/CustomerForm.tvform
+cargo run -p vba-ide-app -- --open examples/forms/CustomerForm.frm
 ```
 
 Use Insert > UserForm for a new design, or View Object to reopen its designer.

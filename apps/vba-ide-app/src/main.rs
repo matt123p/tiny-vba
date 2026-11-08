@@ -18,7 +18,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             "--dark" => app.theme = vba_ui_egui::Theme::dark(),
             "--help" => {
                 println!(
-                    "Craft VBA Editor\nUsage: vba-ide-app [--open file.bas|file.cls|file.tvform] [--capture report.png] [--capture-form report.png] [--dark]\nF5 run, F8 step, F9 breakpoint. --capture runs the authored demo to a real breakpoint, captures the native window and exits."
+                    "Craft VBA Editor\nUsage: vba-ide-app [--open file.bas|file.cls|file.frm] [--capture report.png] [--capture-form report.png] [--dark]\nF5 run, F8 step, F9 breakpoint. --capture runs the authored demo to a real breakpoint, captures the native window and exits."
                 );
                 return Ok(());
             }

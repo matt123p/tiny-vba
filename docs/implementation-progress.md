@@ -1,5 +1,25 @@
 # Implementation progress
 
+## M7A.6 in progress — native-only form files (2026-11-08)
+
+ADR 0099 removes the custom codec, public import/export APIs and file routes.
+New forms now attach native templates; Save/Export and export-before-remove use
+revision-bound native snapshots. A Rust-built CustomerForm native pair replaces
+the custom example. Useful exchange, native/browser demo and host callback tests
+are migrated, not discarded. A repository gate prevents the retired product codec,
+references and example extension from returning. Source/code-page refusals, inert
+attachment, original-byte ownership and existing host trust/budgets remain intact.
+
+The migrated IDE run passes all 15 execution, 99 instance, three native
+attachment and four save cases. Full shared native CI/strict Clippy, WASM target
+check, UI, Xvfb native captures, web and all 15 browser flows pass. Native form
+light/dark/host and real native captures were inspected. Native property collision
+refusal replaces one obsolete custom-form field override assertion; two GUI cases
+use the existing native eight-frame settling allowance without changing assertions
+or VM limits. The full WASI run and pinned fork gates are still running. This is
+not M7A.6 or M7A.7 final acceptance yet.
+Fresh Office evidence remains M8.5 NOT_RUN; uncommon extensions remain P9.
+
 ## M7A.5 complete — native form saving and edited package copies (2026-11-08)
 
 Accepted for the common profile under [ADR 0098](decisions/0098-native-form-encoding-and-source-only-writeback.md)

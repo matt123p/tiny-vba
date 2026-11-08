@@ -541,18 +541,17 @@ impl Ide {
             .iter()
             .find(|m| m.id == id)
             .ok_or_else(|| error("unknown module"))?;
-        self.requests.push(HostRequest::Export {
-            name: if let Some(form) = self.forms.get(&id) {
-                format!("{}.tvform", form.form().name)
-            } else {
-                m.name.clone()
-            },
-            text: if self.forms.contains_key(&id) {
-                self.export_form(id)?
-            } else {
-                m.text.clone()
-            },
-        });
+        if self.native_form(id).is_some() {
+            self.requests.push(HostRequest::NativeForm {
+                snapshot: self.export_native_form(id)?,
+                save: false,
+            });
+        } else {
+            self.requests.push(HostRequest::Export {
+                name: m.name.clone(),
+                text: m.text.clone(),
+            });
+        }
         Ok(())
     }
     pub fn navigate(&mut self, id: SourceId, byte: usize) -> Result<()> {

@@ -41,7 +41,7 @@ fn native_import_uses_existing_designer_source_properties_and_runtime_inertly() 
         .ok_or("native resources")?
         .resources
         .clone();
-    assert!(ide.export_form(id).is_err()); // Never substitute the legacy custom format.
+    assert!(ide.export_native_form(id).is_ok());
     ide.run_form(id, true, &mut NoHost)?;
     settle(&mut ide)?;
     assert_eq!(ide.mode(), Mode::Waiting, "{:?}", ide.diagnostics);

@@ -133,27 +133,20 @@ fn native_colour_member_collisions_are_refused_before_attachment_mutates_the_pro
     Ok(())
 }
 #[test]
-fn native_colour_inspection_aliases_do_not_replace_existing_legacy_source_fields() -> R {
-    let mut ide = Ide::new();
-    let id = ide.add_form("Legacy")?;
-    ide.set_text("Option Explicit\nPublic BackColor As Long\nPublic ForeColor As Long\n".into())?;
-    ide.add_module(
-        "Main.bas",
-        "Sub Main()\nLegacy.BackColor=123\nLegacy.ForeColor=456\nLegacy.Show 0\nEnd Sub",
-    )?;
-    ide.dispatch(Action::Run, &mut NoHost)?;
-    settle(&mut ide)?;
-    assert_eq!(ide.mode(), Mode::Completed, "{:?}", ide.diagnostics);
-    assert_eq!(
-        ide.form_runtime_field(id, None, "BackColor")?,
-        Value::Long(123)
-    );
-    assert_eq!(
-        ide.form_runtime_field(id, None, "ForeColor")?,
-        Value::Long(456)
-    );
+fn newly_created_native_forms_refuse_legacy_colour_field_collisions_without_execution() -> R {
+    for member in ["BackColor", "ForeColor"] {
+        let mut ide = Ide::new();
+        let id = ide.add_form("NativeCreated")?;
+        let original = ide.native_form(id).ok_or("native template")?.clone();
+        ide.set_text(format!("Attribute VB_Name = \"NativeCreated\"\r\nPublic {member} As Long\r\nPrivate Sub UserForm_Initialize()\r\nDebug.Print \"must not run\"\r\nEnd Sub\r\n"))?;
+        assert!(ide.run_form(id, false, &mut NoHost).is_err());
+        assert!(ide.output().is_empty());
+        assert!(!ide.form_visible(id));
+        assert_eq!(ide.native_form(id), Some(&original));
+    }
     Ok(())
 }
+
 #[test]
 fn stopped_colour_setters_resume_once_and_reset_keeps_original_source_and_resources() -> R {
     let mut ide = app(

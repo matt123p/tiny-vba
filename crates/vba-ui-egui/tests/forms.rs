@@ -273,7 +273,9 @@ fn actual_runtime_button_pauses_the_existing_debugger_and_resumes() -> R {
         ),
     )?;
     s.ide.set_text("Private Sub CommandButton1_Click()\nDim n As Long\nn=7\nStop\nDebug.Print n\nMe.Hide\nEnd Sub".into())?;
+    // Native focus/input receipts settle across multiple UI frames.
     let mut h = Harness::builder()
+        .with_max_steps(8)
         .with_size(egui::vec2(1400.0, 1000.0))
         .build_ui_state(draw, s);
     h.get_by_label("Run Form").click();
@@ -368,7 +370,9 @@ fn runtime_text_edit_and_independent_tab_order_use_actual_widgets() -> R {
             break;
         }
     }
+    // Native focus/input receipts settle across multiple UI frames.
     let mut h = Harness::builder()
+        .with_max_steps(8)
         .with_size(egui::vec2(1400.0, 1000.0))
         .build_ui_state(draw, s);
     h.get_by_label("TextBox2").click();

@@ -1377,7 +1377,6 @@ impl Ide {
         }
         let stem = name
             .strip_suffix(".frm")
-            .or_else(|| name.strip_suffix(".tvform"))
             .or_else(|| name.strip_suffix(".cls"))
             .unwrap_or(name);
         let index = self
@@ -1463,7 +1462,12 @@ impl Ide {
         self.forms.values().any(FormDesigner::dirty)
     }
     pub fn add_form(&mut self, name: &str) -> Result<SourceId> {
-        let id = self.insert_form(Form::new(name)?, "Option Explicit\n\n")?;
+        Form::new(name)?;
+        let frame = format!(
+            "VERSION 5.00\r\nBegin {{C62A69F0-16DC-11CE-9E98-00AA00574A4F}} {name}\r\n Caption = \"{name}\"\r\n ClientWidth = 6000\r\n ClientHeight = 4000\r\nEnd\r\nAttribute VB_Name = \"{name}\"\r\nOption Explicit\n\n"
+        );
+        let id =
+            self.import_native_form_export(&format!("{name}.frm"), frame.as_bytes(), 1252, &[])?;
         if let Some(form) = self.forms.get_mut(&id) {
             form.mark_unsaved();
         }
@@ -1491,41 +1495,6 @@ impl Ide {
         )?;
         self.forms.insert(id, designer);
         Ok(id)
-    }
-    pub fn import_form(&mut self, archive: &str) -> Result<SourceId> {
-        let (form, source) = crate::form_archive::decode(archive)?;
-        let candidate = Module {
-            kind: ModuleKind::Class,
-            id: SourceId(0),
-            name: format!("{}.frm", form.name),
-            code_name: None,
-            text: source.clone(),
-            caret: 0,
-            revision: 0,
-            saved_revision: 0,
-            saved_text: source.clone(),
-            saved_name: format!("{}.frm", form.name),
-            breakpoints: BTreeSet::new(),
-            procedures: vec![],
-            syntax_diagnostics: vec![],
-            symbols: vec![],
-        };
-        checked_handlers(&form, &candidate, false)?;
-        self.insert_form(form, &source)
-    }
-    pub fn export_form(&self, id: SourceId) -> Result<String> {
-        if self.native_form(id).is_some() {
-            return Err(error(
-                "native UserForm save/export is not implemented yet; retain the original source/resources",
-            ));
-        }
-        let form = self.forms.get(&id).ok_or_else(|| error("unknown form"))?;
-        let module = self
-            .modules
-            .iter()
-            .find(|m| m.id == id)
-            .ok_or_else(|| error("unknown form source"))?;
-        crate::form_archive::encode(form.form(), &module.text)
     }
     pub fn edit_form(&mut self, id: SourceId, edit: DesignEdit) -> Result<()> {
         if self.session.is_some() {

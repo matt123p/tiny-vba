@@ -1,5 +1,14 @@
 # M7A native forms — implementation inventory and work ledger
 
+M7A.6 native-only update (2026-11-08): the custom form codec/APIs, source-file
+routes, file filters and `.tvform` example are removed under
+[ADR 0099](decisions/0099-native-only-form-workflows.md). Insert UserForm now
+starts from an inert native template, and all form Save/Export/remove-export
+requests use native `.frm`/`.frx` snapshots. The CustomerForm demo and retained
+exchange/host tests use native files. No legacy importer or converter remains.
+Final shared/host gates are in progress; M7A.7 combined acceptance remains next.
+Older incremental format/support notes below are historical and superseded.
+
 M7A.5 persistence update (2026-11-08): native `.frm`/`.frx` saving/export and
 explicit edited XLSM/DOCM copy export are implemented under
 [ADR 0098](decisions/0098-native-form-encoding-and-source-only-writeback.md).
@@ -157,7 +166,7 @@ build/OS/locale comparisons remain NOT_RUN under M8.5.
 | FC3.1–FC3.4 native UserForm codecs/attachment | DONE for native-userform-import-v1 | Export + embedded parity, shared designer/runtime/debugger, standalone IO, XLSM/DOCM trust and byte retention |
 | FC3.5 common native lifecycle | DONE for native-forms-common-v1; exhaustive parity P9 | [Common lifetime/instance evidence](m7a4-completion-checklist.md); shared and pinned-host gates pass; unusual alias/reentrant/ordering combinations tracked in P9 |
 | FC5 edited native persistence | DONE for common-profile native file Save/Export and edited XLSM/DOCM copies | [Acceptance and receipts](m7a5-acceptance.md); ADR 0098; source/cache/signature policy, atomic IO and revision/close checks |
-| FC6 remove .tvform | NOT_STARTED | Requires native replacement workflows; do not extend the legacy format |
+| FC6 remove .tvform | IN_PROGRESS | ADR 0099 removes codec/APIs/routes/filters/custom example; native replacements and final shared/pinned-host gates in progress |
 
 M7A.3 completes the selected worksheet profile under ADR 0041. M7A.4 / FC3.5 /
 FC4 are accepted for the common profile under ADR 0097; uncommon extensions and

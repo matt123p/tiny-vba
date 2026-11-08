@@ -5,6 +5,16 @@ description: Build or review the tiny-vba VBA editor and graphical debugger, inc
 
 # Editor and debugger UI design
 
+Current native-only contract (ADR 0099, 2026-11-08): the custom form codec,
+`import_form`/`export_form` APIs, file routes/filters and example are removed.
+New forms attach inert native templates; all form Save/Export/remove-export
+requests use native snapshots. Use `.frm`/`.frx` fixtures in tests/examples and
+keep retired extension tests negative only. No legacy importer/converter is
+shipped. Historical codec-era instructions below are superseded for format
+support. Preserve common runtime, source/resource ownership, trust and save
+receipts; M7A.6 final gates are recorded in implementation progress.
+
+
 Read [UI contract](../../../docs/editor-debugger-ui.md),
 [UI ownership ADR](../../../docs/decisions/0002-editor-debugger-ui.md) and the implemented UI layers in
 [architecture](../../../docs/architecture.md). This repository owns both reusable panels and a

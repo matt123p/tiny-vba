@@ -36,7 +36,8 @@ continue alongside M7A, but release acceptance depends on M7A completion.
 Status: **IN PROGRESS**, started 2026-11-04 on owner direction.
 The [inventory and work ledger](m7a-inventory.md) records FC0.1's audited paths,
 the completed import/attachment and native worksheet Form Control profiles.
-M7A.4 common UserForm semantics are complete; native editing/persistence and `.tvform` removal remain open;
+M7A.4 common semantics and M7A.5 explicit persistence are complete; M7A.6 format
+removal is in progress and M7A.7 final integration remains open;
 no full M7A acceptance is claimed.
 Owner: tiny-vba reusable form codecs/model/runtime/editor; GridCraft worksheet
 controls/Excel bindings; both forks' document, trust, event and package integration.
@@ -77,7 +78,7 @@ edited XLSM/DOCM copy workflows under ADR 0098. See the
 policy, exact receipts and limitations. Ordinary document Save preserves imported
 VBA bytes. Next is M7A.6; no full M7A sign-off is claimed.
 
-- **M7A.6 — Remove .tvform (FC6):** remove the custom codec, public APIs, import/
+- **M7A.6 — Remove .tvform (FC6; IN PROGRESS):** remove the custom codec, public APIs, import/
   export/save routes, file associations/filters, examples and current support claims.
   Replace demonstrations and useful tests with native Office fixtures/workflows.
   Do not keep a shipped legacy importer or introduce a conversion feature. Historical

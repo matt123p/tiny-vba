@@ -7,8 +7,10 @@ const assert = require('node:assert/strict');
 (async () => {
   const root = path.resolve(__dirname, '../../dist/ui');
   const report = path.resolve(process.env.VBA_UI_REPORT_DIR || path.join(__dirname, '../../reports/ui'));
-  const authored = fs.readFileSync(path.resolve(__dirname, '../../examples/forms/CustomerForm.tvform'), 'utf8');
-  const source = Buffer.from(authored.split('\n').find(line => line.startsWith('S\t')).slice(2), 'hex').toString('utf8');
+  const authored = fs.readFileSync(path.resolve(__dirname, '../../examples/forms/CustomerForm.frm'), 'utf8');
+  const source = authored.split('End\r\n').slice(1).join('End\r\n');
+  const companion = authored.match(/OleObjectBlob = "([^"]+)"/)[1];
+  const resources = fs.readFileSync(path.resolve(__dirname, '../../examples/forms', companion));
   fs.mkdirSync(report, { recursive: true });
   const server = http.createServer((req, res) => {
     const relative = decodeURIComponent(new URL(req.url, 'http://localhost').pathname);
@@ -34,7 +36,7 @@ const assert = require('node:assert/strict');
     await click(17, 15); await click(70, 66);
     const choosing = page.waitForEvent('filechooser');
     await click(100, 140);
-    await (await choosing).setFiles({ name: 'CustomerForm.tvform', mimeType: 'text/plain', buffer: Buffer.from(authored, 'utf8') });
+    await (await choosing).setFiles([{ name: 'CustomerForm.frm', mimeType: 'text/plain', buffer: Buffer.from(authored, 'utf8') }, {name: companion, mimeType:'application/octet-stream', buffer:resources}]);
     await page.waitForFunction(expected => document.querySelector('#vba-source').textContent === expected, source);
     assert.equal(await page.locator('#vba-status').textContent(), 'Design');
     assert.equal(await page.locator('#vba-output').textContent(), '');
@@ -52,13 +54,30 @@ const assert = require('node:assert/strict');
     await page.screenshot({ path: path.join(report, 'm2-browser-form-completed.png') });
     // Export uses design + original source, never mutated runtime control values or generated support.
     await page.keyboard.press('Control+e'); await settle();
-    const downloading = page.waitForEvent('download'); await click(90, 140);
-    const downloaded = await downloading;
-    const chunks = []; for await (const chunk of await downloaded.createReadStream()) chunks.push(chunk);
-    assert.equal(Buffer.concat(chunks).toString('utf8'), authored);
-    assert.equal(downloaded.suggestedFilename(), 'CustomerForm.tvform');
+    const downloads=[]; page.on('download',download=>downloads.push(download));
+    await click(90,140);
+    const deadline=Date.now()+30000;
+    while(downloads.length<2 && Date.now()<deadline) await page.waitForTimeout(50);
+    assert.equal(downloads.length,2);
+    const files=[];
+    for(const download of downloads){const chunks=[];for await(const chunk of await download.createReadStream())chunks.push(chunk);files.push({name:download.suggestedFilename(),mimeType:'application/octet-stream',buffer:Buffer.concat(chunks)});}
+    const frm=files.find(f=>f.name==='CustomerForm.frm');
+    const frx=files.find(f=>f.name.endsWith('.frx'));
+    assert.ok(frm && frx);
+    assert.ok(frm.buffer.toString('utf8').endsWith(source));
+    assert.ok(frm.buffer.toString('utf8').includes('OleObjectBlob = "'+frx.name+'":0000'));
+    assert.equal(frx.buffer.readUInt32LE(0),frx.buffer.length-4);
+    assert.equal(frx.buffer.subarray(4,12).toString('hex'),'d0cf11e0a1b11ae1');
+    await page.reload();
+    await page.waitForFunction(()=>document.querySelector('#vba-source').textContent.includes('Attribute VB_Name'));
+    await click(17,15);await click(70,66);
+    const reimport=page.waitForEvent('filechooser');await click(100,140);await(await reimport).setFiles(files);
+    await page.waitForFunction(expected=>document.querySelector('#vba-source').textContent===expected,source);
+    assert.equal(await page.locator('#vba-output').textContent(),'');
+    assert.equal(await page.locator('#vba-status').textContent(),'Design');
+    await page.screenshot({path:path.join(report,'m7a6-browser-native-reopened.png')});
     assert.deepEqual(errors, []);
-    console.log('BROWSER_FORM_PASS: inert .tvform upload; designer; real modal event breakpoint/resume without replay; exact design/source download; no page errors');
+    console.log('BROWSER_FORM_PASS: inert native pair upload; designer; real modal event breakpoint/resume without replay; exact source/binary pair export and inert reimport; no page errors');
   } finally {
     if (browser) await browser.close();
     await new Promise(resolve => server.close(resolve));

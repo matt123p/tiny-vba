@@ -5,7 +5,6 @@ mod code_aids;
 mod projection;
 pub use projection::CodeProjection;
 mod editing;
-pub mod form_archive;
 mod native_forms;
 mod native_project_save;
 pub use native_forms::NativeFormSave;
@@ -518,15 +517,13 @@ impl Ide {
     pub fn import_source_file(&mut self, name: &str, text: &str) -> Result<SourceId> {
         if name.to_ascii_lowercase().ends_with(".frm") {
             self.import_native_form_export(name, text.as_bytes(), 65001, &[])
-        } else if name.to_ascii_lowercase().ends_with(".tvform") {
-            self.import_form(text)
         } else if name.to_ascii_lowercase().ends_with(".bas")
             || name.to_ascii_lowercase().ends_with(".cls")
         {
             self.add_module(name, text)
         } else {
             Err(error(
-                "unsupported source/resource format; choose .bas, .cls or .tvform",
+                "unsupported source/resource format; choose .bas, .cls or native .frm/.frx",
             ))
         }
     }
@@ -1193,16 +1190,8 @@ impl Ide {
                     .ok_or_else(|| error("no active module"))?;
                 self.requests.push(HostRequest::Save {
                     id: m.id,
-                    name: if let Some(form) = self.forms.get(&m.id) {
-                        format!("{}.tvform", form.form().name)
-                    } else {
-                        m.name.clone()
-                    },
-                    text: if self.forms.contains_key(&m.id) {
-                        self.export_form(m.id)?
-                    } else {
-                        m.text.clone()
-                    },
+                    name: m.name.clone(),
+                    text: m.text.clone(),
                     revision: m.revision,
                 });
             }
@@ -1212,16 +1201,8 @@ impl Ide {
                     .active_module()
                     .ok_or_else(|| error("no active module"))?;
                 self.requests.push(HostRequest::Export {
-                    name: if let Some(form) = self.forms.get(&m.id) {
-                        format!("{}.tvform", form.form().name)
-                    } else {
-                        m.name.clone()
-                    },
-                    text: if self.forms.contains_key(&m.id) {
-                        self.export_form(m.id)?
-                    } else {
-                        m.text.clone()
-                    },
+                    name: m.name.clone(),
+                    text: m.text.clone(),
                 });
             }
             Action::ReturnToHost => self.requests.push(HostRequest::ReturnToHost),

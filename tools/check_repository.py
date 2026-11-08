@@ -141,11 +141,27 @@ def corpora(require_checkouts):
     print(f'corpora: {len(sources)} pins; {count}/{len(seen)} candidate file hashes verified; no macros executed')
 
 
+def native_forms():
+    # Historical docs/negative tests may name the retired format; product code may not.
+    for group in ['crates', 'apps']:
+        for path in (ROOT / group).glob('*/src/**/*.rs'):
+            text = path.read_text()
+            if any(token in text for token in ['.tvform', 'TINY-VBA-FORM', 'form_archive']):
+                raise ValueError(f'retired custom form format in product source: {path.relative_to(ROOT)}')
+    if any((ROOT / 'examples').rglob('*.tvform')):
+        raise ValueError('retired custom form example remains')
+    if (ROOT / 'crates/vba-ide/src/form_archive.rs').exists():
+        raise ValueError('retired custom form codec remains')
+    print('native forms: standard file routes only; retired custom codec/examples absent')
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument('check', nargs='?', choices=['layers', 'corpora', 'all'], default='all')
+    parser.add_argument('check', nargs='?', choices=['layers', 'corpora', 'native-forms', 'all'], default='all')
     parser.add_argument('--require-checkouts', action='store_true')
     args = parser.parse_args()
+    if args.check in {'native-forms', 'all'}:
+        native_forms()
     if args.check in {'layers', 'all'}:
         layers()
     if args.check in {'corpora', 'all'}:

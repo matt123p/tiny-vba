@@ -5,6 +5,16 @@ description: Design or review tiny-vba crate boundaries, public APIs, dependenci
 
 # Architecture decisions
 
+Current native-only contract (ADR 0099, 2026-11-08): the custom form codec,
+`import_form`/`export_form` APIs, file routes/filters and example are removed.
+New forms attach inert native templates; all form Save/Export/remove-export
+requests use native snapshots. Use `.frm`/`.frx` fixtures in tests/examples and
+keep retired extension tests negative only. No legacy importer/converter is
+shipped. Historical codec-era instructions below are superseded for format
+support. Preserve common runtime, source/resource ownership, trust and save
+receipts; M7A.6 final gates are recorded in implementation progress.
+
+
 Current owner scope under [ADR 0097](../../../docs/decisions/0097-common-forms-scope-and-p9.md):
 M7A.4 is COMPLETE for [native-forms-common-v1](../../../docs/m7a4-common-profile.md).
 Remaining uncommon/exhaustive parity belongs to [P9](../../../docs/p9-forms-compatibility.md),

@@ -1,5 +1,14 @@
 # M7A Office forms — control, property, event, format and host contracts
 
+M7A.6 native-only update (2026-11-08): the custom form codec/APIs, source-file
+routes, file filters and `.tvform` example are removed under
+[ADR 0099](decisions/0099-native-only-form-workflows.md). Insert UserForm now
+starts from an inert native template, and all form Save/Export/remove-export
+requests use native `.frm`/`.frx` snapshots. The CustomerForm demo and retained
+exchange/host tests use native files. No legacy importer or converter remains.
+Final shared/host gates are in progress; M7A.7 combined acceptance remains next.
+Older incremental format/support notes below are historical and superseded.
+
 M7A.5 persistence update (2026-11-08): native `.frm`/`.frx` saving/export and
 explicit edited XLSM/DOCM copy export are implemented under
 [ADR 0098](decisions/0098-native-form-encoding-and-source-only-writeback.md).

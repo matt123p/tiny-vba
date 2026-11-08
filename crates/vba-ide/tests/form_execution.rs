@@ -32,7 +32,11 @@ fn fixture(source: &str) -> R<(Ide, SourceId)> {
             ),
         )?;
     }
-    ide.set_text(source.into())?;
+    ide.set_text(if source.contains("Attribute VB_Name") {
+        source.into()
+    } else {
+        format!("Attribute VB_Name = \"CustomerForm\"\r\n{source}")
+    })?;
     Ok((ide, id))
 }
 #[test]
@@ -137,47 +141,43 @@ fn handler_generation_is_idempotent_and_bad_signatures_are_refused() -> R {
     Ok(())
 }
 #[test]
-fn archive_round_trip_preserves_source_layout_groups_and_order_and_rejects_resources_atomically()
--> R {
+fn native_round_trip_preserves_source_layout_and_order_and_rejects_resources_atomically() -> R {
     let (mut ide, id) = fixture(
-        "' Original α\r\nPrivate Sub CommandButton1_Click()\r\nDebug.Print \"hello\"\r\nEnd Sub\r\n",
+        "' Original é\r\nPrivate Sub CommandButton1_Click()\r\nDebug.Print \"hello\"\r\nEnd Sub\r\n",
     )?;
     ide.select_form_control(id, Some(1), false)?;
     ide.select_form_control(id, Some(2), true)?;
     ide.edit_form(id, DesignEdit::Group)?;
+    assert!(ide.export_native_form(id).is_err()); // Unsupported grouping is never silently lost.
+    ide.edit_form(id, DesignEdit::Ungroup)?;
     ide.edit_form(id, DesignEdit::TabOrder(vec![3, 2, 1]))?;
     ide.edit_form(id, DesignEdit::Front)?;
-    let archive = ide.export_form(id)?;
+    let snapshot = ide.export_native_form(id)?;
     let mut opened = Ide::new();
-    let reopened = opened.import_form(&archive)?;
-    assert_eq!(opened.export_form(reopened)?, archive);
+    let reopened = opened.import_source_bundle(snapshot.files(), 1252)?;
     assert_eq!(
         opened.active_module().ok_or("source")?.text,
         ide.active_module().ok_or("source")?.text
     );
-    for bad in [
-        archive.replace("\tLabel\t", "\tActiveX\t"),
-        archive.replace("TINY-VBA-FORM\t1", "TINY-VBA-FORM\t2"),
-        format!("{archive}R\tunknown.frx\n"),
-    ] {
-        let count = opened.modules.len();
-        assert!(opened.import_form(&bad).is_err());
-        assert_eq!(opened.modules.len(), count);
-    }
+    assert_eq!(
+        opened.form(reopened).ok_or("design")?.form().tab_order,
+        vec![3, 2, 1]
+    );
+    let mut malformed = snapshot.files().to_vec();
+    malformed.get_mut(1).ok_or("companion")?.bytes.truncate(6);
+    let count = opened.modules.len();
+    assert!(opened.import_source_bundle(&malformed, 65001).is_err());
+    assert_eq!(opened.modules.len(), count);
     ide.dispatch(Action::Save, &mut NoHost)?;
-    let request = ide.take_requests().pop().ok_or("save")?;
-    let HostRequest::Save {
-        id: saved,
-        revision,
-        text,
-        ..
-    } = request
+    let Some(HostRequest::NativeForm {
+        snapshot,
+        save: true,
+    }) = ide.take_requests().pop()
     else {
-        return Err("wrong request".into());
+        return Err("native save missing".into());
     };
-    assert_eq!(text, archive);
     ide.edit_form(id, DesignEdit::Move(6.0, 0.0))?;
-    assert!(ide.mark_saved(saved, revision).is_err());
+    assert!(ide.acknowledge_native_form_save(&snapshot).is_err());
     assert!(ide.has_modified_forms());
     assert!(ide.close(&mut NoHost, false).is_err());
     Ok(())
@@ -286,14 +286,9 @@ fn new_designs_require_save_and_invalid_source_names_never_mutate_design() -> R 
         .is_err()
     );
     assert!(ide.form(id).ok_or("form")?.form().controls.is_empty());
-    let archive = ide.export_form(id)?;
-    for bad in [
-        archive.replace("\t300\t200", "\tNaN\t200"),
-        format!("{archive}{}", "\t".repeat(10000)),
-        archive.replacen("F\t", "O\nF\t", 1),
-    ] {
+    for bad in ["Removed.tvform", "unknown.bin"] {
         let mut opened = Ide::new();
-        assert!(opened.import_form(&bad).is_err());
+        assert!(opened.import_source_file(bad, "Option Explicit").is_err());
         assert!(opened.modules.is_empty());
     }
     Ok(())
@@ -375,15 +370,33 @@ fn form_component_rename_export_remove_and_layout_history_preserve_owned_design(
     assert_eq!(ide.form(id).ok_or("form")?.form().name, "RenamedForm");
     ide.form_history(id, false)?;
     assert_eq!(ide.form(id).ok_or("form")?.form().name, "RenamedForm");
-    assert!(ide.export_form(id)?.contains("TINY-VBA-FORM"));
+    assert_eq!(
+        ide.export_native_form(id)?
+            .files()
+            .first()
+            .ok_or("file")?
+            .name,
+        "RenamedForm.frm"
+    );
     assert!(ide.remove_module(id, false).is_err());
     ide.export_before_remove(id)?;
-    let Some(HostRequest::Export { name, text }) = ide.take_requests().pop() else {
-        return Err("form export missing".into());
+    let Some(HostRequest::NativeForm {
+        snapshot,
+        save: false,
+    }) = ide.take_requests().pop()
+    else {
+        return Err("native form export missing".into());
     };
-    assert_eq!(name, "RenamedForm.tvform");
+    assert_eq!(
+        snapshot.files().first().ok_or("file")?.name,
+        "RenamedForm.frm"
+    );
     let mut reopened = Ide::new();
-    reopened.import_form(&text)?;
+    let reopened_id = reopened.import_source_bundle(snapshot.files(), 1252)?;
+    assert_eq!(
+        reopened.form(reopened_id).ok_or("form")?.form().name,
+        "RenamedForm"
+    );
     ide.remove_module(id, true)?;
     assert!(ide.form(id).is_none());
     assert!(ide.modules.is_empty());

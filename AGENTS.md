@@ -10,6 +10,11 @@ Do not reopen the exhaustive M7A.4 gate or claim P9 behavior implemented. Bugs i
 included common workflows remain fixes. Safety/trust/bounds and fresh M8.5
 comparison requirements remain unchanged.
 
+ADR 0099 removes the custom codec/APIs/routes/examples. New forms are inert native
+templates and form file operations use native snapshots; do not restore a legacy
+importer/converter. Older codec ownership/support instructions below are historical
+and superseded. Use native fixtures; see implementation progress for M7A.6 gates.
+
 Adapted from Gridcraft's AGENTS.md and CLAUDE.md for this standalone interpreter.
 Read `docs/implementation-progress.md`, `docs/implementation-plan.md`, then the relevant
 architecture/decision document. The supplied design specifications are indexed in `docs/README.md`.
