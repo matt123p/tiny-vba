@@ -126,5 +126,5 @@ pinned host acceptance gates pass; remaining checklist requirements stay open.
 Selected C03/F01/M01/P01 cases follow ADR 0096: native button click focus,
 selection/deferred validation, callbacks and Reset, smaller active-session slices,
 and queued input that survives transient writes and peer index changes. Actual
-removal still cancels delivery. Full shared/browser/pinned host acceptance is in
-progress; enumeration and the remaining checklist requirements stay open.
+removal still cancels delivery. Full shared/browser/pinned host acceptance passes;
+enumeration and the remaining checklist requirements stay open.

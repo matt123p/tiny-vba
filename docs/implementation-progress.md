@@ -11,9 +11,28 @@ matched by object identity after peer removal, while detached targets are reject
 IDE frame work respects smaller active-session slices without raising any limit.
 Eight model and ten UI cases pass, plus the embedding slice regression and the
 retained 40 mouse/14 keyboard cases. Tab reorder/removal also passes at a smaller
-slice with unchanged identity/value expectations. Full shared/browser/host
-acceptance is in progress. The complete M7A.4 checklist remains open; fresh Office
-comparisons remain M8.5 NOT_RUN.
+slice with unchanged identity/value expectations. Full native CI, strict
+workspace/all-targets Clippy, WASM, UI, Xvfb native, web and all fourteen Chromium
+flows pass. Full WASI passes on Node 22.23.4; the eight new model and six embedding
+cases also pass on Node 18.19.1. The retained AutoTab browser flow now waits for
+its exact Change outputs rather than a fixed 250 ms; its expected sequence is
+unchanged. Five theme/scale/host snapshots, browser runtime/Break/completion and
+both host canvases were inspected. Shared product revision:
+`bcf3dc859095df7a331760d1469b8047c00cacf4`. Both hosts pin it. Gridcraft passes
+all 10 CI steps, strict optional VBA/UI Clippy, five form UI cases, the VBA-enabled
+web build and all 33 native/33 Node 22 WASM package cases. Published integration:
+`624d73f45365b1e3661ea81ebed94befc0b5a58d`. Wordcraft passes all eight CI steps
+in isolation with one test thread, strict optional Clippy, 13 VBA UI cases plus
+hidden-editor/canvas cases, the VBA-enabled web build and all 28 native/28 Node 22
+WASM package cases. Published integration:
+`5f74fa087e6ea2ffc7db37b0a203f905d77eb54d`. Both retain typed False inspection
+at Stop, normal AutoTab to the button, trusted continuation and exact original
+project preservation. Each host's 13 shared lockfile packages changed by revision
+only. No permission or execution/memory limits were raised. The complete M7A.4
+checklist remains open; fresh Office comparisons remain M8.5 NOT_RUN. The next
+smallest viewport task is caret reflow after geometry/font changes, retaining
+manual offsets during passive repaints; the remaining collection/lifecycle,
+keyboard/platform, property/control and host ActiveX requirements stay open.
 
 ## M7A.4 continued — native TextBox hidden caret viewports (2026-11-08)
 

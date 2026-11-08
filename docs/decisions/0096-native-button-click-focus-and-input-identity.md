@@ -1,6 +1,6 @@
 # ADR 0096: Native button click focus and input identity
 
-Date: 2026-11-08. Status: adopted; acceptance in progress. M7A.4 remains open.
+Date: 2026-11-08. Status: adopted; selected-case acceptance passed. M7A.4 remains open.
 
 CommandButtonPropMask bit 9 encodes the nondefault TakeFocusOnClick value without
 a DataBlock payload. The reader admits it as False; absence means True. Original
@@ -39,7 +39,15 @@ runtime policy changes, nested runtime buttons, Stop/Continue/Reset and peer
 removal during a paused press. An embedding regression covers slices 1/64/128,
 Stop and future configuration changes. The retained tab reorder/removal test also
 runs at a smaller slice, with its original identity/value expectations. Full
-shared, WASI/browser/theme and pinned host results are recorded after running.
+shared CI, strict workspace/all-targets Clippy, WASM, UI/Xvfb native, web, Node 22
+WASI and all fourteen Chromium flows pass. The eight new model cases and six
+embedding cases also pass on Node 18 WASI. Five theme/scale/host snapshots, browser
+runtime/Break/completion and both host canvases were inspected. The retained
+AutoTab browser flow waits for each exact Change result instead of a fixed 250 ms;
+its expected event sequence is unchanged. Both pinned native/WASM package suites,
+UI/web and strict optional Clippy pass. Both full host CI gates pass; Wordcraft
+runs in isolation with one test thread. Published revisions are recorded in
+implementation progress.
 
 This does not complete live collection enumeration, remaining focus/lifecycle,
 keyboard/accelerator/platform or property/control requirements. The full M7A.4
