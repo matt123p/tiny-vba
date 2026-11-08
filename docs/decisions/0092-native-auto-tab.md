@@ -1,6 +1,6 @@
 # ADR 0092: Native AutoTab through ordinary focus continuations
 
-Date: 2026-11-08. Status: adopted; shared/browser acceptance passed; pinned host checks pending. Full M7A.4 remains open.
+Date: 2026-11-08. Status: adopted; shared/browser and both pinned host acceptance gates passed. Full M7A.4 remains open.
 
 TextBox and ComboBox expose ordinary Boolean AutoTab state with False defaults.
 MS-OFORMS VariousPropertiesBitfield bit 30 seeds it before authored initialization.

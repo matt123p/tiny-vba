@@ -11,7 +11,19 @@ Twelve model and three GPU/input cases pass. Full shared CI, strict workspace/
 all-targets Clippy, WASM, UI, Xvfb native and web gates pass. Full WASI passes on
 Node 22.23.4; the 12 new cases also pass on Node 18.19.1. All ten Chromium flows
 pass. Corrected five-theme/scale/host snapshots and browser runtime/Break/focus
-views were inspected. Both host integration gates are pending.
+views were inspected. Shared product revision:
+`e5a62681f074dab000894118fa71977e438e26df`. Both hosts pin it. Gridcraft passes
+all 10 CI steps, strict optional VBA/UI Clippy, five form UI cases, the VBA-enabled
+web build and all 33 native/33 Node 22 WASM package cases. Its light host canvas
+was inspected. Published integration:
+`f8c9c8c158eb4e2cb789ca1d521c0c781841cfff`. Wordcraft passes all eight CI steps
+in isolation with one test thread, strict optional Clippy, 13 VBA UI cases plus
+hidden-editor/canvas cases, the VBA-enabled web build and all 28 native/28 Node 22
+WASM package cases. Its dark host canvas was inspected. Published integration:
+`9c675db1c41d3efa5da74f20f68a5212cd90c3bd`. Each host's 13 shared lockfile
+packages changed by revision only. Both package regressions cover imported typed
+AutoTab, stopped continuation, authorized edits, focus transfer and exact original
+VBA project preservation.
 Full M7A.4 remains incomplete; the unchanged completion checklist
 and M8.5 NOT_RUN status remain authoritative. The next small property/input
 packet is native SelectionMargin with actual line-selection behavior; it must

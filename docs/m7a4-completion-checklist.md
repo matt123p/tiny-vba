@@ -99,5 +99,5 @@ Boolean False defaults/coercion, actual user editing at MaxLength, canonical
 eligible tab order and ordinary validation/focus continuations. Model/GPU cases
 cover autocomplete without a text diff, passive selection/programmatic changes,
 paste, UTF-16, nested/wrapped traversal, cancellation and Stop/Continue/Reset.
-Full shared/browser acceptance passes; pinned fork acceptance is in progress. This does not
+Full shared/browser and both pinned fork acceptance gates pass. This does not
 close the remaining property, input, lifecycle, binding or platform cases above.
