@@ -1,0 +1,66 @@
+{
+  "schema": 1,
+  "profile": "m8-office-v1",
+  "selection_sha256": "31bcbef65daa186b8a21e62bd9e69ba9da431580b945f509bfbdfe7c801c4e9c",
+  "local_selection_sha256": null,
+  "runtime_tree_sha256": null,
+  "reference_platform": null,
+  "review": null,
+  "results": [
+    {
+      "case_id": "gridcraft-context",
+      "office": null,
+      "fork": null
+    },
+    {
+      "case_id": "gridcraft-events",
+      "office": null,
+      "fork": null
+    },
+    {
+      "case_id": "gridcraft-attributes",
+      "office": null,
+      "fork": null
+    },
+    {
+      "case_id": "gridcraft-package",
+      "office": null,
+      "fork": null
+    },
+    {
+      "case_id": "gridcraft-forms",
+      "office": null,
+      "fork": null
+    },
+    {
+      "case_id": "gridcraft-worksheet-controls",
+      "office": null,
+      "fork": null
+    },
+    {
+      "case_id": "wordcraft-context",
+      "office": null,
+      "fork": null
+    },
+    {
+      "case_id": "wordcraft-events",
+      "office": null,
+      "fork": null
+    },
+    {
+      "case_id": "wordcraft-attributes",
+      "office": null,
+      "fork": null
+    },
+    {
+      "case_id": "wordcraft-package",
+      "office": null,
+      "fork": null
+    },
+    {
+      "case_id": "wordcraft-forms",
+      "office": null,
+      "fork": null
+    }
+  ]
+}

@@ -1,5 +1,25 @@
 # Implementation progress
 
+## M8 release preparation (2026-11-08)
+
+[ADR 0102](decisions/0102-m8-release-evidence-gate.md) and the
+[capture protocol](m8-office-comparison.md) add eleven reviewed-source comparison
+recipes, an empty NOT_RUN packet and an executable offline release evidence gate.
+It checks current identities, bounded contained raw files, exact tagged types,
+values, UTF-16, array bounds, event order and human provenance review. Ten
+maintenance tests cover rejection paths and temporary synthetic packets; they are
+not Office observations. Ordinary core CI includes these checks without Office or
+siblings. Product/dependency trees and original M7A/M8 receipts are unchanged.
+M8.5 actual observation remains NOT_RUN and full M8 stays open.
+
+[Preparation receipts](../tests/fixtures/m8-office/preparation-execution.json)
+record fresh native CI (1,073 Rust tests, strict Clippy, repository checks and
+M8 fuzz/library gates), browser WASM compilation, full actual WASI (756 tests),
+ten maintenance tests and six expected CLI outcomes. Both siblings' pinned recipe
+bytes/entrypoints match. Release readiness returns NOT_RUN with exit 1 as expected.
+The final native receipt explicitly records exit 0 with test optimization level 2
+and two build jobs; no default configuration changed.
+
 ## M8 local implementation complete — Office comparison remains open (2026-11-08)
 
 M7A was reverified before M8 work: all 61 original artifact hashes and all

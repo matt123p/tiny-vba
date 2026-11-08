@@ -1,0 +1,436 @@
+{
+  "schema": 1,
+  "profile": "m8-office-v1",
+  "license": "MIT OR Apache-2.0",
+  "evidence_basis": "authored-protocol-not-observation",
+  "baseline_selection_sha256": "41c0c90ab84cbdf6065301cee4cdd5ea988e84c8b667f3d3972c5dfbe3b35fa4",
+  "cases": [
+    {
+      "id": "gridcraft-context",
+      "product": "Microsoft Excel",
+      "fork": "GridCraft",
+      "category": "context",
+      "entrypoints": [
+        "packaged_module_contexts_survive_tab_rename_with_another_workbook_active"
+      ],
+      "sources": [
+        {
+          "repository": "gridcraft",
+          "path": "crates/vba/tests/support/mod.rs",
+          "sha256": "a6a0b70949fd6b0fa3e431ff70cf4aa0f983adf60d8b89a1b6e1720d6172beab"
+        },
+        {
+          "repository": "gridcraft",
+          "path": "crates/vba/tests/package_acceptance.rs",
+          "sha256": "94aaeb0b811ee4cbfdbe0137d955c0983d4df9f9bee9c17b988137769bf25066"
+        }
+      ],
+      "steps": [
+        "Recreate the authored project and owner/active document setup from the pinned test. Keep owner and active documents distinct; for Excel rename the owner tab as in the test.",
+        "Invoke the same explicit entrypoints and record each qualified and unqualified host access and resulting document state."
+      ],
+      "required_observations": {
+        "effects": [
+          "owner_state",
+          "active_state"
+        ],
+        "errors": [
+          "Err.Number"
+        ]
+      },
+      "initial_status": "NOT_RUN"
+    },
+    {
+      "id": "gridcraft-events",
+      "product": "Microsoft Excel",
+      "fork": "GridCraft",
+      "category": "events",
+      "entrypoints": [
+        "packaged_excel_withevents_is_live_only_until_reset"
+      ],
+      "sources": [
+        {
+          "repository": "gridcraft",
+          "path": "crates/vba/tests/support/mod.rs",
+          "sha256": "a6a0b70949fd6b0fa3e431ff70cf4aa0f983adf60d8b89a1b6e1720d6172beab"
+        },
+        {
+          "repository": "gridcraft",
+          "path": "crates/vba/tests/package_acceptance.rs",
+          "sha256": "94aaeb0b811ee4cbfdbe0137d955c0983d4df9f9bee9c17b988137769bf25066"
+        }
+      ],
+      "steps": [
+        "Attach the authored AppSink to the application using the pinned Connect procedure. Trigger the same sheet-change events as the pinned test.",
+        "Record callbacks in dispatch order and host effects, then disconnect/reset and repeat the trigger to establish subscription lifetime."
+      ],
+      "required_observations": {
+        "event_order": [
+          "ordered_callbacks"
+        ],
+        "effects": [
+          "connected_state",
+          "disconnected_state"
+        ]
+      },
+      "initial_status": "NOT_RUN"
+    },
+    {
+      "id": "gridcraft-attributes",
+      "product": "Microsoft Excel",
+      "fork": "GridCraft",
+      "category": "attributes",
+      "entrypoints": [
+        "packaged_code_edits_export_hidden_records_without_claiming_binary_writeback"
+      ],
+      "sources": [
+        {
+          "repository": "gridcraft",
+          "path": "crates/vba/tests/support/mod.rs",
+          "sha256": "a6a0b70949fd6b0fa3e431ff70cf4aa0f983adf60d8b89a1b6e1720d6172beab"
+        },
+        {
+          "repository": "gridcraft",
+          "path": "crates/vba/tests/package_acceptance.rs",
+          "sha256": "94aaeb0b811ee4cbfdbe0137d955c0983d4df9f9bee9c17b988137769bf25066"
+        }
+      ],
+      "steps": [
+        "Use the authored module and procedure attribute records from the pinned package builder. Export source and inspect the visible code view.",
+        "Apply the same plain-source edit as the pinned test; export again. Record hidden attribute retention and visible source separately."
+      ],
+      "required_observations": {
+        "attributes": [
+          "module_name",
+          "procedure_attributes",
+          "visible_source",
+          "exported_source"
+        ]
+      },
+      "initial_status": "NOT_RUN"
+    },
+    {
+      "id": "gridcraft-package",
+      "product": "Microsoft Excel",
+      "fork": "GridCraft",
+      "category": "package",
+      "entrypoints": [
+        "unchanged_xlsm_load_compile_trust_run_save_reopen"
+      ],
+      "sources": [
+        {
+          "repository": "gridcraft",
+          "path": "crates/vba/tests/support/mod.rs",
+          "sha256": "a6a0b70949fd6b0fa3e431ff70cf4aa0f983adf60d8b89a1b6e1720d6172beab"
+        },
+        {
+          "repository": "gridcraft",
+          "path": "crates/vba/tests/package_acceptance.rs",
+          "sha256": "94aaeb0b811ee4cbfdbe0137d955c0983d4df9f9bee9c17b988137769bf25066"
+        }
+      ],
+      "steps": [
+        "Build the authored macro-enabled package from the pinned test helpers and keep its exact input bytes for both producers. Open without invoking authored entrypoints, then explicitly invoke Main.",
+        "Save and reopen in the native application format. Record semantic source/resource retention and document effects; do not compare ZIP timestamps or whole output archive bytes."
+      ],
+      "required_observations": {
+        "effects": [
+          "before_explicit_run",
+          "after_explicit_run"
+        ],
+        "package": [
+          "native_format",
+          "source_preserved",
+          "resources_preserved"
+        ],
+        "errors": [
+          "Err.Number"
+        ]
+      },
+      "initial_status": "NOT_RUN"
+    },
+    {
+      "id": "gridcraft-forms",
+      "product": "Microsoft Excel",
+      "fork": "GridCraft",
+      "category": "forms",
+      "entrypoints": [
+        "edited_xlsm_native_project_copy_reopens_runs_and_drops_signatures"
+      ],
+      "sources": [
+        {
+          "repository": "gridcraft",
+          "path": "crates/vba/tests/native_forms.rs",
+          "sha256": "bd1fb8c01e811af02aa8bff52b720f4ef841ab528211300c3bd13d0ac55f3770"
+        },
+        {
+          "repository": "gridcraft",
+          "path": "crates/vba/tests/support/native_forms.rs",
+          "sha256": "8153a83331e413323f42dc40f7b543bfa8ec87b3e9a55d7d65b3228fb39a3954"
+        },
+        {
+          "repository": "gridcraft",
+          "path": "crates/vba/tests/support/mod.rs",
+          "sha256": "a6a0b70949fd6b0fa3e431ff70cf4aa0f983adf60d8b89a1b6e1720d6172beab"
+        }
+      ],
+      "steps": [
+        "Recreate the pinned edited native package fixture: saved initialize output, saved embedded TextBox value and edited Apply_Click source. Open and show the form explicitly.",
+        "Click Apply, stop before the host write, continue once, then save/reopen native source and resources. Record output sequence and the worksheet A1 or Word main-story text. Record native form callback order from the actual run."
+      ],
+      "required_observations": {
+        "values": [
+          "initialize_output",
+          "apply_output"
+        ],
+        "effects": [
+          "host_text"
+        ],
+        "package": [
+          "source_reopened",
+          "resource_text_reopened"
+        ],
+        "event_order": [
+          "ordered_callbacks"
+        ]
+      },
+      "initial_status": "NOT_RUN"
+    },
+    {
+      "id": "gridcraft-worksheet-controls",
+      "product": "Microsoft Excel",
+      "fork": "GridCraft",
+      "category": "worksheet-controls",
+      "entrypoints": [
+        "shapes_addformcontrol_and_controlformat_use_native_units_types_lists_and_links"
+      ],
+      "sources": [
+        {
+          "repository": "gridcraft",
+          "path": "crates/vba/tests/support/mod.rs",
+          "sha256": "a6a0b70949fd6b0fa3e431ff70cf4aa0f983adf60d8b89a1b6e1720d6172beab"
+        },
+        {
+          "repository": "gridcraft",
+          "path": "crates/vba/tests/form_controls.rs",
+          "sha256": "2d49a3b6891ec6b5106186a988b9fc7a28e32e9f6efc56f0e0ff95c81f5af9c9"
+        }
+      ],
+      "steps": [
+        "Recreate the authored worksheet and native FormControl operations from the pinned test, including list population, selection and linked cell.",
+        "Record values with VBA types, list count, linked-cell effects and geometry in points. Save/reopen and read the persisted native control state."
+      ],
+      "required_observations": {
+        "values": [
+          "control_value",
+          "list_count",
+          "geometry_points"
+        ],
+        "effects": [
+          "linked_cell"
+        ],
+        "package": [
+          "persisted_control_state"
+        ],
+        "errors": [
+          "Err.Number"
+        ]
+      },
+      "initial_status": "NOT_RUN"
+    },
+    {
+      "id": "wordcraft-context",
+      "product": "Microsoft Word",
+      "fork": "WordCraft",
+      "category": "context",
+      "entrypoints": [
+        "packaged_thisdocument_event_is_explicit_and_owner_bound"
+      ],
+      "sources": [
+        {
+          "repository": "wordcraft",
+          "path": "crates/vba/tests/support/mod.rs",
+          "sha256": "a6a0b70949fd6b0fa3e431ff70cf4aa0f983adf60d8b89a1b6e1720d6172beab"
+        },
+        {
+          "repository": "wordcraft",
+          "path": "crates/vba/tests/package_acceptance.rs",
+          "sha256": "3fbbc1c8a42e73042794fac630180f6d2ea22fb6d3634482e969f510692fb24a"
+        }
+      ],
+      "steps": [
+        "Recreate the authored project and owner/active document setup from the pinned test. Keep owner and active documents distinct; for Excel rename the owner tab as in the test.",
+        "Invoke the same explicit entrypoints and record each qualified and unqualified host access and resulting document state."
+      ],
+      "required_observations": {
+        "effects": [
+          "owner_state",
+          "active_state"
+        ],
+        "errors": [
+          "Err.Number"
+        ]
+      },
+      "initial_status": "NOT_RUN"
+    },
+    {
+      "id": "wordcraft-events",
+      "product": "Microsoft Word",
+      "fork": "WordCraft",
+      "category": "events",
+      "entrypoints": [
+        "packaged_withevents_subscription_cancels_save_and_reset_disconnects_it"
+      ],
+      "sources": [
+        {
+          "repository": "wordcraft",
+          "path": "crates/vba/tests/support/mod.rs",
+          "sha256": "a6a0b70949fd6b0fa3e431ff70cf4aa0f983adf60d8b89a1b6e1720d6172beab"
+        },
+        {
+          "repository": "wordcraft",
+          "path": "crates/vba/tests/package_acceptance.rs",
+          "sha256": "3fbbc1c8a42e73042794fac630180f6d2ea22fb6d3634482e969f510692fb24a"
+        }
+      ],
+      "steps": [
+        "Attach the authored AppSink to the application using the pinned Connect procedure. Trigger the same document/sheet/save events as the pinned test, including cancellation where applicable.",
+        "Record callbacks in dispatch order and host effects, then disconnect/reset and repeat the trigger to establish subscription lifetime."
+      ],
+      "required_observations": {
+        "event_order": [
+          "ordered_callbacks"
+        ],
+        "effects": [
+          "connected_state",
+          "disconnected_state"
+        ],
+        "values": [
+          "cancel"
+        ]
+      },
+      "initial_status": "NOT_RUN"
+    },
+    {
+      "id": "wordcraft-attributes",
+      "product": "Microsoft Word",
+      "fork": "WordCraft",
+      "category": "attributes",
+      "entrypoints": [
+        "packaged_word_code_edits_keep_hidden_metadata_in_plain_source_only"
+      ],
+      "sources": [
+        {
+          "repository": "wordcraft",
+          "path": "crates/vba/tests/support/mod.rs",
+          "sha256": "a6a0b70949fd6b0fa3e431ff70cf4aa0f983adf60d8b89a1b6e1720d6172beab"
+        },
+        {
+          "repository": "wordcraft",
+          "path": "crates/vba/tests/package_acceptance.rs",
+          "sha256": "3fbbc1c8a42e73042794fac630180f6d2ea22fb6d3634482e969f510692fb24a"
+        }
+      ],
+      "steps": [
+        "Use the authored module and procedure attribute records from the pinned package builder. Export source and inspect the visible code view.",
+        "Apply the same plain-source edit as the pinned test; export again. Record hidden attribute retention and visible source separately."
+      ],
+      "required_observations": {
+        "attributes": [
+          "module_name",
+          "procedure_attributes",
+          "visible_source",
+          "exported_source"
+        ]
+      },
+      "initial_status": "NOT_RUN"
+    },
+    {
+      "id": "wordcraft-package",
+      "product": "Microsoft Word",
+      "fork": "WordCraft",
+      "category": "package",
+      "entrypoints": [
+        "unchanged_docm_load_compile_trust_run_save_reopen"
+      ],
+      "sources": [
+        {
+          "repository": "wordcraft",
+          "path": "crates/vba/tests/support/mod.rs",
+          "sha256": "a6a0b70949fd6b0fa3e431ff70cf4aa0f983adf60d8b89a1b6e1720d6172beab"
+        },
+        {
+          "repository": "wordcraft",
+          "path": "crates/vba/tests/package_acceptance.rs",
+          "sha256": "3fbbc1c8a42e73042794fac630180f6d2ea22fb6d3634482e969f510692fb24a"
+        }
+      ],
+      "steps": [
+        "Build the authored macro-enabled package from the pinned test helpers and keep its exact input bytes for both producers. Open without invoking authored entrypoints, then explicitly invoke Main.",
+        "Save and reopen in the native application format. Record semantic source/resource retention and document effects; do not compare ZIP timestamps or whole output archive bytes."
+      ],
+      "required_observations": {
+        "effects": [
+          "before_explicit_run",
+          "after_explicit_run"
+        ],
+        "package": [
+          "native_format",
+          "source_preserved",
+          "resources_preserved"
+        ],
+        "errors": [
+          "Err.Number"
+        ]
+      },
+      "initial_status": "NOT_RUN"
+    },
+    {
+      "id": "wordcraft-forms",
+      "product": "Microsoft Word",
+      "fork": "WordCraft",
+      "category": "forms",
+      "entrypoints": [
+        "edited_docm_native_project_copy_reopens_runs_and_drops_signatures"
+      ],
+      "sources": [
+        {
+          "repository": "wordcraft",
+          "path": "crates/vba/tests/native_forms.rs",
+          "sha256": "194d55ae2b0da1e33f8c451284d0aba8a5df9fa148a3cfdb0c03508bf5ddda4c"
+        },
+        {
+          "repository": "wordcraft",
+          "path": "crates/vba/tests/support/native_forms.rs",
+          "sha256": "de8e6c010a59447381c5fe4799df0f3ba5c2c68f4af361fa9fcbd1f3ffe60cff"
+        },
+        {
+          "repository": "wordcraft",
+          "path": "crates/vba/tests/support/mod.rs",
+          "sha256": "a6a0b70949fd6b0fa3e431ff70cf4aa0f983adf60d8b89a1b6e1720d6172beab"
+        }
+      ],
+      "steps": [
+        "Recreate the pinned edited native package fixture: saved initialize output, saved embedded TextBox value and edited Apply_Click source. Open and show the form explicitly.",
+        "Click Apply, stop before the host write, continue once, then save/reopen native source and resources. Record output sequence and the worksheet A1 or Word main-story text. Record native form callback order from the actual run."
+      ],
+      "required_observations": {
+        "values": [
+          "initialize_output",
+          "apply_output"
+        ],
+        "effects": [
+          "host_text"
+        ],
+        "package": [
+          "source_reopened",
+          "resource_text_reopened"
+        ],
+        "event_order": [
+          "ordered_callbacks"
+        ]
+      },
+      "initial_status": "NOT_RUN"
+    }
+  ]
+}

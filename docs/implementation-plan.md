@@ -68,6 +68,12 @@ inferred. Only M8.5 below remains in this milestone's release gate.
   inherited and fresh evidence distinct. Until Office is available these checks
   remain NOT_RUN; they block this release-validation gate, not M6 sign-off or M7.
 
+Offline preparation is implemented under [ADR 0102](decisions/0102-m8-release-evidence-gate.md):
+eleven source-pinned recipes, an empty results packet and typed release evidence
+validation. See [capture protocol](m8-office-comparison.md). The remaining M8.5
+work is actual named-build observation, comparison and provenance review; the
+preparation does not satisfy that gate.
+
 Acceptance: the declared release profile meets its applicable M1–M6, M6A, M7 and M7A gates,
 retains prior regressions and reports PASS, MISMATCH, UNSUPPORTED,
 BLOCKED_BY_POLICY, INVALID_FIXTURE, CRASH, TIMEOUT and NOT_RUN accurately.

@@ -3,6 +3,14 @@ name: tiny-vba-architecture
 description: Design or review tiny-vba crate boundaries, public APIs, dependencies and cross-layer changes. Use when choosing where a feature belongs or changing the architecture; covers headless engine and repository-owned IDE layering.
 ---
 
+M8 release preparation (2026-11-08): [ADR 0102](../../../docs/decisions/0102-m8-release-evidence-gate.md)
+adds eleven source-pinned Office/fork comparison recipes and an offline typed-result
+validator. `python3 tools/check_m8_release.py --validate` checks preparation;
+its default release gate remains NOT_RUN without fresh Office observations and
+provenance review. Core CI checks preparation plus adversarial validator tests.
+See docs/m8-office-comparison.md. Product sources and old receipts are unchanged;
+M8.5 remains open and P9 stays deferred.
+
 M8 candidate (2026-11-08): ADR 0101 and docs/m8-acceptance.md own the new
 24-case inherited library selection, bounded parser/importer/VM mutation targets,
 asserted native/WASI benchmarks and 20 original host workbook workflows. Host

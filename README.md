@@ -336,3 +336,7 @@ drop-list ComboBox packet, shared ordinary list rows, text/selection/matching an
 VM-owned drop state. Authorized input preserves focus/validation and debugger
 continuations; contextual F4 leaves the editor shortcut intact elsewhere. Locale
 limits, further properties/bindings/resources and broader M7A.4 remain open.
+
+M8 release readiness: `python3 tools/check_m8_release.py` checks the local receipts
+and fresh Office comparison bundle when supplied. [Capture protocol](docs/m8-office-comparison.md)
+and an empty eleven-case template are prepared; actual Office comparison remains NOT_RUN.

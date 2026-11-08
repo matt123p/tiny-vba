@@ -6,6 +6,7 @@ import json
 from pathlib import Path
 import re
 import subprocess
+import sys
 import tomllib
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -160,6 +161,11 @@ def main():
     parser.add_argument('check', nargs='?', choices=['layers', 'corpora', 'native-forms', 'all'], default='all')
     parser.add_argument('--require-checkouts', action='store_true')
     args = parser.parse_args()
+    if args.check == 'all':
+        from check_m8_release import check_preparation
+        check_preparation()
+        subprocess.run([sys.executable, '-m', 'unittest', 'discover', '-s',
+                        str(ROOT / 'tools/tests'), '-p', 'test_m8_release.py'], check=True)
     if args.check in {'native-forms', 'all'}:
         native_forms()
         from check_m7a import check as check_m7a

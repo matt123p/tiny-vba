@@ -11,6 +11,12 @@ Excel/Word comparisons remain NOT_RUN and release validation remains open.** The
 installation and requested continuation without it. Neither authored contracts,
 public documentation nor inherited observations replace that comparison.
 
+Offline M8.5 preparation is complete under [ADR 0102](decisions/0102-m8-release-evidence-gate.md):
+[eleven comparison recipes and capture protocol](m8-office-comparison.md), an empty
+results template and a bounded typed-evidence validator. Run
+`python3 tools/check_m8_release.py` for release readiness; without fresh observations
+it returns NOT_RUN (exit 1). Core CI validates preparation, not Office behavior.
+
 ## Evidence matrix
 
 | Task | Implemented scope | Evidence boundary |

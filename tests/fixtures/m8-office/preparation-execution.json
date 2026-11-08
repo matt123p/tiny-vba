@@ -1,0 +1,190 @@
+{
+  "schema": 1,
+  "profile": "m8-office-preparation-v1",
+  "recorded_at": "2026-11-08T23:45:25.807185+00:00",
+  "evidence_basis": "original-maintenance-validation-not-office-observations",
+  "preparation_status": "PASS",
+  "office_observations": "NOT_RUN",
+  "release_status": "NOT_RUN",
+  "implementation_identity": {
+    "base_commit": "9d9074078fef19a8eaea3e54a30a697863d65e7f",
+    "worktree": "prepared changes identified by source hashes below",
+    "runtime_tree_sha256": "fce541420ebb7576f691d19c64b910967f680b0d16382a8ae616eddc084ba77a"
+  },
+  "environment": {
+    "python": "3.12.3",
+    "os": "Linux-7.0.0-38-generic-x86_64-with-glibc2.39",
+    "rust": "rustc 1.99.1 (58cf8f9c3 2026-10-13)",
+    "node": "v18.19.1"
+  },
+  "artifacts": [
+    {
+      "path": "tools/check_m8_release.py",
+      "sha256": "5efeb278e8d89f4c0139ab07bc997be6d00f58d4962a9ee51d5f2ae7a10fd987"
+    },
+    {
+      "path": "tools/check_repository.py",
+      "sha256": "49e372eb974c6321dd06d229b8db3cda64eb474385481eaa62c709f7e391677a"
+    },
+    {
+      "path": "tools/tests/test_m8_release.py",
+      "sha256": "81e9235943a86d652adaf42178b817e28043e66a88be7a041c5066d90dd84ec2"
+    },
+    {
+      "path": "tests/fixtures/m8-office/selection.json",
+      "sha256": "31bcbef65daa186b8a21e62bd9e69ba9da431580b945f509bfbdfe7c801c4e9c"
+    },
+    {
+      "path": "tests/fixtures/m8-office/results-template.json",
+      "sha256": "b6d5dc12ffaf5159544a4b74a372d2d5d4b00286cbf4288525853bcfbf635922"
+    }
+  ],
+  "preserved_receipts": [
+    {
+      "path": "tests/fixtures/m7a/selection.json",
+      "sha256": "41c0c90ab84cbdf6065301cee4cdd5ea988e84c8b667f3d3972c5dfbe3b35fa4"
+    },
+    {
+      "path": "tests/fixtures/m7a/execution.json",
+      "sha256": "d1dd4c0f517ffbba3f17b56905a680dbec0002c4a7ac4b0f2b34ccafebf419ad"
+    },
+    {
+      "path": "tests/fixtures/m8/selection.json",
+      "sha256": "9c158211fd2b360b352468bab3bc0e78cf70d5df99f2fce08473dd69542e6eef"
+    },
+    {
+      "path": "tests/fixtures/m8/execution.json",
+      "sha256": "bbf9e245dbccb0f4e34a76dcfbba8fa6b5e98e3ca9c32893894f637688ebdf18"
+    }
+  ],
+  "gates": [
+    {
+      "command": "CARGO_PROFILE_TEST_OPT_LEVEL=2 CARGO_BUILD_JOBS=2 cargo xtask ci",
+      "status": "PASS",
+      "exit_code": 0,
+      "test_functions": 1073,
+      "log_sha256": "c1465433c88b317861491157949812cb7501c8a7518c8fbb6888fbef15b14d94",
+      "elapsed_seconds": 1058.2524913670495
+    },
+    {
+      "command": "cargo xtask wasm",
+      "status": "PASS",
+      "exit_code": 0,
+      "log_sha256": "f54d39631fdc31866c0e2f6827a247240a096b1967baac934d71f26e620b9f36"
+    },
+    {
+      "command": "CARGO_PROFILE_TEST_OPT_LEVEL=2 CARGO_BUILD_JOBS=2 cargo xtask wasm-run",
+      "status": "PASS",
+      "exit_code": 0,
+      "test_functions": 756,
+      "log_sha256": "184e5e63e1e8f51538042f839d31b2c31b3c08cef5e4265b95f3eaa306b68b87"
+    },
+    {
+      "command": "python3 tools/check_repository.py",
+      "status": "PASS",
+      "exit_code": 0,
+      "log_sha256": "45ff9b30ad65531bc92adf414ae873b7c80aac086efc1a6bf2f4121bce234485"
+    },
+    {
+      "command": "python3 -m unittest discover -s tools/tests -p test_m8_release.py",
+      "status": "PASS",
+      "exit_code": 0,
+      "test_functions": 10,
+      "log_sha256": "54b4682474510b449080b7af321f7cb76c72916847251d94d00fe9a4d6d8d291"
+    }
+  ],
+  "cli_checks": [
+    {
+      "arguments": [
+        "--validate"
+      ],
+      "exit_code": 0,
+      "expected_exit_code": 0,
+      "output": "M8.5 preparation: 11 cases VALID_FIXTURE; execution NOT_RUN\n"
+    },
+    {
+      "arguments": [
+        "--validate",
+        "--siblings"
+      ],
+      "exit_code": 0,
+      "expected_exit_code": 0,
+      "output": "M8.5 preparation: 11 cases VALID_FIXTURE; execution NOT_RUN\n"
+    },
+    {
+      "arguments": [
+        "--init",
+        "<temporary-directory>/results.json"
+      ],
+      "exit_code": 0,
+      "expected_exit_code": 0,
+      "output": "rfx-m8 evidence: 24 reviewed fixtures; upstream byte verification PASS; no upstream code executed\nM8 selection: 45 artifacts VALID_FIXTURE; execution NOT_RUN by integrity check; siblings not checked\nM8.5 packet created: 11 comparisons NOT_RUN\n"
+    },
+    {
+      "arguments": [
+        "--init",
+        "<temporary-directory>/results.json"
+      ],
+      "exit_code": 2,
+      "expected_exit_code": 2,
+      "output": "rfx-m8 evidence: 24 reviewed fixtures; upstream byte verification PASS; no upstream code executed\nM8 selection: 45 artifacts VALID_FIXTURE; execution NOT_RUN by integrity check; siblings not checked\nRESULT INVALID_FIXTURE m8-release-v1: [Errno 17] File exists: '<temporary-directory>/results.json'\n"
+    },
+    {
+      "arguments": [],
+      "exit_code": 1,
+      "expected_exit_code": 1,
+      "output": "rfx-m8 evidence: 24 reviewed fixtures; upstream byte verification PASS; no upstream code executed\nM8 selection: 45 artifacts VALID_FIXTURE; execution NOT_RUN by integrity check; siblings not checked\nRESULT NOT_RUN m8-release-v1\n{\n  \"profile\": \"m8-release-v1\",\n  \"status\": \"NOT_RUN\",\n  \"local_status\": \"PASS\",\n  \"office_comparisons\": {\n    \"gridcraft-context\": \"NOT_RUN\",\n    \"gridcraft-events\": \"NOT_RUN\",\n    \"gridcraft-attributes\": \"NOT_RUN\",\n    \"gridcraft-package\": \"NOT_RUN\",\n    \"gridcraft-forms\": \"NOT_RUN\",\n    \"gridcraft-worksheet-controls\": \"NOT_RUN\",\n    \"wordcraft-context\": \"NOT_RUN\",\n    \"wordcraft-events\": \"NOT_RUN\",\n    \"wordcraft-attributes\": \"NOT_RUN\",\n    \"wordcraft-package\": \"NOT_RUN\",\n    \"wordcraft-forms\": \"NOT_RUN\"\n  },\n  \"reason\": \"Fresh Excel/Word observations and provenance review are unavailable\"\n}\n"
+    },
+    {
+      "arguments": [
+        "--bundle",
+        "<temporary-directory>/results.json"
+      ],
+      "exit_code": 1,
+      "expected_exit_code": 1,
+      "output": "rfx-m8 evidence: 24 reviewed fixtures; upstream byte verification PASS; no upstream code executed\nM8 selection: 45 artifacts VALID_FIXTURE; execution NOT_RUN by integrity check; siblings not checked\nRESULT NOT_RUN m8-release-v1\n{\n  \"profile\": \"m8-release-v1\",\n  \"status\": \"NOT_RUN\",\n  \"office_comparisons\": {\n    \"gridcraft-context\": \"NOT_RUN\",\n    \"gridcraft-events\": \"NOT_RUN\",\n    \"gridcraft-attributes\": \"NOT_RUN\",\n    \"gridcraft-package\": \"NOT_RUN\",\n    \"gridcraft-forms\": \"NOT_RUN\",\n    \"gridcraft-worksheet-controls\": \"NOT_RUN\",\n    \"wordcraft-context\": \"NOT_RUN\",\n    \"wordcraft-events\": \"NOT_RUN\",\n    \"wordcraft-attributes\": \"NOT_RUN\",\n    \"wordcraft-package\": \"NOT_RUN\",\n    \"wordcraft-forms\": \"NOT_RUN\"\n  },\n  \"review_present\": false,\n  \"comparison_bundle_sha256\": \"42d2b7a8521e2a49c9cfe1404224842519a5e5fd50db5bffeb25dad4066f0870\",\n  \"local_status\": \"PASS\"\n}\n"
+    }
+  ],
+  "comparison_inventory": {
+    "cases": 11,
+    "sibling_source_hashes_and_entrypoints": "PASS",
+    "office_results": {
+      "gridcraft-context": "NOT_RUN",
+      "gridcraft-events": "NOT_RUN",
+      "gridcraft-attributes": "NOT_RUN",
+      "gridcraft-package": "NOT_RUN",
+      "gridcraft-forms": "NOT_RUN",
+      "gridcraft-worksheet-controls": "NOT_RUN",
+      "wordcraft-context": "NOT_RUN",
+      "wordcraft-events": "NOT_RUN",
+      "wordcraft-attributes": "NOT_RUN",
+      "wordcraft-package": "NOT_RUN",
+      "wordcraft-forms": "NOT_RUN"
+    }
+  },
+  "release_readiness": {
+    "profile": "m8-release-v1",
+    "status": "NOT_RUN",
+    "local_status": "PASS",
+    "office_comparisons": {
+      "gridcraft-context": "NOT_RUN",
+      "gridcraft-events": "NOT_RUN",
+      "gridcraft-attributes": "NOT_RUN",
+      "gridcraft-package": "NOT_RUN",
+      "gridcraft-forms": "NOT_RUN",
+      "gridcraft-worksheet-controls": "NOT_RUN",
+      "wordcraft-context": "NOT_RUN",
+      "wordcraft-events": "NOT_RUN",
+      "wordcraft-attributes": "NOT_RUN",
+      "wordcraft-package": "NOT_RUN",
+      "wordcraft-forms": "NOT_RUN"
+    },
+    "reason": "Fresh Excel/Word observations and provenance review are unavailable"
+  },
+  "limitations": [
+    "Synthetic packets exist only in temporary unit-test directories and are not Office evidence.",
+    "No fresh Office observations or provenance review; M8.5 and full M8 release acceptance remain open.",
+    "Product/dependency trees, shipping host pins and original M7A/M8 receipts are unchanged.",
+    "No new remote Windows/macOS or visual comparison claim; existing receipts retain their original scope."
+  ]
+}
