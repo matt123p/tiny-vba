@@ -1,6 +1,6 @@
 # ADR 0098: Native form encoding and source-only project writeback
 
-Date: 2026-11-08. Status: adopted; M7A.5 implementation/acceptance IN PROGRESS.
+Date: 2026-11-08. Status: adopted; M7A.5 COMPLETE for the common-profile explicit persistence workflows.
 
 Owner direction activates M7A.5 for the accepted common forms profile. This
 implements the separately reviewed encoder boundary required by ADR 0037; it does
@@ -58,9 +58,25 @@ acknowledgment is allowed only after successful package/file commit and removal 
 all VBA signature forms/relationships/content types by the owning fork. This shared
 encoder alone does not implement or certify host package/signature policy.
 
+The forks expose explicit edited macro-enabled copy export in their VBE windows
+and UI commands. Fork VBA adapters bind the compiled shared snapshot to document
+and project identity; format crates replace the captured project on a clone and
+remove invalidated signatures. GridCraft prunes signature-private reachability
+while retaining shared nonsignature parts; WordCraft handles its admitted bounded
+VBA-related manifest including legacy/agile/v3 signatures and VBA data. Missing or
+ambiguous graph data refuses. Engine IO serializes/reopens the macro-enabled copy
+and compares the project bytes. UI adapters validate again after file selection
+and atomically commit. Native file choice refuses the current document path.
+Copy export and browser downloads leave the original editor modified; the original
+project bytes and ordinary document-save preservation contract remain intact.
+A caller may acknowledge the source snapshot after a confirmed package commit,
+but that receipt never changes which project ordinary document Save preserves.
+The project must be idle/reset; encoding, import and reopening never run handlers.
+No new dependency edge or VM/host capability is needed for this layering.
+
 Tests and exact gate results are recorded in implementation progress. Fresh Office
-comparisons remain M8.5 NOT_RUN. M7A.5 is not signed off until both native export
-and required edited macro-enabled package workflows have executable evidence.
+comparisons remain M8.5 NOT_RUN. The [M7A.5 acceptance record](../m7a5-acceptance.md) signs off native export
+and explicit edited macro-enabled copy workflows with executable evidence.
 M7A.6 legacy-format removal, M7A.7 final integration and P9 extensions stay separate.
 
 Format references: Microsoft's [Form stream](https://learn.microsoft.com/en-us/openspecs/office_file_formats/ms-oforms/cb5df5d6-e090-4bf3-a328-c4edaff0c66b),

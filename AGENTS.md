@@ -4,7 +4,8 @@ Current owner direction (2026-11-08): [ADR 0097](docs/decisions/0097-common-form
 supersedes historical instructions below that all inventoried forms parity must
 block M7A.4. M7A.4 is COMPLETE for [the common profile](docs/m7a4-common-profile.md).
 Uncommon/exhaustive extensions are [P9](docs/p9-forms-compatibility.md), after M8.
-Next is M7A.5 native persistence, then M7A.6 `.tvform` removal and M7A.7 acceptance.
+M7A.5 persistence is complete for its explicit workflow profile. Next is M7A.6
+`.tvform` removal and M7A.7 acceptance.
 Do not reopen the exhaustive M7A.4 gate or claim P9 behavior implemented. Bugs in
 included common workflows remain fixes. Safety/trust/bounds and fresh M8.5
 comparison requirements remain unchanged.
@@ -277,3 +278,10 @@ bytes separate; compile exact binary-save snapshots, remove stale compiled cache
 reopen/check output and enforce project/source/design identity at acknowledgment.
 Hosts own signature removal and atomic package/file commit. Host workflows and
 final acceptance are still required before M7A.5 is complete.
+
+M7A.5 is COMPLETE for the explicit common-profile native form Save/Export and
+edited XLSM/DOCM copy workflows in docs/m7a5-acceptance.md. Both fork gates pass;
+receipts are in implementation progress. Ordinary document Save retains original
+VBA bytes, copy export retains editor dirty state, and browser download requests
+never acknowledge a disk commit. Next is M7A.6 legacy `.tvform` removal, then
+M7A.7 integration. Preserve the P9 and M8.5 boundaries.

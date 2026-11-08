@@ -50,9 +50,12 @@ const assert = require('node:assert/strict');
     await click(565, 447);
     await page.keyboard.type('a');
     await page.waitForFunction(() => document.querySelector('#vba-output').textContent.trim() === 'auto tab ready\tTrue\nchange\ta');
+    // Output can update before the next egui frame restores the text widget.
+    await settle();
     await page.keyboard.type('b');
     await page.waitForFunction(() => document.querySelector('#vba-output').textContent.trim() === 'auto tab ready\tTrue\nchange\ta\nchange\tab');
     assert.equal((await page.locator('#vba-output').textContent()).trim(), 'auto tab ready\tTrue\nchange\ta\nchange\tab');
+    await settle();
     await page.keyboard.type('c');
     await page.waitForFunction(() => document.querySelector('#vba-status').textContent === 'Break');
     assert.equal((await page.locator('#vba-output').textContent()).trim(), 'auto tab ready\tTrue\nchange\ta\nchange\tab\nchange\tabc\nbefore\nafter\nexit\nenter');

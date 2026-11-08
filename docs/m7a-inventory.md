@@ -1,19 +1,22 @@
 # M7A native forms — implementation inventory and work ledger
 
-M7A.5 encoding update (2026-11-08): [ADR 0098](decisions/0098-native-form-encoding-and-source-only-writeback.md)
-adds explicit native form and source-only MS-OVBA encoders and revision-bound IDE
-snapshots. Native save/export and package writeback remain separate operations.
-Host package/signature integration and final acceptance are still IN PROGRESS;
-this is not a completed M7A.5 claim. Historical read-only descriptions below refer
-to the original decoder path. Next required work includes both host save workflows.
+M7A.5 persistence update (2026-11-08): native `.frm`/`.frx` saving/export and
+explicit edited XLSM/DOCM copy export are implemented under
+[ADR 0098](decisions/0098-native-form-encoding-and-source-only-writeback.md).
+The [workflow and acceptance record](m7a5-acceptance.md) distinguishes native Save,
+Export, browser downloads and ordinary document Save, which preserves originals.
+M7A.5 is COMPLETE for these explicit common-profile workflows. Historical
+read-only descriptions below refer to original decoder/ordinary-save paths, not
+the explicit native encoders.
 
 Current scope (2026-11-08, [ADR 0097](decisions/0097-common-forms-scope-and-p9.md)):
 **M7A.4 is COMPLETE for [native-forms-common-v1](m7a4-common-profile.md).**
 The outstanding uncommon/exhaustive cases in earlier incremental notes now belong
 to [P9](p9-forms-compatibility.md). Those notes retain their original support and
 evidence limits; this sign-off does not implement deferred behavior. M7A.5 native
-persistence, M7A.6 `.tvform` removal, M7A.7 integration and M8.5 fresh comparisons
-remain separate unfinished gates. Next work is M7A.5.
+persistence is complete for the explicit workflows above. M7A.6
+`.tvform` removal, M7A.7 integration and M8.5 fresh comparisons remain unfinished.
+Next work is M7A.6.
 
 Updated 2026-11-08. **IN PROGRESS**. FC0 and FC3.1–FC3.4 are complete for
 `native-userform-import-v1`; see the [control/property/event/format/host matrix](m7a-control-contracts.md).
@@ -153,13 +156,13 @@ build/OS/locale comparisons remain NOT_RUN under M8.5.
 | FC4 common UserForm controls | DONE for native-forms-common-v1; extensions P9 | [Common profile and evidence](m7a4-common-profile.md); standard control/property/input packets accepted; further resource/member/platform cases tracked in P9 |
 | FC3.1–FC3.4 native UserForm codecs/attachment | DONE for native-userform-import-v1 | Export + embedded parity, shared designer/runtime/debugger, standalone IO, XLSM/DOCM trust and byte retention |
 | FC3.5 common native lifecycle | DONE for native-forms-common-v1; exhaustive parity P9 | [Common lifetime/instance evidence](m7a4-completion-checklist.md); shared and pinned-host gates pass; unusual alias/reentrant/ordering combinations tracked in P9 |
-| FC5 edited native persistence | IN_PROGRESS | ADR 0098: native form encoder, source-only MS-OVBA and revision-bound save snapshots; host package/signature workflow acceptance pending |
+| FC5 edited native persistence | DONE for common-profile native file Save/Export and edited XLSM/DOCM copies | [Acceptance and receipts](m7a5-acceptance.md); ADR 0098; source/cache/signature policy, atomic IO and revision/close checks |
 | FC6 remove .tvform | NOT_STARTED | Requires native replacement workflows; do not extend the legacy format |
 
 M7A.3 completes the selected worksheet profile under ADR 0041. M7A.4 / FC3.5 /
 FC4 are accepted for the common profile under ADR 0097; uncommon extensions and
-remaining exhaustive audits are P9. The next shared task is M7A.5 / FC5 native
-editing/persistence, followed by FC6 removal and M7A.7 acceptance.
+remaining exhaustive audits are P9. M7A.5 / FC5 is accepted for the explicit workflows above. The next shared task is
+M7A.6 / FC6 removal, followed by M7A.7 acceptance.
 No native resource layout, default or event order may be inferred from `.tvform`.
 
 M7A.3 update: the initial metadata-only description above is historical. The

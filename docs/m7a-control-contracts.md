@@ -1,19 +1,22 @@
 # M7A Office forms — control, property, event, format and host contracts
 
-M7A.5 encoding update (2026-11-08): [ADR 0098](decisions/0098-native-form-encoding-and-source-only-writeback.md)
-adds explicit native form and source-only MS-OVBA encoders and revision-bound IDE
-snapshots. Native save/export and package writeback remain separate operations.
-Host package/signature integration and final acceptance are still IN PROGRESS;
-this is not a completed M7A.5 claim. Historical read-only descriptions below refer
-to the original decoder path. Next required work includes both host save workflows.
+M7A.5 persistence update (2026-11-08): native `.frm`/`.frx` saving/export and
+explicit edited XLSM/DOCM copy export are implemented under
+[ADR 0098](decisions/0098-native-form-encoding-and-source-only-writeback.md).
+The [workflow and acceptance record](m7a5-acceptance.md) distinguishes native Save,
+Export, browser downloads and ordinary document Save, which preserves originals.
+M7A.5 is COMPLETE for these explicit common-profile workflows. Historical
+read-only descriptions below refer to original decoder/ordinary-save paths, not
+the explicit native encoders.
 
 Current scope (2026-11-08, [ADR 0097](decisions/0097-common-forms-scope-and-p9.md)):
 **M7A.4 is COMPLETE for [native-forms-common-v1](m7a4-common-profile.md).**
 The outstanding uncommon/exhaustive cases in earlier incremental notes now belong
 to [P9](p9-forms-compatibility.md). Those notes retain their original support and
 evidence limits; this sign-off does not implement deferred behavior. M7A.5 native
-persistence, M7A.6 `.tvform` removal, M7A.7 integration and M8.5 fresh comparisons
-remain separate unfinished gates. Next work is M7A.5.
+persistence is complete for the explicit workflows above. M7A.6
+`.tvform` removal, M7A.7 integration and M8.5 fresh comparisons remain unfinished.
+Next work is M7A.6.
 
 Updated 2026-11-08. FC0.2/FC0.3 contract inventory under
 [ADR 0038](decisions/0038-native-office-forms-and-compatibility-only.md),

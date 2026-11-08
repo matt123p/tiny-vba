@@ -240,8 +240,10 @@ Next is M7A: native Office forms and removal of `.tvform`, followed by expanded
 conformance, hardening and release validation (M8). Fresh
 Excel/Word comparisons remain **NOT_RUN**, scheduled for M8.5. The
 [reviewed writeback/signature contract](docs/decisions/0037-m7-package-preservation-and-writeback.md)
-describes the current unsupported edited-writeback/verifier boundary. M7A includes
-the native form/source encoder needed for edited persistence under that contract.
+describes the original preservation boundary; [ADR 0098](docs/decisions/0098-native-form-encoding-and-source-only-writeback.md)
+and the [M7A.5 workflow](docs/m7a5-acceptance.md) add explicit native form saving
+and edited XLSM/DOCM copy export. Ordinary document Save preserves imported VBA
+bytes; cryptographic signature verification/resigning remains unsupported.
 M7 preserves original project bytes and supported related payloads separately
 from plain-source exports. Arbitrary COM/DLL execution, P-code execution and
 third-party ActiveX/OLE controls are outside the current scope. Broader Office

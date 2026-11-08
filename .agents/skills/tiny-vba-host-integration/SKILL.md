@@ -481,3 +481,19 @@ Retain imported originals separately, never write stale caches/signatures, and
 never acknowledge failed/stale/foreign saves. Both host package workflows must
 pass before marking M7A.5 complete. Browser download requests alone do not clear
 dirty state. See docs/decisions/0098-native-form-encoding-and-source-only-writeback.md.
+
+M7A.5 host persistence uses explicit edited XLSM/DOCM copy export. Format crates
+strip invalidated signatures on document clones; engine IO serializes/reopens;
+UI adapters revalidate document/project/source/design identity after selection and
+commit atomically. Ordinary document Save preserves original VBA bytes. Exported
+copies/browser downloads do not clear the original editor's dirty state. Native
+`.frm` Save acknowledgment follows confirmed file IO only. Preserve these distinct
+receipts; see docs/m7a5-acceptance.md and ADR 0098. Final gates are recorded in
+implementation progress; M7A.6 removal remains separate.
+
+M7A.5 is COMPLETE for the explicit common-profile native form Save/Export and
+edited XLSM/DOCM copy workflows in docs/m7a5-acceptance.md. Both fork gates pass;
+receipts are in implementation progress. Ordinary document Save retains original
+VBA bytes, copy export retains editor dirty state, and browser download requests
+never acknowledge a disk commit. Next is M7A.6 legacy `.tvform` removal, then
+M7A.7 integration. Preserve the P9 and M8.5 boundaries.

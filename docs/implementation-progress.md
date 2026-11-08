@@ -1,35 +1,58 @@
 # Implementation progress
 
-## M7A.5 in progress — native encoders and save snapshots (2026-11-08)
+## M7A.5 complete — native form saving and edited package copies (2026-11-08)
 
-ADR 0098 implements native `.frm`/`.frx` designer/source encoding, admitted common
-control edits, current toolbox add/delete, nested resources, storage class/state
-metadata and NextAvailableID maintenance. Output reopens and matches the exact
-source/design. Native standalone Save publishes immutable companions before an
-atomic `.frm` replacement; browser export transfers both files without assuming
-that download requests committed them. Project/source/design-bound snapshots
-reject stale and foreign acknowledgments; imported originals remain separate.
+Accepted for the common profile under [ADR 0098](decisions/0098-native-form-encoding-and-source-only-writeback.md)
+and the [workflow/acceptance record](m7a5-acceptance.md). Native `.frm`/`.frx`
+Save/Export, current designer edits and three toolbox additions survive native
+reopen. Source-only MS-OVBA encoding removes module/project/SRP caches, rebuilds
+CFB storage without old cache bytes, retains class/state metadata and verifies
+exact source/design/component/reference identity. Native IO publishes immutable
+companions before atomic primary replacement, retains private permissions and
+never acknowledges failed/stale/foreign saves. Close releases native originals
+and invalidates outstanding snapshots.
 
-The source-only MS-OVBA encoder updates structural directory offsets, removes
-module/project/SRP performance caches and rebuilds a fresh CFB so freed sectors
-cannot retain removed caches. Exact source, component/code-name/reference and
-form identities are compared after reopen. IDE binary snapshots compile without
-execution and recheck original bytes and revisions. Hosts still own package,
-signature and actual IO policy. M7A.5 is not complete yet: required edited XLSM/
-DOCM package workflows and their integration acceptance are still in progress.
+GridCraft **Export Edited XLSM Copy** (`vba.exportNativePackage`) and WordCraft
+**Export Edited DOCM Copy** (`ui.vbaExportNativePackage`) compile idle/reset source
+without execution, encode actual edited embedded form resources and remove
+invalidated VBA signature relationships/content types/private parts. Format crates
+work on clones; engine IO writes/reopens and compares the exact project; UI checks
+identity again after selection and commits atomically. Missing/ambiguous captured
+graphs refuse. Copies refuse the current document path and leave its editor
+modified. Ordinary document Save still preserves imported VBA bytes: open the
+edited copy to use the persisted changes. Browser downloads do not acknowledge a
+disk commit. These distinct receipts are intentional, not implicit in-place Save.
 
-Full shared native CI, strict workspace Clippy, WASM/WASI, UI/Xvfb and web builds
-pass. Latest writer/metadata rechecks pass: all 60 project tests natively and on
-Node 22 WASI, all 99 retained instance cases and three new IDE save cases natively,
-and the three save cases on WASI. The nine native file-IO cases pass, including private source/companion modes.
-Project close also releases native originals and invalidates save snapshots; the
-four IDE save cases and retained execution/attachment cases pass. A Chromium
-flow edits the designer caption, exports two native files, reimports them inertly
-and executes the original source; its dialog and reopened views were inspected.
-Both forks' initial signature-removal regressions pass; pinned host integration
-is pending. No dependency/VM limit or host authority was added. Fresh Office
-comparisons remain M8.5 NOT_RUN. Next: finish host package export/save workflows,
-then mark M7A.5 only from their native/WASM, trust/revision and package evidence.
+| Repository | Accepted product revision / integration receipt |
+|---|---|
+| tiny-vba shared encoder/snapshots | `8800fcb07e628d4719a5c5459969503ba7e70f7c` (initial encoder `cc09e4a0193a9bfc425acdea1f99c514f1d06b04`) |
+| GridCraft | `01e5308cfa0acd2829083663d81122a7678617e8` |
+| WordCraft | `bfa162a38531b79589b5b8b02c895125b0da03ff` |
+
+Shared native CI, strict full-workspace Clippy, WASM/WASI, UI/Xvfb and web gates
+pass. Final focused rechecks cover 60 project cases natively/on Node 22 WASI, 99
+retained instance cases, four IDE save cases natively/on WASI and nine file-IO
+cases. Execution/attachment rechecks also pass. All 15 Chromium flows pass,
+including actual edited native downloads/reimport/execution. AutoTab's browser
+check now waits for the next egui frame after handler output before typing the
+next key; assertions remain unchanged. The native save dialog, reopened form and
+both host canvases were inspected.
+
+GridCraft: all 10 CI steps, strict optional VBA/UI Clippy, six form UI cases,
+VBA-enabled web build and 34 native/34 Node 22 WASM package cases pass. WordCraft:
+all eight CI steps in isolation with one test thread, strict optional Clippy,
+13 retained VBA UI cases plus hidden-editor/canvas/new copy-command cases,
+VBA-enabled web build and 29 native/29 Node 22 WASM package cases pass. Both format
+signature regressions pass, including incomplete graph/manifest refusal; both UI
+copy cases prove the original dirty state and bytes survive. Each host lockfile
+changes only the revisions of 13 shared packages (26 source occurrences); no new
+dependency edge, VM/host authority or limit was added.
+
+Evidence is authored Rust/production UI, not fresh Office observation. M8.5 remains
+NOT_RUN. Unsupported resource edits, component insertion/renaming, protected/read-only
+source changes and unrepresentable encodings refuse. No cryptographic verifier or
+resigning is claimed. M7A overall remains in progress; next is **M7A.6 `.tvform`
+removal**, then M7A.7 final integration. Uncommon/exhaustive parity stays in P9.
 
 
 ## M7A.4 complete — common forms scope; uncommon work moved to P9 (2026-11-08)

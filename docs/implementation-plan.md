@@ -1,6 +1,6 @@
 # Remaining implementation plan
 
-Updated 2026-11-08. This plan contains **remaining work only**: M7A.5–M7A.7, stable M8 IDs and deferred P9,
+Updated 2026-11-08. This plan contains **remaining work only**: M7A.6–M7A.7, stable M8 IDs and deferred P9,
 after completed M1–M6, M6A and M7 for their declared profiles.
 [M7 acceptance](m7-acceptance.md) records the authored unchanged-document/package
 profile and [ADR 0037](decisions/0037-m7-package-preservation-and-writeback.md)
@@ -51,8 +51,9 @@ and inert package attachment in both forks. See the
 [completed task definitions and evidence](implementation-progress.md#completed-m7a1-and-m7a2-plan-scope)
 and [property/event/format/host contracts](m7a-control-contracts.md).
 M7A.4 is complete for the common profile below. Broader native variants and
-exhaustive lifecycle parity are P9; native edited saving and custom-format removal
-remain M7A.5–M7A.7. No full M7A sign-off is claimed.
+exhaustive lifecycle parity are P9. M7A.5 native persistence is complete for its
+explicit workflows; custom-format removal and final acceptance remain M7A.6/.7.
+No full M7A sign-off is claimed.
 
 Completed checkpoint: **M7A.3 — Worksheet forms and controls (FC1–FC2)** for
 [worksheet-form-controls-v1](m7a-worksheet-controls.md): all nine standard families,
@@ -70,15 +71,12 @@ IDs and exhaustive property/platform/resource/ActiveX work move to
 [P9](p9-forms-compatibility.md); they no longer block M7A.4 or the following gates.
 Bugs in included common workflows remain fixes, not automatic P9 deferrals.
 
-- **M7A.5 — Native editing and persistence (FC5; IN PROGRESS):** implement native `.frm`/`.frx`
-  save/export for the accepted common profile and required edited embedded form/source-resource writeback in
-  `.xlsm`/`.docm` workflows. Review and implement the necessary encoder/package
-  path under ADR 0037, including cache consistency and signature invalidation.
-  ADR 0098 implements shared native form/source-only project encoders and save
-  snapshots; host package workflows and full acceptance remain required.
-  Prove native edit/save/reopen with source/resource identity, revision checks,
-  atomic failure and lifecycle integrity. Retaining only original bytes is not
-  an edited-save PASS; a custom format is not a substitute for native persistence.
+M7A.5 / FC5 is **COMPLETE** for native common-profile Save/Export and explicit
+edited XLSM/DOCM copy workflows under ADR 0098. See the
+[acceptance record](m7a5-acceptance.md) for supported edits, source/cache/signature
+policy, exact receipts and limitations. Ordinary document Save preserves imported
+VBA bytes. Next is M7A.6; no full M7A sign-off is claimed.
+
 - **M7A.6 — Remove .tvform (FC6):** remove the custom codec, public APIs, import/
   export/save routes, file associations/filters, examples and current support claims.
   Replace demonstrations and useful tests with native Office fixtures/workflows.
