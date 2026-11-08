@@ -41,16 +41,22 @@ impl Hit {
         self.owner == other.owner && self.object == other.object
     }
     fn current(&self, ide: &Ide) -> bool {
-        ide.form_instance_visible(self.owner)
-            && self.control.is_none_or(|control| {
-                ide.form_instance_control_object(self.owner, control).ok() == Some(self.object)
-            })
-            && match (self.control, &self.part) {
-                (Some(control), Part::Tab(tab)) => ide
-                    .form_instance_tab_index(self.owner, control, *tab)
-                    .is_ok(),
-                _ => true,
-            }
+        if !ide.form_instance_visible(self.owner) {
+            return false;
+        }
+        // Ordinary mutation frames may be between collection writes. Keep the
+        // bounded receipt until it can be validated immediately before delivery.
+        if !ide.form_instance_can_deliver(self.owner) {
+            return true;
+        }
+        self.control.is_none_or(|control| {
+            ide.form_instance_control_object(self.owner, control).ok() == Some(self.object)
+        }) && match (self.control, &self.part) {
+            (Some(control), Part::Tab(tab)) => ide
+                .form_instance_tab_index(self.owner, control, *tab)
+                .is_ok(),
+            _ => true,
+        }
     }
     fn simple(&self) -> bool {
         self.kind.is_none_or(|kind| {
@@ -440,6 +446,12 @@ impl MouseScope {
     fn listens(ide: &Ide, hit: &Hit) -> bool {
         hit.text()
             || matches!(hit.part, Part::TextScroll(_) | Part::TextScrollCorner)
+            || hit.kind == Some(ControlKind::CommandButton)
+                && hit.control.is_some_and(|control| {
+                    ide.form_instance_field(hit.owner, Some(control), "TakeFocusOnClick")
+                        .ok()
+                        == Some(Value::Boolean(false))
+                })
             || [Phase::Down, Phase::Move, Phase::Up, Phase::DoubleClick]
                 .into_iter()
                 .chain(hit.control.is_none().then_some(Phase::Click))

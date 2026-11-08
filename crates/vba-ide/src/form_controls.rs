@@ -192,6 +192,7 @@ pub(crate) fn control_class(kind: ControlKind, ranges: bool) -> String {
         s.push_str("Public Event Click\nPublic Sub VbaClick()\nRaiseEvent Click\nEnd Sub\n");
     }
     if kind == ControlKind::CommandButton {
+        s.push_str("Public TakeFocusOnClick As Boolean\n");
         s.push_str("Public Property Get Value() As Boolean\nAttribute Value.VB_UserMemId = 0\nValue=False\nEnd Property\nPublic Property Let Value(ByVal value As Boolean)\nIf value Then RaiseEvent Click\nEnd Property\n");
         for property in ["Default", "Cancel"] {
             s.push_str(&format!("Public Vba{property} As Boolean\nPublic Event Vba{property}Changed(ByVal value As Boolean)\nPublic Property Get {property}() As Boolean\n{property}=Vba{property}\nEnd Property\nPublic Property Let {property}(ByVal value As Boolean)\nVba{property}=value\nIf value Then RaiseEvent Vba{property}Changed(value)\nEnd Property\n"));
@@ -245,6 +246,9 @@ pub(crate) fn control_class(kind: ControlKind, ranges: bool) -> String {
         s.push_str("Public Event AddControl(ByVal index As Long,ByVal control As MSForms.Control)\nPublic Event RemoveControl(ByVal index As Long,ByVal control As MSForms.Control)\nPublic Sub VbaNotifyControl(ByVal added As Boolean,ByVal index As Long,ByVal control As MSForms.Control)\nIf added Then\nRaiseEvent AddControl(index,control)\nElse\nRaiseEvent RemoveControl(index,control)\nEnd If\nEnd Sub\n");
     }
     let mut init = format!("VbaKind={kind_code}\n");
+    if kind == ControlKind::CommandButton {
+        init.push_str("TakeFocusOnClick=True\n");
+    }
     if crate::form_word_wrap::caption(kind) {
         s.push_str("Public WordWrap As Boolean\n");
     }

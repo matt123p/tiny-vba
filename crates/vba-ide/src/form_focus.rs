@@ -219,13 +219,15 @@ End If
 End Sub
 Public Sub VbaInput(ByVal index As Long,ByVal text As String)
 If Not VbaWindowEnter() Then Exit Sub
-Dim control As Object
+Dim control As Object,takeFocus As Boolean
 Set control=VbaAllControls.Item(index)
 If control.VbaKind=11 Or control.VbaKind=15 Then
 control.VbaClick
 Exit Sub
 End If
-If control.VbaKind<>1 Then
+takeFocus=True
+If control.VbaKind=3 Then takeFocus=control.TakeFocusOnClick
+If control.VbaKind<>1 And takeFocus Then
 VbaMoveFocus control
 If Not (VbaActiveControl Is control) Then Exit Sub
 End If

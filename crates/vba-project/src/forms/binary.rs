@@ -376,6 +376,7 @@ fn container(
                 tab_index: site.tab,
                 default: false,
                 cancel: false,
+                take_focus_on_click: true,
                 max_length: 0,
                 group_name: String::new(),
                 caption_alignment: 1,
@@ -581,6 +582,7 @@ fn control(bytes: &[u8], site: Site) -> Result<Control> {
     if matches!(site.kind, Kind::SpinButton | Kind::ScrollBar) {
         return numeric_control(r, b, site);
     }
+    let mut take_focus_on_click = true;
     let textbox = matches!(site.kind, Kind::TextBox | Kind::RefEdit);
     let refedit = site.kind == Kind::RefEdit;
     let listbox = site.kind == Kind::ListBox;
@@ -810,7 +812,7 @@ fn control(bytes: &[u8], site: Site) -> Result<Control> {
         let allowed = if site.kind == Kind::Label {
             0xbff
         } else {
-            0x17f
+            0x37f
         };
         let m = mask(&mut b, allowed, 1 << 5)? as u64;
         colors.fore = field(&mut b, m, 0, 4, colors.fore as u32)? as i32;
@@ -840,6 +842,7 @@ fn control(bytes: &[u8], site: Site) -> Result<Control> {
             accelerator = accelerator_character(field(&mut b, m, 11, 2, 0)?)?;
         } else {
             accelerator = accelerator_character(field(&mut b, m, 8, 2, 0)?)?;
+            take_focus_on_click = m & (1 << 9) == 0;
         }
         align(&mut b, 4)?;
         let caption = string(&mut b, caption)?;
@@ -878,6 +881,7 @@ fn control(bytes: &[u8], site: Site) -> Result<Control> {
         tab_index: site.tab,
         default: site.flags & 4 != 0,
         cancel: site.flags & 8 != 0,
+        take_focus_on_click,
         max_length,
         group_name,
         caption_alignment,
@@ -966,6 +970,7 @@ fn numeric_control(r: Reader<'_>, mut b: Reader<'_>, site: Site) -> Result<Contr
         tab_index: site.tab,
         default: false,
         cancel: false,
+        take_focus_on_click: true,
         max_length: 0,
         group_name: String::new(),
         caption_alignment: 1,

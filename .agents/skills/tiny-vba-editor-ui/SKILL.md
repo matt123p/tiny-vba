@@ -429,3 +429,11 @@ bounds, complete glyph/cursor rows, canonical UTF-16/CRLF state, tagged UI offse
 scrolled hit geometry, authorized mouse defaults and Reset. Accessible chrome uses
 caller styles; no API, format, foreign capability or budget changes. Full M7A.4,
 AutoSize/wheel/repeat/platform and geometry/font-change cases remain open.
+
+ADR 0096 implements native CommandButton TakeFocusOnClick with ordinary Boolean
+state and existing authorized input paths. Preserve text focus/ranges and dirty
+validation for False, normal Tab/explicit focus, callback/Reset guards and inert
+resources. Validate queued control membership after ordinary writes settle and
+by object identity after index shifts; do not grant input permission or retain
+VM roots in UI state. Tick with the active session's lower slice when configured.
+No budget is raised; full M7A.4 and fresh Office acceptance remain open.

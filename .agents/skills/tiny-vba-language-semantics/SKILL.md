@@ -433,3 +433,11 @@ Keep text/ranges in VBA, inspection/resources inert, theme-local chrome, current
 geometry/policy/focus after mouse callbacks, reset and caret following. ListBox
 stored Both does not expose a public member. Preserve all budgets/authority;
 AutoSize/hidden-bar/repeat/platform and full M7A.4 remain open.
+
+ADR 0096 implements native CommandButton TakeFocusOnClick with ordinary Boolean
+state and existing authorized input paths. Preserve text focus/ranges and dirty
+validation for False, normal Tab/explicit focus, callback/Reset guards and inert
+resources. Validate queued control membership after ordinary writes settle and
+by object identity after index shifts; do not grant input permission or retain
+VM roots in UI state. Tick with the active session's lower slice when configured.
+No budget is raised; full M7A.4 and fresh Office acceptance remain open.

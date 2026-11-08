@@ -24,6 +24,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let caption_alignment = option.as_deref() == Some("--caption-alignment");
     let text_scroll = option.as_deref() == Some("--text-scroll");
     let text_no_bars = option.as_deref() == Some("--text-no-bars");
+    let button_focus = option.as_deref() == Some("--button-focus");
     let selection_margin = option.as_deref() == Some("--selection-margin");
     let auto_tab = option.as_deref() == Some("--auto-tab");
     let hide_selection = option.as_deref() == Some("--hide-selection");
@@ -78,7 +79,8 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             | "--auto-tab"
             | "--selection-margin"
             | "--text-scroll"
-            | "--text-no-bars",
+            | "--text-no-bars"
+            | "--button-focus",
         ) => false,
         Some(_) => return Err("unknown fixture option".into()),
     };
@@ -110,6 +112,56 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         "Stop\r\nDebug.Print Entry.Text"
     };
     let mut text = String::from_utf8(fixture::export())?.replace("Debug.Print Entry.Text", body);
+    if button_focus {
+        let code = r#"Attribute VB_Name = "NativeForm"
+Attribute VB_PredeclaredId = True
+Option Explicit
+Private Paused As Boolean
+Private Recording As Boolean
+Private Clicks As Long
+Private Sub UserForm_Initialize()
+Heading.Caption="Click Apply, type Z, click again"
+Heading.Width=260
+Entry.Left=16
+Entry.Top=48
+Entry.Width=168
+Entry.Height=24
+Entry.FontSize=14
+Entry.EnterFieldBehavior=1
+Entry.Text="abcde"
+Entry.SelStart=1
+Entry.SelLength=2
+Apply.Left=16
+Apply.Top=110
+Apply.Width=100
+Apply.Height=24
+Recording=True
+Debug.Print "button ready",Apply.TakeFocusOnClick,VarType(Apply.TakeFocusOnClick)
+End Sub
+Private Sub Apply_MouseDown(ByVal b As Integer,ByVal s As Integer,ByVal x As Single,ByVal y As Single)
+If Not Paused Then
+Paused=True
+Debug.Print "down",Me.ActiveControl.Name
+Stop
+Debug.Print "continued",Me.ActiveControl.Name
+End If
+End Sub
+Private Sub Apply_Click()
+Clicks=Clicks+1
+Debug.Print "click",Me.ActiveControl.Name,Entry.SelStart,Entry.SelLength
+If Clicks=1 Then
+Apply.TakeFocusOnClick=True
+Else
+Debug.Print "done",Entry.Text,Apply.TakeFocusOnClick
+Me.Hide
+End If
+End Sub
+Private Sub Entry_Change()
+If Recording Then Debug.Print "typed",Entry.Text
+End Sub
+"#.replace('\n', "\r\n");
+        text = String::from_utf8(fixture::export())?.replace(fixture::SOURCE, &code);
+    }
     if text_no_bars {
         let code = r#"Attribute VB_Name = "NativeForm"
 Attribute VB_PredeclaredId = True
@@ -305,7 +357,9 @@ End Sub
     std::fs::write(dir.join("NativeForm.frm"), text)?;
     std::fs::write(
         dir.join("NativeForm.frx"),
-        if text_no_bars {
+        if button_focus {
+            fixture::button_focus_companion(false)
+        } else if text_no_bars {
             fixture::text_scroll_companion(0xac80_081b, 0, 0)
         } else if text_scroll {
             fixture::text_scroll_companion(0xac80_081b, 0, 2)

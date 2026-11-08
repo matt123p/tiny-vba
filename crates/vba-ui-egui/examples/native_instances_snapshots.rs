@@ -15,6 +15,9 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         .nth(1)
         .unwrap_or_else(|| "reports/ui".into());
     std::fs::create_dir_all(&folder)?;
+    let button_focus = std::env::args()
+        .nth(2)
+        .is_some_and(|o| o == "--button-focus");
     let accelerators = std::env::args()
         .nth(2)
         .is_some_and(|o| o == "--accelerators");
@@ -87,7 +90,9 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             1252,
             &[NativeFormResource {
                 name: "NativeForm.frx".into(),
-                bytes: if hide_selection {
+                bytes: if button_focus {
+                    fixture::button_focus_companion(false)
+                } else if hide_selection {
                     fixture::combo_companion_flags(3, 1, 0x0c80_481b)
                 } else if caption_alignment {
                     fixture::boolean_alignment_companion(true)
@@ -122,7 +127,48 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                 },
             }],
         )?;
-        let main = if text_scroll || text_no_bars {
+        let main = if button_focus {
+            r#"Sub Main()
+Dim a As New NativeForm,b As New NativeForm
+a.Caption="Button preserves text focus"
+b.Caption="Button takes focus"
+Setup a,False
+Setup b,True
+a.Show 0
+b.Show 0
+b.Apply.SetFocus
+a.Entry.SetFocus
+End Sub
+Private Sub Setup(ByVal f As MSForms.UserForm,ByVal take As Boolean)
+f.Width=300
+f.Height=200
+f.Controls("Heading").Caption="TakeFocusOnClick = " & CStr(take)
+f.Controls("Heading").Width=260
+Dim c As MSForms.CommandButton,t As MSForms.TextBox
+Set c=f.Controls("Apply")
+Set t=f.Controls("Entry")
+t.Left=16
+t.Top=60
+t.Width=200
+t.Height=24
+t.FontSize=14
+t.EnterFieldBehavior=1
+t.Text="Select this text"
+t.SelStart=0
+t.SelLength=6
+c.Left=16
+c.Top=110
+c.Width=170
+c.Height=24
+c.FontSize=12
+c.TakeFocusOnClick=take
+If take Then
+c.Caption="Take button focus"
+Else
+c.Caption="Keep text focus"
+End If
+End Sub"#
+        } else if text_scroll || text_no_bars {
             "Sub Main()\nDim a As New NativeForm,b As New NativeForm\na.Caption=\"TextBox both scroll axes\"\nb.Caption=\"Wrapped vertical viewport\"\nSetup a,False\nSetup b,True\na.Show 0\nb.Show 0\nb.Entry.SetFocus\nEnd Sub\nPrivate Sub Setup(ByVal f As MSForms.UserForm,ByVal wrap As Boolean)\nf.Height=260\nf.Width=340\nf.Controls(\"Heading\").Caption=\"Text and ranges stay in VBA\"\nf.Controls(\"Heading\").Width=220\nDim c As MSForms.TextBox,i As Long\nSet c=f.Controls(\"Entry\")\nc.Left=16\nc.Top=40\nc.Width=200\nc.Height=110\nc.MultiLine=True\nc.WordWrap=wrap\nc.ScrollBars=fmScrollBarsBoth\nc.FontSize=12\nc.EnterFieldBehavior=1\nc.HideSelection=False\nc.Text=\"AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA\"\nFor i=1 To 18\nc.Text=c.Text & ChrW(13) & ChrW(10) & \"Row \" & CStr(i) & \" in the native viewport\"\nNext i\nIf wrap Then\nc.SelStart=Len(c.Text)\nc.SelLength=0\nElse\nc.SelStart=1\nc.SelLength=3\nEnd If\nf.Controls(\"Apply\").Top=175\nEnd Sub"
         } else if selection_margin {
             "Sub Main()\nDim a As New NativeForm,b As New NativeForm\na.Caption=\"Selection margin enabled\"\nb.Caption=\"Selection margin disabled\"\nSetup a,True\nSetup b,False\na.Show 0\nb.Show 0\nb.Entry.SetFocus\nEnd Sub\nPrivate Sub Setup(ByVal f As MSForms.UserForm,ByVal enabled As Boolean)\nf.Controls(\"Heading\").Caption=\"Select a line in the left margin\"\nf.Controls(\"Heading\").Width=220\nf.Controls(\"Entry\").Text=\"First line\" & ChrW(13) & ChrW(10) & \"Second line wraps inside the control\"\nf.Controls(\"Entry\").MultiLine=True\nf.Controls(\"Entry\").WordWrap=True\nf.Controls(\"Entry\").SelectionMargin=enabled\nf.Controls(\"Entry\").FontSize=12\nf.Controls(\"Entry\").Width=168\nf.Controls(\"Entry\").Height=90\nf.Controls(\"Entry\").SelStart=0\nf.Controls(\"Entry\").SelLength=12\nf.Controls(\"Entry\").EnterFieldBehavior=1\nf.Controls(\"Entry\").HideSelection=False\nf.Controls(\"Apply\").Top=140\nEnd Sub"
@@ -245,7 +291,9 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                 return Err("expected native tooltip".into());
             }
         }
-        let prefix = if text_no_bars {
+        let prefix = if button_focus {
+            "m7a4-native-button-focus"
+        } else if text_no_bars {
             "m7a4-native-text-no-bars"
         } else if text_scroll {
             "m7a4-native-text-scroll"

@@ -951,6 +951,12 @@ fn compiled_form(
         }
         source.push_str(&setup);
         if let Some(metadata) = metadata {
+            if c.kind == ControlKind::CommandButton {
+                source.push_str(&format!(
+                    "{temp}.TakeFocusOnClick={}\n",
+                    boolean(metadata.take_focus_on_click)
+                ));
+            }
             if c.kind == ControlKind::TextBox {
                 source.push_str(&format!(
                     "{temp}.VbaScrollBars={}\n",

@@ -156,6 +156,7 @@ pub(super) fn control(bytes: &[u8], site: Site) -> Result<Control> {
         tab_index: site.tab,
         default: false,
         cancel: false,
+        take_focus_on_click: true,
         max_length: 0,
         group_name: String::new(),
         caption_alignment: 1,

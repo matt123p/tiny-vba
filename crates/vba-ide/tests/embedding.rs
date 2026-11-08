@@ -222,3 +222,47 @@ fn configured_host_call_budget_survives_pause_and_resume() -> R {
     assert!(ide.configure_execution_limits(invalid).is_err());
     Ok(())
 }
+
+#[test]
+fn low_session_slices_survive_pause_and_future_configuration_changes() -> R {
+    for slice in [1, 64, 128] {
+        let mut ide = Ide::new();
+        ide.add_module("Main.bas", "Sub Main()\nDim i As Long\nFor i=1 To 200\nNext i\nDebug.Print \"before\",i\nStop\nDebug.Print \"after\",i\nEnd Sub")?;
+        ide.configure_execution_limits(vba_ide::Limits {
+            slice,
+            ..Default::default()
+        })?;
+        ide.dispatch(Action::Run, &mut vba_ide::NoHost)?;
+        ide.configure_execution_limits(vba_ide::Limits {
+            slice: 1024,
+            ..Default::default()
+        })?;
+        for _ in 0..20000 {
+            if ide.mode() != Mode::Running {
+                break;
+            }
+            ide.tick(&mut vba_ide::NoHost)?;
+        }
+        assert_eq!(
+            ide.mode(),
+            Mode::Break,
+            "slice {slice}: {:?}",
+            ide.diagnostics
+        );
+        ide.dispatch(Action::Run, &mut vba_ide::NoHost)?;
+        for _ in 0..20000 {
+            if ide.mode() != Mode::Running {
+                break;
+            }
+            ide.tick(&mut vba_ide::NoHost)?;
+        }
+        assert_eq!(
+            ide.mode(),
+            Mode::Completed,
+            "slice {slice}: {:?}",
+            ide.diagnostics
+        );
+        assert_eq!(ide.output(), vec!["before\t201", "after\t201"]);
+    }
+    Ok(())
+}

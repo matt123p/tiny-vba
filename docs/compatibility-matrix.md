@@ -411,3 +411,11 @@ canonical text/ranges, UI-only tagged offsets, authorized callback/default routi
 and Reset remain intact; accessible chrome uses local caller styles. No new API,
 format, foreign call or budget. AutoSize, wheel/repeat/platform, geometry/font-change
 edge cases and full M7A.4 remain open; fresh Office comparisons are NOT_RUN.
+
+[ADR 0096](decisions/0096-native-button-click-focus-and-input-identity.md) adds native
+CommandButton TakeFocusOnClick, True defaults and False clicks that retain text
+focus/selection and deferred validation. Existing callback/trust/Reset paths stay
+intact. Queued input survives transient collection writes and shifted peer indices;
+actual membership and identity are validated before delivery. IDE ticks respect
+smaller active-session slices. No API beyond the Office property, new format,
+foreign call or increased budget. Full M7A.4 and fresh Office comparisons stay open.

@@ -121,6 +121,8 @@ and native save/reopen. See [ADR 0041](decisions/0041-worksheet-form-controls.md
   ADR 0090 adds CheckBox/OptionButton Alignment flags, ordinary Long state,
   published constants and independently clipped captions beside real indicators.
   Other properties and the full remaining checklist stay open.
+  ADR 0096 adds native CommandButton click focus, callback-stable object membership
+  and smaller-slice continuations. Full acceptance stays open.
   ADR 0095 adds fixed-bound hidden-axis caret viewports, actual navigation/typing
   and scrolled pointer geometry without visible bars. Full acceptance stays open.
   ADR 0094 adds native TextBox ScrollBars and actual viewports with deferred

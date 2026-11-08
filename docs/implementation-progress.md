@@ -1,5 +1,20 @@
 # Implementation progress
 
+## M7A.4 continued — button click focus and input identity (2026-11-08)
+
+ADR 0096 implements native CommandButton TakeFocusOnClick, Boolean True defaults,
+ordinary coercion/errors and False clicks that preserve text focus, ranges and
+deferred validation. Raw mouse capture also covers False buttons without authored
+mouse handlers. Tab/Space and explicit/authored focus still work. Control and tab
+membership are checked after callback mutations settle; a surviving target is
+matched by object identity after peer removal, while detached targets are rejected.
+IDE frame work respects smaller active-session slices without raising any limit.
+Eight model and ten UI cases pass, plus the embedding slice regression and the
+retained 40 mouse/14 keyboard cases. Tab reorder/removal also passes at a smaller
+slice with unchanged identity/value expectations. Full shared/browser/host
+acceptance is in progress. The complete M7A.4 checklist remains open; fresh Office
+comparisons remain M8.5 NOT_RUN.
+
 ## M7A.4 continued — native TextBox hidden caret viewports (2026-11-08)
 
 ADR 0095 separates scrollable text axes from visible bars. None and room-hidden

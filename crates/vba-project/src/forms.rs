@@ -111,6 +111,8 @@ pub struct Control {
     pub tab_index: i16,
     pub default: bool,
     pub cancel: bool,
+    /// CommandButton click focus policy; the native file default is true.
+    pub take_focus_on_click: bool,
     pub max_length: i32,
     pub group_name: String,
     /// Public fmAlignment value; the native flag has the inverse meaning.

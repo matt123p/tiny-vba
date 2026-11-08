@@ -132,6 +132,30 @@ pub fn caption_flags_companion(label_flags: u32, button_flags: u32) -> Vec<u8> {
     out.extend(bytes);
     out
 }
+/// CommandButton bit 9 stores the inverse of the Boolean file default; no payload.
+fn button_focus_control(take_focus: bool) -> Vec<u8> {
+    let mut body = u32s(&[0x28 | if take_focus { 0 } else { 1 << 9 }, 0x80000005]);
+    body.extend(string("Apply"));
+    body.extend(u32s(&[2540, 635]));
+    let mut button = record(0x200, &body);
+    button.extend(record(0x200, &[0; 4]));
+    button
+}
+pub fn button_focus_companion(take_focus: bool) -> Vec<u8> {
+    let mut all = controls();
+    all[2] = button_focus_control(take_focus);
+    let mut file = cfb::CompoundFile::create(Cursor::new(Vec::new())).unwrap();
+    for (name, bytes) in streams_with_controls(all, false, false) {
+        file.create_stream(format!("/{name}"))
+            .unwrap()
+            .write_all(&bytes)
+            .unwrap();
+    }
+    let bytes = file.into_inner().into_inner();
+    let mut out = (bytes.len() as u32).to_le_bytes().to_vec();
+    out.extend(bytes);
+    out
+}
 /// Authored paragraph-only TextProps; all actual font attributes use file defaults.
 pub fn alignment_companion(paragraph: u8) -> Vec<u8> {
     let text = record(0x200, &[0x40, 0, 0, 0, paragraph, 0, 0, 0]);
@@ -400,13 +424,29 @@ fn boolean_flags_companion(accelerators: bool, flags: Option<u32>, caption_left:
 
 /// Original MorphData TextBox packet; no Office-produced resource is adopted.
 pub fn text_companion(flags: u32, password: u16) -> Vec<u8> {
-    text_companion_options(flags, password, None)
+    text_companion_options(flags, password, None, None)
 }
 pub fn text_scroll_companion(flags: u32, password: u16, scroll: u8) -> Vec<u8> {
-    text_companion_options(flags, password, Some(scroll))
+    text_companion_options(flags, password, Some(scroll), None)
 }
-fn text_companion_options(flags: u32, password: u16, scroll: Option<u8>) -> Vec<u8> {
+pub fn text_scroll_button_focus_companion(
+    flags: u32,
+    password: u16,
+    scroll: u8,
+    take_focus: bool,
+) -> Vec<u8> {
+    text_companion_options(flags, password, Some(scroll), Some(take_focus))
+}
+fn text_companion_options(
+    flags: u32,
+    password: u16,
+    scroll: Option<u8>,
+    take_focus: Option<bool>,
+) -> Vec<u8> {
     let mut controls = controls();
+    if let Some(take_focus) = take_focus {
+        controls[2] = button_focus_control(take_focus);
+    }
     let mut body = u32s(&[
         0x80400301 | if scroll.is_some() { 1 << 5 } else { 0 },
         0,

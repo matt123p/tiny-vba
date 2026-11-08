@@ -121,7 +121,7 @@ Public Sub VbaMouseInput(ByVal target As Long,ByVal phase As Integer,ByVal butto
 VbaMouseEpoch=VbaMouseEpoch+1
 VbaMouseDone=False
 VbaMouseAllow=False
-Dim control As Object,cancel As MSForms.ReturnBoolean
+Dim control As Object,cancel As MSForms.ReturnBoolean,takeFocus As Boolean
 Set cancel=New VbaFormReturnBoolean
 If Not VbaLoaded Or Not VbaVisible Then GoTo finished
 If phase=0 Or phase=3 Or phase=4 Then
@@ -132,9 +132,13 @@ If target>=VbaAllControls.Count Then GoTo finished
 Set control=VbaAllControls.Item(target)
 If Not VbaCanInput(control) Or Not VbaEligible(control) Then GoTo finished
 If phase=0 Then
+takeFocus=True
+If control.VbaKind=3 Then takeFocus=control.TakeFocusOnClick
+If takeFocus Then
 If control.VbaKind<>1 And control.VbaKind<>11 And control.VbaKind<>15 Then
 VbaMoveFocus control
 If Not (VbaActiveControl Is control) Then GoTo finished
+End If
 End If
 End If
 If phase=0 Then
@@ -154,8 +158,7 @@ End If
 End If
 If Not VbaLoaded Or Not VbaVisible Then GoTo finished
 If control.VbaDetached Or Not VbaCanInput(control) Or Not VbaEligible(control) Then GoTo finished
-If target>=VbaAllControls.Count Then GoTo finished
-If Not (VbaAllControls.Item(target) Is control) Then GoTo finished
+If Not VbaMouseContains(control,target) Then GoTo finished
 Else
 VbaRootMouse phase,button,shift,x,y,cancel
 If Not VbaLoaded Or Not VbaVisible Then GoTo finished
@@ -165,6 +168,22 @@ VbaMouseAllow=Not cancel.Value
 finished:
 VbaMouseDone=True
 End Sub
+Private Function VbaMouseContains(ByVal control As Object,ByVal previous As Long) As Boolean
+If previous<VbaAllControls.Count Then
+If VbaAllControls.Item(previous) Is control Then
+VbaMouseContains=True
+Exit Function
+End If
+End If
+Dim entries() As Object,i As Long
+entries=VbaAllControls.VbaEntries
+For i=0 To VbaAllControls.VbaTotal-1
+If entries(i) Is control Then
+VbaMouseContains=True
+Exit Function
+End If
+Next i
+End Function
 Private Sub VbaRootMouse(ByVal phase As Integer,ByVal button As Integer,ByVal shift As Integer,ByVal x As Single,ByVal y As Single,ByVal cancel As MSForms.ReturnBoolean)
 "#,
     );

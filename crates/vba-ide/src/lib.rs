@@ -1478,7 +1478,8 @@ impl Ide {
         let outcome = if previous == 1 {
             session.resume_host(host)?
         } else {
-            session.run_slice_inspected(host, FRAME_QUOTA, &mut |view, session| {
+            let quota = FRAME_QUOTA.min(session.limits().slice);
+            session.run_slice_inspected(host, quota, &mut |view, session| {
                 let mut stop=self.controller.should_pause(view)?;
                 if view.visible {
                     let procedure=session.program().program().procedures.get(view.procedure.0 as usize).map(|p|p.name.as_str());

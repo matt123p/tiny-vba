@@ -28,7 +28,23 @@ fn harness_options(
     resource: Option<Vec<u8>>,
     missing_glyphs: bool,
 ) -> R<Harness<'static, State>> {
+    harness_limits(handlers, main, empty, resource, missing_glyphs, None)
+}
+fn harness_limits(
+    handlers: &str,
+    main: &str,
+    empty: bool,
+    resource: Option<Vec<u8>>,
+    missing_glyphs: bool,
+    slice: Option<u32>,
+) -> R<Harness<'static, State>> {
     let mut ide = Ide::new();
+    if let Some(slice) = slice {
+        ide.configure_execution_limits(vba_ide::Limits {
+            slice,
+            ..Default::default()
+        })?;
+    }
     let (export, resources) = if empty {
         (
             format!(
@@ -723,19 +739,26 @@ fn tab_and_page_mouse_indices_precede_stopped_selection_defaults() -> R {
 }
 #[test]
 fn queued_tab_release_retains_identity_through_reorder_and_discards_removal() -> R {
-    for remove in [false, true] {
+    for (remove, slice) in [
+        (false, None),
+        (true, None),
+        (false, Some(128)),
+        (true, Some(128)),
+    ] {
         let edit = if remove {
             "Tabs1.Tabs.Remove Index"
         } else {
             "Tabs1.Tabs(Index).Index=0"
         };
-        let mut h = harness_resource(
+        let mut h = harness_limits(
             &format!(
                 "Private Sub Tabs1_MouseDown(Index As Long,ByVal b As Integer,ByVal s As Integer,ByVal x As Single,ByVal y As Single)\n{edit}\nStop\nEnd Sub"
             ),
             "Sub Main()\nNativeForm.Tabs1.Tabs(1).Caption=\"Second\"\nNativeForm.Show\nEnd Sub",
             false,
             Some(fixture::tab_companion(0)),
+            false,
+            slice,
         )?;
         let f = instance(&h)?;
         let object = h.state().ide.form_instance_tab_object(f, 14, 1)?;
@@ -749,7 +772,12 @@ fn queued_tab_release_retains_identity_through_reorder_and_discards_removal() ->
             .center();
         button(&mut h, p, true);
         button(&mut h, p, false);
-        h.run_steps(20);
+        for _ in 0..200 {
+            if h.state().ide.mode() == Mode::Break {
+                break;
+            }
+            h.run_steps(1);
+        }
         assert_eq!(h.state().ide.mode(), Mode::Break);
         if remove {
             assert!(

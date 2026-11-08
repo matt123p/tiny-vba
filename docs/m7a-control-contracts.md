@@ -40,7 +40,7 @@ are file-format defaults from MS-OFORMS, not undocumented VBE toolbox defaults.
 | WordWrap | VariousPropertyBits bit 23; distinct Label/CommandButton file defaults and typed runtime state | D selected captions/TextBox (ADRs 0087/0088), including Boolean captions; AutoSize/scrolling and broader presentation cases remain open |
 | Tag / HelpContextID / ControlTipText | Known frame/site strings/scalars; ordinary per-instance metadata and runtime tips | D; Help/F1 routing remains U (ADR 0055) |
 | Window placement / StartUpPosition / ShowModal | VBFrame metadata retained; enabled/default-modal form required; explicit show modes use existing runtime | P for placement; disabled/default-modeless metadata U; parity M7A.4 |
-| Default / Cancel / Accelerator / TakeFocusOnClick changes | Native site/control flags or fields | Default/Cancel and selected applicable accelerators decoded and executed (ADR 0072); TakeFocusOnClick changes U |
+| Default / Cancel / Accelerator / TakeFocusOnClick | Native site/control flags or fields; CommandButton mask bit 9 toggles the True focus default without payload | Default/Cancel/selected accelerators (ADR 0072); CommandButton TakeFocusOnClick and focus-preserving clicks D selected (ADR 0096) |
 | Locked / multiline / password / MaxLength / scrolling changes | MorphData behavior fields or nondefault flags | Locked/MaxLength, multiline, password and selected Enter/Tab/field behavior and TextBox scrolling decoded and executed; remaining scrolling/platform cases open |
 | ControlSource / RowSource / list metadata | Native binding/site fields retained without resolution | D for value/list families; selected runtime links through explicit host Range capability (ADR 0065) |
 | Pictures / MouseIcon / custom pointers / non-cached class table | Native binary resource or reference-specific class | D selected Image raster resources (ADR 0059) and RefEdit class identity (ADR 0060); MouseIcon/custom pointers and arbitrary activation U |
@@ -433,3 +433,11 @@ canonical text/ranges, UI-only tagged offsets, authorized callback/default routi
 and Reset remain intact; accessible chrome uses local caller styles. No new API,
 format, foreign call or budget. AutoSize, wheel/repeat/platform, geometry/font-change
 edge cases and full M7A.4 remain open; fresh Office comparisons are NOT_RUN.
+
+[ADR 0096](decisions/0096-native-button-click-focus-and-input-identity.md) adds native
+CommandButton TakeFocusOnClick, True defaults and False clicks that retain text
+focus/selection and deferred validation. Existing callback/trust/Reset paths stay
+intact. Queued input survives transient collection writes and shifted peer indices;
+actual membership and identity are validated before delivery. IDE ticks respect
+smaller active-session slices. No API beyond the Office property, new format,
+foreign call or increased budget. Full M7A.4 and fresh Office comparisons stay open.
