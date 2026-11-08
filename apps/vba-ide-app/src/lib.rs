@@ -526,8 +526,12 @@ pub fn write_native_form(
         .parent()
         .filter(|p| !p.as_os_str().is_empty())
         .unwrap_or_else(|| std::path::Path::new("."));
+    let permissions = std::fs::metadata(path)
+        .ok()
+        .filter(|metadata| metadata.is_file())
+        .map(|metadata| metadata.permissions());
     let companion = parent.join(&frx.name);
-    let staged = stage_native_file(parent, &frx.name, &frx.bytes)?;
+    let staged = stage_native_file(parent, &frx.name, &frx.bytes, permissions.as_ref())?;
     let published = std::fs::hard_link(&staged, &companion);
     let _ = std::fs::remove_file(&staged);
     match published {
@@ -547,7 +551,7 @@ pub fn write_native_form(
         }
         Err(error) => return Err(error.into()),
     }
-    let temp = stage_native_file(parent, &frm.name, &frm.bytes)?;
+    let temp = stage_native_file(parent, &frm.name, &frm.bytes, permissions.as_ref())?;
     let result = std::fs::rename(&temp, path);
     if result.is_err() {
         let _ = std::fs::remove_file(&temp);
@@ -559,20 +563,31 @@ fn stage_native_file(
     parent: &std::path::Path,
     name: &str,
     bytes: &[u8],
+    permissions: Option<&std::fs::Permissions>,
 ) -> Result<std::path::PathBuf, Box<dyn std::error::Error>> {
     use std::io::Write;
     for attempt in 0..128 {
         let temp = parent.join(format!(".{name}.save-{}-{attempt}.tmp", std::process::id()));
-        let mut file = match std::fs::OpenOptions::new()
-            .write(true)
-            .create_new(true)
-            .open(&temp)
-        {
+        let mut options = std::fs::OpenOptions::new();
+        options.write(true).create_new(true);
+        #[cfg(unix)]
+        if let Some(permissions) = permissions {
+            use std::os::unix::fs::{OpenOptionsExt, PermissionsExt};
+            options.mode(permissions.mode());
+        }
+        let mut file = match options.open(&temp) {
             Ok(file) => file,
             Err(error) if error.kind() == std::io::ErrorKind::AlreadyExists => continue,
             Err(error) => return Err(error.into()),
         };
         if let Err(error) = file.write_all(bytes).and_then(|()| file.sync_all()) {
+            let _ = std::fs::remove_file(&temp);
+            return Err(error.into());
+        }
+        #[cfg(not(unix))]
+        if let Some(permissions) = permissions
+            && let Err(error) = file.set_permissions(permissions.clone())
+        {
             let _ = std::fs::remove_file(&temp);
             return Err(error.into());
         }

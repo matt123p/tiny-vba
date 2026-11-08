@@ -27,11 +27,13 @@ all bytes and refuse differing content. Standalone native IO stages/syncs comple
 files, publishes the companion exclusively, then atomically replaces the `.frm`
 commit point. It never overwrites an existing companion. Failed commits leave the
 previous `.frm` and its resources intact; an unused new companion may remain.
+Existing private file permissions also apply to its replacement and new companion.
 Browser transfer downloads both binary files and does not infer a disk-save
 acknowledgment from merely requesting downloads.
 
 IDE snapshots bind source/design revisions and an opaque project-instance owner.
-Stale, removed or foreign snapshots cannot clear modified state. Native exports
+Stale, removed or foreign snapshots cannot clear modified state. Successful project
+close releases native originals and invalidates outstanding save-owner tokens. Native exports
 remain separate from the exact imported original resources. Binary project
 snapshots compile exact authored state without execution and require an idle/reset
 session. Fixed component/code-name/reference identities are retained; component

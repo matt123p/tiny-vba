@@ -183,3 +183,44 @@ fn native_pair_commit_reopens_and_companion_collision_preserves_previous_file() 
     std::fs::remove_dir_all(&directory)?;
     Ok(())
 }
+
+#[cfg(unix)]
+#[test]
+fn native_save_keeps_private_source_and_companion_permissions() -> R {
+    use std::os::unix::fs::PermissionsExt;
+    let mut ide = vba_ide::Ide::new();
+    let id = ide.import_source_bundle(
+        &[
+            vba_ide::NativeFormResource {
+                name: "NativeForm.frm".into(),
+                bytes: save_fixture::export(),
+            },
+            vba_ide::NativeFormResource {
+                name: "NativeForm.frx".into(),
+                bytes: save_fixture::companion(),
+            },
+        ],
+        1252,
+    )?;
+    let snapshot = ide.export_native_form(id)?;
+    let directory = std::env::temp_dir().join(format!("vba-native-private-{}", std::process::id()));
+    std::fs::create_dir_all(&directory)?;
+    let path = directory.join("Private.frm");
+    std::fs::write(&path, b"previous private source")?;
+    std::fs::set_permissions(&path, std::fs::Permissions::from_mode(0o600))?;
+    vba_ide_app::write_native_form(&path, &snapshot)?;
+    assert_eq!(
+        std::fs::metadata(&path)?.permissions().mode() & 0o777,
+        0o600
+    );
+    let companion = snapshot.files().get(1).ok_or("companion")?;
+    assert_eq!(
+        std::fs::metadata(directory.join(&companion.name))?
+            .permissions()
+            .mode()
+            & 0o777,
+        0o600
+    );
+    std::fs::remove_dir_all(directory)?;
+    Ok(())
+}

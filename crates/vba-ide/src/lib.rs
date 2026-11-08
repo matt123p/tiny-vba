@@ -1264,6 +1264,8 @@ impl Ide {
         self.document_event_delivery = false;
         self.modules.clear();
         self.forms.clear();
+        self.native_forms.clear();
+        self.native_save_owner = std::sync::Arc::new(());
         self.controller = Controller::new();
         self.stale = false;
         self.refresh_watches();

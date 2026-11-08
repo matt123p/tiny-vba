@@ -135,3 +135,29 @@ fn binary_project_snapshot_compiles_without_execution_and_refuses_stale_commit()
     assert!(ide.acknowledge_native_project_save(&snapshot).is_err());
     Ok(())
 }
+
+#[test]
+fn closing_the_project_releases_native_resources_and_invalidates_save_snapshots() -> R {
+    let mut ide = setup()?;
+    let id = ide.active_module().ok_or("source")?.id;
+    let snapshot = ide.export_native_form(id)?;
+    ide.close(&mut NoHost, true)?;
+    assert!(ide.native_form(id).is_none());
+    assert!(ide.validate_native_form_save(&snapshot).is_err());
+    ide.import_source_bundle(
+        &[
+            NativeFormResource {
+                name: "NativeForm.frm".into(),
+                bytes: fixture::export(),
+            },
+            NativeFormResource {
+                name: "NativeForm.frx".into(),
+                bytes: fixture::companion(),
+            },
+        ],
+        1252,
+    )?;
+    assert!(ide.acknowledge_native_form_save(&snapshot).is_err());
+    assert!(ide.output().is_empty());
+    Ok(())
+}

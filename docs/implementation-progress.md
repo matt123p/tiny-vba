@@ -21,7 +21,9 @@ DOCM package workflows and their integration acceptance are still in progress.
 Full shared native CI, strict workspace Clippy, WASM/WASI, UI/Xvfb and web builds
 pass. Latest writer/metadata rechecks pass: all 60 project tests natively and on
 Node 22 WASI, all 99 retained instance cases and three new IDE save cases natively,
-and the three save cases on WASI. The eight native file-IO cases pass. A Chromium
+and the three save cases on WASI. The nine native file-IO cases pass, including private source/companion modes.
+Project close also releases native originals and invalidates save snapshots; the
+four IDE save cases and retained execution/attachment cases pass. A Chromium
 flow edits the designer caption, exports two native files, reimports them inertly
 and executes the original source; its dialog and reopened views were inspected.
 Both forks' initial signature-removal regressions pass; pinned host integration
