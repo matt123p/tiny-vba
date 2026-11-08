@@ -462,3 +462,11 @@ Track/drag waits for callbacks, current policy/focus and lifetime. Measured room
 MultiLine and WordWrap determine axes; reset, caret following and scrolled hits
 are covered. Native ListBox stored Both is accepted without a new public member.
 No VM/foreign/budget/persistence change; full M7A.4 remains open.
+
+[ADR 0095](decisions/0095-native-textbox-hidden-viewports.md) separates native
+TextBox scrolling axes from visible bars. None/room-hidden bars retain caret
+viewports and translated pointer geometry under fixed authored bounds. Existing
+canonical text/ranges, UI-only tagged offsets, authorized callback/default routing
+and Reset remain intact; accessible chrome uses local caller styles. No new API,
+format, foreign call or budget. AutoSize, wheel/repeat/platform, geometry/font-change
+edge cases and full M7A.4 remain open; fresh Office comparisons are NOT_RUN.

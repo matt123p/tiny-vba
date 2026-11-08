@@ -1,5 +1,23 @@
 # Implementation progress
 
+## M7A.4 continued — native TextBox hidden caret viewports (2026-11-08)
+
+ADR 0095 separates scrollable text axes from visible bars. None and room-hidden
+bars retain fixed-bound caret viewports, including a hidden horizontal axis next
+to a visible vertical bar. Caller-themed accessible chrome is painted separately;
+track/drag still waits for existing authorized mouse callbacks. Text/ranges/policy
+remain ordinary canonical VBA state; UI offsets are tagged, Reset clears them,
+and pointer/margin geometry follows the displayed text. No API, format or budget
+changes. Six new GPU/input cases and eight retained viewport cases pass, including
+actual Ctrl+End/typing, astral UTF-16/CRLF hits and Stop/Continue/Reset. The retained
+40 mouse, alignment, HideSelection and AutoTab suites pass. The new Chromium
+flow passes with inert import, stopped Ctrl+End, one continuation, typing at the
+revealed tail and exact authored source. Five theme/scale/host snapshots and
+browser runtime/Break/scrolled views were inspected. Full shared/browser/host
+acceptance is in progress. AutoSize, repeat/wheel/platform, geometry/font-change
+edge cases and the unchanged milestone checklist remain open. M8.5 fresh Office
+comparisons remain NOT_RUN.
+
 ## M7A.4 continued — native TextBox ScrollBars (2026-11-08)
 
 ADR 0094 adds native ScrollBars import, ordinary Long None defaults, constants

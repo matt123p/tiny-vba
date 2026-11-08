@@ -188,8 +188,6 @@ impl TextBox<'_> {
         let wrap = multi && self.boolean("WordWrap");
         let locked = self.boolean("Locked");
         let bars = self.long("ScrollBars");
-        let horizontal = bars & 1 != 0 && (!multi || !wrap);
-        let scrolling = bars != 0;
         let measurement = text.clone();
         let mask = self
             .field("PasswordChar")
@@ -245,28 +243,7 @@ impl TextBox<'_> {
                 super::fonts::decorate(&mut job, &font_style);
                 job.halign = alignment;
                 job.halign_min_is_start = false;
-                let mut galley = fonts.layout_job(job);
-                if multi
-                    && !wrap
-                    && !horizontal
-                    && width.is_finite()
-                    && width > 0.
-                    && galley.rect.width() > width
-                {
-                    // TextEdit sizes multiline widgets from the galley's rectangle.
-                    // Native controls keep their authored viewport even without wrapping.
-                    // Only the local allocation rectangle changes: shaped glyphs and
-                    // cursor rows remain complete, and the shared font cache stays intact.
-                    let galley = std::sync::Arc::make_mut(&mut galley);
-                    let left = match alignment {
-                        egui::Align::Min => 0.,
-                        egui::Align::Center => -width * 0.5,
-                        egui::Align::Max => -width,
-                    };
-                    galley.rect.min.x = left;
-                    galley.rect.max.x = left + width;
-                }
-                galley
+                fonts.layout_job(job)
             });
             if persistent_selection && !ui.memory(|memory| memory.has_focus(self.widget)) {
                 // Query focus outside the font lock; paint only a local galley clone.
@@ -307,30 +284,26 @@ impl TextBox<'_> {
         scroll_style.floating = false;
         scroll_style.content_margin = egui::Margin::ZERO;
         child.spacing_mut().scroll = scroll_style;
-        if scrolling {
+        if bars != 0 {
             // Integrated bars use host chrome, independently of TextBox.ForeColor.
             let visuals = child.visuals_mut();
             visuals.widgets.inactive.fg_stroke.color = self.theme.muted;
             visuals.widgets.hovered.fg_stroke.color = self.theme.muted;
             visuals.widgets.active.fg_stroke.color = self.theme.muted;
         }
-        let (axes, viewport) = if scrolling {
-            super::text_scroll::axes(
-                self.bounds,
-                margin,
-                bars,
-                [multi, wrap],
-                child.fonts_mut(|fonts| fonts.row_height(&font)),
-                scroll_style,
-                |width| layouter(&child, &measurement, width).rect.size(),
-            )
-        } else {
-            ([false, false], self.bounds.size())
-        };
+        let (axes, viewport) = super::text_scroll::axes(
+            self.bounds,
+            margin,
+            bars,
+            [multi, wrap],
+            child.fonts_mut(|fonts| fonts.row_height(&font)),
+            scroll_style,
+            |width| layouter(&child, &measurement, width).rect.size(),
+        );
         let show = |ui: &mut egui::Ui| {
             builder
                 .id(self.widget)
-                .clip_text(!multi && !axes[0])
+                .clip_text(false)
                 .min_size(viewport)
                 .desired_width(viewport.x)
                 .align(align)
@@ -349,28 +322,40 @@ impl TextBox<'_> {
                 })
                 .show(ui)
         };
-        let mut regions = Vec::new();
-        let mut output = if scrolling {
+        let (mut output, regions) = {
             let (key, mut view) = super::text_scroll::load(self, &child);
+            if wrap {
+                view.offset.x = 0.;
+            }
+            if !multi {
+                view.offset.y = 0.;
+            }
             use std::hash::{Hash, Hasher};
             let mut hash = std::collections::hash_map::DefaultHasher::new();
             raw.units().hash(&mut hash);
             let fingerprint = hash.finish();
             let follow =
                 view.last_selection != Some(canonical) || view.text_fingerprint != fingerprint;
-            let area = egui::ScrollArea::new(axes)
+            // Visibility and scrolling are independent. The same fixed viewport
+            // follows the caret even when a bar is hidden by policy or room.
+            let mut viewport_ui = child.new_child(
+                egui::UiBuilder::new()
+                    .max_rect(egui::Rect::from_min_size(self.bounds.min, viewport)),
+            );
+            viewport_ui.set_clip_rect(child.clip_rect().intersect(viewport_ui.max_rect()));
+            let area = egui::ScrollArea::new([!wrap, multi])
                 .id_salt(self.widget.with("native.text.scroll.area"))
                 .animated(false)
                 .auto_shrink([false, false])
-                .max_width(self.bounds.width())
-                .max_height(self.bounds.height())
-                .scroll_bar_visibility(egui::scroll_area::ScrollBarVisibility::AlwaysVisible)
+                .max_width(viewport.x)
+                .max_height(viewport.y)
+                .scroll_bar_visibility(egui::scroll_area::ScrollBarVisibility::AlwaysHidden)
                 .scroll_source(egui::scroll_area::ScrollSource {
-                    mouse_wheel: true,
+                    mouse_wheel: bars != 0,
                     ..egui::scroll_area::ScrollSource::NONE
                 })
                 .scroll_offset(view.offset)
-                .show(&mut child, |ui| {
+                .show(&mut viewport_ui, |ui| {
                     let output = show(ui);
                     if follow {
                         let caret = output.galley.pos_from_cursor(desired.primary).translate(
@@ -383,7 +368,7 @@ impl TextBox<'_> {
             view.last_selection = Some(canonical);
             view.text_fingerprint = fingerprint;
             view.offset = area.state.clamped_offset();
-            regions = super::text_scroll::geometry(
+            let regions = super::text_scroll::geometry(
                 key,
                 self.bounds,
                 area.inner_rect,
@@ -392,10 +377,9 @@ impl TextBox<'_> {
                 axes,
                 scroll_style,
             );
+            super::text_scroll::paint(&mut child, &regions, scroll_style);
             super::text_scroll::store(ui.ctx(), key, view);
-            area.inner
-        } else {
-            show(&mut child)
+            (area.inner, regions)
         };
         output.response.rect = self.bounds;
         output.response.widget_info(|| {

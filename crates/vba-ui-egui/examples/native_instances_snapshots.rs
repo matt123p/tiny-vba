@@ -59,6 +59,9 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let caption_alignment = std::env::args()
         .nth(2)
         .is_some_and(|o| o == "--caption-alignment");
+    let text_no_bars = std::env::args()
+        .nth(2)
+        .is_some_and(|o| o == "--text-no-bars");
     let text_scroll = std::env::args()
         .nth(2)
         .is_some_and(|o| o == "--text-scroll");
@@ -90,7 +93,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                     fixture::boolean_alignment_companion(true)
                 } else if boolean_wrap {
                     fixture::boolean_word_wrap_companion(0x2c00_081b)
-                } else if word_wrap || auto_tab || selection_margin || text_scroll {
+                } else if word_wrap || auto_tab || selection_margin || text_scroll || text_no_bars {
                     fixture::companion()
                 } else if text_align {
                     fixture::alignment_companion(2)
@@ -119,7 +122,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                 },
             }],
         )?;
-        let main = if text_scroll {
+        let main = if text_scroll || text_no_bars {
             "Sub Main()\nDim a As New NativeForm,b As New NativeForm\na.Caption=\"TextBox both scroll axes\"\nb.Caption=\"Wrapped vertical viewport\"\nSetup a,False\nSetup b,True\na.Show 0\nb.Show 0\nb.Entry.SetFocus\nEnd Sub\nPrivate Sub Setup(ByVal f As MSForms.UserForm,ByVal wrap As Boolean)\nf.Height=260\nf.Width=340\nf.Controls(\"Heading\").Caption=\"Text and ranges stay in VBA\"\nf.Controls(\"Heading\").Width=220\nDim c As MSForms.TextBox,i As Long\nSet c=f.Controls(\"Entry\")\nc.Left=16\nc.Top=40\nc.Width=200\nc.Height=110\nc.MultiLine=True\nc.WordWrap=wrap\nc.ScrollBars=fmScrollBarsBoth\nc.FontSize=12\nc.EnterFieldBehavior=1\nc.HideSelection=False\nc.Text=\"AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA\"\nFor i=1 To 18\nc.Text=c.Text & ChrW(13) & ChrW(10) & \"Row \" & CStr(i) & \" in the native viewport\"\nNext i\nIf wrap Then\nc.SelStart=Len(c.Text)\nc.SelLength=0\nElse\nc.SelStart=1\nc.SelLength=3\nEnd If\nf.Controls(\"Apply\").Top=175\nEnd Sub"
         } else if selection_margin {
             "Sub Main()\nDim a As New NativeForm,b As New NativeForm\na.Caption=\"Selection margin enabled\"\nb.Caption=\"Selection margin disabled\"\nSetup a,True\nSetup b,False\na.Show 0\nb.Show 0\nb.Entry.SetFocus\nEnd Sub\nPrivate Sub Setup(ByVal f As MSForms.UserForm,ByVal enabled As Boolean)\nf.Controls(\"Heading\").Caption=\"Select a line in the left margin\"\nf.Controls(\"Heading\").Width=220\nf.Controls(\"Entry\").Text=\"First line\" & ChrW(13) & ChrW(10) & \"Second line wraps inside the control\"\nf.Controls(\"Entry\").MultiLine=True\nf.Controls(\"Entry\").WordWrap=True\nf.Controls(\"Entry\").SelectionMargin=enabled\nf.Controls(\"Entry\").FontSize=12\nf.Controls(\"Entry\").Width=168\nf.Controls(\"Entry\").Height=90\nf.Controls(\"Entry\").SelStart=0\nf.Controls(\"Entry\").SelLength=12\nf.Controls(\"Entry\").EnterFieldBehavior=1\nf.Controls(\"Entry\").HideSelection=False\nf.Controls(\"Apply\").Top=140\nEnd Sub"
@@ -182,6 +185,13 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         } else {
             main
         };
+        let main = if text_no_bars {
+            main.replace("fmScrollBarsBoth", "fmScrollBarsNone")
+                .replace("TextBox both scroll axes", "TextBox hidden scroll axes")
+                .replace("Wrapped vertical viewport", "Wrapped hidden viewport")
+        } else {
+            main
+        };
         ide.add_module("Main.bas", &main)?;
         ide.dispatch(Action::Run, &mut NoHost)?;
         for _ in 0..1000 {
@@ -235,7 +245,9 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                 return Err("expected native tooltip".into());
             }
         }
-        let prefix = if text_scroll {
+        let prefix = if text_no_bars {
+            "m7a4-native-text-no-bars"
+        } else if text_scroll {
             "m7a4-native-text-scroll"
         } else if selection_margin {
             "m7a4-native-selection-margin"

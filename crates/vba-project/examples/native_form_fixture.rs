@@ -23,6 +23,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let boolean_wrap = option.as_deref() == Some("--boolean-word-wrap");
     let caption_alignment = option.as_deref() == Some("--caption-alignment");
     let text_scroll = option.as_deref() == Some("--text-scroll");
+    let text_no_bars = option.as_deref() == Some("--text-no-bars");
     let selection_margin = option.as_deref() == Some("--selection-margin");
     let auto_tab = option.as_deref() == Some("--auto-tab");
     let hide_selection = option.as_deref() == Some("--hide-selection");
@@ -76,7 +77,8 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             | "--hide-selection"
             | "--auto-tab"
             | "--selection-margin"
-            | "--text-scroll",
+            | "--text-scroll"
+            | "--text-no-bars",
         ) => false,
         Some(_) => return Err("unknown fixture option".into()),
     };
@@ -108,6 +110,57 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         "Stop\r\nDebug.Print Entry.Text"
     };
     let mut text = String::from_utf8(fixture::export())?.replace("Debug.Print Entry.Text", body);
+    if text_no_bars {
+        let code = r#"Attribute VB_Name = "NativeForm"
+Attribute VB_PredeclaredId = True
+Option Explicit
+Private Paused As Boolean
+Private Recording As Boolean
+Private Sub UserForm_Initialize()
+Heading.Caption="Navigate without scrollbars"
+Heading.Width=220
+Entry.Left=16
+Entry.Top=36
+Entry.Width=168
+Entry.Height=90
+Entry.FontSize=12
+Entry.MultiLine=True
+Entry.WordWrap=True
+Entry.EnterFieldBehavior=1
+Entry.HideSelection=False
+Entry.Text="FIRST ROW"
+Dim i As Long
+For i=1 To 30
+Entry.Text=Entry.Text & ChrW(13) & ChrW(10) & "Row " & CStr(i) & " appears after scrolling"
+Next i
+Entry.SelStart=1
+Entry.SelLength=3
+Apply.Left=16
+Apply.Top=140
+Recording=True
+Debug.Print "no bars ready",Entry.ScrollBars,VarType(Entry.ScrollBars)
+End Sub
+Private Sub Entry_KeyDown(ByVal k As MSForms.ReturnInteger,ByVal s As Integer)
+If k.Value=35 And s=2 And Not Paused Then
+Paused=True
+Debug.Print "end down"
+Stop
+Debug.Print "end continued"
+End If
+End Sub
+Private Sub Entry_KeyUp(ByVal k As MSForms.ReturnInteger,ByVal s As Integer)
+If k.Value=35 Then Debug.Print "end range",Entry.SelStart=Len(Entry.Text),Entry.SelLength,Entry.ScrollBars
+End Sub
+Private Sub Entry_Change()
+If Recording Then Debug.Print "typed",Entry.ScrollBars
+End Sub
+Private Sub Apply_Click()
+Debug.Print "done",Entry.ScrollBars,Right$(Entry.Text,1),Entry.SelStart=Len(Entry.Text)
+Me.Hide
+End Sub
+"#.replace('\n', "\r\n");
+        text = String::from_utf8(fixture::export())?.replace(fixture::SOURCE, &code);
+    }
     if text_scroll {
         let code = "Attribute VB_Name = \"NativeForm\"\nAttribute VB_PredeclaredId = True\nOption Explicit\nPrivate Paused As Boolean\nPrivate Sub UserForm_Initialize()\nDebug.Print \"scroll ready\",Entry.ScrollBars,VarType(Entry.ScrollBars)\nHeading.Caption=\"Scroll the text viewport\"\nHeading.Width=220\nEntry.Left=16\nEntry.Top=36\nEntry.Width=168\nEntry.Height=90\nEntry.FontSize=12\nEntry.MultiLine=True\nEntry.WordWrap=True\nEntry.EnterFieldBehavior=1\nEntry.HideSelection=False\nEntry.Text=\"FIRST ROW\"\nDim i As Long\nFor i=1 To 30\nEntry.Text=Entry.Text & ChrW(13) & ChrW(10) & \"Row \" & CStr(i) & \" appears after scrolling\"\nNext i\nEntry.SelStart=1\nEntry.SelLength=3\nApply.Left=16\nApply.Top=140\nEnd Sub\nPrivate Sub Entry_MouseDown(ByVal Button As Integer,ByVal Shift As Integer,ByVal X As Single,ByVal Y As Single)\nIf X>=Entry.Left+Entry.Width-12 And Not Paused Then\nPaused=True\nDebug.Print \"bar down\"\nStop\nDebug.Print \"resumed\"\nEnd If\nEnd Sub\nPrivate Sub Entry_MouseUp(ByVal Button As Integer,ByVal Shift As Integer,ByVal X As Single,ByVal Y As Single)\nDebug.Print \"range\",Entry.SelStart,Entry.SelLength\nEnd Sub\nPrivate Sub Apply_Click()\nDebug.Print \"scroll done\",Entry.ScrollBars,Entry.SelStart,Entry.SelLength\nMe.Hide\nEnd Sub\n".replace('\n', "\r\n");
         text = String::from_utf8(fixture::export())?.replace(fixture::SOURCE, &code);
@@ -252,7 +305,9 @@ End Sub
     std::fs::write(dir.join("NativeForm.frm"), text)?;
     std::fs::write(
         dir.join("NativeForm.frx"),
-        if text_scroll {
+        if text_no_bars {
+            fixture::text_scroll_companion(0xac80_081b, 0, 0)
+        } else if text_scroll {
             fixture::text_scroll_companion(0xac80_081b, 0, 2)
         } else if selection_margin {
             fixture::companion()

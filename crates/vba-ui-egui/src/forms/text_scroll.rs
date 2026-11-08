@@ -190,3 +190,25 @@ pub(super) fn geometry(
     }
     bars
 }
+
+/// Chrome is separate from the scrolling axes; executable input still goes
+/// through MouseScope and its ordinary callback/default continuation.
+pub(super) fn paint(ui: &mut egui::Ui, bars: &[Bar], style: egui::style::ScrollStyle) {
+    for bar in bars {
+        let response = ui.interact(bar.track, bar.key.with(bar.vertical), egui::Sense::hover());
+        response.widget_info(|| egui::WidgetInfo::new(egui::accesskit::Role::ScrollBar));
+        let visuals = ui.style().interact(&response);
+        ui.painter().rect_filled(
+            bar.track,
+            visuals.corner_radius,
+            ui.visuals().extreme_bg_color,
+        );
+        let fill = if style.foreground_color {
+            visuals.fg_stroke.color
+        } else {
+            visuals.bg_fill
+        };
+        ui.painter()
+            .rect_filled(bar.thumb, visuals.corner_radius, fill);
+    }
+}

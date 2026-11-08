@@ -455,3 +455,9 @@ Keep text/ranges in VBA, inspection/resources inert, theme-local chrome, current
 geometry/policy/focus after mouse callbacks, reset and caret following. ListBox
 stored Both does not expose a public member. Preserve all budgets/authority;
 AutoSize/hidden-bar/repeat/platform and full M7A.4 remain open.
+
+ADR 0095 separates TextBox caret scrolling from bar visibility. Preserve fixed
+bounds, complete glyph/cursor rows, canonical UTF-16/CRLF state, tagged UI offsets,
+scrolled hit geometry, authorized mouse defaults and Reset. Accessible chrome uses
+caller styles; no API, format, foreign capability or budget changes. Full M7A.4,
+AutoSize/wheel/repeat/platform and geometry/font-change cases remain open.

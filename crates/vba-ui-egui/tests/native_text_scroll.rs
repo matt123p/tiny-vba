@@ -135,12 +135,186 @@ fn healthy(h: &Harness<'_, State>) {
     assert!(h.state().errors.is_empty(), "{:?}", h.state().errors);
 }
 fn pixels(h: &mut Harness<'_, State>) -> R<Vec<[u8; 4]>> {
-    let r = entry(h).shrink(20.);
+    let bounds = entry(h);
+    let r = egui::Rect::from_min_max(
+        bounds.min + egui::vec2(2., 2.),
+        bounds.max - egui::vec2(20., 20_f32.min(bounds.height() * 0.2)),
+    );
     Ok(h.render()?
         .enumerate_pixels()
         .filter(|(x, y, _)| r.contains(egui::pos2(*x as f32, *y as f32)))
         .map(|(_, _, p)| p.0)
         .collect())
+}
+fn select(h: &mut Harness<'_, State>, value: vba_ide::VbaString, range: (u32, u32)) -> R {
+    let owner = *h.state().ide.form_instances()?.first().ok_or("owner")?;
+    h.state_mut()
+        .ide
+        .form_instance_text(owner, 12, value, range, &mut NoHost)?;
+    h.run_steps(65);
+    Ok(())
+}
+fn text(h: &Harness<'_, State>) -> R<vba_ide::VbaString> {
+    let Value::String(value) = field(h, "VbaText")? else {
+        return Err("text".into());
+    };
+    Ok(value)
+}
+fn changed(a: &[[u8; 4]], b: &[[u8; 4]]) -> usize {
+    a.iter().zip(b).filter(|(a, b)| a != b).count()
+}
+#[test]
+fn no_bar_viewports_follow_programmatic_carets_on_each_applicable_axis() -> R {
+    for (multi, wrap) in [(false, false), (true, false), (true, true)] {
+        let mut h = app(0, multi, wrap, false, false)?;
+        let bounds = entry(&h);
+        let before = pixels(&mut h)?;
+        let value = text(&h)?;
+        let end = u32::try_from(value.units().len())?;
+        select(&mut h, value.clone(), (end, 0))?;
+        if let Some(dir) = std::env::var_os("VBA_TEXT_SCROLL_SHOTS") {
+            h.render()?
+                .save(std::path::Path::new(&dir).join(format!("selected-{multi}-{wrap}.png")))?;
+        }
+        let scrolled = pixels(&mut h)?;
+        let count = changed(&before, &scrolled);
+        assert!(
+            count > 100,
+            "{multi}/{wrap}: {count} pixels, range {:?}/{:?}, expected {end}",
+            field(&h, "VbaSelStart")?,
+            field(&h, "VbaSelLength")?
+        );
+        assert!(bars(&h).is_empty());
+        assert_eq!(entry(&h), bounds);
+        assert_eq!(field(&h, "VbaScrollBars")?, Value::Long(0));
+        assert_eq!(text(&h)?, value);
+        assert_eq!(field(&h, "VbaSelStart")?, Value::Long(i32::try_from(end)?));
+        assert_eq!(h.state().ide.output(), vec!["initialized"]);
+        select(&mut h, value, (1, 3))?;
+        assert!(changed(&scrolled, &pixels(&mut h)?) > 100);
+        healthy(&h);
+    }
+    Ok(())
+}
+#[test]
+fn a_hidden_horizontal_axis_follows_carets_while_only_the_vertical_bar_is_visible() -> R {
+    let mut h = app(2, true, false, false, false)?;
+    let before = pixels(&mut h)?;
+    let value = text(&h)?;
+    select(&mut h, value.clone(), (70, 0))?;
+    assert!(changed(&before, &pixels(&mut h)?) > 100);
+    assert_eq!(bars(&h).len(), 1);
+    let bar = *bars(&h).first().ok_or("vertical bar")?;
+    assert!(bar.height() > bar.width());
+    assert!(bar.right() <= entry(&h).right());
+    assert_eq!(text(&h)?, value);
+    assert_eq!(field(&h, "VbaSelStart")?, Value::Long(70));
+    healthy(&h);
+    Ok(())
+}
+#[test]
+fn no_bar_utf16_and_crlf_selection_hits_the_scrolled_displayed_row() -> R {
+    let mut h = app(0, true, true, false, false)?;
+    let value = vba_ide::VbaString::from_utf8(&format!(
+        "{}\r\nLAST ROW",
+        "row \u{1f600} with UTF16 and CRLF\r\n".repeat(18)
+    ))?;
+    let end = u32::try_from(value.units().len())?;
+    select(&mut h, value.clone(), (end, 0))?;
+    let p = entry(&h).left_top() + egui::vec2(2., 8.);
+    pointer(&mut h, p, true);
+    pointer(&mut h, p, false);
+    h.run_steps(65);
+    let Value::Long(start) = field(&h, "VbaSelStart")? else {
+        return Err("start".into());
+    };
+    let Value::Long(length) = field(&h, "VbaSelLength")? else {
+        return Err("length".into());
+    };
+    assert!(start > 0 && length > 0, "{start}/{length}");
+    assert_eq!(text(&h)?, value);
+    assert!(bars(&h).is_empty());
+    healthy(&h);
+    Ok(())
+}
+#[test]
+fn no_bar_scrolled_pointer_waits_for_callback_and_reset_discards_the_viewport() -> R {
+    let mut h = app(0, true, true, false, true)?;
+    let value = text(&h)?;
+    let end = u32::try_from(value.units().len())?;
+    select(&mut h, value, (end, 0))?;
+    let before = pixels(&mut h)?;
+    let p = entry(&h).left_top() + egui::vec2(2., 8.);
+    pointer(&mut h, p, true);
+    h.run_steps(30);
+    assert_eq!(h.state().ide.mode(), Mode::Break);
+    assert_eq!(field(&h, "VbaSelStart")?, Value::Long(i32::try_from(end)?));
+    pointer(&mut h, p, false);
+    h.state_mut().ide.dispatch(Action::Run, &mut NoHost)?;
+    h.run_steps(80);
+    let Value::Long(start) = field(&h, "VbaSelStart")? else {
+        return Err("start".into());
+    };
+    assert!(start > 0 && start < i32::try_from(end)?);
+    assert_eq!(
+        h.state().ide.output(),
+        vec!["initialized", "down", "resumed"]
+    );
+    h.state_mut().ide.dispatch(Action::Reset, &mut NoHost)?;
+    h.state_mut().ide.dispatch(Action::Run, &mut NoHost)?;
+    h.run_steps(200);
+    assert_eq!(field(&h, "VbaSelStart")?, Value::Long(1));
+    assert!(changed(&before, &pixels(&mut h)?) > 100);
+    assert!(bars(&h).is_empty());
+    healthy(&h);
+    Ok(())
+}
+#[test]
+fn a_single_line_with_no_room_for_a_bar_still_follows_its_caret() -> R {
+    let mut h = app_height(1, false, false, false, false, false, 12.)?;
+    let before = pixels(&mut h)?;
+    let value = text(&h)?;
+    let end = u32::try_from(value.units().len())?;
+    select(&mut h, value.clone(), (end, 0))?;
+    assert!(changed(&before, &pixels(&mut h)?) > 10);
+    assert!(bars(&h).is_empty());
+    assert_eq!(field(&h, "VbaScrollBars")?, Value::Long(1));
+    assert_eq!(text(&h)?, value);
+    healthy(&h);
+    Ok(())
+}
+#[test]
+fn real_keyboard_navigation_and_typing_follow_the_hidden_vertical_viewport() -> R {
+    let mut h = app(0, true, true, false, false)?;
+    let before = pixels(&mut h)?;
+    let value = text(&h)?;
+    let end = i32::try_from(value.units().len())?;
+    for pressed in [true, false] {
+        h.event(egui::Event::Key {
+            key: egui::Key::End,
+            physical_key: Some(egui::Key::End),
+            pressed,
+            repeat: false,
+            modifiers: egui::Modifiers {
+                ctrl: true,
+                command: true,
+                ..egui::Modifiers::NONE
+            },
+        });
+    }
+    h.run_steps(80);
+    assert_eq!(field(&h, "VbaSelStart")?, Value::Long(end));
+    assert_eq!(field(&h, "VbaSelLength")?, Value::Long(0));
+    assert!(changed(&before, &pixels(&mut h)?) > 100);
+    h.event(egui::Event::Text("!".into()));
+    h.run_steps(80);
+    assert_eq!(field(&h, "VbaSelStart")?, Value::Long(end + 1));
+    let mut expected = value.units().to_vec();
+    expected.push(u16::from(b'!'));
+    assert_eq!(text(&h)?.units(), expected);
+    assert!(bars(&h).is_empty());
+    healthy(&h);
+    Ok(())
 }
 #[test]
 fn scrollbars_follow_overflow_axes_wordwrap_and_single_line_rules() -> R {

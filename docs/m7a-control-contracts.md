@@ -1,6 +1,6 @@
 # M7A Office forms — control, property, event, format and host contracts
 
-Updated 2026-11-07. FC0.2/FC0.3 contract inventory under
+Updated 2026-11-08. FC0.2/FC0.3 contract inventory under
 [ADR 0038](decisions/0038-native-office-forms-and-compatibility-only.md),
 [ADR 0039](decisions/0039-m7a-native-control-metadata.md) and
 [ADR 0040](decisions/0040-native-userform-import-and-attachment.md).
@@ -33,7 +33,7 @@ are file-format defaults from MS-OFORMS, not undocumented VBE toolbox defaults.
 | Font | ADR 0081 retains StdFont/TextProps and VBFrame data; typed attributes, independent objects/defaults, inert inspection and local rendering | D selected; replacement/ambient/platform realization P |
 | Border / effect / transparency | Applicable native fields, original resources and typed runtime members | D selected (ADR 0084); remaining member/ambient/platform parity M7A.4 |
 | Alignment / CheckBox, OptionButton | VariousPropertyBits bit 13 is inverse to public fmAlignmentLeft=0/Right=1; ordinary Long state/defaults/errors; ToggleButton disabled | D selected side/layout (ADR 0090); broader property/platform audit remains open |
-| ScrollBars / TextBox | MorphData bit-5 byte 0–3; ordinary Long None default/constants/errors; measured axes and viewport through existing mouse continuation | D selected (ADR 0094); AutoSize, hidden-bar/repeat/platform and container scrolling audit open |
+| ScrollBars / TextBox | MorphData bit-5 byte 0–3; ordinary Long None default/constants/errors; measured axes and viewport through existing mouse continuation | D selected (ADRs 0094/0095), including no-bar caret viewports; AutoSize, repeat/wheel/platform and container audit open |
 | SelectionMargin / TextBox, ComboBox | VariousPropertyBits bit 26; ordinary Boolean True defaults and deferred displayed-line selection/drag in the left edit strip | D selected (ADR 0093); printing/platform and remaining selection audit open |
 | AutoTab / TextBox, ComboBox | VariousPropertyBits bit 30; ordinary Boolean False defaults; accepted user edits reaching MaxLength traverse canonical eligible tab order through normal validation and focus | D selected (ADR 0092); platform/container and full input audit stays open |
 | HideSelection / TextBox, ComboBox | VariousPropertyBits bit 29; ordinary Boolean state, True defaults and passive selected-text highlights; ranges/events/resources stay canonical | D selected (ADR 0091); remaining selection/platform audit stays open |
@@ -41,7 +41,7 @@ are file-format defaults from MS-OFORMS, not undocumented VBE toolbox defaults.
 | Tag / HelpContextID / ControlTipText | Known frame/site strings/scalars; ordinary per-instance metadata and runtime tips | D; Help/F1 routing remains U (ADR 0055) |
 | Window placement / StartUpPosition / ShowModal | VBFrame metadata retained; enabled/default-modal form required; explicit show modes use existing runtime | P for placement; disabled/default-modeless metadata U; parity M7A.4 |
 | Default / Cancel / Accelerator / TakeFocusOnClick changes | Native site/control flags or fields | Default/Cancel and selected applicable accelerators decoded and executed (ADR 0072); TakeFocusOnClick changes U |
-| Locked / multiline / password / MaxLength / scrolling changes | MorphData behavior fields or nondefault flags | Locked/MaxLength, multiline, password and selected Enter/Tab/field behavior decoded and executed; scrolling remains U |
+| Locked / multiline / password / MaxLength / scrolling changes | MorphData behavior fields or nondefault flags | Locked/MaxLength, multiline, password and selected Enter/Tab/field behavior and TextBox scrolling decoded and executed; remaining scrolling/platform cases open |
 | ControlSource / RowSource / list metadata | Native binding/site fields retained without resolution | D for value/list families; selected runtime links through explicit host Range capability (ADR 0065) |
 | Pictures / MouseIcon / custom pointers / non-cached class table | Native binary resource or reference-specific class | D selected Image raster resources (ADR 0059) and RefEdit class identity (ADR 0060); MouseIcon/custom pointers and arbitrary activation U |
 | Container children | Native immediate sites and separate parent storage | D selected bounded Frame/MultiPage/Page packets (ADRs 0056/0058); remaining storage/resource variants open |
@@ -425,3 +425,11 @@ Track/drag waits for callbacks, current policy/focus and lifetime. Measured room
 MultiLine and WordWrap determine axes; reset, caret following and scrolled hits
 are covered. Native ListBox stored Both is accepted without a new public member.
 No VM/foreign/budget/persistence change; full M7A.4 remains open.
+
+[ADR 0095](decisions/0095-native-textbox-hidden-viewports.md) separates native
+TextBox scrolling axes from visible bars. None/room-hidden bars retain caret
+viewports and translated pointer geometry under fixed authored bounds. Existing
+canonical text/ranges, UI-only tagged offsets, authorized callback/default routing
+and Reset remain intact; accessible chrome uses local caller styles. No new API,
+format, foreign call or budget. AutoSize, wheel/repeat/platform, geometry/font-change
+edge cases and full M7A.4 remain open; fresh Office comparisons are NOT_RUN.
