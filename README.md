@@ -1,5 +1,9 @@
 # tiny-vba
 
+Native form exchange uses `.frm`/`.frx`; [M7A.6](docs/m7a6-acceptance.md) removes
+the custom format, codec and file routes. All shared and pinned-host gates pass.
+Next is M7A.7 combined acceptance; fresh Office comparisons remain M8.5 NOT_RUN.
+
 **A clean-room VBA implementation for the ArtCraft applications: GridCraft, WordCraft and DeckCraft.**
 
 Written in Rust, tiny-vba provides the shared language engine, runtime, editor and
@@ -101,8 +105,8 @@ custom format and its importer/exporter are removed under
 native templates. [M7A.5](docs/m7a5-acceptance.md) implements native file Save/Export
 and edited XLSM/DOCM copy export; ordinary document Save preserves original VBA
 bytes. The [common profile](docs/m7a4-common-profile.md) defines supported controls
-and runtime behavior; uncommon extensions remain in P9. M7A.6 final gates are in
-progress, followed by M7A.7 combined acceptance.
+and runtime behavior; uncommon extensions remain in P9. M7A.6 removal and its shared/host gates are complete; next is M7A.7 combined
+acceptance.
 
 ## Debugger
 

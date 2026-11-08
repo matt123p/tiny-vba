@@ -6,7 +6,8 @@ routes, file filters and `.tvform` example are removed under
 starts from an inert native template, and all form Save/Export/remove-export
 requests use native `.frm`/`.frx` snapshots. The CustomerForm demo and retained
 exchange/host tests use native files. No legacy importer or converter remains.
-Final shared/host gates are in progress; M7A.7 combined acceptance remains next.
+M7A.6 is COMPLETE; shared and pinned-host gates pass. See the
+[acceptance record](m7a6-acceptance.md). M7A.7 combined acceptance remains next.
 Older incremental format/support notes below are historical and superseded.
 
 M7A.5 persistence update (2026-11-08): native `.frm`/`.frx` saving/export and
@@ -24,11 +25,11 @@ The outstanding uncommon/exhaustive cases in earlier incremental notes now belon
 to [P9](p9-forms-compatibility.md). Those notes retain their original support and
 evidence limits; this sign-off does not implement deferred behavior. M7A.5 native
 persistence is complete for the explicit workflows above. M7A.6
-`.tvform` removal, M7A.7 integration and M8.5 fresh comparisons remain unfinished.
-Next work is M7A.6.
+format removal is complete; M7A.7 integration and M8.5 fresh comparisons remain
+unfinished. Next work is M7A.7.
 
 M1–M6, M6A and M7 are complete for their declared profiles; the
-remaining plan continues with M7A.6–M7A.7, then M8 and deferred P9. Fresh Excel/Word comparison is
+remaining plan continues with M7A.7, then M8 and deferred P9. Fresh Excel/Word comparison is
 deferred to M8.5. The plan retains M1–M8 numbering with inserted M6A and M7A. Earlier implementation reports,
 specifications and ADRs retain historical IDs; see the
 [mapping](implementation-progress.md#plan-renumbering--2026-10-28).

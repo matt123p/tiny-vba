@@ -1,24 +1,56 @@
 # Implementation progress
 
-## M7A.6 in progress — native-only form files (2026-11-08)
+## M7A.6 complete — native form files replace the custom format (2026-11-08)
 
-ADR 0099 removes the custom codec, public import/export APIs and file routes.
-New forms now attach native templates; Save/Export and export-before-remove use
-revision-bound native snapshots. A Rust-built CustomerForm native pair replaces
-the custom example. Useful exchange, native/browser demo and host callback tests
-are migrated, not discarded. A repository gate prevents the retired product codec,
-references and example extension from returning. Source/code-page refusals, inert
-attachment, original-byte ownership and existing host trust/budgets remain intact.
+Accepted under [ADR 0099](decisions/0099-native-only-form-workflows.md) and the
+[removal/acceptance record](m7a6-acceptance.md). The codec/module, public
+`import_form`/`export_form` APIs, import/save/export/remove-export fallbacks,
+file filters and custom example are removed. New forms attach inert native
+1252-code-page templates; file operations use native revision snapshots. The
+Rust-built CustomerForm pair replaces the custom demonstration. There is no
+legacy importer, converter or renamed custom format. Git preserves native form
+line endings/code-page bytes and binary companions; the tracked form bytes were
+compared with the working bytes used by the tests.
 
-The migrated IDE run passes all 15 execution, 99 instance, three native
-attachment and four save cases. Full shared native CI/strict Clippy, WASM target
-check, UI, Xvfb native captures, web and all 15 browser flows pass. Native form
-light/dark/host and real native captures were inspected. Native property collision
-refusal replaces one obsolete custom-form field override assertion; two GUI cases
-use the existing native eight-frame settling allowance without changing assertions
-or VM limits. The full WASI run and pinned fork gates are still running. This is
-not M7A.6 or M7A.7 final acceptance yet.
-Fresh Office evidence remains M8.5 NOT_RUN; uncommon extensions remain P9.
+Useful exchange tests now cover exact source/layout/tab order, malformed native
+resources before mutation, stale receipts and native rename/export/remove. One
+custom-only BackColor/ForeColor declaration override test now proves the existing
+native pre-execution refusal. Two GUI cases use the existing eight-frame native
+settling allowance with callback, debugger and keyboard assertions unchanged.
+No VM/host permission, memory or execution limit changed. Selection-group native
+persistence remains an explicit refusal. Fixed embedded project component identity
+continues to refuse rename/insertion during edited package-copy export.
+
+| Repository | Accepted product / integration revision |
+|---|---|
+| tiny-vba | `d9431ce4992ee9580acfe2fe0f7276de229bedaf` (core removal `0df0cefa049eadfc1c289be4efaed1d97f934224`) |
+| GridCraft | `33c3dbe048072235d51375aebf0909cc69d46820` |
+| WordCraft | `1d2dae51ec1da2a9016e72915ec2de0ed1963895` |
+
+All shared native CI/strict Clippy, WASM target checks, full Node 22 WASI,
+UI, Xvfb native captures and web gates pass. All 15 Chromium flows pass, including
+actual native CustomerForm import, real Submit Stop/Continue/output 7, two-file
+export, exact source/binary identity and inert reimport. Native light/dark/host
+views, the real native capture and reopened browser designer were inspected.
+The source audit rejects the retired codec/product references/custom examples.
+Historical M2/ADR format records are explicitly superseded, not current support.
+
+GridCraft: 34 native/34 Node 22 WASM package cases, six form UI cases including
+the migrated workbook callback workflow, strict optional VBA/UI Clippy,
+VBA-enabled web and all 10 CI steps pass. WordCraft: all 29 workflow cases
+including the migrated document callback workflow, 29 native/29 Node 22 WASM
+package cases, 13 retained VBA UI cases plus hidden-editor/canvas/copy-command
+checks, strict optional Clippy, VBA-enabled web and all eight CI steps in isolation
+with one test thread pass. Both host canvases were inspected. Thirteen shared
+packages in each lockfile change by revision only (26 source occurrences each).
+
+M7A.5 native file/save/signature/receipt policy remains intact. Ordinary document
+Save retains original VBA bytes; edited package copy export leaves the original
+editor modified; browser download requests never acknowledge a disk commit.
+Next is **M7A.7 combined acceptance**, followed by M8 and uncommon P9 work.
+M7A overall is not yet signed off. Fresh Excel/Word observations remain M8.5
+NOT_RUN; no universal Office or P9 compatibility is claimed.
+
 
 ## M7A.5 complete — native form saving and edited package copies (2026-11-08)
 

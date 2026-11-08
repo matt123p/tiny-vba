@@ -1,6 +1,6 @@
 # Remaining implementation plan
 
-Updated 2026-11-08. This plan contains **remaining work only**: M7A.6–M7A.7, stable M8 IDs and deferred P9,
+Updated 2026-11-08. This plan contains **remaining work only**: M7A.7, stable M8 IDs and deferred P9,
 after completed M1–M6, M6A and M7 for their declared profiles.
 [M7 acceptance](m7-acceptance.md) records the authored unchanged-document/package
 profile and [ADR 0037](decisions/0037-m7-package-preservation-and-writeback.md)
@@ -18,7 +18,7 @@ separate and native host dispatch in Rust.
 
 | Milestone | Remaining work | Prerequisites |
 |---|---|---|
-| M7A | Native Office forms and removal of .tvform | Accepted M1–M6, M6A and M7; reviewed native-form/writeback contracts |
+| M7A | Final common-profile integration acceptance (M7A.7) | Accepted M1–M6, M6A and M7; reviewed native-form/writeback contracts |
 | M8 | Expanded conformance, hardening and release | Accepted M1–M6, M6A, M7 and M7A profiles for the declared release profile |
 | P9 | Extended/uncommon Office forms compatibility | After M8; finite follow-up packets, not a prerequisite of common-profile M7A/M8 |
 
@@ -37,7 +37,7 @@ Status: **IN PROGRESS**, started 2026-11-04 on owner direction.
 The [inventory and work ledger](m7a-inventory.md) records FC0.1's audited paths,
 the completed import/attachment and native worksheet Form Control profiles.
 M7A.4 common semantics and M7A.5 explicit persistence are complete; M7A.6 format
-removal is in progress and M7A.7 final integration remains open;
+removal is complete and M7A.7 final integration remains open;
 no full M7A acceptance is claimed.
 Owner: tiny-vba reusable form codecs/model/runtime/editor; GridCraft worksheet
 controls/Excel bindings; both forks' document, trust, event and package integration.
@@ -53,7 +53,8 @@ and inert package attachment in both forks. See the
 and [property/event/format/host contracts](m7a-control-contracts.md).
 M7A.4 is complete for the common profile below. Broader native variants and
 exhaustive lifecycle parity are P9. M7A.5 native persistence is complete for its
-explicit workflows; custom-format removal and final acceptance remain M7A.6/.7.
+explicit workflows, and M7A.6 format removal is complete. M7A.7 final acceptance
+remains open.
 No full M7A sign-off is claimed.
 
 Completed checkpoint: **M7A.3 — Worksheet forms and controls (FC1–FC2)** for
@@ -76,13 +77,13 @@ M7A.5 / FC5 is **COMPLETE** for native common-profile Save/Export and explicit
 edited XLSM/DOCM copy workflows under ADR 0098. See the
 [acceptance record](m7a5-acceptance.md) for supported edits, source/cache/signature
 policy, exact receipts and limitations. Ordinary document Save preserves imported
-VBA bytes. Next is M7A.6; no full M7A sign-off is claimed.
+VBA bytes. M7A.6 is also complete; next is M7A.7, with no full M7A sign-off claimed.
 
-- **M7A.6 — Remove .tvform (FC6; IN PROGRESS):** remove the custom codec, public APIs, import/
-  export/save routes, file associations/filters, examples and current support claims.
-  Replace demonstrations and useful tests with native Office fixtures/workflows.
-  Do not keep a shipped legacy importer or introduce a conversion feature. Historical
-  acceptance remains traceable and is marked superseded for format direction.
+M7A.6 / FC6 is **COMPLETE** under ADR 0099. The custom codec/APIs/routes/filters
+and example are removed, with native replacement workflows and shared/pinned-host
+gates accepted in [the removal record](m7a6-acceptance.md). No legacy importer or
+conversion feature is shipped. Historical format evidence is marked superseded.
+
 - **M7A.7 — Acceptance:** prove load/compile/display/input/run/edit/save/reopen
   independently against the accepted common profile in both forks; test malformed
   resources, unsupported controls, bounds, trust loss, Reset/close, debugger waits,

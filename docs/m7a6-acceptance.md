@@ -1,6 +1,6 @@
 # M7A.6 — Native form files replace the custom format
 
-Updated 2026-11-08. Status: final gates in progress, under
+Updated 2026-11-08. Status: **COMPLETE**, under
 [ADR 0099](decisions/0099-native-only-form-workflows.md).
 This gate removes the custom format; it does not extend the common runtime or P9.
 
@@ -39,8 +39,8 @@ existing native eight-frame settling allowance; callback, debugger and keyboard
 assertions remain unchanged. No VM, host-permission, memory or execution limit
 was raised.
 
-Shared CI/WASM/WASI/UI/native and both pinned-host gates are being completed;
-results and repository revisions are recorded in
+Shared CI/strict Clippy, WASM/WASI/UI/Xvfb-native and both pinned-host gates pass;
+results and exact repository revisions are recorded in
 [implementation progress](implementation-progress.md). The complete 15-flow
 browser suite passes, including the migrated demo and M7A.5 native save/reopen.
 Both hosts' useful callback tests now use native form files; Word's source-picker

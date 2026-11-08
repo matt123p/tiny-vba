@@ -4,8 +4,8 @@ Current owner direction (2026-11-08): [ADR 0097](docs/decisions/0097-common-form
 supersedes historical instructions below that all inventoried forms parity must
 block M7A.4. M7A.4 is COMPLETE for [the common profile](docs/m7a4-common-profile.md).
 Uncommon/exhaustive extensions are [P9](docs/p9-forms-compatibility.md), after M8.
-M7A.5 persistence is complete for its explicit workflow profile. Next is M7A.6
-`.tvform` removal and M7A.7 acceptance.
+M7A.5 persistence is complete for its explicit workflow profile. M7A.6 removal is
+complete; next is M7A.7 acceptance.
 Do not reopen the exhaustive M7A.4 gate or claim P9 behavior implemented. Bugs in
 included common workflows remain fixes. Safety/trust/bounds and fresh M8.5
 comparison requirements remain unchanged.
@@ -290,3 +290,8 @@ receipts are in implementation progress. Ordinary document Save retains original
 VBA bytes, copy export retains editor dirty state, and browser download requests
 never acknowledge a disk commit. Next is M7A.6 legacy `.tvform` removal, then
 M7A.7 integration. Preserve the P9 and M8.5 boundaries.
+
+M7A.6 is COMPLETE under ADR 0099 and docs/m7a6-acceptance.md, with all shared and
+pinned-host gates passing. Next is M7A.7 combined acceptance. Do not restore the
+retired codec/APIs/routes/examples or a converter. Preserve native save receipts,
+original-byte ownership, common runtime behavior and the P9/M8.5 boundaries.

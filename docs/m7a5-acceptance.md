@@ -68,8 +68,8 @@ are original Rust; no Office-created binaries or external implementation were ad
 
 ## Remaining milestones and limits
 
-M7A.6 removes the shipped legacy `.tvform` codec/routes/examples; it is not part of
-this persistence gate. M7A.7 runs final combined acceptance. M8.5 fresh Excel/Word
+[M7A.6](m7a6-acceptance.md) has now removed the legacy codec/routes/examples;
+that separate removal does not change this persistence gate's original scope. M7A.7 runs final combined acceptance. M8.5 fresh Excel/Word
 comparisons remain **NOT_RUN**. Cryptographic signature verification/resigning,
 protection changes, arbitrary OCX/COM loading and exhaustive native resource/member
 parity are unsupported. No runtime/host permission, memory or execution limit was

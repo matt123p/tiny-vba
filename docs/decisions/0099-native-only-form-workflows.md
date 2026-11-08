@@ -1,6 +1,6 @@
 # ADR 0099: Native-only form file workflows
 
-Date: 2026-11-08. Status: adopted; M7A.6 final gates in progress.
+Date: 2026-11-08. Status: adopted; M7A.6 COMPLETE; shared and pinned-host gates pass.
 
 Owner direction in ADR 0038 requires removing the custom form format. M7A.5
 supplies the replacement native encoders and host package-copy workflows. This

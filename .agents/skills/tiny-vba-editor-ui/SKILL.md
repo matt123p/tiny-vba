@@ -447,3 +447,8 @@ resources. Validate queued control membership after ordinary writes settle and
 by object identity after index shifts; do not grant input permission or retain
 VM roots in UI state. Tick with the active session's lower slice when configured.
 No budget is raised; full M7A.4 and fresh Office acceptance remain open.
+
+M7A.6 is COMPLETE under ADR 0099 and docs/m7a6-acceptance.md, with all shared and
+pinned-host gates passing. Next is M7A.7 combined acceptance. Do not restore the
+retired codec/APIs/routes/examples or a converter. Preserve native save receipts,
+original-byte ownership, common runtime behavior and the P9/M8.5 boundaries.
