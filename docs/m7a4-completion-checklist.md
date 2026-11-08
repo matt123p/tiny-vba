@@ -115,9 +115,10 @@ thumb input preserves canonical text/ranges and follows current policy/focus.
 Tagged UI offsets reset with execution/control identity; scrolled hits and caret
 following are covered. Native ListBox stored Both is accepted without a new
 public member. Full shared/browser/pinned host acceptance gates pass;
-AutoSize, hidden-bar/repeat/platform and container scrolling remain open.
+ADR 0095 adds selected no-bar caret scrolling; AutoSize, repeat/wheel/platform
+and container scrolling remain open.
 
 Selected P01 no-bar caret scrolling follows ADR 0095, including fixed bounds,
 real navigation/typing, hidden-axis/visible-bar coexistence, canonical UTF-16/CRLF
 ranges, displayed-line pointer hits and Stop/Continue/Reset. Full shared/browser/
-pinned host acceptance is in progress; remaining checklist requirements stay open.
+pinned host acceptance gates pass; remaining checklist requirements stay open.

@@ -1,6 +1,6 @@
 # ADR 0095: Native TextBox caret viewports without visible bars
 
-Date: 2026-11-08. Status: adopted; acceptance in progress. M7A.4 remains open.
+Date: 2026-11-08. Status: adopted; increment accepted. M7A.4 remains open.
 
 The UI now separates scrollable text axes from visible scrollbar axes. A native
 TextBox always has a fixed, clipped text viewport: horizontal for single-line or
@@ -33,8 +33,11 @@ Ctrl+End followed by typing. Untouched initial right/centre-aligned overflow
 keeps its alignment; a later explicit caret move can reveal either end. The
 existing clipped-pointer expectation and a new caret-zero pixel test cover this.
 The eight existing viewport cases and retained
-mouse, alignment, HideSelection and AutoTab suites also pass. Full shared,
-browser/theme and pinned host acceptance will be recorded in progress after running.
+mouse, alignment, HideSelection and AutoTab suites also pass. Full shared CI, strict workspace/all-targets Clippy, WASM/WASI/UI/Xvfb/web,
+thirteen Chromium flows and both pinned host acceptance suites pass. The host
+suites include full CI, strict optional Clippy, VBA-enabled web, native/Node WASM
+package cases and inspected no-bar canvases. Exact revisions and case counts are
+recorded in implementation progress.
 The new Chromium flow already passes stopped Ctrl+End, continuation and typing
 at the revealed tail with exact source preservation. Five theme variants and
 browser runtime/Break/scrolled views were inspected.

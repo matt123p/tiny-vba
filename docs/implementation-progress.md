@@ -12,14 +12,27 @@ changes. Seven new GPU/input cases and eight retained viewport cases pass, inclu
 actual Ctrl+End/typing, astral UTF-16/CRLF hits and Stop/Continue/Reset. Initial
 right/centre-aligned overflow retains its alignment until later caret movement;
 the retained clipped-pointer expectation and a new explicit-caret-zero test pass.
-The retained
-40 mouse, alignment, HideSelection and AutoTab suites pass. The new Chromium
+The retained 40 mouse, alignment, HideSelection and AutoTab suites pass. The new Chromium
 flow passes with inert import, stopped Ctrl+End, one continuation, typing at the
 revealed tail and exact authored source. Five theme/scale/host snapshots and
-browser runtime/Break/scrolled views were inspected. Full shared/browser/host
-acceptance is in progress. AutoSize, repeat/wheel/platform, geometry/font-change
+browser runtime/Break/scrolled views were inspected. Full native CI, strict
+workspace/all-targets Clippy, WASM, UI, Xvfb native, web and all thirteen Chromium
+flows pass. Full WASI passes on Node 22.23.4. Shared product revision:
+`25a35a403e862bb8510bfe7117d95f379aeea1fc`. Both hosts pin it. Gridcraft passes
+all 10 CI steps, strict optional VBA/UI Clippy, five form UI cases, the VBA-enabled
+web build and all 33 native/33 Node 22 WASM package cases. Its light no-bar host
+canvas was inspected. Published integration:
+`205c3a6e4043eadf5791991223c718b7a9f5612f`. Wordcraft passes all eight CI steps
+in isolation with one test thread, strict optional Clippy, 13 VBA UI cases plus
+hidden-editor/canvas cases, the VBA-enabled web build and all 28 native/28 Node 22
+WASM package cases. Its dark no-bar host canvas was inspected. Published
+integration: `a391fbd465e22dbe6e88805994072867fcf1866c`. Each host's 13 shared
+lockfile packages changed by revision only. Both retain typed property, trusted
+continuation and exact original project preservation regressions. AutoSize,
+repeat/wheel/platform, geometry/font-change
 edge cases and the unchanged milestone checklist remain open. M8.5 fresh Office
-comparisons remain NOT_RUN.
+comparisons remain NOT_RUN. The next smallest viewport task is caret reflow after
+geometry/font changes, retaining manual offsets during passive repaints.
 
 ## M7A.4 continued — native TextBox ScrollBars (2026-11-08)
 
