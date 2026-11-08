@@ -664,7 +664,8 @@ fn control(bytes: &[u8], site: Site) -> Result<Control> {
             0
         };
         if site.kind == Kind::TextBox || combobox {
-            text_flags |= (1 << 29) | (1 << 30);
+            text_flags |= (1 << 26) | (1 << 29) | (1 << 30);
+            text_behavior.selection_margin = flags & (1 << 26) != 0;
             text_behavior.auto_tab = flags & (1 << 30) != 0;
             text_behavior.hide_selection = flags & (1 << 29) != 0;
         }

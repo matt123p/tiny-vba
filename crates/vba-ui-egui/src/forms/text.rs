@@ -43,6 +43,7 @@ pub(super) struct Geometry {
     pub width: f32,
     pub font: egui::FontId,
     pub alignment: egui::Align,
+    pub margin_right: Option<f32>,
 }
 impl Geometry {
     pub(super) fn cursor(
@@ -52,7 +53,7 @@ impl Geometry {
         owner: vba_ide::FormInstance,
         control: u32,
         pos: egui::Pos2,
-    ) -> Option<(vba_ide::VbaString, String, CCursor)> {
+    ) -> Option<(vba_ide::VbaString, String, CCursor, std::ops::Range<usize>)> {
         let field = |name| ide.form_instance_field(owner, Some(control), name).ok();
         let vba_ide::Value::String(raw) = field("VbaText")? else {
             return None;
@@ -93,7 +94,15 @@ impl Geometry {
             point.y = galley.rect.center().y;
         }
         let cursor = galley.cursor_from_pos(point);
-        Some((raw, text, cursor))
+        let row_index = galley.layout_from_cursor(cursor).row;
+        let start = galley
+            .rows
+            .iter()
+            .take(row_index)
+            .map(|row| row.char_count_including_newline().0)
+            .sum::<usize>();
+        let length = galley.rows.get(row_index)?.char_count_including_newline().0;
+        Some((raw, text, cursor, start..start.saturating_add(length)))
     }
 }
 fn selection(text: &str, range: CCursorRange) -> (u32, u32) {
@@ -271,8 +280,14 @@ impl TextBox<'_> {
         };
         let mut classes = builder.classes().clone();
         classes.add_class_if(TextEdit::CLASS_READ_ONLY, locked);
-        let mut align = ui
-            .widget_style::<egui::widget_style::TextEditStyle>(self.widget, &classes)
+        let style = ui.widget_style::<egui::widget_style::TextEditStyle>(self.widget, &classes);
+        let margin_enabled = self.field("SelectionMargin") == Some(vba_ide::Value::Boolean(true));
+        let mut margin = style.atom_layout.frame.inner_margin
+            + egui::Margin::from(style.atom_layout.frame.stroke.width);
+        if margin_enabled {
+            margin.left = margin.left.saturating_add(6);
+        }
+        let mut align = style
             .atom_layout
             .align2
             .unwrap_or_else(|| ui.layout().align2());
@@ -284,10 +299,10 @@ impl TextBox<'_> {
             .min_size(self.bounds.size())
             .desired_width(self.bounds.width())
             .align(align)
+            .margin(margin)
             .char_limit(maximum)
             .password(mask.is_some())
             .layouter(&mut layouter)
-            .hint_text(&self.control.name)
             .lock_focus(multi && self.boolean("TabKeyBehavior"))
             .return_key(if multi {
                 Some(egui::KeyboardShortcut::new(
@@ -333,6 +348,7 @@ impl TextBox<'_> {
             width: output.galley.job.wrap.max_width,
             font,
             alignment,
+            margin_right: margin_enabled.then_some(self.bounds.left() + 6.),
         })
     }
 }

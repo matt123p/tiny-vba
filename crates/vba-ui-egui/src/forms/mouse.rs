@@ -104,6 +104,7 @@ struct TextAnchor {
     start: usize,
     end: usize,
     words: bool,
+    lines: bool,
 }
 struct NumericAnchor {
     gesture: u64,
@@ -1049,7 +1050,7 @@ impl MouseScope {
         else {
             return false;
         };
-        let Some((value, normalized, cursor)) =
+        let Some((value, normalized, cursor, line)) =
             geometry.cursor(ctx, ide, raw.hit.owner, control, raw.pos)
         else {
             return false;
@@ -1068,7 +1069,34 @@ impl MouseScope {
         let count = normalized.chars().count();
         let mut start = cursor.index.0.min(count);
         let mut end = start;
-        if raw.phase == Phase::DoubleClick {
+        let line_start = matches!(raw.phase, Phase::Down | Phase::DoubleClick)
+            && raw.button == 1
+            && field("SelectionMargin") == Some(Value::Boolean(true))
+            && geometry.margin_right.is_some_and(|right| raw.pos.x < right);
+        let lines = line_start
+            || field("SelectionMargin") == Some(Value::Boolean(true))
+                && !matches!(raw.phase, Phase::Down | Phase::DoubleClick)
+                && self
+                    .text_anchor
+                    .as_ref()
+                    .is_some_and(|anchor| anchor.gesture == raw.gesture && anchor.lines);
+        if line_start {
+            start = line.start;
+            end = line.end;
+            if raw.shift & 1 != 0 {
+                start = start.min(text::chars_before(&original, existing_start));
+                end = end.max(text::chars_before(
+                    &original,
+                    existing_start.saturating_add(existing_length),
+                ));
+            }
+        } else if lines {
+            let Some(anchor) = &self.text_anchor else {
+                return false;
+            };
+            start = anchor.start.min(line.start);
+            end = anchor.end.max(line.end);
+        } else if raw.phase == Phase::DoubleClick {
             start = ccursor_previous_word(&normalized, cursor).index.0;
             end = ccursor_next_word(&normalized, cursor).index.0;
         } else if raw.phase == Phase::Down {
@@ -1095,15 +1123,16 @@ impl MouseScope {
             self.text_anchor = Some(TextAnchor {
                 gesture: raw.gesture,
                 start,
-                end: if raw.phase == Phase::DoubleClick {
+                end: if lines || raw.phase == Phase::DoubleClick {
                     end
                 } else {
                     start
                 },
-                words: raw.phase == Phase::DoubleClick,
+                words: !lines && raw.phase == Phase::DoubleClick,
+                lines,
             });
         }
-        if start != end && field("AutoWordSelect") == Some(Value::Boolean(true)) {
+        if !lines && start != end && field("AutoWordSelect") == Some(Value::Boolean(true)) {
             let low = start.min(end);
             let high = start.max(end);
             start =

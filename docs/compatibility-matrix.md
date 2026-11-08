@@ -388,3 +388,10 @@ AutoTab: bit-30 import, False defaults and user-edit-driven canonical tab traver
 through existing validation/focus frames. Actual mutation cause survives unchanged
 autocomplete text; programmatic assignments and caret-only input stay passive.
 Full property/platform/input and M7A.4 acceptance remains open; M8.5 is NOT_RUN.
+
+[ADR 0093](decisions/0093-native-selection-margin.md) adds native TextBox/ComboBox
+SelectionMargin, True defaults and a theme-local selection strip. Whole displayed
+rows select/drag through the existing mouse continuation, including wrapped text
+and canonical UTF-16/CRLF ranges. Post-callback state remains authoritative;
+selection-only input stays passive and empty edit fields render blank. No VM,
+foreign, budget or persistence change is implied. Full M7A.4 remains open.

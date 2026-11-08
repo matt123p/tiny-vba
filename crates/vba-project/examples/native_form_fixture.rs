@@ -22,6 +22,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let word_wrap = option.as_deref() == Some("--word-wrap");
     let boolean_wrap = option.as_deref() == Some("--boolean-word-wrap");
     let caption_alignment = option.as_deref() == Some("--caption-alignment");
+    let selection_margin = option.as_deref() == Some("--selection-margin");
     let auto_tab = option.as_deref() == Some("--auto-tab");
     let hide_selection = option.as_deref() == Some("--hide-selection");
     let colors = option.as_deref() == Some("--colors");
@@ -72,7 +73,8 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             | "--boolean-word-wrap"
             | "--caption-alignment"
             | "--hide-selection"
-            | "--auto-tab",
+            | "--auto-tab"
+            | "--selection-margin",
         ) => false,
         Some(_) => return Err("unknown fixture option".into()),
     };
@@ -104,6 +106,10 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         "Stop\r\nDebug.Print Entry.Text"
     };
     let mut text = String::from_utf8(fixture::export())?.replace("Debug.Print Entry.Text", body);
+    if selection_margin {
+        let code = "Attribute VB_Name = \"NativeForm\"\nAttribute VB_PredeclaredId = True\nOption Explicit\nPrivate Sub UserForm_Initialize()\nDebug.Print \"margin ready\",Entry.SelectionMargin\nHeading.Caption=\"Click the left selection margin\"\nHeading.Width=220\nEntry.Left=16\nEntry.Top=48\nEntry.Width=168\nEntry.Height=26\nEntry.FontSize=12\nEntry.EnterFieldBehavior=1\nEntry.Text=\"alpha beta\"\nEntry.SelStart=0\nEntry.SelLength=0\nApply.Left=16\nApply.Top=80\nEnd Sub\nPrivate Sub Entry_MouseDown(ByVal Button As Integer,ByVal Shift As Integer,ByVal X As Single,ByVal Y As Single)\nEntry.Text=\"new value\"\nDebug.Print \"down\"\nStop\nDebug.Print \"resumed\"\nEnd Sub\nPrivate Sub Entry_MouseUp(ByVal Button As Integer,ByVal Shift As Integer,ByVal X As Single,ByVal Y As Single)\nDebug.Print \"selected\",Entry.SelStart,Entry.SelLength\nEnd Sub\nPrivate Sub Apply_Click()\nDebug.Print VarType(Entry.SelectionMargin),Entry.SelectionMargin,Entry.SelLength\nMe.Hide\nEnd Sub\n".replace('\n', "\r\n");
+        text = String::from_utf8(fixture::export())?.replace(fixture::SOURCE, &code);
+    }
     if auto_tab {
         let code = "Attribute VB_Name = \"NativeForm\"\nAttribute VB_PredeclaredId = True\nOption Explicit\nPrivate Recording As Boolean\nPrivate Sub UserForm_Initialize()\nDebug.Print \"auto tab ready\",Entry.AutoTab\nHeading.Caption=\"Type three characters\"\nHeading.Width=220\nEntry.Left=16\nEntry.Top=48\nEntry.Width=168\nEntry.Height=26\nEntry.Text=\"\"\nEntry.MaxLength=3\nEntry.EnterFieldBehavior=1\nApply.Left=16\nApply.Top=80\nRecording=True\nEnd Sub\nPrivate Sub Entry_Change()\nIf Recording Then Debug.Print \"change\",Entry.Text\nEnd Sub\nPrivate Sub Entry_BeforeUpdate(ByVal Cancel As MSForms.ReturnBoolean)\nDebug.Print \"before\"\nEnd Sub\nPrivate Sub Entry_AfterUpdate()\nDebug.Print \"after\"\nEnd Sub\nPrivate Sub Entry_Exit(ByVal Cancel As MSForms.ReturnBoolean)\nDebug.Print \"exit\"\nEnd Sub\nPrivate Sub Apply_Enter()\nDebug.Print \"enter\"\nStop\nDebug.Print \"resumed\"\nEnd Sub\nPrivate Sub Apply_Click()\nDebug.Print \"completed\",Entry.Text\nMe.Hide\nEnd Sub\n".replace('\n', "\r\n");
         text = String::from_utf8(fixture::export())?.replace(fixture::SOURCE, &code);
@@ -240,7 +246,9 @@ End Sub
     std::fs::write(dir.join("NativeForm.frm"), text)?;
     std::fs::write(
         dir.join("NativeForm.frx"),
-        if auto_tab {
+        if selection_margin {
+            fixture::companion()
+        } else if auto_tab {
             fixture::text_companion(0x6c80_081b, 0)
         } else if hide_selection {
             fixture::combo_companion_flags(3, 1, 0x0c80_481b)

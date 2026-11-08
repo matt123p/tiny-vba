@@ -1,5 +1,25 @@
 # Implementation progress
 
+## M7A.4 continued — native SelectionMargin (2026-11-08)
+
+ADR 0093 adds native bit-26 TextBox/ComboBox import, ordinary Boolean True
+defaults and theme-local left edit padding. Actual margin input selects displayed
+lines and drags across rows using canonical UTF-16/CRLF ranges. The existing
+mouse barrier waits for callbacks and uses resumed text, focus and policy.
+Locked fields remain selectable; selection-only input stays passive. Empty native
+edit fields now render blank while retaining accessible names. Seven model and
+six new input cases pass; all 40 mouse cases pass after caret-specific tests
+move their points beyond the newly active default margin. Alignment pixel tests
+cover both margin states with the existing tolerance. Full shared CI, strict
+workspace/all-targets Clippy, WASM, UI, Xvfb native, web and all eleven Chromium
+flows pass. Full WASI passes on Node 22.23.4; all seven new model cases also pass
+on Node 18.19.1. Five theme/scale/host snapshots and browser runtime/Break/selected
+views were inspected. Both pinned host acceptance gates are pending. M7A.4 and
+the unchanged completion checklist remain open; fresh Office comparisons are
+M8.5 NOT_RUN. The next property/input packet is native TextBox ScrollBars state,
+resource import and actual viewport behavior, preserving canonical text/ranges
+and the existing input continuation barriers.
+
 ## M7A.4 continued — native AutoTab (2026-11-08)
 
 ADR 0092 implements bit-30 import, ordinary Boolean False defaults and user-edit

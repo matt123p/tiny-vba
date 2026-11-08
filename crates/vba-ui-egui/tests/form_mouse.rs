@@ -161,7 +161,7 @@ fn text_caret_waits_for_stopped_callback_and_uses_its_updated_value() -> R {
         "Sub Main()\nNativeForm.Show\nEnd Sub",
         false,
     )?;
-    let p = entry(&h).left_center() + egui::vec2(5., 0.);
+    let p = entry(&h).left_center() + egui::vec2(11., 0.);
     button(&mut h, p, true);
     h.run_steps(15);
     assert_eq!(h.state().ide.mode(), Mode::Break);
@@ -189,7 +189,7 @@ fn text_drag_captures_outside_without_handlers_or_change_events() -> R {
         false,
     )?;
     let rect = entry(&h);
-    let p = rect.left_center() + egui::vec2(3., 0.);
+    let p = rect.left_center() + egui::vec2(9., 0.);
     button(&mut h, p, true);
     h.run_steps(20);
     assert_eq!(entry(&h), rect, "input barriers must not move a modal form");
@@ -387,7 +387,7 @@ fn combo_text_press_and_drag_wait_for_callbacks() -> R {
         )
         .rect()
         .left_center()
-        + egui::vec2(3., 0.);
+        + egui::vec2(9., 0.);
     button(&mut h, p, true);
     h.run_steps(15);
     assert_eq!(h.state().ide.mode(), Mode::Break);
@@ -1386,5 +1386,132 @@ fn text_waits_for_a_mouse_move_callback_and_reaches_the_canonical_textbox() -> R
             .form_instance_field(instance(&h)?, Some(12), "VbaText")?,
         Value::String(vba_ide::VbaString::from_utf8("a")?)
     );
+    Ok(())
+}
+
+#[test]
+fn selection_margin_selects_utf16_line_and_drag_extends_by_whole_rows() -> R {
+    let mut h = harness_options(
+        "",
+        "Sub Main()\nNativeForm.Entry.MultiLine=True\nNativeForm.Entry.WordWrap=False\nNativeForm.Entry.SelectionMargin=True\nNativeForm.Entry.FontSize=12\nNativeForm.Entry.Width=180\nNativeForm.Entry.Height=100\nNativeForm.Entry.Text=\"A\" & ChrW(55357) & ChrW(56832) & ChrW(13) & ChrW(10) & \"Beta\" & ChrW(13) & ChrW(10) & \"last\"\nNativeForm.Show 0\nEnd Sub",
+        false,
+        None,
+        true,
+    )?;
+    let rect = entry(&h);
+    button(&mut h, rect.left_top() + egui::vec2(2., 8.), true);
+    h.run_steps(25);
+    assert_eq!(selected(&h)?, (0, 5));
+    h.event(egui::Event::PointerMoved(
+        rect.left_top() + egui::vec2(2., 28.),
+    ));
+    h.run_steps(25);
+    assert_eq!(selected(&h)?, (0, 11));
+    button(&mut h, rect.left_top() + egui::vec2(2., 28.), false);
+    h.run_steps(25);
+    assert_eq!(selected(&h)?, (0, 11));
+    assert_clean(&h);
+    assert_eq!(h.state().ide.output(), vec!["initialized"]);
+    Ok(())
+}
+#[test]
+fn selection_margin_false_keeps_caret_input_and_locked_text_can_be_selected() -> R {
+    for (margin, locked) in [(false, false), (true, false), (true, true)] {
+        let mut h = harness(
+            "",
+            &format!(
+                "Sub Main()\nNativeForm.Entry.Text=\"abcdef\"\nNativeForm.Entry.EnterFieldBehavior=1\nNativeForm.Entry.SelectionMargin={}\nNativeForm.Entry.Locked={}\nNativeForm.Show 0\nEnd Sub",
+                if margin { "True" } else { "False" },
+                if locked { "True" } else { "False" }
+            ),
+            false,
+        )?;
+        let p = entry(&h).left_center() + egui::vec2(2., 0.);
+        button(&mut h, p, true);
+        button(&mut h, p, false);
+        h.run_steps(45);
+        assert_eq!(selected(&h)?, if margin { (0, 6) } else { (0, 0) });
+        assert_clean(&h);
+    }
+    Ok(())
+}
+#[test]
+fn selection_margin_default_waits_for_mouse_down_and_uses_resumed_text() -> R {
+    let mut h = harness(
+        "Private Sub Entry_MouseDown(ByVal b As Integer,ByVal s As Integer,ByVal x As Single,ByVal y As Single)\nEntry.Text=\"new\" & ChrW(13) & ChrW(10) & \"value\"\nDebug.Print \"down\"\nStop\nDebug.Print \"resumed\"\nEnd Sub\nPrivate Sub Entry_MouseUp(ByVal b As Integer,ByVal s As Integer,ByVal x As Single,ByVal y As Single)\nDebug.Print Entry.SelStart,Entry.SelLength\nEnd Sub",
+        "Sub Main()\nNativeForm.Entry.MultiLine=True\nNativeForm.Entry.Height=80\nNativeForm.Entry.SelectionMargin=True\nNativeForm.Show 0\nEnd Sub",
+        false,
+    )?;
+    let p = entry(&h).left_top() + egui::vec2(2., 8.);
+    button(&mut h, p, true);
+    h.run_steps(25);
+    assert_eq!(h.state().ide.mode(), Mode::Break);
+    assert_eq!(selected(&h)?, (0, 0));
+    button(&mut h, p, false);
+    h.run_steps(5);
+    h.state_mut().ide.dispatch(Action::Run, &mut NoHost)?;
+    h.run_steps(80);
+    assert_eq!(selected(&h)?, (0, 5));
+    assert_eq!(
+        h.state().ide.output(),
+        vec!["initialized", "down", "resumed", "0\t5"]
+    );
+    assert_clean(&h);
+    Ok(())
+}
+#[test]
+fn selection_margin_combobox_edit_region_uses_same_passive_selection_path() -> R {
+    let mut h = harness_resource(
+        "",
+        "Sub Main()\nNativeForm.Combo1.Text=\"abcdef\"\nNativeForm.Combo1.SelectionMargin=True\nNativeForm.Combo1.EnterFieldBehavior=1\nNativeForm.Show 0\nNativeForm.Combo1.SetFocus\nEnd Sub",
+        false,
+        Some(fixture::combo_companion(3, 1)),
+    )?;
+    let rect = h
+        .get(
+            egui_kittest::kittest::By::new()
+                .label("Combo1")
+                .role(egui::accesskit::Role::TextInput),
+        )
+        .rect();
+    let p = rect.left_center() + egui::vec2(2., 0.);
+    button(&mut h, p, true);
+    button(&mut h, p, false);
+    h.run_steps(60);
+    assert_eq!(selection(&h, 14)?, (0, 6));
+    assert_clean(&h);
+    Ok(())
+}
+#[test]
+fn selection_margin_uses_display_rows_for_wrapped_text() -> R {
+    let mut h = harness(
+        "",
+        "Sub Main()\nNativeForm.Entry.Text=\"aaaa bbbb cccc\"\nNativeForm.Entry.FontSize=12\nNativeForm.Entry.Width=50\nNativeForm.Entry.Height=100\nNativeForm.Entry.MultiLine=True\nNativeForm.Entry.WordWrap=True\nNativeForm.Entry.SelectionMargin=True\nNativeForm.Show 0\nEnd Sub",
+        false,
+    )?;
+    let p = entry(&h).left_top() + egui::vec2(2., 8.);
+    button(&mut h, p, true);
+    button(&mut h, p, false);
+    h.run_steps(60);
+    assert_eq!(selected(&h)?, (0, 5));
+    assert_clean(&h);
+    Ok(())
+}
+#[test]
+fn selection_margin_callback_policy_changes_take_effect_before_the_default() -> R {
+    let mut h = harness(
+        "Private Sub Entry_MouseDown(ByVal b As Integer,ByVal s As Integer,ByVal x As Single,ByVal y As Single)\nEntry.SelectionMargin=False\nStop\nEnd Sub",
+        "Sub Main()\nNativeForm.Entry.Text=\"abcdef\"\nNativeForm.Entry.SelectionMargin=True\nNativeForm.Show 0\nEnd Sub",
+        false,
+    )?;
+    let p = entry(&h).left_center() + egui::vec2(2., 0.);
+    button(&mut h, p, true);
+    h.run_steps(25);
+    assert_eq!(h.state().ide.mode(), Mode::Break);
+    h.state_mut().ide.dispatch(Action::Run, &mut NoHost)?;
+    button(&mut h, p, false);
+    h.run_steps(60);
+    assert_eq!(selected(&h)?, (0, 0));
+    assert_clean(&h);
     Ok(())
 }

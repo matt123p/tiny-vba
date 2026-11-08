@@ -624,3 +624,10 @@ validation/focus continuation. Actual edit cause survives unchanged autocomplete
 text; caret movement and programmatic assignments remain passive. Reentrant
 focus/window/policy changes suppress stale navigation. No VM/foreign/budget or
 persistence change is implied; full M7A.4 and fresh Office acceptance remain open.
+
+[ADR 0093](decisions/0093-native-selection-margin.md) adds native TextBox/ComboBox
+SelectionMargin, True defaults and a theme-local selection strip. Whole displayed
+rows select/drag through the existing mouse continuation, including wrapped text
+and canonical UTF-16/CRLF ranges. Post-callback state remains authoritative;
+selection-only input stays passive and empty edit fields render blank. No VM,
+foreign, budget or persistence change is implied. Full M7A.4 remains open.

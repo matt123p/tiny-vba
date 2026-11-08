@@ -953,9 +953,10 @@ fn compiled_form(
         if let Some(metadata) = metadata {
             if crate::form_hide_selection::supported(c.kind) {
                 source.push_str(&format!(
-                    "{temp}.HideSelection={}\n{temp}.AutoTab={}\n",
+                    "{temp}.HideSelection={}\n{temp}.AutoTab={}\n{temp}.SelectionMargin={}\n",
                     boolean(metadata.text_behavior.hide_selection),
-                    boolean(metadata.text_behavior.auto_tab)
+                    boolean(metadata.text_behavior.auto_tab),
+                    boolean(metadata.text_behavior.selection_margin)
                 ));
             }
             source.push_str(&crate::form_caption_alignment::initial(

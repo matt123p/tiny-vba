@@ -78,50 +78,56 @@ fn ink(
 }
 #[test]
 fn label_and_textbox_values_move_left_center_right_inside_fixed_bounds() -> R {
-    let mut offsets = Vec::new();
-    let mut previous = None;
-    for alignment in 1..=3 {
-        let body = format!(
-            "NativeForm.Heading.Caption=\"MMMM\"\nNativeForm.Heading.Top=12\nNativeForm.Heading.Height=24\nNativeForm.Heading.Width=168\nNativeForm.Heading.FontSize=12\nNativeForm.Heading.ForeColor=RGB(201,7,23)\nNativeForm.Heading.TextAlign={alignment}\nNativeForm.Entry.Text=\"MMMM\"\nNativeForm.Entry.Top=50\nNativeForm.Entry.Width=168\nNativeForm.Entry.FontSize=12\nNativeForm.Entry.EnterFieldBehavior=1\nNativeForm.Entry.ForeColor=RGB(3,101,201)\nNativeForm.Entry.TextAlign={alignment}"
-        );
-        let mut h = app(&body, "")?;
-        let label = bounds(&h, "Heading", egui::accesskit::Role::Button);
-        let entry = bounds(&h, "Entry", egui::accesskit::Role::TextInput);
-        if let Some(old) = previous {
-            assert_eq!((label, entry), old);
-        }
-        previous = Some((label, entry));
-        let pixels = h.render()?;
-        let caption = ink(
-            pixels.enumerate_pixels().map(|(x, y, p)| (x, y, p.0)),
-            label,
-            [201, 7, 23, 255],
-        )?;
-        let text = ink(
-            pixels.enumerate_pixels().map(|(x, y, p)| (x, y, p.0)),
-            entry,
-            [3, 101, 201, 255],
-        )?;
-        for (rect, ink) in [(label, caption), (entry, text)] {
-            let (actual, expected) = match alignment {
-                1 => (ink.0 as f32, rect.left()),
-                2 => ((ink.0 as f32 + ink.1 as f32 + 1.) * 0.5, rect.center().x),
-                _ => (ink.1 as f32 + 1., rect.right()),
-            };
-            assert!(
-                (actual - expected).abs() < 12.,
-                "alignment {alignment}: {ink:?} in {rect:?}"
+    for margin in [false, true] {
+        let mut offsets = Vec::new();
+        let mut previous = None;
+        for alignment in 1..=3 {
+            let body = format!(
+                "NativeForm.Heading.Caption=\"MMMM\"\nNativeForm.Heading.Top=12\nNativeForm.Heading.Height=24\nNativeForm.Heading.Width=168\nNativeForm.Heading.FontSize=12\nNativeForm.Heading.ForeColor=RGB(201,7,23)\nNativeForm.Heading.TextAlign={alignment}\nNativeForm.Entry.Text=\"MMMM\"\nNativeForm.Entry.Top=50\nNativeForm.Entry.Width=168\nNativeForm.Entry.FontSize=12\nNativeForm.Entry.EnterFieldBehavior=1\nNativeForm.Entry.ForeColor=RGB(3,101,201)\nNativeForm.Entry.TextAlign={alignment}\nNativeForm.Entry.SelectionMargin={margin}"
             );
+            let mut h = app(&body, "")?;
+            let label = bounds(&h, "Heading", egui::accesskit::Role::Button);
+            let entry = bounds(&h, "Entry", egui::accesskit::Role::TextInput);
+            if let Some(old) = previous {
+                assert_eq!((label, entry), old);
+            }
+            previous = Some((label, entry));
+            let pixels = h.render()?;
+            let caption = ink(
+                pixels.enumerate_pixels().map(|(x, y, p)| (x, y, p.0)),
+                label,
+                [201, 7, 23, 255],
+            )?;
+            let text = ink(
+                pixels.enumerate_pixels().map(|(x, y, p)| (x, y, p.0)),
+                entry,
+                [3, 101, 201, 255],
+            )?;
+            let edit_region = egui::Rect::from_min_max(
+                entry.min + egui::vec2(if margin { 6. } else { 0. }, 0.),
+                entry.max,
+            );
+            for (rect, ink) in [(label, caption), (edit_region, text)] {
+                let (actual, expected) = match alignment {
+                    1 => (ink.0 as f32, rect.left()),
+                    2 => ((ink.0 as f32 + ink.1 as f32 + 1.) * 0.5, rect.center().x),
+                    _ => (ink.1 as f32 + 1., rect.right()),
+                };
+                assert!(
+                    (actual - expected).abs() < 12.,
+                    "alignment {alignment}: {ink:?} in {rect:?}"
+                );
+            }
+            offsets.push((caption.0, text.0));
+            assert_eq!(h.ctx.global_style().visuals.override_text_color, None);
         }
-        offsets.push((caption.0, text.0));
-        assert_eq!(h.ctx.global_style().visuals.override_text_color, None);
-    }
-    for pair in offsets.windows(2) {
-        let [left, right] = pair else {
-            return Err("offset pair".into());
-        };
-        assert!(right.0 > left.0 + 20, "{offsets:?}");
-        assert!(right.1 > left.1 + 20, "{offsets:?}");
+        for pair in offsets.windows(2) {
+            let [left, right] = pair else {
+                return Err("offset pair".into());
+            };
+            assert!(right.0 > left.0 + 20, "{offsets:?}");
+            assert!(right.1 > left.1 + 20, "{offsets:?}");
+        }
     }
     Ok(())
 }
