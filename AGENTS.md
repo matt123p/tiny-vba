@@ -1,5 +1,14 @@
 # tiny-vba — instructions for agents
 
+Current owner direction (2026-11-08): [ADR 0097](docs/decisions/0097-common-forms-scope-and-p9.md)
+supersedes historical instructions below that all inventoried forms parity must
+block M7A.4. M7A.4 is COMPLETE for [the common profile](docs/m7a4-common-profile.md).
+Uncommon/exhaustive extensions are [P9](docs/p9-forms-compatibility.md), after M8.
+Next is M7A.5 native persistence, then M7A.6 `.tvform` removal and M7A.7 acceptance.
+Do not reopen the exhaustive M7A.4 gate or claim P9 behavior implemented. Bugs in
+included common workflows remain fixes. Safety/trust/bounds and fresh M8.5
+comparison requirements remain unchanged.
+
 Adapted from Gridcraft's AGENTS.md and CLAUDE.md for this standalone interpreter.
 Read `docs/implementation-progress.md`, `docs/implementation-plan.md`, then the relevant
 architecture/decision document. The supplied design specifications are indexed in `docs/README.md`.

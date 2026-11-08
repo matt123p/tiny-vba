@@ -1,6 +1,6 @@
 # Remaining implementation plan
 
-Updated 2026-11-08. This plan contains **remaining work only**: M7A followed by stable M8 IDs,
+Updated 2026-11-08. This plan contains **remaining work only**: M7A.5–M7A.7, stable M8 IDs and deferred P9,
 after completed M1–M6, M6A and M7 for their declared profiles.
 [M7 acceptance](m7-acceptance.md) records the authored unchanged-document/package
 profile and [ADR 0037](decisions/0037-m7-package-preservation-and-writeback.md)
@@ -20,6 +20,7 @@ separate and native host dispatch in Rust.
 |---|---|---|
 | M7A | Native Office forms and removal of .tvform | Accepted M1–M6, M6A and M7; reviewed native-form/writeback contracts |
 | M8 | Expanded conformance, hardening and release | Accepted M1–M6, M6A, M7 and M7A profiles for the declared release profile |
+| P9 | Extended/uncommon Office forms compatibility | After M8; finite follow-up packets, not a prerequisite of common-profile M7A/M8 |
 
 M7 remains complete for its historical authored profile. Owner direction now
 inserts **M7A before M8**, activates native Office forms/controls and requires
@@ -35,7 +36,7 @@ continue alongside M7A, but release acceptance depends on M7A completion.
 Status: **IN PROGRESS**, started 2026-11-04 on owner direction.
 The [inventory and work ledger](m7a-inventory.md) records FC0.1's audited paths,
 the completed import/attachment and native worksheet Form Control profiles.
-Native UserForm semantics/editing/persistence and `.tvform` removal remain open;
+M7A.4 common UserForm semantics are complete; native editing/persistence and `.tvform` removal remain open;
 no full M7A acceptance is claimed.
 Owner: tiny-vba reusable form codecs/model/runtime/editor; GridCraft worksheet
 controls/Excel bindings; both forks' document, trust, event and package integration.
@@ -49,103 +50,28 @@ separate native export and embedded input, shared designer/debugger attachment,
 and inert package attachment in both forks. See the
 [completed task definitions and evidence](implementation-progress.md#completed-m7a1-and-m7a2-plan-scope)
 and [property/event/format/host contracts](m7a-control-contracts.md).
-Broader native variants, full Office lifecycle semantics, native edited saving and
-custom-format removal remain M7A.4–M7A.7; no full M7A sign-off is claimed.
+M7A.4 is complete for the common profile below. Broader native variants and
+exhaustive lifecycle parity are P9; native edited saving and custom-format removal
+remain M7A.5–M7A.7. No full M7A sign-off is claimed.
 
 Completed checkpoint: **M7A.3 — Worksheet forms and controls (FC1–FC2)** for
 [worksheet-form-controls-v1](m7a-worksheet-controls.md): all nine standard families,
 source reconciliation, trusted input, live bindings, selected ControlFormat APIs
 and native save/reopen. See [ADR 0041](decisions/0041-worksheet-form-controls.md).
 
-- **M7A.4 — Office form/control semantics (FC3.5/FC4; IN PROGRESS):** the
-  [first instance packet](m7a4-userform-instances.md) removes the explicit New
-  restriction in shared tiny-vba and implements instance-bound windows, input and
-  continuation. The [runtime increment](m7a4-native-runtime.md) adds boolean controls,
-  collections, For Each enumeration, scalar As New, MSForms nominal interfaces,
-  qualified VBA.UserForms access, selected native focus/typed validation and
-  native TextBox selection/input properties. Selected SpinButton/ScrollBar native
-  records, properties and input/event paths are implemented under ADR 0050.
-  Selected native unbound ListBox rows/selection/input are implemented under ADR 0051.
-  Native editable/drop-list ComboBox text/matching/drop input is implemented under ADR 0052.
-  Shared 2D List/Column loading and indexed/current-row Column access follow ADR 0053.
-  ADR 0054 adds bounded array readback; ADR 0055 adds native metadata/control tips.
-  ADR 0056 adds bounded native Frame containers, scoped collections/groups and focus.
-  ADR 0057 adds selected native TabStrip records, Tab/Tabs identity and input.
-  ADR 0058 adds selected MultiPage/Page f/o/x joins, collections and rendering,
-  and corrects indexed Click and repeated-selection behavior for both tab controls.
-  ADR 0059 adds selected native Image/picture records, assignments and rendering.
-  ADR 0060 adds selected native RefEdit class/text/drop behavior and host selection.
-  ADR 0061 adds Tabs/Pages mutation, Integer Index and runtime Name with stable aliases.
-  ADR 0062 adds selected dynamic Controls and WithEvents focus/validation.
-  ADR 0063 adds native multiple selection; ADR 0064 adds native runtime TypeName.
-  ADR 0065 adds selected native cell/row bindings and the approved static permission cap.
-  ADR 0066 extends read-only runtime type names to embedding-owned objects.
-  ADR 0067 adds VarType default value inspection and public default functions.
-  ADR 0068 adds lazy project-class/native-form arrays under IR 14.
-  ADR 0069 adds UserForms access without form components.
-  ADR 0070 adds selected typed native keyboard callbacks and a bounded raw-input barrier;
-  full keyboard/platform/focus/IME acceptance remains partial.
-  ADR 0071 adds root keyboard focus and canonical Tab/SetFocus/Space ordering.
-  ADR 0072 adds selected native accelerators; duplicate/platform ordering remains open.
-  ADR 0073 adds typed mouse callbacks and selected capture/default paths; M01 remains partial.
-  ADR 0074 adds selected TextBox pointer selection and native AutoWordSelect metadata.
-  ADR 0075 adds selected composite/list/numeric/indexed-tab pointer defaults and
-  retained modal display metadata without changing input ownership.
-  ADR 0077 adds selected native window activation and cross-modeless key continuations;
-  ADR 0078 adds selected automatic document-input routing with an authorized raw
-  barrier; ADR 0079 orders selected earlier native key/paste/IME input before
-  document deactivation, including stopped prefix callbacks and spanning composition.
-  Full lifecycle acceptance remains open.
-  ADR 0080 adds selected native BackColor/ForeColor import, canonical properties,
-  palette/theme rendering and runtime-created MultiPage parent lookup. P01/W01
-  and the full colour/font/appearance/member audit remain partial.
-  ADR 0081 adds selected native Font import, typed ordinary objects, copied
-  container defaults and local font rendering; replacement/ambient/platform
-  realization and the remaining appearance/member requirements stay open.
-  ADR 0082 adds typed Font reference assignment, old aliases and root lazy reload;
-  Nothing/external/other-assignment, ambient/platform and remaining property cases
-  stay open.
-  ADR 0083 removes non-Office Page appearance members and uses MultiPage-owned
-  defaults/painting. ADR 0084 retains native borders/effects/background styles and
-  implements selected typed interactions/local rendering; ADR 0085 adds published
-  Font attribute aliases. Full appearance/member/platform acceptance stays open.
-  ADR 0086 adds selected TextAlign, native/public value translation, independent
-  ordinary state and matching text/caret geometry; ComboBox popup rows retain
-  independent alignment. The remaining checklist and full milestone stay open.
-  ADR 0087 adds selected caption WordWrap, native/file defaults, dynamic TextBox
-  True defaults and fixed horizontal text allocation; broader wrapping, AutoSize
-  and the full M7A.4 checklist remain open.
-  ADR 0088 extends native WordWrap to Boolean controls, preserving value/group/
-  event state and bounded accessible captions; broader properties and the
-  remaining checklist still require implementation.
-  ADR 0090 adds CheckBox/OptionButton Alignment flags, ordinary Long state,
-  published constants and independently clipped captions beside real indicators.
-  Other properties and the full remaining checklist stay open.
-  ADR 0096 adds native CommandButton click focus, callback-stable object membership
-  and smaller-slice continuations. Full acceptance stays open.
-  ADR 0095 adds fixed-bound hidden-axis caret viewports, actual navigation/typing
-  and scrolled pointer geometry without visible bars. Full acceptance stays open.
-  ADR 0094 adds native TextBox ScrollBars and actual viewports with deferred
-  pointer defaults, canonical text/ranges and tagged UI offsets. Full acceptance stays open.
-  ADR 0093 adds native SelectionMargin flags/defaults and displayed-line selection
-  through existing mouse continuation and canonical ranges. Full acceptance stays open.
-  ADR 0092 adds selected native AutoTab through ordinary focus/validation,
-  preserving edit cause, autocomplete and Stop/Continue. Full acceptance stays open.
-  ADR 0091 adds native TextBox/ComboBox HideSelection, True defaults and
-  inactive highlights of canonical ranges without text/focus/event changes.
-  Remaining selection/property/scrolling/platform work and full M7A.4 stay open.
-  ADR 0076 adds selected nested modal mouse/keyboard input continuations with
-  shared raw-input bounds, held release, parent unload and Reset regressions. L02
-  remains partial; all remaining lifecycle and control contracts stay open.
-  The [completion checklist](m7a4-completion-checklist.md) makes remaining cases explicit.
-  Remaining requirements and integration are recorded there. Reuse the shared runtime
-  behind native forms and close Office compatibility gaps for the inventoried
-  standard controls. Match instance/default-instance behavior, lifecycle, modal/
-  modeless behavior, focus/tab order, properties, bindings, events, coercion and
-  errors. Verify explicit multi-instance creation against Office rather than
-  retaining a custom restriction as compatibility. No new widget or custom semantics.
+Completed checkpoint: **M7A.4 — Common Office form/control semantics (FC3.5/FC4)**
+for [native-forms-common-v1](m7a4-common-profile.md), accepted on explicit owner
+scope reduction under [ADR 0097](decisions/0097-common-forms-scope-and-p9.md).
+Common controls/properties, instances and modal/modeless lifecycle, text/list/
+choice/container state, ordinary input/events, appearance, debugger and trust
+behavior pass the [revised checklist](m7a4-completion-checklist.md). Existing
+less common implemented features are retained. The former outstanding checklist
+IDs and exhaustive property/platform/resource/ActiveX work move to
+[P9](p9-forms-compatibility.md); they no longer block M7A.4 or the following gates.
+Bugs in included common workflows remain fixes, not automatic P9 deferrals.
+
 - **M7A.5 — Native editing and persistence (FC5):** implement native `.frm`/`.frx`
-  save/export and required edited embedded form/source-resource writeback in
+  save/export for the accepted common profile and required edited embedded form/source-resource writeback in
   `.xlsm`/`.docm` workflows. Review and implement the necessary encoder/package
   path under ADR 0037, including cache consistency and signature invalidation.
   Prove native edit/save/reopen with source/resource identity, revision checks,
@@ -157,7 +83,7 @@ and native save/reopen. See [ADR 0041](decisions/0041-worksheet-form-controls.md
   Do not keep a shipped legacy importer or introduce a conversion feature. Historical
   acceptance remains traceable and is marked superseded for format direction.
 - **M7A.7 — Acceptance:** prove load/compile/display/input/run/edit/save/reopen
-  independently against the declared native inventory in both forks; test malformed
+  independently against the accepted common profile in both forks; test malformed
   resources, unsupported controls, bounds, trust loss, Reset/close, debugger waits,
   cancellation, events, undo/recalculation and signature-loss policy. Run shared
   CI/WASM/WASI/UI/native/browser and affected fork gates. Check that no shipping
@@ -224,3 +150,27 @@ For each change, run the repository's required CI/WASM gates and affected UI/hos
 checks; update [progress](implementation-progress.md), [compatibility](compatibility-matrix.md)
 and the owning contract/ADR. The [UI scope index](ui/post-m8-roadmap.md) points
 to the remaining UI/host requirements without duplicating this plan.
+
+## P9 — Extended Office forms compatibility
+
+Status: **PLANNED**, deferred by owner direction on 2026-11-08. P9 is the owner's
+requested label; existing M1–M8 task IDs remain stable. It follows M8 and does not
+block native common-profile persistence/removal/integration or the declared M8
+release gate. [The P9 backlog](p9-forms-compatibility.md) preserves every migrated
+outstanding checklist ID and partial evidence.
+
+- **P9.1:** Unusual aliases/default reloads and mutation/enumeration parity.
+- **P9.2:** Exhaustive reentrant lifecycle, activation, focus and validation cases.
+- **P9.3:** Platform/IME/DBCS, repeat/modifier/accelerator and remaining mouse cases.
+- **P9.4:** Advanced/uncommon properties, AutoSize, scrolling/placement, fonts,
+  appearance, selection and remaining member/default/resource audit.
+- **P9.5:** Additional binding value types/shapes, update timing and reentrancy.
+- **P9.6:** Further container/tab/page/list/combo/numeric contracts.
+- **P9.7:** Further picture and RefEdit/platform contracts.
+- **P9.8:** Office-supplied worksheet ActiveX in its owning fork.
+
+Each packet needs a finite acceptance contract and appropriate native/WASM,
+debugger/trust/lifetime, UI and host evidence. Unsupported behavior stays explicit;
+no complete MSForms parity or P9 implementation is claimed. Third-party controls
+and arbitrary COM/OCX/DLL loading remain excluded. M8.5 comparisons for the current
+release profile stay required; later P9 extensions carry their own evidence.

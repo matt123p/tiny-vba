@@ -1,6 +1,14 @@
 # Compatibility matrix
 
-Updated 2026-11-07. Stage: M5 document/event/UDF profile accepted against GridCraft; M6 signed off for its tested integration profile (see the [M6.5 check](m6-context-resolution-check.md)); M6A VBA intrinsic coverage accepted for the [declared profile](m6a-acceptance.md), with GridCraft and WordCraft pinned to the published shared revision; **M7 authored unchanged-document/package acceptance is complete for [m7-unchanged-v1](m7-acceptance.md)**; **M7A is in progress: native Button metadata and selected native UserForm import/attachment are implemented; broader semantics, native edited saving and .tvform removal remain open**; M8 release gates remain. **The documented m5-host-v1 consumer, including M3 control, M4 scalar widths and IR 4 host roots, has execution evidence; the 44 authored and 153 reviewed fixtures remain asserted PASS.**
+Current scope (2026-11-08, [ADR 0097](decisions/0097-common-forms-scope-and-p9.md)):
+**M7A.4 is COMPLETE for [native-forms-common-v1](m7a4-common-profile.md).**
+The outstanding uncommon/exhaustive cases in earlier incremental notes now belong
+to [P9](p9-forms-compatibility.md). Those notes retain their original support and
+evidence limits; this sign-off does not implement deferred behavior. M7A.5 native
+persistence, M7A.6 `.tvform` removal, M7A.7 integration and M8.5 fresh comparisons
+remain separate unfinished gates. Next work is M7A.5.
+
+Updated 2026-11-07. Stage: M5 document/event/UDF profile accepted against GridCraft; M6 signed off for its tested integration profile (see the [M6.5 check](m6-context-resolution-check.md)); M6A VBA intrinsic coverage accepted for the [declared profile](m6a-acceptance.md), with GridCraft and WordCraft pinned to the published shared revision; **M7 authored unchanged-document/package acceptance is complete for [m7-unchanged-v1](m7-acceptance.md)**; **M7A is in progress: M7A.1–.4 are complete for their declared profiles, including native-forms-common-v1; native edited saving and .tvform removal remain open; uncommon forms parity is P9**; M8 release gates remain. **The documented m5-host-v1 consumer, including M3 control, M4 scalar widths and IR 4 host roots, has execution evidence; the 44 authored and 153 reviewed fixtures remain asserted PASS.**
 
 | Dimension | Status | Evidence / next gate |
 | Imported object member dispatch | Implemented binder correction, including getter aliases | ADR 0017/0025; vba-vm/tests/embedding.rs preserves actual Get/Call/Let/Set, named arguments and returned object targets |

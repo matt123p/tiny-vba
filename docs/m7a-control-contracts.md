@@ -1,5 +1,13 @@
 # M7A Office forms — control, property, event, format and host contracts
 
+Current scope (2026-11-08, [ADR 0097](decisions/0097-common-forms-scope-and-p9.md)):
+**M7A.4 is COMPLETE for [native-forms-common-v1](m7a4-common-profile.md).**
+The outstanding uncommon/exhaustive cases in earlier incremental notes now belong
+to [P9](p9-forms-compatibility.md). Those notes retain their original support and
+evidence limits; this sign-off does not implement deferred behavior. M7A.5 native
+persistence, M7A.6 `.tvform` removal, M7A.7 integration and M8.5 fresh comparisons
+remain separate unfinished gates. Next work is M7A.5.
+
 Updated 2026-11-08. FC0.2/FC0.3 contract inventory under
 [ADR 0038](decisions/0038-native-office-forms-and-compatibility-only.md),
 [ADR 0039](decisions/0039-m7a-native-control-metadata.md) and

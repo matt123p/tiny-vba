@@ -5,6 +5,14 @@ description: Implement or review tiny-vba changes using the project design contr
 
 # tiny-vba development
 
+Current owner scope under [ADR 0097](../../../docs/decisions/0097-common-forms-scope-and-p9.md):
+M7A.4 is COMPLETE for [native-forms-common-v1](../../../docs/m7a4-common-profile.md).
+Remaining uncommon/exhaustive parity belongs to [P9](../../../docs/p9-forms-compatibility.md),
+after M8. This supersedes historical exhaustive-blocker language below. Next is
+M7A.5 native persistence, then M7A.6 removal and M7A.7 integration. Keep common
+workflow bugs, existing support, safety/quality gates and M8.5 evidence intact.
+
+
 Licensing is MIT OR Apache-2.0 on explicit maintainer direction; see
 [ADR 0035](../../../docs/decisions/0035-dual-license.md). Retain third-party notices.
 

@@ -1,5 +1,35 @@
 # Implementation progress
 
+## M7A.4 complete — common forms scope; uncommon work moved to P9 (2026-11-08)
+
+On explicit owner direction, ADR 0097 replaces the exhaustive M7A.4 gate with
+[native-forms-common-v1](m7a4-common-profile.md). The accepted profile covers
+standard controls, everyday properties, instance/modal/modeless lifetime,
+text/list/choice/container state, common input/events, appearance and debugger/
+trust/budget behavior. Existing implementation already satisfies it; no runtime
+change is needed. The [revised checklist](m7a4-completion-checklist.md) is COMPLETE.
+The former outstanding IDs C02–A01 are preserved and assigned to eight finite
+[P9 follow-up areas](p9-forms-compatibility.md), after M8. Their unsupported
+behavior remains unsupported; this is not full Office/MSForms parity.
+
+Focused rechecks pass: 129 native model cases (99 instance, nine keyboard, ten
+mouse, eight button focus, three native attachment) and 26 GPU/input cases
+(14 keyboard, ten button focus, two native attachment/designer). The full shared
+CI/strict Clippy/WASM/WASI/UI/Xvfb/web/fourteen-browser and pinned-host evidence
+recorded below under ADR 0096 remains applicable: no product code, dependency
+pins, budgets or expected outputs changed. Repository/document consistency and
+format checks pass. Historical statements below that all remaining forms work
+blocks M7A.4 are superseded by this owner-authorized scope decision.
+
+M7A overall remains IN PROGRESS. **Next: M7A.5 native editing/persistence** for the
+common profile, then M7A.6 `.tvform` removal and M7A.7 end-to-end acceptance.
+First persistence task: review the existing ADR 0037 encoder/writeback/cache/
+signature boundary and implement a bounded native `.frm`/`.frx` edit/export/reopen
+path preserving separate authored source and resources. Original-byte retention
+alone is not edited-save acceptance. Fresh declared-profile Office comparisons
+remain M8.5 NOT_RUN. P9 extensions do not block the common-profile sequence;
+common workflow bugs and safety/quality requirements remain ordinary fixes/gates.
+
 ## M7A.4 continued — button click focus and input identity (2026-11-08)
 
 ADR 0096 implements native CommandButton TakeFocusOnClick, Boolean True defaults,

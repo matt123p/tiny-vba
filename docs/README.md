@@ -1,7 +1,15 @@
 # Documentation index
 
+Current scope (2026-11-08, [ADR 0097](decisions/0097-common-forms-scope-and-p9.md)):
+**M7A.4 is COMPLETE for [native-forms-common-v1](m7a4-common-profile.md).**
+The outstanding uncommon/exhaustive cases in earlier incremental notes now belong
+to [P9](p9-forms-compatibility.md). Those notes retain their original support and
+evidence limits; this sign-off does not implement deferred behavior. M7A.5 native
+persistence, M7A.6 `.tvform` removal, M7A.7 integration and M8.5 fresh comparisons
+remain separate unfinished gates. Next work is M7A.5.
+
 M1–M6, M6A and M7 are complete for their declared profiles; the
-remaining plan starts at M7A, then M8. Fresh Excel/Word comparison is
+remaining plan continues with M7A.5–M7A.7, then M8 and deferred P9. Fresh Excel/Word comparison is
 deferred to M8.5. The plan retains M1–M8 numbering with inserted M6A and M7A. Earlier implementation reports,
 specifications and ADRs retain historical IDs; see the
 [mapping](implementation-progress.md#plan-renumbering--2026-10-28).

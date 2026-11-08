@@ -1,6 +1,15 @@
 # M7A.4 native runtime — current implementation and remaining work
 
-Updated 2026-11-08. **IN PROGRESS. M7A.4 is not complete.** This record extends
+Updated 2026-11-08. **COMPLETE for the common profile; extended work is P9.**
+Current scope (2026-11-08, [ADR 0097](decisions/0097-common-forms-scope-and-p9.md)):
+**M7A.4 is COMPLETE for [native-forms-common-v1](m7a4-common-profile.md).**
+The outstanding uncommon/exhaustive cases in earlier incremental notes now belong
+to [P9](p9-forms-compatibility.md). Those notes retain their original support and
+evidence limits; this sign-off does not implement deferred behavior. M7A.5 native
+persistence, M7A.6 `.tvform` removal, M7A.7 integration and M8.5 fresh comparisons
+remain separate unfinished gates. Next work is M7A.5.
+
+This chronological record extends
 [the first instance increment](m7a4-userform-instances.md) under
 [ADR 0043](decisions/0043-native-controls-and-project-inspection.md).
 

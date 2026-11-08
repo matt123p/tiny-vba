@@ -1,5 +1,13 @@
 # M7A native forms — implementation inventory and work ledger
 
+Current scope (2026-11-08, [ADR 0097](decisions/0097-common-forms-scope-and-p9.md)):
+**M7A.4 is COMPLETE for [native-forms-common-v1](m7a4-common-profile.md).**
+The outstanding uncommon/exhaustive cases in earlier incremental notes now belong
+to [P9](p9-forms-compatibility.md). Those notes retain their original support and
+evidence limits; this sign-off does not implement deferred behavior. M7A.5 native
+persistence, M7A.6 `.tvform` removal, M7A.7 integration and M8.5 fresh comparisons
+remain separate unfinished gates. Next work is M7A.5.
+
 Updated 2026-11-08. **IN PROGRESS**. FC0 and FC3.1–FC3.4 are complete for
 `native-userform-import-v1`; see the [control/property/event/format/host matrix](m7a-control-contracts.md).
 M7A.3's worksheet profile is implemented under
@@ -135,15 +143,16 @@ build/OS/locale comparisons remain NOT_RUN under M8.5.
 | FC1.2–FC1.4 geometry/render/input/launch | DONE for worksheet-form-controls-v1 | Native widgets, placement, pointer/keyboard, consent, owner scope and debugger continuation |
 | FC1.5 native worksheet save | DONE for worksheet-form-controls-v1 | Untouched bytes plus edited caption/anchor/assignment/state/create/delete/reopen |
 | FC2 worksheet Form Controls | DONE for worksheet-form-controls-v1 | Nine native families, bounded bindings/list state, selected Shape/ControlFormat APIs; [contract/evidence](m7a-worksheet-controls.md) |
-| FC4 broader UserForm controls | IN_PROGRESS | [Selected flat control runtime](m7a4-native-runtime.md) includes boolean, text, numeric and unbound single-selection ListBox packets; further list/container/image/binding/platform packets remain |
+| FC4 common UserForm controls | DONE for native-forms-common-v1; extensions P9 | [Common profile and evidence](m7a4-common-profile.md); standard control/property/input packets accepted; further resource/member/platform cases tracked in P9 |
 | FC3.1–FC3.4 native UserForm codecs/attachment | DONE for native-userform-import-v1 | Export + embedded parity, shared designer/runtime/debugger, standalone IO, XLSM/DOCM trust and byte retention |
-| FC3.5 native lifecycle parity | IN_PROGRESS | [Shared explicit instance packet](m7a4-userform-instances.md) implemented; default/collection/lifecycle/focus/event and fork gates remain |
+| FC3.5 common native lifecycle | DONE for native-forms-common-v1; exhaustive parity P9 | [Common lifetime/instance evidence](m7a4-completion-checklist.md); shared and pinned-host gates pass; unusual alias/reentrant/ordering combinations tracked in P9 |
 | FC5 edited native persistence | NOT_STARTED | Required encoder, native resource and signature/cache contract |
 | FC6 remove .tvform | NOT_STARTED | Requires native replacement workflows; do not extend the legacy format |
 
-M7A.3 completes the selected worksheet profile under ADR 0041. The next shared
-task is M7A.4 / FC3.5 / FC4 native lifecycle/property/input parity and
-broader native control packets against the completed contract matrix.
+M7A.3 completes the selected worksheet profile under ADR 0041. M7A.4 / FC3.5 /
+FC4 are accepted for the common profile under ADR 0097; uncommon extensions and
+remaining exhaustive audits are P9. The next shared task is M7A.5 / FC5 native
+editing/persistence, followed by FC6 removal and M7A.7 acceptance.
 No native resource layout, default or event order may be inferred from `.tvform`.
 
 M7A.3 update: the initial metadata-only description above is historical. The

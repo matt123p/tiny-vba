@@ -1,5 +1,13 @@
 # Architecture
 
+Current scope (2026-11-08, [ADR 0097](decisions/0097-common-forms-scope-and-p9.md)):
+**M7A.4 is COMPLETE for [native-forms-common-v1](m7a4-common-profile.md).**
+The outstanding uncommon/exhaustive cases in earlier incremental notes now belong
+to [P9](p9-forms-compatibility.md). Those notes retain their original support and
+evidence limits; this sign-off does not implement deferred behavior. M7A.5 native
+persistence, M7A.6 `.tvform` removal, M7A.7 integration and M8.5 fresh comparisons
+remain separate unfinished gates. Next work is M7A.5.
+
 Status: M0–M4 complete for the documented [M4 language profile](m4-language.md), with
 verified IR 1/2/3/4/5 and explicit-frame execution; the M5 native host contract is implemented
 ([ADR 0013](decisions/0013-m5-host-contract.md)). M6 read-only project decoding is implemented

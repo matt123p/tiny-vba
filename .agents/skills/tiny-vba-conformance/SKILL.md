@@ -5,6 +5,14 @@ description: Create or review tiny-vba test scenarios, external corpus use, orac
 
 # Conformance and evidence
 
+Current owner scope under [ADR 0097](../../../docs/decisions/0097-common-forms-scope-and-p9.md):
+M7A.4 is COMPLETE for [native-forms-common-v1](../../../docs/m7a4-common-profile.md).
+Remaining uncommon/exhaustive parity belongs to [P9](../../../docs/p9-forms-compatibility.md),
+after M8. This supersedes historical exhaustive-blocker language below. Next is
+M7A.5 native persistence, then M7A.6 removal and M7A.7 integration. Keep common
+workflow bugs, existing support, safety/quality gates and M8.5 evidence intact.
+
+
 Read [methodology](../../../docs/conformance-methodology.md),
 [compatibility matrix](../../../docs/compatibility-matrix.md) and
 [current progress](../../../docs/implementation-progress.md). Before external corpus work, read

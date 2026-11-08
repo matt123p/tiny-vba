@@ -1,6 +1,15 @@
 # M7A.4 first packet — explicit UserForm instances
 
-Updated 2026-11-04. **Implemented in shared tiny-vba; M7A.4 remains IN PROGRESS.**
+Updated 2026-11-08. **M7A.4 common-profile acceptance is complete.**
+Current scope (2026-11-08, [ADR 0097](decisions/0097-common-forms-scope-and-p9.md)):
+**M7A.4 is COMPLETE for [native-forms-common-v1](m7a4-common-profile.md).**
+The outstanding uncommon/exhaustive cases in earlier incremental notes now belong
+to [P9](p9-forms-compatibility.md). Those notes retain their original support and
+evidence limits; this sign-off does not implement deferred behavior. M7A.5 native
+persistence, M7A.6 `.tvform` removal, M7A.7 integration and M8.5 fresh comparisons
+remain separate unfinished gates. Next work is M7A.5.
+
+The original first-packet description follows.
 [ADR 0042](decisions/0042-userform-instance-routing.md) replaces the earlier custom
 restriction to predeclared form instances. This packet admits explicit Set/New
 construction of the existing flat native Label/TextBox/CommandButton form profile.
