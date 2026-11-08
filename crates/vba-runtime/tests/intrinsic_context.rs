@@ -455,6 +455,24 @@ fn rnd_negative_seed_then_randomize_numeric_repeats_vba_sequence()
 fn rgb_and_qbcolor_return_vba_long_color_values_and_enforce_ranges()
 -> Result<(), Box<dyn std::error::Error>> {
     let context = IntrinsicContext::no_services(Mode::Binary, "", "", "", 32);
+    // MS-VBAL 6.1.2.7.1.10's published numeric table, independent of the implementation.
+    for (index, expected) in [
+        0, 8388608, 32768, 8421376, 128, 8388736, 32896, 12632256, 8421504, 16711680, 65280,
+        16776960, 255, 16711935, 65535, 16777215,
+    ]
+    .into_iter()
+    .enumerate()
+    {
+        assert_eq!(
+            vba_runtime::intrinsic_extended_with_context(
+                I::QbColor,
+                &[Some(Value::Long(i32::try_from(index)?))],
+                &context,
+            ),
+            Ok(Value::Long(expected)),
+            "QBColor({index})"
+        );
+    }
     assert_eq!(
         vba_runtime::intrinsic_extended_with_context(
             I::Rgb,
@@ -485,7 +503,7 @@ fn rgb_and_qbcolor_return_vba_long_color_values_and_enforce_ranges()
             &[Some(Value::Integer(4))],
             &context,
         ),
-        Ok(Value::Long(0x0000_00ff))
+        Ok(Value::Long(0x0000_0080))
     );
     assert_eq!(
         vba_runtime::intrinsic_extended_with_context(

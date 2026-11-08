@@ -10,5 +10,9 @@ publish = false
 [lints]
 workspace = true
 
+[[example]]
+name = "fuzz_parser"
+path = "../../fuzz/targets/parser.rs"
+
 [dependencies]
 vba-diagnostics.workspace = true

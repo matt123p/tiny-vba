@@ -1,0 +1,249 @@
+{
+  "schema": 1,
+  "profile": "m8-local-v1",
+  "date": "2026-11-08",
+  "evidence_basis": [
+    "authored-contract",
+    "inherited-mac-oracle"
+  ],
+  "office_observations": "NOT_RUN",
+  "m7a_baseline_tree_sha256": "a6b1acaa2f6da29d4ef603bfee9c26b285113e52d30bd11c850df1845023e420",
+  "runtime_tree_sha256": "fce541420ebb7576f691d19c64b910967f680b0d16382a8ae616eddc084ba77a",
+  "artifacts": [
+    {
+      "repository": "tiny-vba",
+      "path": "fuzz/driver.rs",
+      "sha256": "15b075ccc27b34f23cb9868156539b15eb2ca97fdccf16cf40ce73a36579d6ff"
+    },
+    {
+      "repository": "tiny-vba",
+      "path": "fuzz/targets/parser.rs",
+      "sha256": "6b2e5e9a9db184d284b1d245c973bedc0aede696f1ec2c2d719b3ee31eb3c010"
+    },
+    {
+      "repository": "tiny-vba",
+      "path": "fuzz/targets/importer.rs",
+      "sha256": "dea036937a3f23b9ad1ace872d40a82e2208abc549644ea46629e0c7542b1229"
+    },
+    {
+      "repository": "tiny-vba",
+      "path": "fuzz/targets/vm.rs",
+      "sha256": "b40ede0437965152a071fa2cd5b4de3d5a37e8beadd1a9f3ffb38ccb2835c7ef"
+    },
+    {
+      "repository": "tiny-vba",
+      "path": "apps/vba-cli/examples/m8_bench.rs",
+      "sha256": "1e8ff8a5eab178a8898117d7eaeae7013e999b76af80b34d71bf5f065bf797a0"
+    },
+    {
+      "repository": "tiny-vba",
+      "path": "apps/vba-cli/examples/m8_conformance.rs",
+      "sha256": "1c10de20a5c3cb21b0fc31e5d219f79d9485e03ddc4cb8b1578824d8b2ff6955"
+    },
+    {
+      "repository": "tiny-vba",
+      "path": "apps/vba-cli/examples/support/m8_oracle_fixtures.rs",
+      "sha256": "e83fe895fd8985989e730bd5f1cc9e26e9cef69686f9b7d649c26774a918aa85"
+    },
+    {
+      "repository": "tiny-vba",
+      "path": "apps/vba-cli/tests/m8_conformance.rs",
+      "sha256": "52700f24785354963f4d53cb3a44a9637e52ac886040d615ac8802413cf255fc"
+    },
+    {
+      "repository": "tiny-vba",
+      "path": "crates/vba-vm/tests/host.rs",
+      "sha256": "728944e28f512728c4c800d92c38fb51fabedb388c0c945b2392992ad9b88fa7"
+    },
+    {
+      "repository": "tiny-vba",
+      "path": "tests/fixtures/m8-oracle/selection.json",
+      "sha256": "6a587c06b0fb1e0b06962ffce2fba41865fd11b4ee0c35797b00a9a9896ca8b6"
+    },
+    {
+      "repository": "tiny-vba",
+      "path": "tests/fixtures/m8-oracle/selected-expected.json",
+      "sha256": "cef60b5cebd27baec1ca67dd611bb19679d1b15a33b73585314213d5ead704c8"
+    },
+    {
+      "repository": "tiny-vba",
+      "path": "tests/fixtures/m8-oracle/rfx-m8-001.vbas",
+      "sha256": "846bba42749e345005b98bfb1ac881cfefd188d9d68c45c17842b03427f486f0"
+    },
+    {
+      "repository": "tiny-vba",
+      "path": "tests/fixtures/m8-oracle/rfx-m8-002.vbas",
+      "sha256": "41a3fea54d34afe4e7282269d8c0e33923aee2f407e7a9e529957bb33a8a4ef0"
+    },
+    {
+      "repository": "tiny-vba",
+      "path": "tests/fixtures/m8-oracle/rfx-m8-003.vbas",
+      "sha256": "a7843b7ffec4c92593722afec0ec7ec7a30501c48a045c82b92151be7e65c227"
+    },
+    {
+      "repository": "tiny-vba",
+      "path": "tests/fixtures/m8-oracle/rfx-m8-004.vbas",
+      "sha256": "14e3b1eb2ad95da02374abe7f4a308099f333db3282d41c45a3433c8b82a37af"
+    },
+    {
+      "repository": "tiny-vba",
+      "path": "tests/fixtures/m8-oracle/rfx-m8-005.vbas",
+      "sha256": "c935e616ac905ed79abc22547f71d5d5d8a317d2a3ef9887f6e24e39ef7f15c3"
+    },
+    {
+      "repository": "tiny-vba",
+      "path": "tests/fixtures/m8-oracle/rfx-m8-006.vbas",
+      "sha256": "5bcaed93b5ba4c323b46d758554f056866c03d5ab860d1bb2a3b12880a101c80"
+    },
+    {
+      "repository": "tiny-vba",
+      "path": "tests/fixtures/m8-oracle/rfx-m8-007.vbas",
+      "sha256": "58b4df00b1e49ae794cb1a861286054b30c6db21218273707170061fde1d45de"
+    },
+    {
+      "repository": "tiny-vba",
+      "path": "tests/fixtures/m8-oracle/rfx-m8-008.vbas",
+      "sha256": "5938da4a98711be2ca0e75d8458b8b711223e8af863c4716face9fe6fd53890b"
+    },
+    {
+      "repository": "tiny-vba",
+      "path": "tests/fixtures/m8-oracle/rfx-m8-009.vbas",
+      "sha256": "9df421f0c5d6eb3aa5436d6649687dec7fc11b2f7d4deced70c81b7a27048b17"
+    },
+    {
+      "repository": "tiny-vba",
+      "path": "tests/fixtures/m8-oracle/rfx-m8-010.vbas",
+      "sha256": "26abc2cc110abafecea7ad24f303cb482f449a5f0c8bcb437b1364c4ab7f41c6"
+    },
+    {
+      "repository": "tiny-vba",
+      "path": "tests/fixtures/m8-oracle/rfx-m8-011.vbas",
+      "sha256": "44308ab13df243743a626ee2a22b0fc69bb5019599f26afd492f476ec248f622"
+    },
+    {
+      "repository": "tiny-vba",
+      "path": "tests/fixtures/m8-oracle/rfx-m8-012.vbas",
+      "sha256": "35246e5871c6e5a92b1727b2badd32de6bfdc9cce6baa7bd8c05f4c840c7d403"
+    },
+    {
+      "repository": "tiny-vba",
+      "path": "tests/fixtures/m8-oracle/rfx-m8-013.vbas",
+      "sha256": "fa033298e45a43d95c81000bf7611cd571415598b82d269d64911810be506bef"
+    },
+    {
+      "repository": "tiny-vba",
+      "path": "tests/fixtures/m8-oracle/rfx-m8-014.vbas",
+      "sha256": "2b535f2439355186deef632cf839fbaf6f62557caeef4d249e3efd5c21d3743a"
+    },
+    {
+      "repository": "tiny-vba",
+      "path": "tests/fixtures/m8-oracle/rfx-m8-015.vbas",
+      "sha256": "789a83ff2ca616ff3996f530e0ae85bd1c12ed83719b091225e7739ccaf71905"
+    },
+    {
+      "repository": "tiny-vba",
+      "path": "tests/fixtures/m8-oracle/rfx-m8-016.vbas",
+      "sha256": "4dbb8e69b6eeb34b2f93c2e74cbc123a11d764808ff0739855ec5e52bf77c67d"
+    },
+    {
+      "repository": "tiny-vba",
+      "path": "tests/fixtures/m8-oracle/rfx-m8-017.vbas",
+      "sha256": "947be4346b5e007baa7247f31f90a3b9ac4f03ded5aec494f9ba8009cb5a2bd7"
+    },
+    {
+      "repository": "tiny-vba",
+      "path": "tests/fixtures/m8-oracle/rfx-m8-018.vbas",
+      "sha256": "aade8ad400ba023d281c1776801d2e493746f1c6fff3ecd618280e7e79a28297"
+    },
+    {
+      "repository": "tiny-vba",
+      "path": "tests/fixtures/m8-oracle/rfx-m8-019.vbas",
+      "sha256": "27790771de1d8dbeed3a0a308cf383595c99e1371f991f00861edf591c5e875b"
+    },
+    {
+      "repository": "tiny-vba",
+      "path": "tests/fixtures/m8-oracle/rfx-m8-020.vbas",
+      "sha256": "07aed7cdc258abbf7adc7a95d974a8ad9644253f23fbcdd50f93003df1049a83"
+    },
+    {
+      "repository": "tiny-vba",
+      "path": "tests/fixtures/m8-oracle/rfx-m8-021.vbas",
+      "sha256": "7128be1d392d8049143741d9e2348097090d7733836bca47cbca6be3b41f2b00"
+    },
+    {
+      "repository": "tiny-vba",
+      "path": "tests/fixtures/m8-oracle/rfx-m8-022.vbas",
+      "sha256": "72f2220de0c975d7f8fa5291e1b9e3ee23c8ac5afc3ba869c08bafe0d1d20578"
+    },
+    {
+      "repository": "tiny-vba",
+      "path": "tests/fixtures/m8-oracle/rfx-m8-023.vbas",
+      "sha256": "10093251e27d13222927973a77cd121ec54068c78d9f0c1c9e9f9e06a3900470"
+    },
+    {
+      "repository": "tiny-vba",
+      "path": "tests/fixtures/m8-oracle/rfx-m8-024.vbas",
+      "sha256": "eb7bbd18aabc3dceff7bffe8b45cf0d21ea5b704ef779e76f9e2458c93eec78a"
+    },
+    {
+      "repository": "gridcraft",
+      "path": "crates/vba/tests/m8_workbooks.rs",
+      "sha256": "83b87fae75d28dda6d2a86b2df45f85f373718df19e9f180046dd0a752ce7a48"
+    },
+    {
+      "repository": "gridcraft",
+      "path": "tests/fixtures/m8/selection.json",
+      "sha256": "d383853dfcb2d6ff7b8f777ae539f785ea1dd36486069b3950cc9eb2891e18c6"
+    },
+    {
+      "repository": "tiny-vba",
+      "path": "crates/vba-runtime/tests/m4_matrix.rs",
+      "sha256": "529073ba78dd8da46c05c8a4ebc43ffafcf57d8c0ac2290adb70934205e6625e"
+    },
+    {
+      "repository": "tiny-vba",
+      "path": "crates/vba-runtime/tests/intrinsic_context.rs",
+      "sha256": "d611619c9957f2f46baa81e6f9185a128a1322774558bfba3892ccf10ce8ff47"
+    },
+    {
+      "repository": "tiny-vba",
+      "path": "crates/vba-vm/tests/m4.rs",
+      "sha256": "ad2d8eb8b3aff7034a98748152c8c1355c194a953803146c17b8449c217f7dd0"
+    },
+    {
+      "repository": "tiny-vba",
+      "path": "tools/check_m8.py",
+      "sha256": "3edf03cccdbf892c22cc731cfd58126fed44fd4979ab2a86cc1041a0fcddc4b8"
+    },
+    {
+      "repository": "tiny-vba",
+      "path": "tools/run_m8_hosts.py",
+      "sha256": "0d3cf97f95622318ead506cd7b9880bc3f69debbde87e4c21218838ad8a44b3f"
+    },
+    {
+      "repository": "tiny-vba",
+      "path": "tools/check_m4_evidence.py",
+      "sha256": "4415a14b72b5ab42c35c29779dccf8c28b54bb68975d76a7e67e88c471d64ae4"
+    },
+    {
+      "repository": "tiny-vba",
+      "path": "tools/check_m7a.py",
+      "sha256": "af59454c485ac88eba152efca639c68a25a4955acf80ee8799960092944c03a2"
+    },
+    {
+      "repository": "tiny-vba",
+      "path": "xtask/src/main.rs",
+      "sha256": "4ef27167ca6b4fc8e34c6200b5b68e64660164a78615b9d7c6dec5fdb0000c11"
+    },
+    {
+      "repository": "tiny-vba",
+      "path": "fuzz/seeds/importer.cfb",
+      "sha256": "3c52b29dbe2de39ac2943fe77e4460a70bb5a3d1d17e4c389ddd2e980a0d795b"
+    },
+    {
+      "repository": "tiny-vba",
+      "path": "fuzz/seeds/pause-heavy.bas",
+      "sha256": "ee67c1dd5d97e78d1266db054a8108561cfd709d0fce73ba768ddfe33743c581"
+    }
+  ]
+}

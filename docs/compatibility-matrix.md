@@ -1,5 +1,14 @@
 # Compatibility matrix
 
+M8 local conformance/hardening (2026-11-08): [ADR 0101](decisions/0101-m8-conformance-and-host-payload.md)
+and [the evidence/profile matrix](m8-acceptance.md) cover 24 additional inherited
+library observations, bounded fuzz targets, asserted native/WASI benchmarks and
+20 original host workbooks. VarType enum width, QBColor palette and reusable host
+scratch accounting are corrected. Budgets and host authority remain unchanged.
+M7A remains accepted; its original receipts are historical for their pinned tree.
+M8.5 fresh Office comparisons are NOT_RUN; release validation remains open.
+
+
 M7A.1–M7A.7 are COMPLETE for the owner-approved common native forms profile
 (2026-11-08), under [ADR 0100](decisions/0100-common-native-forms-acceptance.md).
 The [acceptance matrix](m7a-acceptance.md) and reviewed selection/execution records

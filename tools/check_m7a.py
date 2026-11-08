@@ -35,7 +35,16 @@ def check(local=False):
     require(selection['evidence_basis'] == 'authored-contract', 'evidence basis')
     require(selection['office_observations'] == 'NOT_RUN', 'no fresh Office claim allowed')
     require(selection['deferred'] == ['P9', 'M8.5'], 'deferred boundaries')
-    require(selection['runtime_tree_sha256'] == runtime_digest(), 'review changed shared runtime/renderer/dependency sources')
+    current_tree = runtime_digest()
+    if selection['runtime_tree_sha256'] != current_tree:
+        # Keep accepted historical receipts immutable. A later milestone records
+        # its changed tree explicitly and reruns gates rather than reusing them.
+        m8_path = ROOT / 'tests/fixtures/m8/selection.json'
+        require(m8_path.is_file(), 'review changed shared runtime/renderer/dependency sources')
+        m8 = json.loads(m8_path.read_text())
+        require(m8['m7a_baseline_tree_sha256'] == selection['runtime_tree_sha256'], 'M8 baseline identity')
+        require(m8['runtime_tree_sha256'] == current_tree, 'review changed M8 runtime sources')
+        print('M7A receipts are historical for the baseline tree; changed M8 implementation requires fresh execution, no retained gate reuse')
     require({s['repository'] for s in selection['specimens']} == {'gridcraft', 'wordcraft'}, 'both native hosts required')
     seen = set()
     count = 0

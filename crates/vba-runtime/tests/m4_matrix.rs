@@ -43,7 +43,7 @@ fn decimal_variant_keeps_exact_identity_and_integral_ties_even_conversion() -> R
     assert_eq!(value.validate(), Ok(()));
     assert_eq!(
         r::intrinsic(I::VarType, std::slice::from_ref(&value)),
-        Ok(V::Integer(14))
+        Ok(V::Long(14))
     );
     assert_eq!(
         r::intrinsic(I::TypeName, std::slice::from_ref(&value)),
@@ -465,7 +465,7 @@ fn utf16_slicing_and_array_intrinsics_preserve_exact_units() -> R {
     );
     assert_eq!(
         r::intrinsic(I::VarType, std::slice::from_ref(&a)),
-        Ok(V::Integer(8204))
+        Ok(V::Long(8204))
     );
     assert_eq!(
         r::intrinsic(I::Join, &[a, string("|")?]),

@@ -20,6 +20,78 @@ fn python() -> &'static str {
     if cfg!(windows) { "python" } else { "python3" }
 }
 
+fn m8_examples(wasm: bool) -> Result<(), Box<dyn Error>> {
+    for (package, example) in [
+        ("vba-syntax", "fuzz_parser"),
+        ("vba-project", "fuzz_importer"),
+        ("vba-vm", "fuzz_vm"),
+        ("vba-cli", "m8_conformance"),
+    ] {
+        if wasm {
+            command(
+                "cargo",
+                &[
+                    "build",
+                    "-p",
+                    package,
+                    "--example",
+                    example,
+                    "--locked",
+                    "--target",
+                    "wasm32-wasip1",
+                ],
+            )?;
+            let target = std::env::var_os("CARGO_TARGET_DIR")
+                .map(PathBuf::from)
+                .unwrap_or_else(|| PathBuf::from("target"));
+            let path = target.join(format!("wasm32-wasip1/debug/examples/{example}.wasm"));
+            command(
+                "node",
+                &[
+                    "tools/run_wasi.cjs",
+                    path.to_str().ok_or("non-UTF-8 WASI path")?,
+                ],
+            )?;
+        } else {
+            command(
+                "cargo",
+                &["run", "-p", package, "--example", example, "--locked"],
+            )?;
+        }
+    }
+    Ok(())
+}
+
+fn m8_host_tests(wasm: bool) -> Result<(), Box<dyn Error>> {
+    if wasm {
+        let runner = format!(
+            "target.wasm32-wasip1.runner=[\"node\", {:?}]",
+            std::env::current_dir()?.join("tools/run_wasi.cjs")
+        );
+        command(
+            "cargo",
+            &[
+                "test",
+                "-p",
+                "vba-vm",
+                "--test",
+                "host",
+                "--locked",
+                "--target",
+                "wasm32-wasip1",
+                "--config",
+                &runner,
+            ],
+        )?;
+    } else {
+        command(
+            "cargo",
+            &["test", "-p", "vba-vm", "--test", "host", "--locked"],
+        )?;
+    }
+    Ok(())
+}
+
 fn workspace_root(start: &Path) -> io::Result<PathBuf> {
     start
         .ancestors()
@@ -39,6 +111,58 @@ fn run() -> Result<(), Box<dyn Error>> {
     std::env::set_current_dir(&root)?;
     eprintln!("xtask workspace: {}", root.display());
     match std::env::args().nth(1).as_deref() {
+        Some("m8") => {
+            command(python(), &["tools/check_m8.py"])?;
+            m8_host_tests(false)?;
+            m8_examples(false)?;
+            println!(
+                "M8 local authored/inherited conformance and robustness PASS; fresh Office NOT_RUN; release comparison gate remains open"
+            );
+        }
+        Some("m8-wasm") => {
+            m8_examples(true)?;
+            m8_host_tests(true)?;
+        }
+        Some("m8-hosts") => command(python(), &["tools/run_m8_hosts.py"])?,
+        Some("m8-bench") => {
+            command(
+                "cargo",
+                &[
+                    "run",
+                    "--release",
+                    "-p",
+                    "vba-cli",
+                    "--example",
+                    "m8_bench",
+                    "--locked",
+                ],
+            )?;
+            command(
+                "cargo",
+                &[
+                    "build",
+                    "--release",
+                    "-p",
+                    "vba-cli",
+                    "--example",
+                    "m8_bench",
+                    "--locked",
+                    "--target",
+                    "wasm32-wasip1",
+                ],
+            )?;
+            let target = std::env::var_os("CARGO_TARGET_DIR")
+                .map(PathBuf::from)
+                .unwrap_or_else(|| PathBuf::from("target"));
+            let path = target.join("wasm32-wasip1/release/examples/m8_bench.wasm");
+            command(
+                "node",
+                &[
+                    "tools/run_wasi.cjs",
+                    path.to_str().ok_or("non-UTF-8 benchmark path")?,
+                ],
+            )?;
+        }
         Some("m7") => {
             // Optional real-fork integration gate. Ordinary core CI remains sibling-independent.
             command(python(), &["tools/check_m7.py"])?;
@@ -185,6 +309,7 @@ fn run() -> Result<(), Box<dyn Error>> {
                 &["test", "--workspace", "--all-features", "--locked"],
             )?;
             command(python(), &["tools/check_repository.py"])?;
+            m8_examples(false)?;
         }
         Some("wasm-run") => {
             command("node", &["--test", "tools/run_wasi.test.cjs"])?;
@@ -233,6 +358,7 @@ fn run() -> Result<(), Box<dyn Error>> {
                     &import_runner,
                 ],
             )?;
+            m8_examples(true)?;
             command(
                 "cargo",
                 &[
@@ -330,6 +456,8 @@ fn run() -> Result<(), Box<dyn Error>> {
                     "vba-vm",
                     "--test",
                     "callbacks",
+                    "--test",
+                    "host",
                     "--test",
                     "m4",
                     "--test",
@@ -491,7 +619,7 @@ fn run() -> Result<(), Box<dyn Error>> {
         )?,
         _ => {
             return Err(io::Error::other(
-                "usage: cargo xtask <ci|layers|corpora|m7|m7a|wasm|wasm-run|ui|ui-native|web>",
+                "usage: cargo xtask <ci|layers|corpora|m7|m7a|m8|m8-wasm|m8-hosts|m8-bench|wasm|wasm-run|ui|ui-native|web>",
             )
             .into());
         }

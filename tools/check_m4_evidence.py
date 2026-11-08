@@ -25,7 +25,8 @@ def fields(path):
     return result, body
 
 
-def check(require_checkouts=False):
+def check(require_checkouts=False, directory=DIRECTORY, count=153, prefix="rfx-m4", bundle_path="apps/vba-cli/examples/support/m4_oracle_fixtures.rs"):
+    DIRECTORY = directory
     selection = json.loads((DIRECTORY / 'selection.json').read_text())
     expected_bytes = (DIRECTORY / 'selected-expected.json').read_bytes()
     if sha(expected_bytes) != selection['selected_expected_sha256']:
@@ -95,15 +96,15 @@ def check(require_checkouts=False):
                 actual += '\n' + match.group(0) + '\n'
             if actual != body:
                 raise ValueError(f'fixture is not the reviewed source adaptation: {ident}')
-    bundle=(ROOT / 'apps/vba-cli/examples/support/m4_oracle_fixtures.rs').read_text()
-    bundled=re.findall(r'include_str!\(\s*"[^"]*/(rfx-m4-[0-9]{3})\.vbas"\s*\)',bundle)
-    if len(bundled)!=153 or set(bundled)!=ids:
+    bundle=(ROOT / bundle_path).read_text()
+    bundled=re.findall(rf'include_str!\(\s*"[^"]*/({re.escape(prefix)}-[0-9]{{3}})\.vbas"\s*\)',bundle)
+    if len(bundled)!=count or set(bundled)!=ids:
         raise ValueError('native/WASI oracle fixture bundle differs')
-    if len(ids) != 153 or keys != set(expected) or {p.stem for p in DIRECTORY.glob('*.vbas')} != ids:
+    if len(ids) != count or keys != set(expected) or {p.stem for p in DIRECTORY.glob('*.vbas')} != ids:
         raise ValueError('oracle selection inventory differs')
     if sha((DIRECTORY / 'LICENSE.reflex-grid.txt').read_bytes()) != selection['files']['LICENSE']:
         raise ValueError('upstream MIT notice differs')
-    print(f'M4 evidence: {len(ids)} reviewed fixtures; upstream byte verification {"PASS" if available else "unavailable (bundled evidence checked)"}; no upstream code executed')
+    print(f'{prefix} evidence: {len(ids)} reviewed fixtures; upstream byte verification {"PASS" if available else "unavailable (bundled evidence checked)"}; no upstream code executed')
 
 
 if __name__ == '__main__':

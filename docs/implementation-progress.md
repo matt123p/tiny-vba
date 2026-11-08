@@ -1,5 +1,117 @@
 # Implementation progress
 
+## M8 local implementation complete — Office comparison remains open (2026-11-08)
+
+M7A was reverified before M8 work: all 61 original artifact hashes and all
+130 selected integration test functions passed. Its original selection/execution
+records remain unchanged. [ADR 0101](decisions/0101-m8-conformance-and-host-payload.md)
+and [M8 acceptance](m8-acceptance.md) define the finite `m8-local-v1` profile.
+**M8.1–M8.4 are complete locally. M8.5 fresh Excel/Word comparison remains
+NOT_RUN and full M8 release acceptance stays open.** The owner has no Office
+installation and directed continuation without it; no fresh observation or gate
+waiver is inferred. P9 remains after M8.
+
+The VM now reuses temporary host dispatch/poll scratch under the unchanged
+64 MiB default. Real ByRef snapshot copies, argument metadata, results, patches
+and errors still consume cumulative work. Intrinsic immediate replies use checked
+precommit accounting too. Seventeen native/WASI regressions cover repeated calls,
+100 waits, debugger continuation, oversized input/replies, cumulative work,
+pre-effect refusal and atomic writeback. No VM/host authority or default limit
+increased. `VarType` now returns its enum's Long representation; `QBColor` uses
+the formal 16-color numeric table. Runtime results and descriptors agree, and the
+new independent inherited observations keep their original expectations.
+
+The additional MIT library selection is 24 disjoint ASCII host-free expressions
+with pinned raw observations, source/report/adaptation hashes and the existing
+notice. The Mac build/OS/date are exact; per-run locale was not recorded and stays
+explicit. M4's original 153-case denominator is unchanged. Ten excluded candidates
+remain NOT_RUN with unsupported-capability reasons; no source substitution or
+fabricated service turns them into passes. Three Rust fuzz targets run native
+and actual WASI mutations through the parser, inert importer and verified VM.
+The original CFB seed is frozen, VM seed entrypoints are preflight-compiled, and
+valid pause-heavy programs are cancelled at the harness quota. Default campaigns
+use seed 19768 and 256 mutations each; seed 123 adds 4,096 mutations per target.
+These are bounded mutation campaigns, not long-running coverage-guided evidence.
+
+Eight release-mode benchmarks assert exact typed results and stable instruction
+counts per sample in native and WASI builds. [Published distributions](../tests/fixtures/m8/benchmarks.json)
+record two warmups, ten samples, build/toolchain/target and concurrent measurement
+conditions; no cross-machine speed claim or wall-clock threshold is inferred.
+GridCraft commit `af0e23ef4aefe619540fb5360128bc410a5061ff` adds 20 independent
+original Rust-built XLSM workflows. They assert inert import/compile, denied run
+before consent, exact values/output types, retained inputs, native save/reopen,
+original project bytes, one undo group and Reset. These are authored workbooks,
+not third-party/Office-produced corpus or a global compatibility percentage.
+
+Validation of the final product implementation:
+
+- `cargo xtask ci`: PASS, 1,073 test functions plus strict workspace Clippy,
+  format/layers/fixture checks and local fuzz/library execution.
+- `cargo xtask wasm`: PASS. Full Node 22 WASI: PASS, 756 test functions with
+  `CARGO_PROFILE_TEST_OPT_LEVEL=2 CARGO_BUILD_JOBS=2`, including all 17 host
+  accounting regressions. The explicit completion recorder reports exit 0.
+- `cargo xtask m8` and `m8-wasm`: PASS for final host accounting, corrected
+  fuzz inputs and all 24 inherited library comparisons. Focused strict Clippy
+  also passes for the final fuzz targets and gate orchestration. These final
+  test-only deltas supplement the broader native/UI runs without changing product
+  code or increasing any runtime budget.
+- `cargo xtask m8-bench`: all eight typed features PASS on both targets.
+- `cargo xtask ui`: PASS, 574 test functions and original snapshots.
+  `xvfb-run -a cargo xtask ui-native` and `cargo xtask web`: PASS. Current light,
+  dark, narrow, scaled, injected-theme, native and browser captures were inspected.
+- All 15 original Chromium flows PASS against the final bundle, including actual
+  native two-file import/export, input, Stop/Continue, save/reimport and execution.
+- `cargo xtask m8-hosts`: PASS against the actual shared candidate. Grid: 61
+  native/61 Node WASM cases (20 new workbooks, 35 native form, five M7 package and
+  one worksheet suite case). Word: 65 native/39 Node WASM cases (30 native form,
+  six M7 package, 29 native workflow/three WASM workflow cases). Shipping lockfiles
+  were restored; their runtime pins remain unchanged.
+- Grid's shipping-pin full CI: all 10 steps PASS; strict Clippy for the new
+  workbook suite PASS. Word's product sources and shipping lockfile are unchanged.
+
+[Selection](../tests/fixtures/m8/selection.json) pins 47 inputs plus the shared
+production/dependency tree. [Execution](../tests/fixtures/m8/execution.json)
+records exact commands, environment, input/tree/log hashes, host counts and
+benchmark/visual receipts. Integrity is VALID_FIXTURE / NOT_RUN, independently of
+execution. An earlier browser launch timeout and a default-profile WASI shell
+termination are retained as unsuccessful attempt receipts; the final unchanged
+15-flow run and explicitly recorded full WASI completion passed. No terminated
+shell receipt is represented as a clean gate pass.
+
+Remaining release limits include unavailable fresh Excel/Word comparisons,
+unexecuted remote macOS/Windows jobs, deferred P9 behavior and unchanged host
+shipping pins. Ordinary document Save still retains imported VBA; edited native
+package persistence remains explicit copy export. **Next: M8.5 permitted fresh
+Office observations and release comparison for the declared profile.**
+
+## Completed M8 local plan scope
+
+These stable M8.1–M8.4 task definitions are fulfilled for `m8-local-v1`; the
+Office comparison gate remains separate and required. They are retained here so
+the remaining plan contains only unfinished release work.
+
+- **M8.1:** Curate further licensed library/corpus cases and independently
+  established oracle expectations with exact versions, OS/locale, types,
+  errors and side effects. Keep unreviewed/unexecuted material NOT_RUN.
+- **M8.2:** Add importer/parser/VM fuzz targets and minimized regressions,
+  bounded-work/timeout tests and repeatable native/WASM performance benchmarks.
+  **Review VM host-call payload accounting:** foreign-call paths currently
+  reserve 64 KiB for reply/snapshot space by charging it to the session payload
+  budget. Determine whether that reservation represents live, reusable memory or
+  cumulative work; if it is temporary, track peak in-flight payload separately
+  from cumulative allocation/work counters and release the reservation when the
+  call completes or fails. Add tests proving repeated host calls can reuse the
+  reservation while oversized arguments/replies and aggregate work still fail
+  within documented limits. Cover pause/resume and failure before host effects.
+  Do not raise payload defaults solely to compensate for reusable per-call space.
+- **M8.3:** Complete native/WASM CI and affected UI/native/browser gates.
+  Publish the supported feature/profile/version matrix and remaining gaps.
+- **M8.4:** Expand feature-specific asserted benchmarks and assemble an integrated
+  suite of 20 independent reviewed workbooks; publish provenance and coverage.
+  Report language and Office-host categories separately; no global percentage
+  substitutes for a feature's acceptance gate.
+
+
 ## M7A.7 and M7A complete — common native forms acceptance (2026-11-08)
 
 [ADR 0100](decisions/0100-common-native-forms-acceptance.md) signs off the

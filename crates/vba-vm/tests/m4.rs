@@ -1518,7 +1518,7 @@ fn m6a6_environment_intrinsic_uses_host_wait_without_replaying_the_request() -> 
 fn m6a6_rgb_and_qbcolor_execute_from_vba_source() -> R {
     answer(
         "Function Answer() As Long\nAnswer = RGB(1, 2, 3) + QBColor(4)\nEnd Function",
-        Value::Long(0x030300),
+        Value::Long(0x030281),
     )
 }
 

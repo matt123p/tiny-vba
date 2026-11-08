@@ -226,7 +226,11 @@ callee effects. Generic results/patches validate payload before writeback or res
 
 The 64 MiB session payload budget uses conservative cumulative copy charges (64 bytes per scalar
 copy plus UTF-16 buffers, 256 per local descriptor/binding and 64 per reserved stack entry). It also
-reserves 64 KiB per host dispatch/poll and maximum declared result-copy space before direct calls.
+checks 64 KiB of temporary host dispatch/poll space plus argument metadata while live,
+and reserves maximum declared result-copy space before direct calls. Host scratch is
+reused between calls/polls (ADR 0101), with its peak reported separately; actual
+argument/result/writeback copies and error text remain cumulative. Intrinsic host
+results pass the same precommit accounting as member-call results.
 Transient copying can exhaust this conservative budget before the instruction ceiling. Snapshots have
 an independent bounded local-copy budget; returned immutable snapshots are caller-owned. Rust tree/
 source/value clones may use the standard allocator; fallible reservations guard operand/frame vectors.
@@ -779,3 +783,8 @@ intact. Queued input survives transient collection writes and shifted peer indic
 actual membership and identity are validated before delivery. IDE ticks respect
 smaller active-session slices. No API beyond the Office property, new format,
 foreign call or increased budget. Full M7A.4 and fresh Office comparisons stay open.
+
+M8 intrinsic corrections under ADR 0101: `VarType` returns the Long representation
+of its `VbVarType` enum, for scalar and array inputs. `QBColor` uses the formal
+16-color numeric table. See [M8 evidence](m8-acceptance.md); fresh Office
+comparisons remain NOT_RUN. No payload default or host authority is increased.

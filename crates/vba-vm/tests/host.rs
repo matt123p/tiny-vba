@@ -267,7 +267,16 @@ fn waiting_cancel_disconnect_wrong_host_and_poll_limits_cleanup_tokens() -> R {
             ..Default::default()
         },
     )?;
-    let mut h = ScriptedHost::new(TARGET, vec![Reply::Wait(99)]);
+    let mut h = ScriptedHost::new(
+        TARGET,
+        vec![
+            Reply::Wait(99),
+            Reply::Complete(Completion {
+                value: Value::String(vba_values::VbaString::from_units(vec![120; 10000])?),
+                writes: vec![],
+            }),
+        ],
+    );
     assert_eq!(drive(&mut s, &mut h, &Controller::new())?, Outcome::Waiting);
     assert!(matches!(
         s.resume_host(&mut h)?,
@@ -276,7 +285,279 @@ fn waiting_cancel_disconnect_wrong_host_and_poll_limits_cleanup_tokens() -> R {
             ..
         })
     ));
-    assert!(h.trace.contains(&Event::Cancel(99)));
+    assert!(s.pending_host_token().is_none());
+    Ok(())
+}
+
+#[test]
+fn temporary_host_payload_is_reused_across_calls_waits_and_debugger_pauses() -> R {
+    let source = "Function Answer(ByVal target As Object) As Long\nDim i As Long\nFor i=1 To 100\ntarget.Record i\nNext i\nStop\nAnswer=i\nEnd Function";
+    let mut s = session(
+        source,
+        false,
+        Limits {
+            payload: 200000,
+            ..Default::default()
+        },
+    )?;
+    let mut h = ScriptedHost::new(TARGET, (0..100).map(|_| done()).collect());
+    let mut controller = Controller::new();
+    assert!(matches!(
+        drive(&mut s, &mut h, &controller)?,
+        Outcome::Paused(_)
+    ));
+    assert_eq!(s.counters().host_calls, 100);
+    assert_eq!(s.counters().host_payload_peak, 65536 + 256);
+    controller.continue_execution(&mut s)?;
+    assert_eq!(
+        drive(&mut s, &mut h, &controller)?,
+        Outcome::Completed(ReturnValue::Function(Value::Long(101)))
+    );
+    assert_eq!(h.trace.len(), 100);
+
+    let mut replies: Vec<_> = (1..=100).map(Reply::Wait).collect();
+    replies.push(done());
+    let mut s = session(
+        SOURCE,
+        false,
+        Limits {
+            payload: 80000,
+            ..Default::default()
+        },
+    )?;
+    let mut h = ScriptedHost::new(TARGET, replies);
+    assert_eq!(drive(&mut s, &mut h, &Controller::new())?, Outcome::Waiting);
+    for _ in 0..99 {
+        assert_eq!(s.resume_host(&mut h)?, Outcome::Waiting);
+    }
+    assert_eq!(s.resume_host(&mut h)?, Outcome::Yielded);
+    assert_eq!(
+        drive(&mut s, &mut h, &Controller::new())?,
+        Outcome::Completed(ReturnValue::Function(Value::Long(2)))
+    );
+    assert_eq!(s.counters().host_calls, 1);
+    assert_eq!(s.counters().host_polls, 100);
+    assert_eq!(s.counters().host_payload_peak, 65536 + 256);
+    assert!(s.pending_host_token().is_none());
+    Ok(())
+}
+
+#[test]
+fn host_payload_preflight_and_cumulative_work_still_fail_closed() -> R {
+    for (source, cap) in [
+        (SOURCE.to_owned(), 65536),
+        (
+            SOURCE.replace("target.Record x", "target.Record String(30000,120)"),
+            100000,
+        ),
+    ] {
+        let mut s = session(
+            &source,
+            false,
+            Limits {
+                payload: cap,
+                ..Default::default()
+            },
+        )?;
+        let mut h = ScriptedHost::new(TARGET, vec![done()]);
+        assert!(matches!(
+            drive(&mut s, &mut h, &Controller::new())?,
+            Outcome::Failed(vm::Failure {
+                kind: vm::FailureKind::ResourceLimit,
+                ..
+            })
+        ));
+        assert!(
+            h.trace.is_empty(),
+            "no host effects before payload preflight"
+        );
+    }
+    let source = "Function Answer(ByVal target As Object) As Long\nDim i As Long\nFor i=1 To 1000\ntarget.Record i\nNext i\nEnd Function";
+    for (payload, host_calls) in [(100000, 1024), (1000000, 3)] {
+        let mut s = session(
+            source,
+            false,
+            Limits {
+                payload,
+                host_calls,
+                ..Default::default()
+            },
+        )?;
+        let mut h = ScriptedHost::new(TARGET, (0..1000).map(|_| done()).collect());
+        assert!(matches!(
+            drive(&mut s, &mut h, &Controller::new())?,
+            Outcome::Failed(vm::Failure {
+                kind: vm::FailureKind::ResourceLimit,
+                ..
+            })
+        ));
+        assert!(s.counters().host_calls < 1000);
+        if host_calls == 3 {
+            assert_eq!(s.counters().host_calls, 3);
+            assert_eq!(h.trace.len(), 3);
+        }
+    }
+    Ok(())
+}
+
+#[test]
+fn repeated_byref_snapshots_charge_actual_copy_work_before_dispatch() -> R {
+    let source = "Function Answer(ByVal target As Object) As Long\nDim i As Long,x As String\nx=String(4096,120)\nFor i=1 To 100\ntarget.Record x\nNext i\nEnd Function";
+    let mut s = session(
+        source,
+        true,
+        Limits {
+            payload: 200000,
+            ..Default::default()
+        },
+    )?;
+    let mut h = ScriptedHost::new(TARGET, (0..100).map(|_| done()).collect());
+    assert!(matches!(
+        drive(&mut s, &mut h, &Controller::new())?,
+        Outcome::Failed(vm::Failure {
+            kind: vm::FailureKind::ResourceLimit,
+            ..
+        })
+    ));
+    // Each dispatched snapshot copies 8 KiB from the canonical ByRef string.
+    assert!(s.counters().host_calls > 0 && s.counters().host_calls < 20);
+    assert_eq!(h.trace.len() as u64, s.counters().host_calls);
+    assert!(s.pending_host_token().is_none());
+    Ok(())
+}
+
+#[test]
+fn oversized_host_reply_never_commits_byref_patches() -> R {
+    for waiting in [false, true] {
+        let reply = Reply::Complete(Completion {
+            value: Value::String(vba_values::VbaString::from_units(vec![120; 10000])?),
+            writes: vec![(0, Value::Long(99))],
+        });
+        let replies = if waiting {
+            vec![Reply::Wait(1), reply]
+        } else {
+            vec![reply]
+        };
+        let mut s = session(
+            SOURCE,
+            true,
+            Limits {
+                payload: 80000,
+                ..Default::default()
+            },
+        )?;
+        let mut h = ScriptedHost::new(TARGET, replies);
+        let mut out = drive(&mut s, &mut h, &Controller::new())?;
+        if waiting {
+            assert_eq!(out, Outcome::Waiting);
+            out = s.resume_host(&mut h)?;
+        }
+        let Outcome::Failed(failure) = out else {
+            return Err("oversized reply accepted".into());
+        };
+        assert_eq!(failure.kind, vm::FailureKind::ResourceLimit);
+        assert!(
+            failure
+                .frames
+                .first()
+                .ok_or("frame")?
+                .locals
+                .iter()
+                .any(|l| l.name == "x" && l.value == Value::Long(1))
+        );
+        assert!(s.pending_host_token().is_none());
+    }
+    Ok(())
+}
+
+#[test]
+fn intrinsic_host_calls_reuse_scratch_and_validate_immediate_and_resumed_results() -> R {
+    struct IntrinsicHost {
+        calls: usize,
+        wait: bool,
+        result: vba_values::VbaString,
+    }
+    impl vba_foreign::Host for IntrinsicHost {
+        fn identity(&self) -> u64 {
+            TARGET.host
+        }
+        fn invoke(&mut self, _: vba_foreign::HostCall) -> Reply {
+            done()
+        }
+        fn invoke_intrinsic(&mut self, _: vba_foreign::HostIntrinsicCall) -> Reply {
+            self.calls += 1;
+            if self.wait {
+                Reply::Wait(1)
+            } else {
+                self.resume(1)
+            }
+        }
+        fn resume(&mut self, _: u64) -> Reply {
+            Reply::Complete(Completion {
+                value: Value::String(self.result.clone()),
+                writes: vec![],
+            })
+        }
+        fn cancel(&mut self, _: u64) {}
+    }
+    for wait in [false, true] {
+        for oversized in [false, true] {
+            let p = program(
+                "Function Answer() As Long\nDim i As Long, s As String\nFor i=1 To 50\ns=Environ$(\"SAFE\")\nNext i\nAnswer=i\nEnd Function",
+                false,
+            )?;
+            let mut s = Session::new(
+                p,
+                105,
+                vec![],
+                Some(HostBinding {
+                    roots: Default::default(),
+                    identity: TARGET.host,
+                    permitted: Default::default(),
+                }),
+                Limits {
+                    payload: if oversized { 80000 } else { 130000 },
+                    ..Default::default()
+                },
+            )?;
+            let mut host = IntrinsicHost {
+                calls: 0,
+                wait,
+                result: vba_values::VbaString::from_units(vec![
+                    120;
+                    if oversized { 10000 } else { 1 }
+                ])?,
+            };
+            let mut out = Outcome::Yielded;
+            for _ in 0..1000 {
+                out = if out == Outcome::Waiting {
+                    s.resume_host(&mut host)?
+                } else {
+                    s.run_slice(&mut host, 128, &mut |_| Ok(false))?
+                };
+                if !matches!(out, Outcome::Yielded | Outcome::Waiting) {
+                    break;
+                }
+            }
+            if oversized {
+                assert!(matches!(
+                    out,
+                    Outcome::Failed(vm::Failure {
+                        kind: vm::FailureKind::ResourceLimit,
+                        ..
+                    })
+                ));
+                assert_eq!(host.calls, 1);
+            } else {
+                assert_eq!(
+                    out,
+                    Outcome::Completed(ReturnValue::Function(Value::Long(51)))
+                );
+                assert_eq!(host.calls, 50);
+            }
+            assert!(s.pending_host_token().is_none());
+        }
+    }
     Ok(())
 }
 #[test]

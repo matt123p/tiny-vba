@@ -798,7 +798,7 @@ pub fn intrinsic(function: I, args: &[V]) -> Result<V> {
                     K::Object => 9,
                 };
                 return if function == VarType {
-                    Ok(V::Integer(8192 + base))
+                    Ok(V::Long(8192 + base))
                 } else {
                     Ok(V::String(
                         VbaString::from_utf8(&format!("{:?}()", array.kind()))
@@ -826,7 +826,7 @@ pub fn intrinsic(function: I, args: &[V]) -> Result<V> {
                 V::LongLong(_) => (20, "LongLong"),
             };
             if function == VarType {
-                V::Integer(code)
+                V::Long(code)
             } else {
                 V::String(VbaString::from_utf8(name).map_err(|_| mismatch())?)
             }
@@ -1096,8 +1096,8 @@ pub(crate) fn color_intrinsic(function: I, arguments: &[Option<V>]) -> Result<V>
         }
         let index = index as usize;
         const QB_COLORS: [i32; 16] = [
-            0x000000, 0xff0000, 0x00ff00, 0xffff00, 0x0000ff, 0xff00ff, 0x00ffff, 0xffffff,
-            0x808080, 0xff8080, 0x80ff80, 0xffff80, 0x8080ff, 0xff80ff, 0x80ffff, 0xffffff,
+            0x000000, 0x800000, 0x008000, 0x808000, 0x000080, 0x800080, 0x008080, 0xc0c0c0,
+            0x808080, 0xff0000, 0x00ff00, 0xffff00, 0x0000ff, 0xff00ff, 0x00ffff, 0xffffff,
         ];
         return Ok(V::Long(
             *QB_COLORS

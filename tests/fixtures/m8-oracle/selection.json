@@ -1,0 +1,262 @@
+{
+  "source_repository": "https://github.com/milochen0418/reflex_grid",
+  "source_revision": "03a338b214df243f1bc68e50512936ddc5566c76",
+  "oracle_run_revision": "3758c56a39f0c8841fa43eedda0e074414fed3e3",
+  "files": {
+    "tests/vba_excel_cases.py": "e5d03d56c4f06433c5c4198c3ac79a4af3ff8c8def9d265337749705caf1cd0e",
+    "tests/vba_excel_expected.json": "610f3ed1d17922a8d095179c6c6eb5e62936c81d7cef4993f3a7adb62a40427a",
+    "docs/excel-oracle.json": "4144969beac52097fba9ae19bad0e30a03d6ecf1b3278fd1fe424431bc4b61ec",
+    "LICENSE": "a6c7fac3d7ba2a1c58b2dc32880902ef62ccf2e7fe85e2fe25ba74b088dc0031"
+  },
+  "oracle": {
+    "excel": "Microsoft Excel for Mac 16.114 (build 26101123)",
+    "os": "macOS 15.3.1",
+    "date": "2026-10-15",
+    "locale": "not-recorded-per-run",
+    "reflexgrid_commit": "3758c56a39f0c8841fa43eedda0e074414fed3e3"
+  },
+  "selection": [
+    {
+      "id": "rfx-m8-001",
+      "case_key": "InStrRev(\"hello\", \"l\")",
+      "shape": "expression",
+      "helpers": [],
+      "vba_sha256": "5c81af1fd6207aa95b28f47fcab9730cacbd67ed292b2ad1fb1c8db06aa7ec27"
+    },
+    {
+      "id": "rfx-m8-002",
+      "case_key": "InStrRev(\"hello\", \"l\", 3)",
+      "shape": "expression",
+      "helpers": [],
+      "vba_sha256": "913645fbdef4fc24ec3d85cdece4fa21fad594e8b1a04b04b9399e5c8e359ba0"
+    },
+    {
+      "id": "rfx-m8-003",
+      "case_key": "StrReverse(\"abc\")",
+      "shape": "expression",
+      "helpers": [],
+      "vba_sha256": "503de2f7c2b2c62a3a6a5978b7152005cec8940b427830d808340457c793fccf"
+    },
+    {
+      "id": "rfx-m8-004",
+      "case_key": "Space(3) & \"|\"",
+      "shape": "expression",
+      "helpers": [],
+      "vba_sha256": "d6f9226d27fb5638fcdef33949ff0fa76d8fb51e86642247a3c2a00f92ce83ea"
+    },
+    {
+      "id": "rfx-m8-005",
+      "case_key": "String(3, \"ab\")",
+      "shape": "expression",
+      "helpers": [],
+      "vba_sha256": "8b9a6f706b9fcd8d74b4c5ab4cfa7115087a7660ffb900be63dc5a6be5849308"
+    },
+    {
+      "id": "rfx-m8-006",
+      "case_key": "String(3, 65)",
+      "shape": "expression",
+      "helpers": [],
+      "vba_sha256": "ab5c35e6aa88ab0523e86c75bf7f260e7c0a3cc902b2fb866c14e6f6aeabb043"
+    },
+    {
+      "id": "rfx-m8-007",
+      "case_key": "VarType(1)",
+      "shape": "expression",
+      "helpers": [],
+      "vba_sha256": "ee65d5144410f10b4ac2931564175aa947aa5ae598b70af2810bf5681f96e346"
+    },
+    {
+      "id": "rfx-m8-008",
+      "case_key": "VarType(1&)",
+      "shape": "expression",
+      "helpers": [],
+      "vba_sha256": "15916d77e3c05398d14b56a887d6c8c66aa74314a1be347cf121521d7c78ee40"
+    },
+    {
+      "id": "rfx-m8-009",
+      "case_key": "VarType(1.5)",
+      "shape": "expression",
+      "helpers": [],
+      "vba_sha256": "828bfb939041e90e284f747f01a7deb1374883134ac5e6ff598916cb1f934c9d"
+    },
+    {
+      "id": "rfx-m8-010",
+      "case_key": "VarType(\"x\")",
+      "shape": "expression",
+      "helpers": [],
+      "vba_sha256": "15f32c0d715beb231d475c37639e9a0f1a8a22ae85c17a8f37283a5ed40bb0b9"
+    },
+    {
+      "id": "rfx-m8-011",
+      "case_key": "VarType(Array(1))",
+      "shape": "expression",
+      "helpers": [],
+      "vba_sha256": "58b78ef7d6901656f98e2bf14c75340331db0d2bd3069bcdba0233fe03472bf4"
+    },
+    {
+      "id": "rfx-m8-012",
+      "case_key": "VarType(Empty)",
+      "shape": "expression",
+      "helpers": [],
+      "vba_sha256": "e9b9df092199461e5145a62394a879f4a858a87af220148561bab28b6fdad9e4"
+    },
+    {
+      "id": "rfx-m8-013",
+      "case_key": "VarType(Null)",
+      "shape": "expression",
+      "helpers": [],
+      "vba_sha256": "69bf1982298ad3742d45b4fbaeb0d3d969a341f3534a672d1995cba2de373df4"
+    },
+    {
+      "id": "rfx-m8-014",
+      "case_key": "VarType(CCur(1))",
+      "shape": "expression",
+      "helpers": [],
+      "vba_sha256": "8c98ca8350e3a5da4868cba877a5869b528e6be390d4f7c4a2cf95be664836fb"
+    },
+    {
+      "id": "rfx-m8-015",
+      "case_key": "VarType(True)",
+      "shape": "expression",
+      "helpers": [],
+      "vba_sha256": "d3495c50e20b4ec27c3bb58c8c847905ed4008470be5733417e09b9b2e0727b2"
+    },
+    {
+      "id": "rfx-m8-016",
+      "case_key": "RGB(255, 128, 0)",
+      "shape": "expression",
+      "helpers": [],
+      "vba_sha256": "2c5da34aaaf6f9d914c19ce4b1b4b7e9a327a3d892410cf73d5036c4d042caf5"
+    },
+    {
+      "id": "rfx-m8-017",
+      "case_key": "QBColor(12)",
+      "shape": "expression",
+      "helpers": [],
+      "vba_sha256": "68382dace862735cbc7ae8bfeb0043186f211b9d7d19762a83c9e373f259041b"
+    },
+    {
+      "id": "rfx-m8-018",
+      "case_key": "Choose(2, \"a\", \"b\", \"c\")",
+      "shape": "expression",
+      "helpers": [],
+      "vba_sha256": "550ec34b8391c3383faee94c3e38df27e47bcb25405a63a6fe96066f4bed6b89"
+    },
+    {
+      "id": "rfx-m8-019",
+      "case_key": "Choose(5, \"a\")",
+      "shape": "expression",
+      "helpers": [],
+      "vba_sha256": "ba77c50ae7cc78b19c7c9744469f1451fae66377aeae2218d7ca93ce2d823b0c"
+    },
+    {
+      "id": "rfx-m8-020",
+      "case_key": "Switch(False, 1, True, 2)",
+      "shape": "expression",
+      "helpers": [],
+      "vba_sha256": "75b9e73ae092b8cacd7b9da58868217bf1b18e8130870c99b0ba19bed1a18cac"
+    },
+    {
+      "id": "rfx-m8-021",
+      "case_key": "Abs(-32768)",
+      "shape": "expression",
+      "helpers": [],
+      "vba_sha256": "2e45d05226f53e38e15e0eb1828cddc527ba3e4c9fbe068d4759d5e16341a374"
+    },
+    {
+      "id": "rfx-m8-022",
+      "case_key": "Sqr(16)",
+      "shape": "expression",
+      "helpers": [],
+      "vba_sha256": "d8afe1f52da5443ec2e3a5c6757a1debfa7f1753515ea066e9ffd256a67ac325"
+    },
+    {
+      "id": "rfx-m8-023",
+      "case_key": "IsEmpty(\"\")",
+      "shape": "expression",
+      "helpers": [],
+      "vba_sha256": "c0b2a9e1033e304cc1733516c1d89234258a3ec55071dcd339ea5c4101a44ab2"
+    },
+    {
+      "id": "rfx-m8-024",
+      "case_key": "IsNumeric(Null)",
+      "shape": "expression",
+      "helpers": [],
+      "vba_sha256": "3bd09a9efbb4dc3fdc22eb072501f9b63169d51522441388289768e46aeafbae"
+    }
+  ],
+  "review": "24 ASCII host-free expression data entries; no helpers, environment calls, external objects, locale-formatted results or downloaded scripts; inherited Mac observations only",
+  "selected_expected_sha256": "cef60b5cebd27baec1ca67dd611bb19679d1b15a33b73585314213d5ead704c8",
+  "excluded_candidates": [
+    {
+      "case_key": "DateDiff(\"d\", #1/1/2020#, #3/1/2020#)",
+      "status": "NOT_RUN",
+      "reason": "source date literal #...# is outside the parser profile; no source substitution authorized",
+      "capability": "UNSUPPORTED",
+      "evidence_basis": "capability classification; excluded from the executable selection"
+    },
+    {
+      "case_key": "DateDiff(\"m\", #1/31/2020#, #2/1/2020#)",
+      "status": "NOT_RUN",
+      "reason": "source date literal #...# is outside the parser profile; no source substitution authorized",
+      "capability": "UNSUPPORTED",
+      "evidence_basis": "capability classification; excluded from the executable selection"
+    },
+    {
+      "case_key": "DateDiff(\"yyyy\", #12/31/2019#, #1/1/2020#)",
+      "status": "NOT_RUN",
+      "reason": "source date literal #...# is outside the parser profile; no source substitution authorized",
+      "capability": "UNSUPPORTED",
+      "evidence_basis": "capability classification; excluded from the executable selection"
+    },
+    {
+      "case_key": "DateDiff(\"ww\", #1/1/2020#, #1/31/2020#)",
+      "status": "NOT_RUN",
+      "reason": "source date literal #...# is outside the parser profile; no source substitution authorized",
+      "capability": "UNSUPPORTED",
+      "evidence_basis": "capability classification; excluded from the executable selection"
+    },
+    {
+      "case_key": "DateDiff(\"w\", #1/1/2020#, #1/31/2020#)",
+      "status": "NOT_RUN",
+      "reason": "source date literal #...# is outside the parser profile; no source substitution authorized",
+      "capability": "UNSUPPORTED",
+      "evidence_basis": "capability classification; excluded from the executable selection"
+    },
+    {
+      "case_key": "DateDiff(\"h\", #1/1/2020 10:59#, #1/1/2020 11:00#)",
+      "status": "NOT_RUN",
+      "reason": "source date literal #...# is outside the parser profile; no source substitution authorized",
+      "capability": "UNSUPPORTED",
+      "evidence_basis": "capability classification; excluded from the executable selection"
+    },
+    {
+      "case_key": "DateDiff(\"s\", #1/1/2020#, #1/2/2020#)",
+      "status": "NOT_RUN",
+      "reason": "source date literal #...# is outside the parser profile; no source substitution authorized",
+      "capability": "UNSUPPORTED",
+      "evidence_basis": "capability classification; excluded from the executable selection"
+    },
+    {
+      "case_key": "DateDiff(\"d\", #1/2/2020#, #1/1/2020#)",
+      "status": "NOT_RUN",
+      "reason": "source date literal #...# is outside the parser profile; no source substitution authorized",
+      "capability": "UNSUPPORTED",
+      "evidence_basis": "capability classification; excluded from the executable selection"
+    },
+    {
+      "case_key": "Year(#1/15/2020#)",
+      "status": "NOT_RUN",
+      "reason": "source date literal #...# is outside the parser profile; no source substitution authorized",
+      "capability": "UNSUPPORTED",
+      "evidence_basis": "capability classification; excluded from the executable selection"
+    },
+    {
+      "case_key": "IsNumeric(\"12\")",
+      "status": "NOT_RUN",
+      "reason": "host-free profile has no injected numeric-conversion service; raw published Boolean|True retained by upstream pin, not reclassified PASS",
+      "capability": "UNSUPPORTED",
+      "evidence_basis": "capability classification; excluded from the executable selection"
+    }
+  ]
+}

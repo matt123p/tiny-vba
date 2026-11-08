@@ -1,5 +1,14 @@
 # Conformance methodology
 
+M8 local conformance/hardening (2026-11-08): [ADR 0101](decisions/0101-m8-conformance-and-host-payload.md)
+and [the evidence/profile matrix](m8-acceptance.md) cover 24 additional inherited
+library observations, bounded fuzz targets, asserted native/WASI benchmarks and
+20 original host workbooks. VarType enum width, QBColor palette and reusable host
+scratch accounting are corrected. Budgets and host authority remain unchanged.
+M7A remains accepted; its original receipts are historical for their pinned tree.
+M8.5 fresh Office comparisons are NOT_RUN; release validation remains open.
+
+
 Status: M4 external acceptance implemented, 2026-10-26. Schema 1 preserves authored, unmeasured
 expectations. Schema 2 records reviewed external source hashes, upstream build/OS/date/locale
 availability and raw oracle results, which must agree with typed expectations. The selected

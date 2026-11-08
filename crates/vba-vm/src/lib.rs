@@ -200,6 +200,8 @@ pub struct Counters {
     pub host_calls: u64,
     pub host_polls: u64,
     pub callbacks_run: u64,
+    /// Largest temporary host dispatch/poll reservation, reused between calls.
+    pub host_payload_peak: usize,
 }
 #[derive(Clone, Debug)]
 enum Operand {
@@ -1595,6 +1597,25 @@ impl Session {
         }
         self.allocation_bytes = bytes;
         Ok(())
+    }
+    // This space exists only during synchronous dispatch/poll validation. Pending
+    // calls retain locations/tokens, not a second reply buffer. Do not accumulate
+    // the reservation as allocation work; actual result/write copies still charge.
+    fn host_payload_capacity(&mut self, arguments: usize) -> Result<usize> {
+        let scratch = arguments
+            .checked_mul(256)
+            .and_then(|n| n.checked_add(65536))
+            .ok_or_else(resource)?;
+        let cap = self
+            .limits
+            .payload
+            .checked_sub(scratch)
+            .ok_or_else(resource)?;
+        if self.allocation_bytes > cap {
+            return Err(resource());
+        }
+        self.counters.host_payload_peak = self.counters.host_payload_peak.max(scratch);
+        Ok(cap)
     }
     fn generation(&mut self) -> Result<()> {
         self.generation = self.generation.checked_add(1).ok_or_else(resource)?;
@@ -3414,13 +3435,12 @@ impl Session {
                     if self.counters.host_calls >= self.limits.host_calls {
                         return Err(resource());
                     }
-                    let snapshot_bytes = arguments
-                        .iter()
-                        .flatten()
-                        .try_fold(65_536_usize, |total, value| {
-                            total.checked_add(value_bytes(value)).ok_or_else(resource)
-                        })?;
+                    let snapshot_bytes = arguments.iter().flatten().try_fold(
+                        arguments.len().checked_mul(256).ok_or_else(resource)?,
+                        |total, value| total.checked_add(value_bytes(value)).ok_or_else(resource),
+                    )?;
                     self.charge(snapshot_bytes)?;
+                    let payload_cap = self.host_payload_capacity(arguments.len())?;
                     self.counters.host_calls = self
                         .counters
                         .host_calls
@@ -3430,15 +3450,32 @@ impl Session {
                     self.advance()?;
                     let outcome = self
                         .foreign
-                        .invoke_intrinsic(
+                        .invoke_intrinsic_checked(
                             host,
                             foreign::HostIntrinsicCall {
                                 intrinsic: descriptor.spelling.to_owned(),
                                 arguments,
                             },
                             &mut self.store,
+                            &mut |_, value| {
+                                let next = self
+                                    .allocation_bytes
+                                    .checked_add(value_bytes(value))
+                                    .ok_or_else(resource)?;
+                                if next > payload_cap {
+                                    return Err(resource());
+                                }
+                                self.allocation_bytes = next;
+                                Ok(())
+                            },
                         )
-                        .map_err(|error| protocol(&error.message))?;
+                        .map_err(|error| {
+                            if error.code == "VBA0031" {
+                                error
+                            } else {
+                                protocol(&error.message)
+                            }
+                        })?;
                     self.accept_host(outcome)?;
                 } else {
                     let value = if let Some(value) = project_name {
@@ -3944,7 +3981,22 @@ impl Session {
         if self.counters.host_calls >= self.limits.host_calls {
             return Err(resource());
         }
-        self.charge(256 * arguments.len() + 65536)?; // reserve reply/snapshot budget before host effects
+        // Foreign ByRef arguments clone canonical values into the host snapshot.
+        // Charge that actual copy work even though reply scratch is reusable.
+        let snapshot_bytes = arguments.iter().try_fold(
+            arguments.len().checked_mul(256).ok_or_else(resource)?,
+            |total, argument| {
+                let bytes = match argument.value {
+                    foreign::ArgumentValue::ByRef(location) => {
+                        value_bytes(self.store.read(location)?)
+                    }
+                    _ => 0, // ByVal values were charged when evaluated onto the stack.
+                };
+                total.checked_add(bytes).ok_or_else(resource)
+            },
+        )?;
+        self.charge(snapshot_bytes)?;
+        let payload_cap = self.host_payload_capacity(arguments.len())?;
         self.counters.host_calls = self
             .counters
             .host_calls
@@ -3987,7 +4039,7 @@ impl Session {
         let check_limit = self.limits.instructions;
         let array_types = &self.array_types;
         let used = &mut self.allocation_bytes;
-        let cap = self.limits.payload;
+        let cap = payload_cap;
         let mut validate = |l: Option<Location>, v: &Value| {
             if let Some(location) = l
                 && array_locked(frames, location, enum_work, check_limit)?
@@ -4135,6 +4187,7 @@ impl Session {
                 self.state = Outcome::Yielded;
             }
             foreign::Outcome::Error(error) => {
+                self.charge(error.description.len())?;
                 self.host_result_reference = None;
                 self.host_intrinsic_return = None;
                 let failure =
@@ -4177,11 +4230,14 @@ impl Session {
             .host_polls
             .checked_add(1)
             .ok_or_else(resource)?;
-        if let Err(error) = self.charge(65536) {
-            self.foreign.cancel(host)?;
-            self.fail(error)?;
-            return Ok(self.state.clone());
-        }
+        let payload_cap = match self.host_payload_capacity(0) {
+            Ok(cap) => cap,
+            Err(error) => {
+                self.foreign.cancel(host)?;
+                self.fail(error)?;
+                return Ok(self.state.clone());
+            }
+        };
         let result_reference = self.host_result_reference;
         let frames = &self.frames;
         let kinds = &self.kinds;
@@ -4198,7 +4254,7 @@ impl Session {
         let check_limit = self.limits.instructions;
         let array_types = &self.array_types;
         let used = &mut self.allocation_bytes;
-        let cap = self.limits.payload;
+        let cap = payload_cap;
         let mut validate = |l: Option<Location>, v: &Value| {
             if let Some(location) = l
                 && array_locked(frames, location, enum_work, check_limit)?

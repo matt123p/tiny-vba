@@ -2,8 +2,12 @@
 
 M7A.1–M7A.7 are complete for the [common native forms profile](docs/m7a-acceptance.md).
 Native `.frm`/`.frx` and edited XLSM/DOCM copy workflows are accepted, and the
-custom format is removed. Next is M8; uncommon P9 and M8.5 fresh Office comparison
-remain separate. This is authored acceptance, not universal Office parity.
+custom format is removed. [M8.1–M8.4 local conformance and hardening](docs/m8-acceptance.md)
+are complete: 24 additional inherited library cases, bounded fuzzing, eight
+asserted native/WASI benchmarks and 20 original workbook workflows, with passing
+native/WASM/UI/browser gates. Fresh Excel/Word comparison (M8.5) remains NOT_RUN,
+so full M8 release acceptance stays open. P9 remains deferred. These finite
+profiles do not imply universal Office parity.
 
 **A clean-room VBA implementation for the ArtCraft applications: GridCraft, WordCraft and DeckCraft.**
 

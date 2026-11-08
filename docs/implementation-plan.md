@@ -1,7 +1,7 @@
 # Remaining implementation plan
 
 Updated 2026-11-08. This plan contains **remaining work only**: stable M8 IDs and deferred P9,
-after completed M1–M6, M6A, M7 and common-profile M7A.
+after completed M1–M6, M6A, M7, common-profile M7A and local M8.1–M8.4.
 [M7 acceptance](m7-acceptance.md) records the authored unchanged-document/package
 profile and [ADR 0037](decisions/0037-m7-package-preservation-and-writeback.md)
 records the reviewed binary-writeback/signature contract. Completed task definitions
@@ -18,7 +18,7 @@ separate and native host dispatch in Rust.
 
 | Milestone | Remaining work | Prerequisites |
 |---|---|---|
-| M8 | Expanded conformance, hardening and release | Accepted M1–M6, M6A, M7 and M7A profiles for the declared release profile |
+| M8 | M8.5 fresh Office comparison and release validation | Accepted M1–M6, M6A, M7 and M7A profiles for the declared release profile |
 | P9 | Extended/uncommon Office forms compatibility | After M8; finite follow-up packets, not a prerequisite of common-profile M7A/M8 |
 
 M7 remains complete for its historical authored profile. Owner direction now
@@ -41,29 +41,23 @@ remains M8.5 NOT_RUN. Next is M8; task IDs below stay stable.
 
 ## M8 — Expanded conformance, hardening and release
 
+Current local implementation and finite acceptance scope are in [ADR 0101](decisions/0101-m8-conformance-and-host-payload.md)
+and [M8 evidence](m8-acceptance.md). M8.1–M8.4 are complete for the declared finite local profile; exact
+validation is recorded in progress. The owner has no Office and requested
+continuation without it. M8.5 remains NOT_RUN and the release comparison gate
+stays open; no Office result is inferred. Task IDs below remain stable.
+
 Owner: tiny-vba language/debugger/import evidence; forks own Office behavior and
 document results. Evidence work starts alongside M1 and feeds this final gate.
 
-- **M8.1:** Curate further licensed library/corpus cases and independently
-  established oracle expectations with exact versions, OS/locale, types,
-  errors and side effects. Keep unreviewed/unexecuted material NOT_RUN.
-- **M8.2:** Add importer/parser/VM fuzz targets and minimized regressions,
-  bounded-work/timeout tests and repeatable native/WASM performance benchmarks.
-  **Review VM host-call payload accounting:** foreign-call paths currently
-  reserve 64 KiB for reply/snapshot space by charging it to the session payload
-  budget. Determine whether that reservation represents live, reusable memory or
-  cumulative work; if it is temporary, track peak in-flight payload separately
-  from cumulative allocation/work counters and release the reservation when the
-  call completes or fails. Add tests proving repeated host calls can reuse the
-  reservation while oversized arguments/replies and aggregate work still fail
-  within documented limits. Cover pause/resume and failure before host effects.
-  Do not raise payload defaults solely to compensate for reusable per-call space.
-- **M8.3:** Complete native/WASM CI and affected UI/native/browser gates.
-  Publish the supported feature/profile/version matrix and remaining gaps.
-- **M8.4:** Expand feature-specific asserted benchmarks and assemble an integrated
-  suite of 20 independent reviewed workbooks; publish provenance and coverage.
-  Report language and Office-host categories separately; no global percentage
-  substitutes for a feature's acceptance gate.
+M8.1–M8.4 are **COMPLETE for the declared local profile** under ADR 0101.
+Their fulfilled task definitions are retained in
+[completed scope](implementation-progress.md#completed-m8-local-plan-scope).
+The 24 additional inherited cases, hardening/benchmarks, local native/WASM/UI
+validation and 20 original workbook workflows are recorded in the M8 acceptance
+and execution records. Remote OS results and fresh Office observations are not
+inferred. Only M8.5 below remains in this milestone's release gate.
+
 - **M8.5 — Fresh Excel/Word comparison (deferred from M6.4):** collect permitted
   black-box observations against named Microsoft Excel and Word builds. Compare
   the shared engine and real fork workflows for module-context/name resolution,

@@ -175,6 +175,16 @@ impl Session {
         call: HostIntrinsicCall,
         store: &mut Locations,
     ) -> Result<Outcome, Diagnostic> {
+        self.invoke_intrinsic_checked(host, call, store, &mut |_, _| Ok(()))
+    }
+    /// Host intrinsics use the same precommit result accounting as member calls.
+    pub fn invoke_intrinsic_checked(
+        &mut self,
+        host: &mut impl Host,
+        call: HostIntrinsicCall,
+        store: &mut Locations,
+        validate: &mut impl FnMut(Option<Location>, &Value) -> Result<(), Diagnostic>,
+    ) -> Result<Outcome, Diagnostic> {
         check_protocol(host.protocol())?;
         if self.pending.is_some() {
             return Err(protocol("call already suspended"));
@@ -209,9 +219,7 @@ impl Session {
             }
         }
         let reply = host.invoke_intrinsic(call);
-        self.accept(reply, Vec::new(), store, host.identity(), 0, &mut |_, _| {
-            Ok(())
-        })
+        self.accept(reply, Vec::new(), store, host.identity(), 0, validate)
     }
     pub fn invoke_checked(
         &mut self,

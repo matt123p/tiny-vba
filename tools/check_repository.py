@@ -164,6 +164,8 @@ def main():
         native_forms()
         from check_m7a import check as check_m7a
         check_m7a(local=True)
+        from check_m8 import check as check_m8
+        check_m8()
     if args.check in {'layers', 'all'}:
         layers()
     if args.check in {'corpora', 'all'}:

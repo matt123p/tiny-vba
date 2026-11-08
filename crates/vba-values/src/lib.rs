@@ -1648,9 +1648,14 @@ const fn return_variant(intrinsic: Intrinsic) -> IntrinsicReturn {
         | I::Trim
         | I::LTrim
         | I::RTrim => R::Variant,
-        I::InStr | I::InStrRev | I::Len | I::LenB | I::LBound | I::UBound | I::DateDiff => {
-            R::Fixed(K::Long)
-        }
+        I::InStr
+        | I::InStrRev
+        | I::Len
+        | I::LenB
+        | I::LBound
+        | I::UBound
+        | I::DateDiff
+        | I::VarType => R::Fixed(K::Long),
         I::IsObject
         | I::IsArray
         | I::IsMissing
@@ -1659,7 +1664,7 @@ const fn return_variant(intrinsic: Intrinsic) -> IntrinsicReturn {
         | I::IsError
         | I::IsDate
         | I::IsNumeric => R::Fixed(K::Boolean),
-        I::VarType | I::Sgn | I::Asc | I::AscB | I::AscW => R::Fixed(K::Integer),
+        I::Sgn | I::Asc | I::AscB | I::AscW => R::Fixed(K::Integer),
         I::TypeName
         | I::Replace
         | I::Join

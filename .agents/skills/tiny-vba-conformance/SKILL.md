@@ -3,6 +3,16 @@ name: tiny-vba-conformance
 description: Create or review tiny-vba test scenarios, external corpus use, oracle evidence, compatibility reports and release claims. Use for fixture adoption, semantic evidence or measuring implemented behaviour.
 ---
 
+M8 candidate (2026-11-08): ADR 0101 and docs/m8-acceptance.md own the new
+24-case inherited library selection, bounded parser/importer/VM mutation targets,
+asserted native/WASI benchmarks and 20 original host workbook workflows. Host
+scratch is temporary/reused under unchanged defaults; real copies/work remain
+cumulative. VarType returns the VbVarType enum's Long representation; QBColor
+uses the formal numeric table. Preserve original M7A receipts; changed trees
+require the reviewed M8 selection and fresh gates. The owner has no Office and
+requested continuation without it: M8.5 remains NOT_RUN and release validation
+stays open. P9 remains after M8. Older milestone directions below are historical.
+
 # Conformance and evidence
 
 Current acceptance: ADR 0100 completes M7A.1–M7A.7 for the agreed common native
