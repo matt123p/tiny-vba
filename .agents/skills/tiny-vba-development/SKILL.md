@@ -437,3 +437,9 @@ canonical text/ranges/events and inert resources/inspection. Paint inactive rang
 only in local clipped galley copies; query focus/style and decorate outside font
 locks. Retain caller style/font caches, edit permission, non-applicable flag
 refusals and all budgets. Full M7A.4/fresh Office acceptance remains separate.
+
+ADR 0092 adds selected native AutoTab through ordinary focus/validation frames.
+Preserve actual edit cause separately from caret-only input: autocomplete can
+keep text unchanged. Programmatic assignment is passive; current policy, window,
+focus serial and eligibility guard reentrant callbacks. Keep existing trust,
+continuations, resources and all budgets; the full M7A.4 checklist stays open.

@@ -240,3 +240,12 @@ against the caller's atlas; it never acquires font files. Return None to use a
 matching installed named family or the host's existing fallback. The callback
 can select an italic face; when it resolves a face the renderer does not add
 synthetic italics. Underline/strikethrough remain local text decorations.
+
+Native text widgets emit `FormCommand::InstanceTextEdit` for an actual edit and
+`InstanceText` for selection-only movement (ADR 0092). Both execute code and
+require the same host preparation. Custom adapters should call
+`Ide::form_instance_text_edit` when replacing text, including an autocompleted
+suffix whose replacement leaves the final text unchanged. Existing
+`form_instance_text` callers keep comparison-based updates. Keep these commands
+in input order; AutoTab completes through ordinary validation/focus callbacks and
+may Stop or wait before the destination receives focus.

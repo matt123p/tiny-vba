@@ -13,7 +13,11 @@ enum FormInput {
     Refresh(Vec<ObjectRef>),
     Focus,
     Activate,
-    Text { start: i32, length: i32 },
+    Text {
+        start: i32,
+        length: i32,
+        edited: bool,
+    },
     Numeric(FormNumericInput),
     List(i32),
     Selection(FormListInput),
@@ -949,8 +953,9 @@ fn compiled_form(
         if let Some(metadata) = metadata {
             if crate::form_hide_selection::supported(c.kind) {
                 source.push_str(&format!(
-                    "{temp}.HideSelection={}\n",
-                    boolean(metadata.text_behavior.hide_selection)
+                    "{temp}.HideSelection={}\n{temp}.AutoTab={}\n",
+                    boolean(metadata.text_behavior.hide_selection),
+                    boolean(metadata.text_behavior.auto_tab)
                 ));
             }
             source.push_str(&crate::form_caption_alignment::initial(
@@ -2540,6 +2545,29 @@ impl Ide {
         selection: (u32, u32),
         host: &mut impl Host,
     ) -> Result<()> {
+        self.deliver_form_text(instance, control, text, selection, false, host)
+    }
+    /// Deliver an actual widget edit, including replacement of an autocompleted suffix
+    /// with the same text. Selection-only input uses `form_instance_text` instead.
+    pub fn form_instance_text_edit(
+        &mut self,
+        instance: FormInstance,
+        control: u32,
+        text: VbaString,
+        selection: (u32, u32),
+        host: &mut impl Host,
+    ) -> Result<()> {
+        self.deliver_form_text(instance, control, text, selection, true, host)
+    }
+    fn deliver_form_text(
+        &mut self,
+        instance: FormInstance,
+        control: u32,
+        text: VbaString,
+        selection: (u32, u32),
+        edited: bool,
+        host: &mut impl Host,
+    ) -> Result<()> {
         if self.native_form(instance.source).is_none() {
             return Err(error("native text input requires a native form"));
         }
@@ -2556,6 +2584,7 @@ impl Ide {
             FormInput::Text {
                 start: i32::try_from(start).map_err(|_| error("text selection budget"))?,
                 length: i32::try_from(length).map_err(|_| error("text selection budget"))?,
+                edited,
             },
             host,
         )
@@ -3164,14 +3193,15 @@ impl Ide {
                 .cloned()
                 .unwrap_or(Value::String(VbaString::from_utf8("")?));
             let update = if matches!(input, FormInput::Text { .. }) {
-                session.read_instance_field(object, "VbaText")? != text
+                matches!(input, FormInput::Text { edited: true, .. })
+                    || session.read_instance_field(object, "VbaText")? != text
             } else {
                 false
             };
             object = instance.object;
             handler = "VbaInput";
             arguments = vec![Value::Long(index), text];
-            if let FormInput::Text { start, length } = input {
+            if let FormInput::Text { start, length, .. } = input {
                 handler = "VbaTextInput";
                 arguments.extend([
                     Value::Long(start),

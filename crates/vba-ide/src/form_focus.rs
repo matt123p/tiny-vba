@@ -157,7 +157,10 @@ VbaMoveFocus control
 If Not (VbaActiveControl Is control) Then Exit Sub
 If Not VbaCanInput(control) Then Exit Sub
 If update Then
+Dim serial As Long
+serial=VbaFocusSerial
 control.VbaSetTextSelection text,start,length
+VbaAutoTab control,text,serial
 Else
 control.VbaSetSelection start,length
 End If
@@ -228,13 +231,18 @@ If Not (VbaActiveControl Is control) Then Exit Sub
 End If
 If Not VbaCanInput(control) Then Exit Sub
 If control.VbaKind=2 Or control.VbaKind=10 Or control.VbaKind=16 Then
+Dim serial As Long,edited As Boolean
+serial=VbaFocusSerial
+edited=(control.Text<>text Or control.SelLength>0)
 control.VbaSetText text
+If edited Then VbaAutoTab control,text,serial
 Else
 control.VbaClick
 End If
 End Sub
 "#,
     );
+    source.push_str(crate::form_auto_tab::ROOT);
     for (event, cancel) in [
         ("Enter", false),
         ("Exit", true),

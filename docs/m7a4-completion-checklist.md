@@ -1,6 +1,6 @@
 # M7A.4 completion checklist
 
-Updated 2026-11-07. M7A.4 remains IN PROGRESS. This makes the existing runtime
+Updated 2026-11-08. M7A.4 remains IN PROGRESS. This makes the existing runtime
 ledger actionable; it does not replace or reduce the native control contracts,
 inventory, or implementation plan. PASS below requires executable evidence;
 reference-based expectations and fresh Office observations remain distinct.
@@ -93,3 +93,11 @@ inspection and range/resource/event preservation. GPU cases cover both ComboBox
 styles, active/inactive highlights, emoji/CRLF ranges and real focus transfer.
 Full shared/browser and both pinned host acceptance gates pass. Remaining selection,
 AutoSize/scrolling and the unchanged member/platform audit stay open.
+
+Selected P01 AutoTab follows ADR 0092: native TextBox/ComboBox bit 30, ordinary
+Boolean False defaults/coercion, actual user editing at MaxLength, canonical
+eligible tab order and ordinary validation/focus continuations. Model/GPU cases
+cover autocomplete without a text diff, passive selection/programmatic changes,
+paste, UTF-16, nested/wrapped traversal, cancellation and Stop/Continue/Reset.
+Full shared/browser acceptance passes; pinned fork acceptance is in progress. This does not
+close the remaining property, input, lifecycle, binding or platform cases above.

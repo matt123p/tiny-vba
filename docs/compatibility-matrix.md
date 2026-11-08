@@ -382,3 +382,9 @@ both ComboBox presentations; focus/style queries stay outside font locks.
 Inspection, global style, font caches and all VM/host budgets remain unchanged.
 Other selection/property/AutoSize/scrolling and full M7A.4 work stay open; fresh
 Office observations remain M8.5 NOT_RUN.
+
+[ADR 0092](decisions/0092-native-auto-tab.md) adds selected native TextBox/ComboBox
+AutoTab: bit-30 import, False defaults and user-edit-driven canonical tab traversal
+through existing validation/focus frames. Actual mutation cause survives unchanged
+autocomplete text; programmatic assignments and caret-only input stay passive.
+Full property/platform/input and M7A.4 acceptance remains open; M8.5 is NOT_RUN.

@@ -49,6 +49,7 @@ pub enum FormCommand {
     InstanceMouse(vba_ide::FormInstance, Option<u32>, vba_ide::FormMouseInput),
     InstanceKey(vba_ide::FormInstance, Option<u32>, vba_ide::FormKeyInput),
     InstanceText(vba_ide::FormInstance, u32, vba_ide::VbaString, (u32, u32)),
+    InstanceTextEdit(vba_ide::FormInstance, u32, vba_ide::VbaString, (u32, u32)),
 }
 impl FormCommand {
     // New form commands require host preparation unless explicitly known to be inert.
@@ -115,6 +116,9 @@ pub(super) fn apply_form(
         FormCommand::InstanceKey(instance, control, input) => ide
             .form_instance_key(instance, control, input, host)
             .map(|_| ()),
+        FormCommand::InstanceTextEdit(instance, control, text, selection) => {
+            ide.form_instance_text_edit(instance, control, text, selection, host)
+        }
         FormCommand::InstanceText(instance, control, text, selection) => {
             ide.form_instance_text(instance, control, text, selection, host)
         }
@@ -1821,7 +1825,7 @@ impl EditorUi {
                         let active = ide.form_instance_field(instance, None, "VbaActiveControl").ok();
                         let active_id = focus.iter().find(|(_, control, _)| form.controls.iter().find(|c| c.id == *control).is_some_and(|c| ide.form_instance_control_object(instance,c.id).ok().map(vba_ide::Value::Object) == active));
                         let requested = focus.iter().find(|(_, _, target)| Some(*target) == focused);
-                        let pending = commands.iter().any(|command| matches!(command, Command::Form(FormCommand::InstanceWindowFocus(owner, _) | FormCommand::InstanceMouse(owner, _, _) | FormCommand::InstanceKey(owner, _, _) | FormCommand::InstanceFocus(owner, _) | FormCommand::InstanceActivate(owner, _) | FormCommand::InstanceText(owner, _, _, _) | FormCommand::InstanceNumeric(owner, _, _) | FormCommand::InstanceList(owner, _, _) | FormCommand::InstanceListSelection(owner, _, _) | FormCommand::InstanceTab(owner, _, _) | FormCommand::InstanceDrop(owner, _, _) | FormCommand::InstanceNavigate(owner, _, _) | FormCommand::InstanceEvent(owner, _, _)) if *owner == instance));
+                        let pending = commands.iter().any(|command| matches!(command, Command::Form(FormCommand::InstanceWindowFocus(owner, _) | FormCommand::InstanceMouse(owner, _, _) | FormCommand::InstanceKey(owner, _, _) | FormCommand::InstanceFocus(owner, _) | FormCommand::InstanceActivate(owner, _) | FormCommand::InstanceText(owner, _, _, _) | FormCommand::InstanceTextEdit(owner, _, _, _) | FormCommand::InstanceNumeric(owner, _, _) | FormCommand::InstanceList(owner, _, _) | FormCommand::InstanceListSelection(owner, _, _) | FormCommand::InstanceTab(owner, _, _) | FormCommand::InstanceDrop(owner, _, _) | FormCommand::InstanceNavigate(owner, _, _) | FormCommand::InstanceEvent(owner, _, _)) if *owner == instance));
                         if let Some((_, control, _)) = requested && requested != active_id && !pending {
                             commands.push(Command::Form(FormCommand::InstanceFocus(instance, *control)));
                         }

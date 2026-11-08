@@ -319,12 +319,12 @@ impl TextBox<'_> {
             };
             let selected = selection(&String::from_utf16_lossy(native.units()), range);
             if output.response.changed() || output.response.has_focus() && selected != canonical {
-                commands.push(Command::Form(FormCommand::InstanceText(
-                    self.instance,
-                    self.control.id,
-                    native,
-                    selected,
-                )));
+                let command = if output.response.changed() {
+                    FormCommand::InstanceTextEdit(self.instance, self.control.id, native, selected)
+                } else {
+                    FormCommand::InstanceText(self.instance, self.control.id, native, selected)
+                };
+                commands.push(Command::Form(command));
             }
         }
         Some(Geometry {

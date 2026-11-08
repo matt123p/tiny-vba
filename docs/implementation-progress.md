@@ -1,5 +1,22 @@
 # Implementation progress
 
+## M7A.4 continued — native AutoTab (2026-11-08)
+
+ADR 0092 implements bit-30 import, ordinary Boolean False defaults and user-edit
+AutoTab through the existing canonical tab order and validation/focus frames.
+Actual widget edit cause is retained even when replacing an autocompleted suffix
+leaves text unchanged. Programmatic assignments and selection-only input stay
+passive; reentrant focus/window/policy changes suppress stale advancement.
+Twelve model and three GPU/input cases pass. Full shared CI, strict workspace/
+all-targets Clippy, WASM, UI, Xvfb native and web gates pass. Full WASI passes on
+Node 22.23.4; the 12 new cases also pass on Node 18.19.1. All ten Chromium flows
+pass. Corrected five-theme/scale/host snapshots and browser runtime/Break/focus
+views were inspected. Both host integration gates are pending.
+Full M7A.4 remains incomplete; the unchanged completion checklist
+and M8.5 NOT_RUN status remain authoritative. The next small property/input
+packet is native SelectionMargin with actual line-selection behavior; it must
+retain canonical ranges and the existing mouse/keyboard continuation barriers.
+
 ## M7A.4 continued — native HideSelection (2026-11-07)
 
 ADR 0091 adds native bit-29 decoding for TextBox/ComboBox, ordinary Boolean state

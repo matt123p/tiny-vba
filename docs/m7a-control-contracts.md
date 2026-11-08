@@ -33,6 +33,7 @@ are file-format defaults from MS-OFORMS, not undocumented VBE toolbox defaults.
 | Font | ADR 0081 retains StdFont/TextProps and VBFrame data; typed attributes, independent objects/defaults, inert inspection and local rendering | D selected; replacement/ambient/platform realization P |
 | Border / effect / transparency | Applicable native fields, original resources and typed runtime members | D selected (ADR 0084); remaining member/ambient/platform parity M7A.4 |
 | Alignment / CheckBox, OptionButton | VariousPropertyBits bit 13 is inverse to public fmAlignmentLeft=0/Right=1; ordinary Long state/defaults/errors; ToggleButton disabled | D selected side/layout (ADR 0090); broader property/platform audit remains open |
+| AutoTab / TextBox, ComboBox | VariousPropertyBits bit 30; ordinary Boolean False defaults; accepted user edits reaching MaxLength traverse canonical eligible tab order through normal validation and focus | D selected (ADR 0092); platform/container and full input audit stays open |
 | HideSelection / TextBox, ComboBox | VariousPropertyBits bit 29; ordinary Boolean state, True defaults and passive selected-text highlights; ranges/events/resources stay canonical | D selected (ADR 0091); remaining selection/platform audit stays open |
 | WordWrap | VariousPropertyBits bit 23; distinct Label/CommandButton file defaults and typed runtime state | D selected captions/TextBox (ADRs 0087/0088), including Boolean captions; AutoSize/scrolling and broader presentation cases remain open |
 | Tag / HelpContextID / ControlTipText | Known frame/site strings/scalars; ordinary per-instance metadata and runtime tips | D; Help/F1 routing remains U (ADR 0055) |
@@ -400,3 +401,10 @@ both ComboBox presentations; focus/style queries stay outside font locks.
 Inspection, global style, font caches and all VM/host budgets remain unchanged.
 Other selection/property/AutoSize/scrolling and full M7A.4 work stay open; fresh
 Office observations remain M8.5 NOT_RUN.
+
+[ADR 0092](decisions/0092-native-auto-tab.md) adds native TextBox/ComboBox AutoTab,
+False defaults and ordinary user-edit-driven tab traversal through the existing
+validation/focus continuation. Actual edit cause survives unchanged autocomplete
+text; caret movement and programmatic assignments remain passive. Reentrant
+focus/window/policy changes suppress stale navigation. No VM/foreign/budget or
+persistence change is implied; full M7A.4 and fresh Office acceptance remain open.

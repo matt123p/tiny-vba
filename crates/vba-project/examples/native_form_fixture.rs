@@ -22,6 +22,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let word_wrap = option.as_deref() == Some("--word-wrap");
     let boolean_wrap = option.as_deref() == Some("--boolean-word-wrap");
     let caption_alignment = option.as_deref() == Some("--caption-alignment");
+    let auto_tab = option.as_deref() == Some("--auto-tab");
     let hide_selection = option.as_deref() == Some("--hide-selection");
     let colors = option.as_deref() == Some("--colors");
     let nested_mouse = option.as_deref() == Some("--nested-mouse");
@@ -70,7 +71,8 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             | "--word-wrap"
             | "--boolean-word-wrap"
             | "--caption-alignment"
-            | "--hide-selection",
+            | "--hide-selection"
+            | "--auto-tab",
         ) => false,
         Some(_) => return Err("unknown fixture option".into()),
     };
@@ -102,6 +104,10 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         "Stop\r\nDebug.Print Entry.Text"
     };
     let mut text = String::from_utf8(fixture::export())?.replace("Debug.Print Entry.Text", body);
+    if auto_tab {
+        let code = "Attribute VB_Name = \"NativeForm\"\nAttribute VB_PredeclaredId = True\nOption Explicit\nPrivate Recording As Boolean\nPrivate Sub UserForm_Initialize()\nDebug.Print \"auto tab ready\",Entry.AutoTab\nHeading.Caption=\"Type three characters\"\nHeading.Width=220\nEntry.Left=16\nEntry.Top=48\nEntry.Width=168\nEntry.Height=26\nEntry.Text=\"\"\nEntry.MaxLength=3\nEntry.EnterFieldBehavior=1\nApply.Left=16\nApply.Top=80\nRecording=True\nEnd Sub\nPrivate Sub Entry_Change()\nIf Recording Then Debug.Print \"change\",Entry.Text\nEnd Sub\nPrivate Sub Entry_BeforeUpdate(ByVal Cancel As MSForms.ReturnBoolean)\nDebug.Print \"before\"\nEnd Sub\nPrivate Sub Entry_AfterUpdate()\nDebug.Print \"after\"\nEnd Sub\nPrivate Sub Entry_Exit(ByVal Cancel As MSForms.ReturnBoolean)\nDebug.Print \"exit\"\nEnd Sub\nPrivate Sub Apply_Enter()\nDebug.Print \"enter\"\nStop\nDebug.Print \"resumed\"\nEnd Sub\nPrivate Sub Apply_Click()\nDebug.Print \"completed\",Entry.Text\nMe.Hide\nEnd Sub\n".replace('\n', "\r\n");
+        text = String::from_utf8(fixture::export())?.replace(fixture::SOURCE, &code);
+    }
     if hide_selection {
         let code="Attribute VB_Name = \"NativeForm\"\nAttribute VB_PredeclaredId = True\nOption Explicit\nPrivate Sub UserForm_Initialize()\nDebug.Print \"selection ready\"\nDebug.Print Entry.HideSelection,Combo1.HideSelection\nHeading.Caption=\"Select text, then move focus\"\nHeading.Width=220\nEntry.Width=168\nEntry.Height=30\nEntry.FontSize=12\nEntry.EnterFieldBehavior=1\nEntry.Text=\"ALPHA BRAVO\"\nEntry.HideSelection=False\nEntry.SelStart=1\nEntry.SelLength=4\nCombo1.Left=16\nCombo1.Top=110\nCombo1.Width=168\nCombo1.Height=26\nCombo1.FontSize=12\nCombo1.EnterFieldBehavior=1\nCombo1.Text=\"ALPHA BRAVO\"\nCombo1.HideSelection=False\nCombo1.SelStart=1\nCombo1.SelLength=4\nEnd Sub\nPrivate Sub Apply_Click()\nEntry.SelStart=1\nEntry.SelLength=4\nCombo1.SelStart=1\nCombo1.SelLength=4\nEntry.HideSelection=True\nCombo1.HideSelection=True\nDebug.Print VarType(Entry.HideSelection),Entry.HideSelection,Combo1.HideSelection,Entry.SelLength,Combo1.SelLength\nStop\nEntry.HideSelection=False\nCombo1.HideSelection=False\nDebug.Print Entry.HideSelection,Combo1.HideSelection,Entry.SelText,Combo1.SelText\nMe.Hide\nEnd Sub\n".replace('\n',"\r\n");
         text = String::from_utf8(fixture::export())?.replace(fixture::SOURCE, &code);
@@ -234,7 +240,9 @@ End Sub
     std::fs::write(dir.join("NativeForm.frm"), text)?;
     std::fs::write(
         dir.join("NativeForm.frx"),
-        if hide_selection {
+        if auto_tab {
+            fixture::text_companion(0x6c80_081b, 0)
+        } else if hide_selection {
             fixture::combo_companion_flags(3, 1, 0x0c80_481b)
         } else if caption_alignment {
             fixture::boolean_alignment_companion(true)

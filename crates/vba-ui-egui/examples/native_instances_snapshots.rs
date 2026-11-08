@@ -59,6 +59,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let caption_alignment = std::env::args()
         .nth(2)
         .is_some_and(|o| o == "--caption-alignment");
+    let auto_tab = std::env::args().nth(2).is_some_and(|o| o == "--auto-tab");
     let hide_selection = std::env::args()
         .nth(2)
         .is_some_and(|o| o == "--hide-selection");
@@ -83,7 +84,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                     fixture::boolean_alignment_companion(true)
                 } else if boolean_wrap {
                     fixture::boolean_word_wrap_companion(0x2c00_081b)
-                } else if word_wrap {
+                } else if word_wrap || auto_tab {
                     fixture::companion()
                 } else if text_align {
                     fixture::alignment_companion(2)
@@ -112,7 +113,9 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                 },
             }],
         )?;
-        let main = if hide_selection {
+        let main = if auto_tab {
+            "Sub Main()\nDim a As New NativeForm,b As New NativeForm,c As Object\na.Caption=\"AutoTab enabled\"\nb.Caption=\"AutoTab disabled\"\nSetup a,True\nSetup b,False\na.Show 0\nb.Show 0\nb.Entry.SetFocus\nEnd Sub\nPrivate Sub Setup(ByVal f As MSForms.UserForm,ByVal enabled As Boolean)\nf.Controls(\"Heading\").Caption=\"Enter a three-character code\"\nf.Controls(\"Heading\").Width=220\nf.Controls(\"Entry\").Text=\"ab\"\nf.Controls(\"Entry\").MaxLength=3\nf.Controls(\"Entry\").AutoTab=enabled\nf.Controls(\"Entry\").SelStart=2\nf.Controls(\"Entry\").EnterFieldBehavior=1\nf.Controls(\"Entry\").FontSize=12\nf.Controls(\"Entry\").Width=168\nDim c As Object\nSet c=f.Controls.Add(\"Forms.ComboBox.1\",\"Code\")\nc.Left=16\nc.Top=110\nc.Width=168\nc.Height=28\nc.FontSize=12\nc.AddItem \"abc\"\nc.Text=\"abc\"\nc.SelStart=1\nc.SelLength=2\nc.HideSelection=False\nc.MaxLength=3\nc.AutoTab=enabled\nEnd Sub"
+        } else if hide_selection {
             "Sub Main()\nDim a As New NativeForm,b As New NativeForm\na.Caption=\"Selection remains visible\"\nb.Caption=\"Selection hides without focus\"\nSetup a,False\nSetup b,True\na.Show 0\nb.Show 0\nb.Apply.SetFocus\nEnd Sub\nPrivate Sub Setup(ByVal f As MSForms.UserForm,ByVal hide As Boolean)\nf.Height=200\nf.Controls(\"Heading\").Visible=False\nf.Controls(\"Apply\").Top=155\nDim c As Object\nSet c=f.Controls(\"Entry\")\nc.Left=16\nc.Top=12\nc.Width=190\nc.Height=36\nc.FontSize=12\nc.EnterFieldBehavior=1\nc.Text=\"ALPHA BRAVO\"\nc.HideSelection=hide\nc.SelStart=1\nc.SelLength=4\nSet c=f.Controls(\"Combo1\")\nc.Left=16\nc.Top=65\nc.Width=190\nc.Height=28\nc.FontSize=12\nc.EnterFieldBehavior=1\nc.Text=\"ALPHA BRAVO\"\nc.HideSelection=hide\nc.SelStart=1\nc.SelLength=4\nSet c=f.Controls.Add(\"Forms.ComboBox.1\",\"Fixed\")\nc.Left=16\nc.Top=106\nc.Width=190\nc.Height=28\nc.FontSize=12\nc.Style=2\nc.AddItem \"ALPHA BRAVO\"\nc.ListIndex=0\nc.EnterFieldBehavior=1\nc.HideSelection=hide\nc.SelStart=1\nc.SelLength=4\nEnd Sub"
         } else if caption_alignment {
             "Sub Main()\nDim a As New NativeForm,b As New NativeForm\na.Caption=\"Caption left of indicator\"\nb.Caption=\"Caption right of indicator\"\nSetup a,fmAlignmentLeft\nSetup b,fmAlignmentRight\na.Show 0\nb.Show 0\nEnd Sub\nPrivate Sub Setup(ByVal f As MSForms.UserForm,ByVal side As Long)\nf.Height=230\nf.Controls(\"Heading\").Visible=False\nf.Controls(\"Entry\").Visible=False\nf.Controls(\"Apply\").Visible=False\nf.Controls(\"Toggle1\").Visible=False\nDim name As Variant,c As Object,n As Long\nFor Each name In Array(\"Check1\",\"ChoiceA\",\"ChoiceB\")\nSet c=f.Controls(name)\nc.Caption=\"Caption stays inside its own bounds\"\nc.Left=16\nc.Top=12+n*68\nc.Width=145\nc.Height=60\nc.FontSize=12\nc.Alignment=side\nc.WordWrap=n<>1\nn=n+1\nNext name\nEnd Sub"
@@ -222,7 +225,9 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                 return Err("expected native tooltip".into());
             }
         }
-        let prefix = if hide_selection {
+        let prefix = if auto_tab {
+            "m7a4-native-auto-tab"
+        } else if hide_selection {
             "m7a4-native-hide-selection"
         } else if caption_alignment {
             "m7a4-native-caption-alignment"

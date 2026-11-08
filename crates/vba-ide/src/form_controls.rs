@@ -83,6 +83,9 @@ pub(crate) fn control_class(kind: ControlKind, ranges: bool) -> String {
     s.push_str(crate::form_text_align::members(kind));
     s.push_str(crate::form_caption_alignment::members(kind));
     s.push_str(crate::form_hide_selection::members(kind));
+    if crate::form_hide_selection::supported(kind) {
+        s.push_str("Public AutoTab As Boolean\n");
+    }
     if crate::form_font::supported(kind) {
         s.push_str(&crate::form_font::members(false));
         s.push_str(&crate::form_font::shortcuts(kind));

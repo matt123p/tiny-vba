@@ -1,6 +1,6 @@
 # M7A native forms — implementation inventory and work ledger
 
-Updated 2026-11-07. **IN PROGRESS**. FC0 and FC3.1–FC3.4 are complete for
+Updated 2026-11-08. **IN PROGRESS**. FC0 and FC3.1–FC3.4 are complete for
 `native-userform-import-v1`; see the [control/property/event/format/host matrix](m7a-control-contracts.md).
 M7A.3's worksheet profile is implemented under
 [ADR 0041](decisions/0041-worksheet-form-controls.md). Shared runtime increments
@@ -418,3 +418,10 @@ both ComboBox presentations; focus/style queries stay outside font locks.
 Inspection, global style, font caches and all VM/host budgets remain unchanged.
 Other selection/property/AutoSize/scrolling and full M7A.4 work stay open; fresh
 Office observations remain M8.5 NOT_RUN.
+
+[ADR 0092](decisions/0092-native-auto-tab.md) adds native TextBox/ComboBox AutoTab,
+False defaults and ordinary user-edit-driven tab traversal through the existing
+validation/focus continuation. Actual edit cause survives unchanged autocomplete
+text; caret movement and programmatic assignments remain passive. Reentrant
+focus/window/policy changes suppress stale navigation. No VM/foreign/budget or
+persistence change is implied; full M7A.4 and fresh Office acceptance remain open.

@@ -121,6 +121,8 @@ and native save/reopen. See [ADR 0041](decisions/0041-worksheet-form-controls.md
   ADR 0090 adds CheckBox/OptionButton Alignment flags, ordinary Long state,
   published constants and independently clipped captions beside real indicators.
   Other properties and the full remaining checklist stay open.
+  ADR 0092 adds selected native AutoTab through ordinary focus/validation,
+  preserving edit cause, autocomplete and Stop/Continue. Full acceptance stays open.
   ADR 0091 adds native TextBox/ComboBox HideSelection, True defaults and
   inactive highlights of canonical ranges without text/focus/event changes.
   Remaining selection/property/scrolling/platform work and full M7A.4 stay open.

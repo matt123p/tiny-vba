@@ -1,6 +1,6 @@
 # M7A.4 native runtime — current implementation and remaining work
 
-Updated 2026-11-07. **IN PROGRESS. M7A.4 is not complete.** This record extends
+Updated 2026-11-08. **IN PROGRESS. M7A.4 is not complete.** This record extends
 [the first instance increment](m7a4-userform-instances.md) under
 [ADR 0043](decisions/0043-native-controls-and-project-inspection.md).
 
@@ -440,3 +440,10 @@ both ComboBox presentations; focus/style queries stay outside font locks.
 Inspection, global style, font caches and all VM/host budgets remain unchanged.
 Other selection/property/AutoSize/scrolling and full M7A.4 work stay open; fresh
 Office observations remain M8.5 NOT_RUN.
+
+[ADR 0092](decisions/0092-native-auto-tab.md) adds native TextBox/ComboBox AutoTab,
+False defaults and ordinary user-edit-driven tab traversal through the existing
+validation/focus continuation. Actual edit cause survives unchanged autocomplete
+text; caret movement and programmatic assignments remain passive. Reentrant
+focus/window/policy changes suppress stale navigation. No VM/foreign/budget or
+persistence change is implied; full M7A.4 and fresh Office acceptance remain open.
