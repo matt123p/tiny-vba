@@ -1,5 +1,12 @@
 # M7A native forms — implementation inventory and work ledger
 
+M7A.5 encoding update (2026-11-08): [ADR 0098](decisions/0098-native-form-encoding-and-source-only-writeback.md)
+adds explicit native form and source-only MS-OVBA encoders and revision-bound IDE
+snapshots. Native save/export and package writeback remain separate operations.
+Host package/signature integration and final acceptance are still IN PROGRESS;
+this is not a completed M7A.5 claim. Historical read-only descriptions below refer
+to the original decoder path. Next required work includes both host save workflows.
+
 Current scope (2026-11-08, [ADR 0097](decisions/0097-common-forms-scope-and-p9.md)):
 **M7A.4 is COMPLETE for [native-forms-common-v1](m7a4-common-profile.md).**
 The outstanding uncommon/exhaustive cases in earlier incremental notes now belong
@@ -146,7 +153,7 @@ build/OS/locale comparisons remain NOT_RUN under M8.5.
 | FC4 common UserForm controls | DONE for native-forms-common-v1; extensions P9 | [Common profile and evidence](m7a4-common-profile.md); standard control/property/input packets accepted; further resource/member/platform cases tracked in P9 |
 | FC3.1–FC3.4 native UserForm codecs/attachment | DONE for native-userform-import-v1 | Export + embedded parity, shared designer/runtime/debugger, standalone IO, XLSM/DOCM trust and byte retention |
 | FC3.5 common native lifecycle | DONE for native-forms-common-v1; exhaustive parity P9 | [Common lifetime/instance evidence](m7a4-completion-checklist.md); shared and pinned-host gates pass; unusual alias/reentrant/ordering combinations tracked in P9 |
-| FC5 edited native persistence | NOT_STARTED | Required encoder, native resource and signature/cache contract |
+| FC5 edited native persistence | IN_PROGRESS | ADR 0098: native form encoder, source-only MS-OVBA and revision-bound save snapshots; host package/signature workflow acceptance pending |
 | FC6 remove .tvform | NOT_STARTED | Requires native replacement workflows; do not extend the legacy format |
 
 M7A.3 completes the selected worksheet profile under ADR 0041. M7A.4 / FC3.5 /

@@ -82,6 +82,11 @@ impl Ide {
         }
         if native.source.len() > crate::SourceFile::MAX_BYTES
             || native.resources.len() > 512
+            || native.storages.len() > 512
+            || native
+                .storages
+                .iter()
+                .any(|s| s.path.len() > 256 || s.clsid.len() != 36)
             || native.attributes.len() > 8192
             || native.diagnostics.len() > 64
             || native.diagnostics.iter().any(|s| s.len() > 4096)
@@ -317,3 +322,198 @@ impl Ide {
         Ok(id)
     }
 }
+
+/// Immutable, revision-bound native save snapshot. Caller owns actual file commit.
+#[derive(Clone, Debug)]
+pub struct NativeFormSave {
+    owner: std::sync::Arc<()>,
+    id: SourceId,
+    source_revision: u64,
+    design_revision: u64,
+    text: String,
+    files: Vec<NativeFormResource>,
+}
+impl NativeFormSave {
+    pub fn files(&self) -> &[NativeFormResource] {
+        &self.files
+    }
+    pub fn source_id(&self) -> SourceId {
+        self.id
+    }
+}
+impl Ide {
+    /// Encode the exact current designer/source, never runtime widget values.
+    pub fn export_native_form(&self, id: SourceId) -> Result<NativeFormSave> {
+        let original = self
+            .native_form(id)
+            .ok_or_else(|| error("unknown native form"))?;
+        let module = self
+            .modules
+            .iter()
+            .find(|m| m.id == id)
+            .ok_or_else(|| error("missing native source"))?;
+        let designer = self
+            .forms
+            .get(&id)
+            .ok_or_else(|| error("missing native designer"))?;
+        let form = designer.form();
+        form.validate()?;
+        crate::form_project::checked_handlers(form, module, true)?;
+        let point = |n: i32| n as f32 * (72.0 / 2540.0);
+        let metric = |value: f32, old: i32| -> Result<i32> {
+            if (value - point(old)).abs() < 0.0001 {
+                return Ok(old);
+            }
+            let n = (f64::from(value) * 2540.0 / 72.0).round();
+            if !n.is_finite() || !(-1_155_944.0..=1_155_944.0).contains(&n) {
+                return Err(error("native geometry limit"));
+            }
+            Ok(n as i32)
+        };
+        let mut design = original.design.clone();
+        design.caption = form.caption.clone();
+        design.width = metric(form.width, design.width)?;
+        design.height = metric(form.height, design.height)?;
+        let mut controls = Vec::new();
+        for c in &form.controls {
+            if c.group.is_some() {
+                return Err(error("native designer selection groups are not persisted"));
+            }
+            let mut native = if let Some(n) = original.design.controls.iter().find(|n| n.id == c.id)
+            {
+                n.clone()
+            } else {
+                let kind = match c.kind {
+                    ControlKind::Label => Kind::Label,
+                    ControlKind::TextBox => Kind::TextBox,
+                    ControlKind::CommandButton => Kind::CommandButton,
+                    _ => return Err(error("new native control resource kind")),
+                };
+                vba_project::forms::new_designer_control(kind, c.id, &c.name)?
+            };
+            native.name = c.name.clone();
+            native.caption = c.caption.clone();
+            native.text = c.text.clone();
+            native.parent = c.parent;
+            native.left = metric(c.bounds.left, native.left)?;
+            native.top = metric(c.bounds.top, native.top)?;
+            native.width = metric(c.bounds.width, native.width)?;
+            native.height = metric(c.bounds.height, native.height)?;
+            native.enabled = c.enabled;
+            native.visible = c.visible;
+            native.tab_stop = c.tab_stop;
+            let order = form
+                .tab_order
+                .iter()
+                .filter_map(|id| form.controls.iter().find(|c| c.id == *id))
+                .filter(|other| other.parent == c.parent)
+                .position(|other| other.id == c.id)
+                .ok_or_else(|| error("native tab order"))?;
+            // Preserve untouched -1/unassigned metadata until the designer order changes.
+            let original_order = original
+                .design
+                .controls
+                .iter()
+                .filter(|o| o.parent == c.parent)
+                .map(|o| o.id)
+                .collect::<Vec<_>>();
+            let current_order = form
+                .tab_order
+                .iter()
+                .filter(|id| {
+                    form.controls
+                        .iter()
+                        .any(|o| o.id == **id && o.parent == c.parent)
+                })
+                .copied()
+                .collect::<Vec<_>>();
+            let mut expected = original_order.clone();
+            expected.sort_by_key(|id| {
+                original
+                    .design
+                    .controls
+                    .iter()
+                    .find(|o| o.id == *id)
+                    .map_or(i32::MAX, |o| {
+                        if o.tab_index < 0 {
+                            i32::MAX
+                        } else {
+                            i32::from(o.tab_index)
+                        }
+                    })
+            });
+            if current_order != expected {
+                native.tab_index =
+                    i16::try_from(order).map_err(|_| error("native tab order limit"))?;
+            }
+            controls.push(native);
+        }
+        design.controls = controls;
+        let files = vba_project::forms::encode_export(
+            original,
+            &design,
+            &module.text,
+            &vba_project::Limits::default(),
+        )?;
+        Ok(NativeFormSave {
+            owner: self.native_save_owner.clone(),
+            id,
+            source_revision: module.revision,
+            design_revision: designer.revision(),
+            text: module.text.clone(),
+            files,
+        })
+    }
+    /// Call only after the caller atomically committed all native output files.
+    pub fn validate_native_form_save(&self, snapshot: &NativeFormSave) -> Result<()> {
+        if !std::sync::Arc::ptr_eq(&snapshot.owner, &self.native_save_owner) {
+            return Err(error("native save belongs to another project instance"));
+        }
+        let module = self
+            .modules
+            .iter()
+            .find(|m| m.id == snapshot.id)
+            .ok_or_else(|| error("native save source no longer exists"))?;
+        let form = self
+            .forms
+            .get(&snapshot.id)
+            .ok_or_else(|| error("native save designer no longer exists"))?;
+        if module.revision != snapshot.source_revision
+            || module.text != snapshot.text
+            || form.revision() != snapshot.design_revision
+        {
+            return Err(error(
+                "native source/design changed during save; still modified",
+            ));
+        }
+        Ok(())
+    }
+    /// Acknowledge only after successful caller commit of this validated snapshot.
+    pub fn acknowledge_native_form_save(&mut self, snapshot: &NativeFormSave) -> Result<()> {
+        self.validate_native_form_save(snapshot)?;
+        let module = self
+            .modules
+            .iter_mut()
+            .find(|m| m.id == snapshot.id)
+            .ok_or_else(|| error("native source disappeared"))?;
+        module.saved_revision = module.revision;
+        module.saved_text = module.text.clone();
+        module.saved_name = module.name.clone();
+        if let Some(form) = self.forms.get_mut(&snapshot.id) {
+            form.mark_saved();
+        }
+        Ok(())
+    }
+}
+
+impl PartialEq for NativeFormSave {
+    fn eq(&self, other: &Self) -> bool {
+        std::sync::Arc::ptr_eq(&self.owner, &other.owner)
+            && self.id == other.id
+            && self.source_revision == other.source_revision
+            && self.design_revision == other.design_revision
+            && self.text == other.text
+            && self.files == other.files
+    }
+}
+impl Eq for NativeFormSave {}

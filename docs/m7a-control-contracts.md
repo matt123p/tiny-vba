@@ -1,5 +1,12 @@
 # M7A Office forms — control, property, event, format and host contracts
 
+M7A.5 encoding update (2026-11-08): [ADR 0098](decisions/0098-native-form-encoding-and-source-only-writeback.md)
+adds explicit native form and source-only MS-OVBA encoders and revision-bound IDE
+snapshots. Native save/export and package writeback remain separate operations.
+Host package/signature integration and final acceptance are still IN PROGRESS;
+this is not a completed M7A.5 claim. Historical read-only descriptions below refer
+to the original decoder path. Next required work includes both host save workflows.
+
 Current scope (2026-11-08, [ADR 0097](decisions/0097-common-forms-scope-and-p9.md)):
 **M7A.4 is COMPLETE for [native-forms-common-v1](m7a4-common-profile.md).**
 The outstanding uncommon/exhaustive cases in earlier incremental notes now belong
@@ -138,7 +145,7 @@ ActiveX event signatures are not inferred from Form Control assignments.
 | Export `.frm` + optional `.frx` | VERSION 5.00 Office designer CLSID; exact authored source; caller-named companion/offset; checked CFB f/o | Shared decoder; portable native/WASM/WASI | Selected six-family flat subset; distinct export tests and the M7A.4 runtime record |
 | Embedded form | BaseClass + MODULESTREAMNAME designer storage + VBFrame + MS-OFORMS f/o | Shared decoder, fork package/trust | Independent embedded and XLSM/DOCM tests |
 | Designer/code/Properties/debugger | Caller SourceId -> shared validated design + authored class/event code | Shared IDE/UI, standalone and both forks | Existing UI and runtime; inert attachment and exact handler tests |
-| Native export/edited embedded save | Native source/resource encoder, cache/signature policy, revision checks, atomic commit | Shared encoder plus caller IO/package policy | U until M7A.5; no custom-format fallback |
+| Native export/edited embedded save | Native source/resource encoder, cache/signature policy, revision checks, atomic commit | Shared encoder plus caller IO/package policy | ADR 0098 implements native export and source-only encoding; required host workflow acceptance in progress; no custom-format fallback |
 | Worksheet forms | Spreadsheet controls/ctrlProp/VML/DrawingML identities | GridCraft Excel profile | [worksheet-form-controls-v1](m7a-worksheet-controls.md), M7A.3 |
 | Worksheet ActiveX | Separate Windows Office object/resource/event model | GridCraft platform packet | U; Office for Mac does not support worksheet ActiveX |
 | Rust host builds | Decode without Office/COM installation | Windows/macOS/Linux/BSD and browser/WASI toolchains | Actual tested environments recorded separately, not implied by target list |

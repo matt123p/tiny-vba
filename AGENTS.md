@@ -269,3 +269,11 @@ completed document-pass acknowledgment. Keep debugger input available at Stop;
 repaint before replay after skipped/hidden document passes. Reset/source/document/
 trust/geometry changes and authored activation invalidate retained input. No new
 VM/foreign behavior or increased budget is implied; full M7A.4 remains partial.
+
+ADR 0098 implements explicit inert native form and source-only MS-OVBA encoders
+for M7A.5 beside the decoder. This supersedes historical decoder-only/no-encoder
+language for those explicit APIs, not ordinary package saves. Keep original import
+bytes separate; compile exact binary-save snapshots, remove stale compiled caches,
+reopen/check output and enforce project/source/design identity at acknowledgment.
+Hosts own signature removal and atomic package/file commit. Host workflows and
+final acceptance are still required before M7A.5 is complete.

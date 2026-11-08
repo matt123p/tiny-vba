@@ -90,18 +90,22 @@ impl BrowserFiles {
         Ok(())
     }
     pub fn download(&mut self, name: &str, text: &str) -> Result<(), String> {
-        self.download_inner(name, text)
+        self.download_bytes(name, text.as_bytes())
+    }
+    pub fn download_bytes(&mut self, name: &str, bytes: &[u8]) -> Result<(), String> {
+        self.download_inner(name, bytes)
             .map_err(|e| format!("Browser download failed: {e:?}"))
     }
-    fn download_inner(&mut self, name: &str, text: &str) -> Result<(), JsValue> {
-        if text.len() > 8 * 1024 * 1024 {
+    fn download_inner(&mut self, name: &str, bytes: &[u8]) -> Result<(), JsValue> {
+        if bytes.len() > 8 * 1024 * 1024 {
             return Err(JsValue::from_str("source budget exceeded"));
         }
         let document = web_sys::window()
             .and_then(|w| w.document())
             .ok_or_else(|| JsValue::from_str("no document"))?;
-        let parts = js_sys::Array::of1(&JsValue::from_str(text));
-        let blob = web_sys::Blob::new_with_str_sequence(&parts)?;
+        let array = js_sys::Uint8Array::from(bytes);
+        let parts = js_sys::Array::of1(&array);
+        let blob = web_sys::Blob::new_with_u8_array_sequence(&parts)?;
         let url = web_sys::Url::create_object_url_with_blob(&blob)?;
         let anchor = document
             .create_element("a")?

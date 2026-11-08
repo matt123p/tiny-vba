@@ -2,9 +2,12 @@
 mod appearance;
 mod binary;
 pub use appearance::Appearance;
+mod encode;
 mod fonts;
 mod frame;
 use crate::{Attribute, Limits, Metered, Result, budget, container_error, read_stream};
+pub use binary::new_designer_control;
+pub use encode::{encode_embedded, encode_export};
 pub use fonts::Font;
 pub use frame::{companion_name, decode_export};
 use std::io::Cursor;
@@ -228,6 +231,13 @@ pub struct Resource {
     pub bytes: Vec<u8>,
 }
 #[derive(Clone, Debug, PartialEq, Eq)]
+pub struct StorageMetadata {
+    /// Path relative to the native form storage; root is `/`.
+    pub path: String,
+    pub clsid: String,
+    pub state_bits: u32,
+}
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub struct NativeForm {
     pub format: Format,
     pub name: String,
@@ -238,6 +248,7 @@ pub struct NativeForm {
     pub design: Design,
     /// Original designer/frame and companion streams, independent of mutable IDE state.
     pub resources: Vec<Resource>,
+    pub storages: Vec<StorageMetadata>,
     /// Retained design/formatting properties the initial shared renderer does not interpret.
     pub diagnostics: Vec<String>,
 }
@@ -334,6 +345,7 @@ pub(crate) fn embedded(
     result.source = source.into();
     result.attributes = crate::text::attributes(source, name)?;
     result.resources = resources;
+    result.storages = storage_metadata(file, &root)?;
     Ok(result)
 }
 
@@ -354,4 +366,45 @@ pub struct ImageBehavior {
     pub alignment: u8,
     pub tiling: bool,
     pub auto_size: bool,
+}
+
+pub(crate) fn storage_metadata<T: std::io::Read + std::io::Seek>(
+    file: &cfb::CompoundFile<T>,
+    root: &str,
+) -> Result<Vec<StorageMetadata>> {
+    let base = if root.is_empty() { "/" } else { root };
+    let mut storages = std::collections::BTreeMap::new();
+    let entries = std::iter::once(file.entry(base).map_err(container_error)?)
+        .chain(file.walk_storage(base).map_err(container_error)?);
+    for entry in entries.filter(|entry| entry.is_storage()) {
+        let name = entry
+            .path()
+            .to_str()
+            .ok_or_else(|| crate::corrupt("storage path"))?;
+        let relative = if root.is_empty() {
+            name
+        } else {
+            if !name
+                .get(..root.len())
+                .is_some_and(|prefix| prefix.eq_ignore_ascii_case(root))
+            {
+                return Err(crate::corrupt("storage root"));
+            }
+            name.get(root.len()..)
+                .ok_or_else(|| crate::corrupt("storage root"))?
+        };
+        let path = if relative.is_empty() { "/" } else { relative };
+        if storages.len() >= 512 {
+            return Err(budget());
+        }
+        storages.insert(
+            path.to_owned(),
+            StorageMetadata {
+                path: path.into(),
+                clsid: entry.clsid().to_string(),
+                state_bits: entry.state_bits(),
+            },
+        );
+    }
+    Ok(storages.into_values().collect())
 }

@@ -70,10 +70,12 @@ IDs and exhaustive property/platform/resource/ActiveX work move to
 [P9](p9-forms-compatibility.md); they no longer block M7A.4 or the following gates.
 Bugs in included common workflows remain fixes, not automatic P9 deferrals.
 
-- **M7A.5 — Native editing and persistence (FC5):** implement native `.frm`/`.frx`
+- **M7A.5 — Native editing and persistence (FC5; IN PROGRESS):** implement native `.frm`/`.frx`
   save/export for the accepted common profile and required edited embedded form/source-resource writeback in
   `.xlsm`/`.docm` workflows. Review and implement the necessary encoder/package
   path under ADR 0037, including cache consistency and signature invalidation.
+  ADR 0098 implements shared native form/source-only project encoders and save
+  snapshots; host package workflows and full acceptance remain required.
   Prove native edit/save/reopen with source/resource identity, revision checks,
   atomic failure and lifecycle integrity. Retaining only original bytes is not
   an edited-save PASS; a custom format is not a substitute for native persistence.

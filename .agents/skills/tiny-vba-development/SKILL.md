@@ -477,3 +477,12 @@ resources. Validate queued control membership after ordinary writes settle and
 by object identity after index shifts; do not grant input permission or retain
 VM roots in UI state. Tick with the active session's lower slice when configured.
 No budget is raised; full M7A.4 and fresh Office acceptance remain open.
+
+ADR 0098 activates explicit inert native form/source-only MS-OVBA encoding for
+M7A.5. vba-project owns bounded format encoding and reopen checks; the IDE owns
+compile-checked, project/source/design revision snapshots; callers own IO and
+package/signature/trust policy. No new VM/foreign authority or budget is granted.
+Retain imported originals separately, never write stale caches/signatures, and
+never acknowledge failed/stale/foreign saves. Both host package workflows must
+pass before marking M7A.5 complete. Browser download requests alone do not clear
+dirty state. See docs/decisions/0098-native-form-encoding-and-source-only-writeback.md.

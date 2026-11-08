@@ -7,6 +7,9 @@ pub use projection::CodeProjection;
 mod editing;
 pub mod form_archive;
 mod native_forms;
+mod native_project_save;
+pub use native_forms::NativeFormSave;
+pub use native_project_save::NativeProjectSave;
 pub use vba_project::Limits as ProjectImportLimits;
 pub use vba_project::forms::companion_name as native_form_companion_name;
 pub use vba_project::forms::{NativeForm, Resource as NativeFormResource};
@@ -282,6 +285,10 @@ impl Action {
 }
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub enum HostRequest {
+    NativeForm {
+        snapshot: NativeFormSave,
+        save: bool,
+    },
     Save {
         id: SourceId,
         name: String,
@@ -333,6 +340,7 @@ pub struct StopLocation {
     pub procedure: String,
 }
 pub struct Ide {
+    native_save_owner: std::sync::Arc<()>,
     native_forms: BTreeMap<SourceId, NativeForm>,
     forms: BTreeMap<SourceId, forms::FormDesigner>,
     form_gate: form_project::FormGate,
@@ -391,6 +399,7 @@ impl Ide {
         Self {
             forms: BTreeMap::new(),
             native_forms: BTreeMap::new(),
+            native_save_owner: std::sync::Arc::new(()),
             form_gate: Default::default(),
             title: "Untitled Project".into(),
             modules: vec![],
@@ -1149,6 +1158,34 @@ impl Ide {
                     m.breakpoints.clear();
                 }
                 self.controller = Controller::new();
+            }
+            Action::Save
+                if self
+                    .active_module()
+                    .is_some_and(|m| self.native_form(m.id).is_some()) =>
+            {
+                let id = self
+                    .active_module()
+                    .ok_or_else(|| error("no native form"))?
+                    .id;
+                self.requests.push(HostRequest::NativeForm {
+                    snapshot: self.export_native_form(id)?,
+                    save: true,
+                });
+            }
+            Action::Export
+                if self
+                    .active_module()
+                    .is_some_and(|m| self.native_form(m.id).is_some()) =>
+            {
+                let id = self
+                    .active_module()
+                    .ok_or_else(|| error("no native form"))?
+                    .id;
+                self.requests.push(HostRequest::NativeForm {
+                    snapshot: self.export_native_form(id)?,
+                    save: false,
+                });
             }
             Action::Save => {
                 let m = self

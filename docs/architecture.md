@@ -1,5 +1,12 @@
 # Architecture
 
+M7A.5 encoding update (2026-11-08): [ADR 0098](decisions/0098-native-form-encoding-and-source-only-writeback.md)
+adds explicit native form and source-only MS-OVBA encoders and revision-bound IDE
+snapshots. Native save/export and package writeback remain separate operations.
+Host package/signature integration and final acceptance are still IN PROGRESS;
+this is not a completed M7A.5 claim. Historical read-only descriptions below refer
+to the original decoder path. Next required work includes both host save workflows.
+
 Current scope (2026-11-08, [ADR 0097](decisions/0097-common-forms-scope-and-p9.md)):
 **M7A.4 is COMPLETE for [native-forms-common-v1](m7a4-common-profile.md).**
 The outstanding uncommon/exhaustive cases in earlier incremental notes now belong

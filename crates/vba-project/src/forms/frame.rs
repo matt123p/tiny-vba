@@ -235,7 +235,7 @@ pub(super) fn dimension(header: &Header, key: &str, default: i32) -> Result<i32>
     // 1440 twips = 2540 HIMETRIC, retaining nearest native unit.
     i32::try_from((i64::from(twips) * 127 + 36) / 72).map_err(|_| budget())
 }
-fn blob(header: &Header) -> Result<Option<(String, usize)>> {
+pub(super) fn blob(header: &Header) -> Result<Option<(String, usize)>> {
     let Some(value) = header.properties.get("oleobjectblob") else {
         return Ok(None);
     };
@@ -348,6 +348,7 @@ pub fn decode_export(
             });
         }
         let mut form = binary::decode(&resources, "", &header)?;
+        form.storages = super::storage_metadata(&file, "")?;
         form.resources = vec![
             Resource {
                 name: file_name.into(),
@@ -401,6 +402,7 @@ pub fn decode_export(
                 height: dimension(&header, "clientheight", 0)?,
                 controls: vec![],
             },
+            storages: vec![],
             resources: vec![Resource {
                 name: file_name.into(),
                 bytes: bytes.into(),

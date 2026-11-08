@@ -451,7 +451,7 @@ fn container(
     {
         return Err(corrupt("invalid native OLE_COLOR"));
     }
-    Ok(NativeForm { format: Format::Embedded, name: header.name.clone(), code_page: 1252, source: String::new(), attributes: vec![], design: Design { appearance, font, colors, caption, enabled: flags&4!=0, tag: frame::metadata(header)?.0, help_context_id: frame::metadata(header)?.1, width,height,controls }, resources: vec![], diagnostics: vec!["Native resources retained; fonts, decoration and window placement remain partial. Palette-indexed colours require the embedding's colour resolver; native RGB/system colours are rendered. Full Office presentation/lifecycle parity is tracked separately in M7A.4.".into()] })
+    Ok(NativeForm { format: Format::Embedded, name: header.name.clone(), code_page: 1252, source: String::new(), attributes: vec![], design: Design { appearance, font, colors, caption, enabled: flags&4!=0, tag: frame::metadata(header)?.0, help_context_id: frame::metadata(header)?.1, width,height,controls }, resources: vec![], storages:vec![], diagnostics: vec!["Native resources retained; fonts, decoration and window placement remain partial. Palette-indexed colours require the embedding's colour resolver; native RGB/system colours are rendered. Full Office presentation/lifecycle parity is tracked separately in M7A.4.".into()] })
 }
 struct Site {
     id: u32,
@@ -999,4 +999,65 @@ fn accelerator_character(value: u32) -> Result<String> {
     char::from_u32(value)
         .map(|character| character.to_string())
         .ok_or_else(|| corrupt("invalid native accelerator character"))
+}
+
+pub(super) fn skip_font(r: &mut Reader<'_>) -> Result<()> {
+    font(r).map(|_| ())
+}
+pub(super) fn skip_classes(r: &mut Reader<'_>) -> Result<()> {
+    classes::read(r).map(|_| ())
+}
+
+pub(super) fn new_control_record(kind: Kind) -> Result<Vec<u8>> {
+    let mut body = match kind {
+        Kind::TextBox => [
+            0x80000100u32.to_le_bytes(),
+            0u32.to_le_bytes(),
+            2540u32.to_le_bytes(),
+            635u32.to_le_bytes(),
+        ]
+        .concat(),
+        Kind::Label | Kind::CommandButton => [
+            0x28u32.to_le_bytes(),
+            0u32.to_le_bytes(),
+            2540u32.to_le_bytes(),
+            635u32.to_le_bytes(),
+        ]
+        .concat(),
+        _ => return Err(unsupported("new native control resource kind")),
+    };
+    let mut record = 0x0200u16.to_le_bytes().to_vec();
+    record.extend(
+        u16::try_from(body.len())
+            .map_err(|_| budget())?
+            .to_le_bytes(),
+    );
+    record.append(&mut body);
+    record.extend([0, 2, 4, 0, 0, 0, 0, 0]);
+    Ok(record)
+}
+/// File-format defaults for the three controls exposed by the shared toolbox.
+pub fn new_designer_control(kind: Kind, id: u32, name: &str) -> Result<Control> {
+    text::identifier(name)?;
+    if id == 0 || id > i32::MAX as u32 {
+        return Err(corrupt("native site ID"));
+    }
+    control(
+        &new_control_record(kind)?,
+        Site {
+            id,
+            name: name.into(),
+            tag: String::new(),
+            control_tip_text: String::new(),
+            control_source: String::new(),
+            row_source: String::new(),
+            help_context_id: 0,
+            flags: 0x13,
+            bytes: 0,
+            tab: -1,
+            kind,
+            left: 0,
+            top: 0,
+        },
+    )
 }

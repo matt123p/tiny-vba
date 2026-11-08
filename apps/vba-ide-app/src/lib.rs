@@ -155,6 +155,7 @@ impl App {
                     "Standalone editor: there is no workbook/document window to return to.",
                 ),
                 other => {
+                    if let HostRequest::NativeForm{snapshot,..}=&other && let Some(file)=snapshot.files().first(){self.path=file.name.clone();}
                     if let HostRequest::Save { name, .. } | HostRequest::Export { name, .. } =
                         &other
                         && name.ends_with(".tvform")
@@ -193,7 +194,7 @@ impl App {
         if self.file_request.is_some() {
             let mut close = false;
             egui::Window::new("Source File").collapsible(false).show(ctx,|ui|{
-            ui.label("VBA source or native .frm/.frx forms. Select both files in the browser. Native form saving is not yet available.");
+            ui.label("VBA source and native .frm/.frx forms. Select both native files in the browser.");
             ui.add(egui::TextEdit::singleline(&mut self.path).hint_text("Source path")).on_hover_text("Source file path");
             #[cfg(not(target_arch="wasm32"))]
             if ui.button("Confirm Source File").clicked() && let Some(request)=self.file_request.clone() {
@@ -201,7 +202,8 @@ impl App {
                 let result:Result<(),Box<dyn std::error::Error>>=match request {
                     HostRequest::Import=>read_source_bundle(&path).and_then(|files|self.ide.import_source_bundle(&files,1252).map(|_|()).map_err(Into::into)),
                     HostRequest::Save{id,text,revision,..}=>write_source(&path,&text).and_then(|()|self.ide.mark_saved(id,revision).map_err(Into::into)),
-                    HostRequest::Export{text,..}=>write_source(&path,&text),_=>Ok(())
+                    HostRequest::Export{text,..}=>write_source(&path,&text),
+                    HostRequest::NativeForm{snapshot,save}=>self.ide.validate_native_form_save(&snapshot).map_err(Into::into).and_then(|()|write_native_form(&path,&snapshot)).and_then(|()|if save{self.ide.acknowledge_native_form_save(&snapshot).map_err(Into::into)}else{Ok(())}),_=>Ok(())
                 };
                 match result {Ok(())=>{self.ide.message("Source file operation completed.");close=true;},Err(e)=>self.ide.message(e.to_string())}
             }
@@ -213,6 +215,11 @@ impl App {
                 if ui.button("Import Source").clicked(){
                     if ![".bas",".cls",".tvform"].iter().any(|extension|self.path.to_ascii_lowercase().ends_with(extension)){self.ide.message("Choose a .bas, .cls or .tvform name.");}
                     else {match self.ide.import_source_file(&self.path,&self.browser_source){Ok(_)=>{close=true;self.browser_source.clear();},Err(d)=>self.ide.message(d.to_string())}}
+                }
+            },Some(HostRequest::NativeForm{snapshot,..})=>{
+                if ui.button("Download Native Form Files").clicked(){
+                    let result=snapshot.files().iter().try_for_each(|file|self.browser_files.download_bytes(&file.name,&file.bytes));
+                    match result{Ok(())=>self.ide.message("Native form downloads requested. Save remains unacknowledged until the files are committed."),Err(message)=>self.ide.message(message)}
                 }
             },Some(HostRequest::Save{name,text,..}|HostRequest::Export{name,text,..})=>{
                 if ui.button("Download Source File").clicked() {match self.browser_files.download(name,text) {Ok(())=>self.ide.message("Download requested. Source remains modified until save is acknowledged."),Err(message)=>self.ide.message(message)}}
@@ -497,4 +504,79 @@ pub fn start() -> Result<(), wasm_bindgen::JsValue> {
         }
     });
     Ok(())
+}
+
+/// Publish an immutable companion first, then atomically replace the .frm commit point.
+/// Existing companion bytes are never overwritten; collisions refuse. No acknowledgment here.
+#[cfg(not(target_arch = "wasm32"))]
+pub fn write_native_form(
+    path: &std::path::Path,
+    snapshot: &vba_ide::NativeFormSave,
+) -> Result<(), Box<dyn std::error::Error>> {
+    use std::io::Read;
+    let frm = snapshot.files().first().ok_or("native form file missing")?;
+    let frx = snapshot.files().get(1).ok_or("native companion missing")?;
+    if !path
+        .extension()
+        .is_some_and(|extension| extension.eq_ignore_ascii_case("frm"))
+    {
+        return Err("Choose a native .frm file".into());
+    }
+    let parent = path
+        .parent()
+        .filter(|p| !p.as_os_str().is_empty())
+        .unwrap_or_else(|| std::path::Path::new("."));
+    let companion = parent.join(&frx.name);
+    let staged = stage_native_file(parent, &frx.name, &frx.bytes)?;
+    let published = std::fs::hard_link(&staged, &companion);
+    let _ = std::fs::remove_file(&staged);
+    match published {
+        Ok(()) => {}
+        Err(error) if error.kind() == std::io::ErrorKind::AlreadyExists => {
+            let metadata = std::fs::symlink_metadata(&companion)?;
+            if !metadata.file_type().is_file() || metadata.len() != frx.bytes.len() as u64 {
+                return Err("Native companion collision".into());
+            }
+            let mut bytes = Vec::new();
+            std::fs::File::open(&companion)?
+                .take(4 * 1024 * 1024 + 1)
+                .read_to_end(&mut bytes)?;
+            if bytes != frx.bytes {
+                return Err("Native companion collision".into());
+            }
+        }
+        Err(error) => return Err(error.into()),
+    }
+    let temp = stage_native_file(parent, &frm.name, &frm.bytes)?;
+    let result = std::fs::rename(&temp, path);
+    if result.is_err() {
+        let _ = std::fs::remove_file(&temp);
+    }
+    result.map_err(Into::into)
+}
+#[cfg(not(target_arch = "wasm32"))]
+fn stage_native_file(
+    parent: &std::path::Path,
+    name: &str,
+    bytes: &[u8],
+) -> Result<std::path::PathBuf, Box<dyn std::error::Error>> {
+    use std::io::Write;
+    for attempt in 0..128 {
+        let temp = parent.join(format!(".{name}.save-{}-{attempt}.tmp", std::process::id()));
+        let mut file = match std::fs::OpenOptions::new()
+            .write(true)
+            .create_new(true)
+            .open(&temp)
+        {
+            Ok(file) => file,
+            Err(error) if error.kind() == std::io::ErrorKind::AlreadyExists => continue,
+            Err(error) => return Err(error.into()),
+        };
+        if let Err(error) = file.write_all(bytes).and_then(|()| file.sync_all()) {
+            let _ = std::fs::remove_file(&temp);
+            return Err(error.into());
+        }
+        return Ok(temp);
+    }
+    Err("Native save staging limit".into())
 }

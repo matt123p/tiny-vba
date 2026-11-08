@@ -961,7 +961,7 @@ if let Some(instancing)=m.instancing(){ui.label(theme.label("Instancing"));ui.la
             ui.label(theme.label("Craft VBA Editor • independently authored"));
             ui.label(theme.label("F5 Run • F8 Step • F9 Breakpoint"));
             ui.label(theme.label("Safe watches never invoke host properties or functions."));
-            ui.label(theme.label("Plain source editing; no Office binary project writeback."));
+            ui.label(theme.label("Source and native forms can be exported here."));
         });
     }
     fn shortcuts(&mut self, ctx: &egui::Context, ide: &Ide, commands: &mut Vec<Command>) {

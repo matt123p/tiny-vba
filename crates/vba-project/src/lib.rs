@@ -1,13 +1,15 @@
-//! Bounded, read-only MS-OVBA source extraction. No compiler, VM, IO or trust policy.
+//! Bounded inert MS-OVBA decoding and explicit source-only encoding. No VM, IO or trust policy.
 #![forbid(unsafe_code)]
 mod compression;
 mod directory;
 pub mod forms;
 mod text;
-pub use compression::decompress;
+mod writeback;
+pub use compression::{compress, decompress};
 pub use directory::{Information, Reference, ReferenceKind};
 use std::io::{self, Cursor, Read, Seek, SeekFrom};
 use vba_diagnostics::{Diagnostic, SourceFile, SourceId};
+pub use writeback::{ModuleUpdate, encode_updated_project};
 
 type Result<T> = std::result::Result<T, Diagnostic>;
 fn corrupt(message: &str) -> Diagnostic {
@@ -267,8 +269,8 @@ fn container_error(error: io::Error) -> Diagnostic {
         corrupt(&format!("CFB: {error}"))
     }
 }
-fn read_stream(
-    file: &mut cfb::CompoundFile<Metered<'_>>,
+fn read_stream<T: Read + Seek>(
+    file: &mut cfb::CompoundFile<T>,
     path: &str,
     limit: usize,
 ) -> Result<Vec<u8>> {

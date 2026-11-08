@@ -135,3 +135,51 @@ fn invalid_form_open_preserves_the_existing_project() -> R {
     std::fs::remove_file(path)?;
     Ok(())
 }
+#[path = "../../../crates/vba-project/tests/support/native_forms.rs"]
+mod save_fixture;
+#[test]
+fn native_pair_commit_reopens_and_companion_collision_preserves_previous_file() -> R {
+    use vba_ide::{Ide, NativeFormResource, forms::DesignEdit};
+    let mut ide = Ide::new();
+    let id = ide.import_source_bundle(
+        &[
+            NativeFormResource {
+                name: "NativeForm.frm".into(),
+                bytes: save_fixture::export(),
+            },
+            NativeFormResource {
+                name: "NativeForm.frx".into(),
+                bytes: save_fixture::companion(),
+            },
+        ],
+        1252,
+    )?;
+    let directory = std::env::temp_dir().join(format!("vba-native-save-{}", std::process::id()));
+    std::fs::create_dir_all(&directory)?;
+    let path = directory.join("Backup.frm");
+    let snapshot = ide.export_native_form(id)?;
+    vba_ide_app::write_native_form(&path, &snapshot)?;
+    let mut reopened = Ide::new();
+    reopened.import_source_bundle(&vba_ide_app::read_source_bundle(&path)?, 1252)?;
+    assert_eq!(
+        reopened.active_module().ok_or("source")?.text,
+        save_fixture::SOURCE
+    );
+    let original = std::fs::read(&path)?;
+    ide.edit_form(
+        id,
+        DesignEdit::FormProperties {
+            caption: "new title".into(),
+            width: 300.0,
+            height: 200.0,
+        },
+    )?;
+    let snapshot = ide.export_native_form(id)?;
+    let companion = snapshot.files().get(1).ok_or("companion")?;
+    std::fs::write(directory.join(&companion.name), b"collision")?;
+    assert!(vba_ide_app::write_native_form(&path, &snapshot).is_err());
+    assert!(std::fs::read(&path)? == original);
+    assert!(ide.form(id).ok_or("form")?.dirty());
+    std::fs::remove_dir_all(&directory)?;
+    Ok(())
+}

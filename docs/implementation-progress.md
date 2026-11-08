@@ -1,5 +1,35 @@
 # Implementation progress
 
+## M7A.5 in progress — native encoders and save snapshots (2026-11-08)
+
+ADR 0098 implements native `.frm`/`.frx` designer/source encoding, admitted common
+control edits, current toolbox add/delete, nested resources, storage class/state
+metadata and NextAvailableID maintenance. Output reopens and matches the exact
+source/design. Native standalone Save publishes immutable companions before an
+atomic `.frm` replacement; browser export transfers both files without assuming
+that download requests committed them. Project/source/design-bound snapshots
+reject stale and foreign acknowledgments; imported originals remain separate.
+
+The source-only MS-OVBA encoder updates structural directory offsets, removes
+module/project/SRP performance caches and rebuilds a fresh CFB so freed sectors
+cannot retain removed caches. Exact source, component/code-name/reference and
+form identities are compared after reopen. IDE binary snapshots compile without
+execution and recheck original bytes and revisions. Hosts still own package,
+signature and actual IO policy. M7A.5 is not complete yet: required edited XLSM/
+DOCM package workflows and their integration acceptance are still in progress.
+
+Full shared native CI, strict workspace Clippy, WASM/WASI, UI/Xvfb and web builds
+pass. Latest writer/metadata rechecks pass: all 60 project tests natively and on
+Node 22 WASI, all 99 retained instance cases and three new IDE save cases natively,
+and the three save cases on WASI. The eight native file-IO cases pass. A Chromium
+flow edits the designer caption, exports two native files, reimports them inertly
+and executes the original source; its dialog and reopened views were inspected.
+Both forks' initial signature-removal regressions pass; pinned host integration
+is pending. No dependency/VM limit or host authority was added. Fresh Office
+comparisons remain M8.5 NOT_RUN. Next: finish host package export/save workflows,
+then mark M7A.5 only from their native/WASM, trust/revision and package evidence.
+
+
 ## M7A.4 complete — common forms scope; uncommon work moved to P9 (2026-11-08)
 
 On explicit owner direction, ADR 0097 replaces the exhaustive M7A.4 gate with

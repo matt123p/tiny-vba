@@ -46,6 +46,7 @@ pub(crate) struct Description {
     pub stream: String,
     pub doc_string: String,
     pub offset: u32,
+    pub offset_field: usize,
     pub procedural: bool,
     pub read_only: bool,
     pub private: bool,
@@ -213,6 +214,7 @@ pub(crate) fn parse(
             return Err(corrupt("duplicate module identity or stream"));
         }
         let doc_string = pair(&mut r, 0x1c, 0x48, code_page, 2000)?;
+        let offset_field = r.pos.checked_add(6).ok_or_else(budget)?;
         let offset = u32_record(&mut r, 0x31)?;
         r.fixed(0x1e, 4)?;
         r.fixed(0x2c, 2)?;
@@ -240,6 +242,7 @@ pub(crate) fn parse(
             stream,
             doc_string,
             offset,
+            offset_field,
             procedural,
             read_only,
             private,
