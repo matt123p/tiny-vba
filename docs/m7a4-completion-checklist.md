@@ -106,5 +106,5 @@ Selected P01 SelectionMargin follows ADR 0093: native bit 26, Boolean True
 defaults and actual left-strip displayed-line selection/drag. Canonical ranges
 retain CRLF/UTF-16 semantics; callback, Stop/resume and current policy/focus remain
 authoritative. Empty edit fields render blank with accessible names. Full shared/
-browser acceptance passes; pinned host acceptance is in progress; printing, remaining selection/
+browser and both pinned host acceptance gates pass; printing, remaining selection/
 property/input/lifecycle/binding/platform requirements above stay open.

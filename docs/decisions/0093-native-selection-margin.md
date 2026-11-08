@@ -1,6 +1,6 @@
 # ADR 0093: Native SelectionMargin and deferred line selection
 
-Date: 2026-11-08. Status: adopted; shared/browser acceptance passed; pinned host checks pending. Full M7A.4 remains open.
+Date: 2026-11-08. Status: adopted; shared/browser and both pinned host acceptance gates passed. Full M7A.4 remains open.
 
 TextBox and ComboBox expose ordinary Boolean SelectionMargin state with True
 file/runtime defaults. Native VariousPropertiesBitfield bit 26 seeds it before
