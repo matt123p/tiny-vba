@@ -1,0 +1,416 @@
+{
+  "schema": 1,
+  "profile": "m8-local-v1",
+  "date": "2026-11-08",
+  "local_status": "PASS",
+  "release_status": "NOT_RUN",
+  "milestone_status": "IN_PROGRESS: M8.5 remains an external release gate",
+  "office_observations": "NOT_RUN",
+  "selection_sha256": "9c158211fd2b360b352468bab3bc0e78cf70d5df99f2fce08473dd69542e6eef",
+  "runtime_tree_sha256": "fce541420ebb7576f691d19c64b910967f680b0d16382a8ae616eddc084ba77a",
+  "evidence_basis": [
+    "authored-contract",
+    "inherited-mac-oracle"
+  ],
+  "implementation_identity": {
+    "tiny_vba_base_revision": "ec3a708b3f0431c0f9b370072d90a2a070f699c0",
+    "source_state": "reviewed working-tree candidate, committed with these records; identity is the runtime digest plus selected input hashes",
+    "gridcraft_record_revision": "af0e23ef4aefe619540fb5360128bc410a5061ff",
+    "wordcraft_record_revision": "b19060d19b77406fbd5c72d37345113308922c1a",
+    "shipping_runtime_pin": "d9431ce4992ee9580acfe2fe0f7276de229bedaf",
+    "host_mode": "candidate path overrides, original lock bytes restored"
+  },
+  "environment": {
+    "os": "Linux 7.0.0-38-generic x86_64 GNU/Linux",
+    "rustc": "rustc 1.99.1 (58cf8f9c3 2026-10-13)",
+    "cargo": "cargo 1.99.1 (5f94df478 2026-08-27)",
+    "node": "v22.23.4",
+    "web_bindgen": "wasm-bindgen 0.2.126",
+    "host_wasm_runner": "wasm-bindgen-test-runner 0.2.129",
+    "playwright": "1.64.1",
+    "comparison_context": "authored invariant/Gregorian/UTF-16 and inherited Mac observations with per-run locale not recorded"
+  },
+  "gates": [
+    {
+      "gate": "M7A baseline re-verification",
+      "command": "cargo xtask m7a",
+      "status": "PASS",
+      "exit_code": 0,
+      "log_sha256": "f3c46f1078fbe3172f9094618427f8e0d6ae3b6e6e0b6e3f9f5e0701486c3c12",
+      "test_functions": 130,
+      "scope": "baseline before M8 changes; 61 original artifact hashes; 130 test functions"
+    },
+    {
+      "gate": "shared native CI",
+      "command": "cargo xtask ci",
+      "status": "PASS",
+      "exit_code": 0,
+      "log_sha256": "8984858e3398487ebe2bc1a127e63c396913c9570c003ebf8f3ba0227fec0203",
+      "test_functions": 1073,
+      "scope": "current product implementation; final test-only harness/orchestration deltas additionally validated below"
+    },
+    {
+      "gate": "browser WASM compilation",
+      "command": "cargo xtask wasm",
+      "status": "PASS",
+      "exit_code": 0,
+      "log_sha256": "3add7deb603b564ff081b5cfbd17abc37d1a95411084cea858c2e9c83b9924b3",
+      "test_functions": 0
+    },
+    {
+      "gate": "full actual WASI",
+      "command": "CARGO_PROFILE_TEST_OPT_LEVEL=2 CARGO_BUILD_JOBS=2 cargo xtask wasm-run",
+      "status": "PASS",
+      "exit_code": 0,
+      "log_sha256": "ddf5961ffb27104126905468de31f135cf85b03d8416f78292755ffb12d5457b",
+      "test_functions": 756,
+      "completion": {
+        "command": "cargo xtask wasm-run",
+        "exit_code": 0,
+        "test_opt_level": 2,
+        "build_jobs": 2,
+        "elapsed_seconds": 395.4253568649292
+      }
+    },
+    {
+      "gate": "M8 local gate",
+      "command": "cargo xtask m8",
+      "status": "PASS",
+      "exit_code": 0,
+      "log_sha256": "6c4478a479f4270e0573769cf657dcc6ed56ba3eb20b83975b7adb510417028a",
+      "test_functions": 17
+    },
+    {
+      "gate": "final M8 WASI gate",
+      "command": "cargo xtask m8-wasm",
+      "status": "PASS",
+      "exit_code": 0,
+      "log_sha256": "47e335f526df626ab118e7154336d6dcf2915ddd9f96c0af84d2e0c2f45ff914",
+      "test_functions": 17
+    },
+    {
+      "gate": "editor/forms UI and snapshots",
+      "command": "cargo xtask ui",
+      "status": "PASS",
+      "exit_code": 0,
+      "log_sha256": "eca66857288f44ee1716265785b33afadab8c207b9f7b8230368fedd5d498770",
+      "test_functions": 574
+    },
+    {
+      "gate": "native captures",
+      "command": "xvfb-run -a cargo xtask ui-native",
+      "status": "PASS",
+      "exit_code": 0,
+      "log_sha256": "55fc68c27c17b94cc79dcf547f7cadd76d56c586bb27c4e97194a9653d2aadb6",
+      "test_functions": 0
+    },
+    {
+      "gate": "production browser bundle",
+      "command": "cargo xtask web",
+      "status": "PASS",
+      "exit_code": 0,
+      "log_sha256": "574fa6080955db975be3090ce6d4c2ac467cce3150e34840dca8e5a5286a7542",
+      "test_functions": 0,
+      "tool": "wasm-bindgen 0.2.126"
+    },
+    {
+      "gate": "current shared candidate in both hosts",
+      "command": "cargo xtask m8-hosts",
+      "status": "PASS",
+      "exit_code": 0,
+      "log_sha256": "ff25e709c46a02781591b8e0a205d11728a35c87a8e6b7e7157dac81c346effa",
+      "test_functions": 226,
+      "scope": "temporary local dependency overrides; original host lockfiles restored; shipping pins unchanged"
+    },
+    {
+      "gate": "GridCraft full shipping-pin CI",
+      "command": "CRAFT_FONTS_DIR=/tmp/gridcraft-acceptance-fonts CRAFT_FONTS_REQUIRED=1 cargo xtask ci",
+      "status": "PASS",
+      "exit_code": 0,
+      "log_sha256": "e2b62ac65d973b364e8f81989452355f9983424afafef2560b93341266e69eb2",
+      "test_functions": 3110,
+      "steps": 10
+    },
+    {
+      "gate": "Grid new workbook suite strict Clippy",
+      "command": "cargo clippy -p gridcraft-vba --test m8_workbooks --locked -- -D warnings",
+      "status": "PASS",
+      "exit_code": 0,
+      "log_sha256": "dbf8208a6acafa6c90f618a2ad151145530152b6641ef389cc7c4e47c2878671",
+      "test_functions": 0
+    },
+    {
+      "gate": "final VM fuzz strict Clippy",
+      "command": "cargo clippy -p vba-vm --example fuzz_vm --locked -- -D warnings",
+      "status": "PASS",
+      "exit_code": 0,
+      "log_sha256": "35fbebc1e4b352cb45acf21be31412b9b4da9f92188faef2798c0e905698e3c0",
+      "test_functions": 0
+    },
+    {
+      "gate": "final gate orchestration strict Clippy",
+      "command": "cargo clippy -p xtask --all-targets --locked -- -D warnings",
+      "status": "PASS",
+      "exit_code": 0,
+      "log_sha256": "23efbe4e2f27045f06546213d5a3a1e8fa5edc68af15f4cfaa84880afefa8e16",
+      "test_functions": 0
+    },
+    {
+      "gate": "frozen importer fuzz strict Clippy",
+      "command": "cargo clippy -p vba-project --example fuzz_importer --locked -- -D warnings",
+      "status": "PASS",
+      "exit_code": 0,
+      "log_sha256": "34b583bae6b1fc1b7ca2533ec7ed0900c40208b7b4ad7ab1100c55ad00670f3d",
+      "test_functions": 0
+    },
+    {
+      "gate": "asserted release benchmarks",
+      "command": "cargo xtask m8-bench",
+      "status": "PASS",
+      "exit_code": 0,
+      "log_sha256": "539a4456f284f5908e413158a851f230fc98d85985037677714914060e7bf348",
+      "test_functions": 0,
+      "features": 8,
+      "targets": [
+        "x86_64-linux-native",
+        "wasm32-wasip1/Node22"
+      ]
+    },
+    {
+      "gate": "Chromium original workflows",
+      "command": "original tools/ui-browser scripts; Rust native_form_fixture per native flow",
+      "status": "PASS",
+      "exit_code": 0,
+      "log_sha256": "a59a5759822200c7e8fb844ab6e2e1098c8cb527d23aa1cb5e4626d09e623626",
+      "test_functions": 0,
+      "flows": [
+        "smoke",
+        "forms",
+        "fonts",
+        "appearance",
+        "text-align",
+        "word-wrap",
+        "boolean-word-wrap",
+        "caption-alignment",
+        "hide-selection",
+        "auto-tab",
+        "selection-margin",
+        "text-scroll",
+        "text-no-bars",
+        "button-focus",
+        "native-save"
+      ],
+      "flow_count": 15,
+      "assertions": "original and unchanged"
+    }
+  ],
+  "host_suites": [
+    {
+      "mode": "M8 candidate host gridcraft",
+      "suite": "form_controls",
+      "passed": 1,
+      "status": "PASS"
+    },
+    {
+      "mode": "M8 candidate host gridcraft",
+      "suite": "m8_workbooks",
+      "passed": 20,
+      "status": "PASS"
+    },
+    {
+      "mode": "M8 candidate host gridcraft",
+      "suite": "native_forms",
+      "passed": 35,
+      "status": "PASS"
+    },
+    {
+      "mode": "M8 candidate host gridcraft",
+      "suite": "package_acceptance",
+      "passed": 5,
+      "status": "PASS"
+    },
+    {
+      "mode": "M8 candidate WASM host gridcraft",
+      "suite": "form_controls",
+      "passed": 1,
+      "status": "PASS"
+    },
+    {
+      "mode": "M8 candidate WASM host gridcraft",
+      "suite": "m8_workbooks",
+      "passed": 20,
+      "status": "PASS"
+    },
+    {
+      "mode": "M8 candidate WASM host gridcraft",
+      "suite": "native_forms",
+      "passed": 35,
+      "status": "PASS"
+    },
+    {
+      "mode": "M8 candidate WASM host gridcraft",
+      "suite": "package_acceptance",
+      "passed": 5,
+      "status": "PASS"
+    },
+    {
+      "mode": "M8 candidate host wordcraft",
+      "suite": "native_forms",
+      "passed": 30,
+      "status": "PASS"
+    },
+    {
+      "mode": "M8 candidate host wordcraft",
+      "suite": "package_acceptance",
+      "passed": 6,
+      "status": "PASS"
+    },
+    {
+      "mode": "M8 candidate host wordcraft",
+      "suite": "word_workflows",
+      "passed": 29,
+      "status": "PASS"
+    },
+    {
+      "mode": "M8 candidate WASM host wordcraft",
+      "suite": "native_forms",
+      "passed": 30,
+      "status": "PASS"
+    },
+    {
+      "mode": "M8 candidate WASM host wordcraft",
+      "suite": "package_acceptance",
+      "passed": 6,
+      "status": "PASS"
+    },
+    {
+      "mode": "M8 candidate WASM host wordcraft",
+      "suite": "word_workflows",
+      "passed": 3,
+      "status": "PASS"
+    }
+  ],
+  "library": {
+    "count": 24,
+    "native": "PASS",
+    "wasi": "PASS",
+    "evidence": "inherited upstream-reported Mac observations; original M4 denominator 153 unchanged",
+    "excluded_candidates": 10,
+    "excluded_execution": "NOT_RUN",
+    "excluded_capability": "UNSUPPORTED"
+  },
+  "workbooks": {
+    "count": 20,
+    "native": "PASS",
+    "node_wasm": "PASS",
+    "evidence": "independent original Rust-built native XLSM workflows, not Office-produced or third-party workbooks",
+    "selection": "../gridcraft/tests/fixtures/m8/selection.json"
+  },
+  "host_accounting": {
+    "tests": 17,
+    "native": "PASS",
+    "wasi": "PASS",
+    "default_payload_bytes": 67108864,
+    "default_budgets_changed": false,
+    "scratch": "temporary 64 KiB plus packet metadata; real copy work remains cumulative"
+  },
+  "fuzz": {
+    "default_seed": 19768,
+    "mutations_per_target": 256,
+    "seed_counts": {
+      "parser": 6,
+      "importer": 6,
+      "vm": 7
+    },
+    "native": "PASS",
+    "wasi": "PASS",
+    "extended_seed": 123,
+    "extended_mutations_per_target": 4096,
+    "extended_native": "PASS",
+    "extended_parser_importer_log_sha256": "534c771db55dfb5cf3100471b8c1a593630e9ed17c10038c3b9db19456822681",
+    "final_extended_vm_log_sha256": "7b908387247624c10f1010bb63e775698618d0fcd626325c580394e268773c99",
+    "policy": "bounded mutation campaigns and stdin entrypoints; no coverage-guided or long-duration claim; VM seeds preflight-compile; own slice quota cancels pause-heavy programs"
+  },
+  "benchmarks_sha256": "4eb33275aa2f5f7f93642e979f10fc6457c48e38464bdc14690462b17533dbff",
+  "visual_review": [
+    {
+      "path": "reports/ui/native-paused.png",
+      "sha256": "29151c3ad61df558258b3948cd22ba0cbe8967a28e4ce1d1b7ea34f4a2226cb4",
+      "review": "inspected original current app output"
+    },
+    {
+      "path": "reports/ui/native-form.png",
+      "sha256": "9bc3ee26820caf60eb61a1c8754818cc60621d24a6f04a29d9250a21de24b3a7",
+      "review": "inspected original current app output"
+    },
+    {
+      "path": "reports/ui/dark-paused.png",
+      "sha256": "f30b98deba61d5585201de795563815673ac10ed778255fffe332a729ced5980",
+      "review": "inspected original current app output"
+    },
+    {
+      "path": "reports/ui/narrow-paused.png",
+      "sha256": "73b72b9fb85f1025404b84a5411d497fe5b02a8edcfd930dd67bea0e0a908f52",
+      "review": "inspected original current app output"
+    },
+    {
+      "path": "reports/ui/scaled-paused.png",
+      "sha256": "db1a18cc173f4a65a0bd38b7e36881a9bbd0a3611c769fee2d30ac248aae504f",
+      "review": "inspected original current app output"
+    },
+    {
+      "path": "reports/ui/host-theme.png",
+      "sha256": "5f771e7e1fec2ca688dcb0c01e2eeb516b03b34f5196b65fd918b75280f448a5",
+      "review": "inspected original current app output"
+    },
+    {
+      "path": "reports/ui/m2-form-runtime-dark.png",
+      "sha256": "1737231e6e94ecbe4caf423d77b95e79eca281f870a67b1c95dc20899a5e2ee1",
+      "review": "inspected original current app output"
+    },
+    {
+      "path": "reports/ui/m7a6-browser-native-reopened.png",
+      "sha256": "e29ce5ab811aeb0c1e18e6664cb1f48b1fa014db7868bbb87f1285d93aaa82a8",
+      "review": "inspected original current app output"
+    }
+  ],
+  "integrity": {
+    "m7a_artifacts": 61,
+    "m7a_check_log_sha256": "68d73a278c817ba7f806e89bfba7a2175897f85739b40770af073e80e3ecae78",
+    "m8_artifacts": 47,
+    "outcome": "VALID_FIXTURE",
+    "execution": "NOT_RUN by integrity checks"
+  },
+  "office_comparison": {
+    "status": "NOT_RUN",
+    "excel_build": null,
+    "word_build": null,
+    "os": null,
+    "locale": null,
+    "reason": "Owner reports no Excel/Word installation; no fresh comparison bundle supplied; release comparison gate remains open"
+  },
+  "attempt_notes": [
+    {
+      "stage": "pre-final browser boolean word wrap launch",
+      "status": "TIMEOUT",
+      "wait_seconds": 30,
+      "log_sha256": "b3f36edf0746a06bab3a8c9f79652da9c87616c1480db87db263d1a5d1168186",
+      "resolution": "original assertions passed on retry and in the full final 15-flow run; initial cause not established"
+    },
+    {
+      "stage": "earlier full default-profile WASI shell",
+      "wrapper_exit_code": 143,
+      "reported_test_functions_passed": 739,
+      "accepted_as_gate": false,
+      "log_sha256": "ed95daeb50754077603be611fa1d70ba8dae4ca0ea13d8710ff70f42f96d2bf7",
+      "resolution": "replaced by final explicit completion recorder, optimized tests, exit 0; no VM limit increased"
+    }
+  ],
+  "limitations": [
+    "M8.5 fresh Excel/Word comparison NOT_RUN; no release sign-off",
+    "Remote macOS/Windows CI not inferred from local Linux/WASM results",
+    "P9 uncommon forms compatibility remains deferred",
+    "Host shipping runtime pins unchanged; candidate behavior tested with temporary overrides",
+    "Only finite authored and inherited selections are measured; no global Office compatibility percentage"
+  ]
+}

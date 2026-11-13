@@ -160,5 +160,24 @@ class ReleaseEvidence(unittest.TestCase):
             with self.subTest(value=value), self.assertRaises(gate.InvalidFixture): gate.typed_value(value)
 
 
+
+class ChangedCandidate(unittest.TestCase):
+    def test_unrun_candidate_cannot_reuse_historical_release_pass(self):
+        from unittest.mock import patch
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            fixtures = root / 'tests/fixtures/m8'
+            fixtures.mkdir(parents=True)
+            (fixtures / 'selection.json').write_text('{}')
+            (fixtures / 'execution.json').write_text(json.dumps({'local_status': 'NOT_RUN', 'gates': []}))
+            with patch.object(gate, 'ROOT', root), patch('check_m8.check'), patch.object(
+                gate, 'check_preparation', return_value={'cases': [{'id': 'unrun'}]}
+            ):
+                report = gate.release_report(bundle=root / 'unused.json')
+            self.assertEqual(report['status'], 'NOT_RUN')
+            self.assertEqual(report['local_status'], 'NOT_RUN')
+            self.assertEqual(report['office_comparisons'], {'unrun': 'NOT_RUN'})
+
+
 if __name__ == '__main__':
     unittest.main()

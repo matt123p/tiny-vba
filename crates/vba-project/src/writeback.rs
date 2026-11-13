@@ -103,13 +103,11 @@ pub fn encode_updated_project(
     let caches = file
         .walk()
         .filter(|e| e.is_stream())
-        .filter(|e| {
-            e.path()
-                .to_str()
-                .is_some_and(|s| s.to_ascii_lowercase().starts_with("/vba/__srp_"))
-        })
-        .map(|e| e.path().to_owned())
-        .collect::<Vec<_>>();
+        .map(|e| crate::forms::resource_path(e.path()))
+        .collect::<Result<Vec<_>>>()?;
+    let caches = caches
+        .into_iter()
+        .filter(|path| path.to_ascii_lowercase().starts_with("/vba/__srp_"));
     for path in caches {
         file.remove_stream(path).map_err(container_error)?;
     }
@@ -139,8 +137,8 @@ pub fn encode_updated_project(
             .map_err(container_error)?;
     }
     for entry in entries.iter().filter(|entry| entry.is_stream()) {
-        let path = entry.path().to_str().ok_or_else(budget)?;
-        let bytes = crate::read_stream(&mut file, path, limits.stream_bytes)?;
+        let path = crate::forms::resource_path(entry.path())?;
+        let bytes = crate::read_stream(&mut file, &path, limits.stream_bytes)?;
         total = total
             .checked_add(bytes.len())
             .filter(|n| *n <= limits.input_bytes)

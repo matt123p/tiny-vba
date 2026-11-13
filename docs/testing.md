@@ -71,3 +71,20 @@ but actual Excel/Word observations and provenance review remain **NOT_RUN**.
 `python3 tools/check_m8_release.py --validate` validates preparation only;
 without a completed reviewed bundle the release gate intentionally fails.
 The full capture and typed-result protocol is in [release validation](m8-office-comparison.md).
+
+## CI environments and candidate identity
+
+Native CI runs independently on Linux, Windows and macOS (matrix fail-fast is
+disabled). Linux rendering tests require the software Vulkan/EGL packages installed
+by the workflow. The dedicated UI job retains browser/native capture coverage.
+CFB resource/storage identities and runtime digest paths use `/` on every OS.
+
+The inaccessible ReflexGrid download is replaced by four exact MIT oracle input
+files under `references/oracle-sources/reflex-grid/`. Both inherited selections
+still verify their original hashes; unretained upstream candidates remain NOT_RUN.
+Other public corpora retain strict submodule pin/notice/specimen verification.
+
+The original M8 selection and execution bytes are preserved under
+`tests/fixtures/m8/baseline-2026-11-08/`. Current candidate receipts describe only
+checks actually rerun after the portability change. Release readiness remains
+NOT_RUN until all required local and fresh Office gates are satisfied.

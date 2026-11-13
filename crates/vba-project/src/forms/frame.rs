@@ -333,19 +333,14 @@ pub fn decode_export(
             .map(|e| e.path().to_owned())
             .collect::<Vec<_>>()
         {
-            let path = entry
-                .to_str()
-                .ok_or_else(|| corrupt("resource stream name"))?;
+            let path = super::resource_path(&entry)?;
             let bytes =
-                super::read_stream(&mut file, path, MAX_RESOURCE_BYTES.saturating_sub(total))?;
+                super::read_stream(&mut file, &path, MAX_RESOURCE_BYTES.saturating_sub(total))?;
             total = total
                 .checked_add(bytes.len())
                 .filter(|n| *n <= MAX_RESOURCE_BYTES)
                 .ok_or_else(budget)?;
-            resources.push(Resource {
-                name: path.into(),
-                bytes,
-            });
+            resources.push(Resource { name: path, bytes });
         }
         let mut form = binary::decode(&resources, "", &header)?;
         form.storages = super::storage_metadata(&file, "")?;

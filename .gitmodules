@@ -1,7 +1,3 @@
-[submodule "tests/corpora/reflex-grid"]
-	path = tests/corpora/reflex-grid
-	url = https://github.com/milochen0418/reflex_grid.git
-	update = none
 [submodule "tests/corpora/vba-json"]
 	path = tests/corpora/vba-json
 	url = https://github.com/VBA-tools/VBA-JSON.git

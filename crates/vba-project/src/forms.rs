@@ -317,15 +317,13 @@ pub(crate) fn embedded(
         .map(|e| e.path().to_owned())
         .collect();
     for path in paths {
-        let path = path
-            .to_str()
-            .ok_or_else(|| crate::corrupt("designer stream path"))?;
+        let path = resource_path(&path)?;
         if path.ends_with("/\u{3}VBFrame") {
             continue;
         }
         let bytes = read_stream(
             file,
-            path,
+            &path,
             limits
                 .stream_bytes
                 .min(MAX_RESOURCE_BYTES.saturating_sub(total)),
@@ -334,10 +332,7 @@ pub(crate) fn embedded(
             .checked_add(bytes.len())
             .filter(|n| *n <= MAX_RESOURCE_BYTES)
             .ok_or_else(budget)?;
-        resources.push(Resource {
-            name: path.into(),
-            bytes,
-        });
+        resources.push(Resource { name: path, bytes });
     }
     let mut result = binary::decode(&resources, &root, &header)?;
     result.format = Format::Embedded;
@@ -368,6 +363,14 @@ pub struct ImageBehavior {
     pub auto_size: bool,
 }
 
+// CFB names cannot contain backslashes. Normalize the library's platform-native
+// paths before they become serialized resource/storage identities.
+pub(super) fn resource_path(path: &std::path::Path) -> Result<String> {
+    path.to_str()
+        .map(|name| name.replace('\\', "/"))
+        .ok_or_else(|| crate::corrupt("native resource path"))
+}
+
 pub(crate) fn storage_metadata<T: std::io::Read + std::io::Seek>(
     file: &cfb::CompoundFile<T>,
     root: &str,
@@ -377,12 +380,9 @@ pub(crate) fn storage_metadata<T: std::io::Read + std::io::Seek>(
     let entries = std::iter::once(file.entry(base).map_err(container_error)?)
         .chain(file.walk_storage(base).map_err(container_error)?);
     for entry in entries.filter(|entry| entry.is_storage()) {
-        let name = entry
-            .path()
-            .to_str()
-            .ok_or_else(|| crate::corrupt("storage path"))?;
+        let name = resource_path(entry.path())?;
         let relative = if root.is_empty() {
-            name
+            name.as_str()
         } else {
             if !name
                 .get(..root.len())

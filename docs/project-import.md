@@ -108,3 +108,7 @@ resource budgets are checked before a result is published.
 variants refuse before mutation. Import is separate from native Save/Export and
 source-only project encoding; original resources remain separate from edited
 snapshots. [Forms](forms.md) defines the current profile and writeback boundaries.
+
+CFB libraries expose platform-native paths; shared native resource/storage names
+are normalized to `/` before lookup or encoding. Nested Frame/MultiPage resources
+therefore keep the same identity across Windows, Linux and macOS.

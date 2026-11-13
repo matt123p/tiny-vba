@@ -12,7 +12,8 @@
       "rights": "pending-specimen-review",
       "capabilities": "unclassified",
       "profile": "unverified",
-      "expected_behavior": "not-curated"
+      "expected_behavior": "not-curated",
+      "availability": "not-retained-in-oracle-snapshot"
     },
     {
       "source": "reflex-grid",
@@ -23,7 +24,8 @@
       "rights": "pending-specimen-review",
       "capabilities": "unclassified",
       "profile": "unverified",
-      "expected_behavior": "not-curated"
+      "expected_behavior": "not-curated",
+      "availability": "not-retained-in-oracle-snapshot"
     },
     {
       "source": "reflex-grid",
@@ -34,7 +36,8 @@
       "rights": "pending-specimen-review",
       "capabilities": "unclassified",
       "profile": "unverified",
-      "expected_behavior": "not-curated"
+      "expected_behavior": "not-curated",
+      "availability": "not-retained-in-oracle-snapshot"
     },
     {
       "source": "reflex-grid",
@@ -45,7 +48,8 @@
       "rights": "pending-specimen-review",
       "capabilities": "unclassified",
       "profile": "unverified",
-      "expected_behavior": "not-curated"
+      "expected_behavior": "not-curated",
+      "availability": "not-retained-in-oracle-snapshot"
     },
     {
       "source": "reflex-grid",
@@ -56,7 +60,8 @@
       "rights": "pending-specimen-review",
       "capabilities": "unclassified",
       "profile": "unverified",
-      "expected_behavior": "not-curated"
+      "expected_behavior": "not-curated",
+      "availability": "not-retained-in-oracle-snapshot"
     },
     {
       "source": "reflex-grid",
@@ -67,7 +72,8 @@
       "rights": "pending-specimen-review",
       "capabilities": "unclassified",
       "profile": "unverified",
-      "expected_behavior": "not-curated"
+      "expected_behavior": "not-curated",
+      "availability": "not-retained-in-oracle-snapshot"
     },
     {
       "source": "reflex-grid",
@@ -78,7 +84,8 @@
       "rights": "pending-specimen-review",
       "capabilities": "unclassified",
       "profile": "unverified",
-      "expected_behavior": "not-curated"
+      "expected_behavior": "not-curated",
+      "availability": "not-retained-in-oracle-snapshot"
     },
     {
       "source": "reflex-grid",
@@ -89,7 +96,8 @@
       "rights": "pending-specimen-review",
       "capabilities": "unclassified",
       "profile": "unverified",
-      "expected_behavior": "not-curated"
+      "expected_behavior": "not-curated",
+      "availability": "not-retained-in-oracle-snapshot"
     },
     {
       "source": "reflex-grid",
@@ -124,7 +132,8 @@
       "rights": "pending-specimen-review",
       "capabilities": "unclassified",
       "profile": "unverified",
-      "expected_behavior": "not-curated"
+      "expected_behavior": "not-curated",
+      "availability": "not-retained-in-oracle-snapshot"
     },
     {
       "source": "reflex-grid",
@@ -135,7 +144,8 @@
       "rights": "pending-specimen-review",
       "capabilities": "unclassified",
       "profile": "unverified",
-      "expected_behavior": "not-curated"
+      "expected_behavior": "not-curated",
+      "availability": "not-retained-in-oracle-snapshot"
     },
     {
       "source": "reflex-grid",
@@ -146,7 +156,8 @@
       "rights": "pending-specimen-review",
       "capabilities": "unclassified",
       "profile": "unverified",
-      "expected_behavior": "not-curated"
+      "expected_behavior": "not-curated",
+      "availability": "not-retained-in-oracle-snapshot"
     },
     {
       "source": "reflex-grid",
@@ -157,7 +168,8 @@
       "rights": "pending-specimen-review",
       "capabilities": "unclassified",
       "profile": "unverified",
-      "expected_behavior": "not-curated"
+      "expected_behavior": "not-curated",
+      "availability": "not-retained-in-oracle-snapshot"
     },
     {
       "source": "vba-json",

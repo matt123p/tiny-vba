@@ -33,7 +33,7 @@ def check(require_checkouts=False, directory=DIRECTORY, count=153, prefix="rfx-m
         raise ValueError('selected oracle expected data changed without review')
     expected = json.loads(expected_bytes)
     ids, keys = set(), set()
-    sources = ROOT / 'tests/corpora/reflex-grid'
+    sources = ROOT / 'references/oracle-sources/reflex-grid'
     available = (sources / 'tests/vba_excel_cases.py').is_file()
     if require_checkouts and not available:
         raise ValueError('ReflexGrid checkout required')

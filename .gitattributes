@@ -4,3 +4,6 @@
 # Native VBA exports retain their original code page and authored line endings.
 *.frm -text whitespace=cr-at-eol
 *.frx binary
+
+# Pinned upstream oracle bytes must not be normalized by checkout.
+/references/oracle-sources/** -text

@@ -15,10 +15,15 @@ MIT. Tree-sitter VBA: harumiWeb, MIT; bundled third-party fixtures may have othe
 chapmjs/vba-samples and dtripathi18/Excel-VBA-Projects have no top-level licence file in the pinned
 checkouts. Marked NOASSERTION and pending review; no redistribution or execution permission is inferred.
 
-The workspace design inputs were user-supplied and copied unchanged under docs/design/.
+The original user-supplied design inputs remain in Git history; maintained contracts live under docs/.
 Gridcraft AGENTS.md/CLAUDE.md supplied the conventions adapted into independently worded tiny-vba guidance;
-Gridcraft's upstream licensing is MIT OR Apache-2.0. tiny-vba's existing MIT licence remains unchanged.
+Gridcraft's upstream licensing is MIT OR Apache-2.0. tiny-vba is dual-licensed MIT OR Apache-2.0.
 
 Normative reference leads: Microsoft MS-VBAL, MS-OVBA and MS-CFB URLs in the supplied interpreter spec.
 They are not downloaded or version-pinned by this setup. Pin the actual specification revision/hash when
 selecting normative cases; do not claim current online versions from the historical design alone.
+
+The unavailable ReflexGrid checkout has been replaced by four exact MIT
+oracle-data/notice files under `oracle-sources/reflex-grid/`. Source revision,
+original URL and all file hashes remain in the source lock and oracle selections.
+This snapshot is data for verification; its Python is never imported or executed.

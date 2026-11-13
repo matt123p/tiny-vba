@@ -328,6 +328,11 @@ def release_report(bundle=None):
     # Historical local receipts contain fractional durations, not VBA values.
     local = json.loads((ROOT / 'tests/fixtures/m8/execution.json').read_text(),
                        object_pairs_hook=unique_pairs, parse_constant=reject_number)
+    if local['local_status'] == 'NOT_RUN':
+        require(isinstance(local['gates'], list), 'local gate list')
+        return {'profile': 'm8-release-v1', 'status': 'NOT_RUN', 'local_status': 'NOT_RUN',
+                'office_comparisons': {case['id']: 'NOT_RUN' for case in manifest['cases']},
+                'reason': 'Changed local candidate has not completed all release gates; historical receipts are not reused'}
     require(local['local_status'] == 'PASS' and isinstance(local['gates'], list)
             and LOCAL_GATES <= {gate['gate'] for gate in local['gates']}
             and len({gate['gate'] for gate in local['gates']}) == len(local['gates'])

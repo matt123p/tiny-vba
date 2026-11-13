@@ -1,6 +1,7 @@
 # External corpus candidates
 
-Six upstream repositories are cloned as Git submodules; Microsoft VBA-Docs is a seventh reference submodule.
+Five upstream test repositories and Microsoft VBA-Docs are pinned as Git submodules.
+The reviewed ReflexGrid oracle inputs are an exact local data snapshot.
 Exact revisions and upstream notice hashes: [source lock](../../references/sources.lock.json).
 Candidate files and SHA-256/size metadata: [inventory.json](inventory.json).
 Whole candidate files remain NOT_RUN. The reviewed M4 exception below executes only selected
@@ -9,7 +10,7 @@ No downloaded code or macro is automatically executed, linked or copied into int
 
 | Checkout | Intended material | Current restriction |
 |---|---|---|
-| reflex-grid | tests/vba_excel_cases.py, vba_excel_expected.json, vba_object_cases.py, vba_object_expected.json; Mac oracle method | MIT top-level; use data/methodology only; separate Mac profile, bundled third-party rights |
+| ReflexGrid oracle snapshot | Pinned language case table, expected results, oracle report and MIT notice | Inert local data only; original source revision and hashes retained; separate Mac profile |
 | vba-json | JsonConverter.bas, specs/Specs.bas, specs/VBA-JSON - Specs.xlsm | MIT top-level; identify dictionary/OS dependencies |
 | vba-project-starter | src/DemoStudy.xlsm, tests/tests_DemoStudy.xlsm and modules | MIT top-level; cross-workbook dependencies; advanced integration |
 | vba-samples | Macro-enabled teaching workbooks | No top-level licence found; pending rights review, IO/forms classification |
@@ -65,3 +66,14 @@ Normal Rust tests need no submodule checkout. CI also checks evidence bytes/adap
 available. [Results and provenance limits](../../docs/m4-oracle-report.md) distinguish inherited
 upstream-reported observations from local native/WASI comparisons. This is the reviewed policy
 exception for M4 acceptance; it does not authorize arbitrary corpus execution or whole-file PASS.
+
+## Offline ReflexGrid oracle source
+
+The original upstream is no longer publicly available.
+`references/oracle-sources/reflex-grid/` retains exactly the four files already
+pinned by the M4/M8 oracle selections, with unchanged bytes and MIT attribution.
+The maintenance checker parses data literals and JSON; it never imports or runs
+the upstream Python. Extra, missing or changed snapshot files fail validation.
+Other historical ReflexGrid candidate specimens remain inventoried as NOT_RUN
+and explicitly not retained; they are not counted as verified snapshot inputs.
+No interpreter implementation or unreviewed third-party workbook is copied.

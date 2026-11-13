@@ -719,7 +719,7 @@ fn resource_streams(original: &NativeForm, limits: &Limits) -> Result<(String, V
                 .collect::<Vec<_>>();
             let mut resources = Vec::new();
             for p in paths {
-                let name = p.to_str().ok_or_else(budget)?.to_owned();
+                let name = super::resource_path(&p)?;
                 let bytes = crate::read_stream(&mut file, &name, MAX_RESOURCE_BYTES)?;
                 resources.push(Resource { name, bytes });
             }

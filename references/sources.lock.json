@@ -4,7 +4,7 @@
   "sources": [
     {
       "id": "reflex-grid",
-      "path": "tests/corpora/reflex-grid",
+      "path": "references/oracle-sources/reflex-grid",
       "repository": "https://github.com/milochen0418/reflex_grid.git",
       "commit": "03a338b214df243f1bc68e50512936ddc5566c76",
       "declared_license": "MIT",
@@ -17,7 +17,14 @@
       "role": "language-oracle-and-office-scenarios",
       "adoption_status": "153-language-oracle-cases-reviewed",
       "execution_policy": "reviewed-pure-language-allowlist-only",
-      "notes": "MIT case data and upstream-reported Excel Mac results only, under docs/decisions/0012-m4-oracle-acceptance.md. Exact selection/hashes in tests/fixtures/m4-oracle/selection.json. Upstream scripts and implementation code excluded; unselected specimens remain NOT_RUN."
+      "notes": "MIT case data and upstream-reported Excel Mac results only, under docs/decisions/0012-m4-oracle-acceptance.md. Exact selection/hashes in tests/fixtures/m4-oracle/selection.json. Upstream scripts and implementation code excluded; unselected specimens remain NOT_RUN. The upstream became unavailable in November 2026. Only the four exact MIT oracle-data/notice files are retained locally; no upstream implementation is adopted or executed. Other inventoried specimens are unavailable and remain NOT_RUN.",
+      "distribution": "vendored-oracle-data",
+      "snapshot_files": {
+        "tests/vba_excel_cases.py": "e5d03d56c4f06433c5c4198c3ac79a4af3ff8c8def9d265337749705caf1cd0e",
+        "tests/vba_excel_expected.json": "610f3ed1d17922a8d095179c6c6eb5e62936c81d7cef4993f3a7adb62a40427a",
+        "docs/excel-oracle.json": "4144969beac52097fba9ae19bad0e30a03d6ecf1b3278fd1fe424431bc4b61ec",
+        "LICENSE": "a6c7fac3d7ba2a1c58b2dc32880902ef62ccf2e7fe85e2fe25ba74b088dc0031"
+      }
     },
     {
       "id": "vba-json",

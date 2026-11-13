@@ -125,3 +125,5 @@ and evidence references.
 - [ADR 0099: Native-only form file workflows](0099-native-only-form-workflows.md)
 - [ADR 0100: Common native forms acceptance](0100-common-native-forms-acceptance.md)
 - [ADR 0102 — Offline preparation and validation of M8 release evidence](0102-m8-release-evidence-gate.md)
+
+- [0103 — CI portability and offline oracle source](0103-ci-portability-and-offline-oracle-source.md)

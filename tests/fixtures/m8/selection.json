@@ -1,14 +1,14 @@
 {
   "schema": 1,
   "profile": "m8-local-v1",
-  "date": "2026-11-08",
+  "date": "2026-11-13",
   "evidence_basis": [
     "authored-contract",
     "inherited-mac-oracle"
   ],
   "office_observations": "NOT_RUN",
   "m7a_baseline_tree_sha256": "a6b1acaa2f6da29d4ef603bfee9c26b285113e52d30bd11c850df1845023e420",
-  "runtime_tree_sha256": "fce541420ebb7576f691d19c64b910967f680b0d16382a8ae616eddc084ba77a",
+  "runtime_tree_sha256": "8c8c9bf918aa450bd5bc171f1db726a12f36a79fcfdf4c2956d7dcaf5d3542a7",
   "artifacts": [
     {
       "repository": "tiny-vba",
@@ -223,12 +223,12 @@
     {
       "repository": "tiny-vba",
       "path": "tools/check_m4_evidence.py",
-      "sha256": "4415a14b72b5ab42c35c29779dccf8c28b54bb68975d76a7e67e88c471d64ae4"
+      "sha256": "6fe73c7f9f20d1fe7f1c9efd8c5087aa5622880f24cf2e2d70ea08b4bf56f076"
     },
     {
       "repository": "tiny-vba",
       "path": "tools/check_m7a.py",
-      "sha256": "af59454c485ac88eba152efca639c68a25a4955acf80ee8799960092944c03a2"
+      "sha256": "2aa254840b1647b7d0b3c2261c662308360693040cbc0b241c4c9daf4b58d25d"
     },
     {
       "repository": "tiny-vba",
@@ -244,6 +244,48 @@
       "repository": "tiny-vba",
       "path": "fuzz/seeds/pause-heavy.bas",
       "sha256": "ee67c1dd5d97e78d1266db054a8108561cfd709d0fce73ba768ddfe33743c581"
+    },
+    {
+      "repository": "tiny-vba",
+      "path": "crates/vba-project/tests/native_resource_paths.rs",
+      "sha256": "2bb76134169ee0b9e16b738ded0812aa7e826b49a25a50c3a1c965c70edfd6e0"
+    },
+    {
+      "repository": "tiny-vba",
+      "path": "tools/check_repository.py",
+      "sha256": "0693b47853dc816305295bf6e6f1c64c8ddf96a067d1dd1d8e51e23f6b42e934"
+    },
+    {
+      "repository": "tiny-vba",
+      "path": "tools/tests/test_corpus_snapshot.py",
+      "sha256": "a1fb8dc7aead1921c88a83be722fcd6345996dc08ee0fc03b5788da1edf42d7d"
+    },
+    {
+      "repository": "tiny-vba",
+      "path": ".github/workflows/ci.yml",
+      "sha256": "757071d0bcafc11a4d67ac048bfbef463ccc54cfd1e8a342533c7720c1803e34"
+    },
+    {
+      "repository": "tiny-vba",
+      "path": "references/sources.lock.json",
+      "sha256": "ffce8f41b67d1bd34982c203b63bfe464a3d18ca230197c9a29ae43f5a357f5a"
+    },
+    {
+      "repository": "tiny-vba",
+      "path": "tests/corpora/inventory.json",
+      "sha256": "1901550970ed8b5a3c7059f0305d9309e91de047d1f8de3ac874857850b8dc9b"
+    },
+    {
+      "repository": "tiny-vba",
+      "path": "tools/check_m8_release.py",
+      "sha256": "9f4e0038cc56f6c910c5771abcb8aa66d84159a51ed435f2f956ea3a24868f54"
+    },
+    {
+      "repository": "tiny-vba",
+      "path": "tools/tests/test_m8_release.py",
+      "sha256": "d0116f7e91072826a2c5153b20aa586bec9486f13aeed78e9d26be917442c644"
     }
-  ]
+  ],
+  "baseline_selection_sha256": "9c158211fd2b360b352468bab3bc0e78cf70d5df99f2fce08473dd69542e6eef",
+  "review": "CI portability candidate: canonical native CFB resource paths on Windows, slash-normalized runtime digests, exact MIT oracle snapshot instead of inaccessible upstream checkout. Original local/host acceptance receipts remain in baseline-2026-11-08; no result is carried forward to this tree."
 }

@@ -89,12 +89,31 @@ def layers():
     print(f'layers: {len(actual)} crates, acyclic; engine/IDE model remain headless; UI above model')
 
 
+def oracle_snapshot(source, checkout):
+    """Validate inert, explicitly retained upstream data; never import its Python."""
+    files = source['snapshot_files']
+    if not files or not isinstance(files, dict):
+        raise ValueError('empty oracle snapshot')
+    actual = {p.relative_to(checkout).as_posix() for p in checkout.rglob('*') if p.is_file()}
+    if actual != set(files):
+        raise ValueError('oracle snapshot file inventory differs')
+    for name, digest in files.items():
+        if not re.fullmatch(r'[0-9a-f]{64}', digest):
+            raise ValueError('invalid oracle snapshot digest')
+        if hashlib.sha256(contained(checkout, name).read_bytes()).hexdigest() != digest:
+            raise ValueError(f'oracle snapshot hash mismatch: {name}')
+    for notice in source['license_files']:
+        if files.get(notice['path']) != notice['sha256']:
+            raise ValueError('oracle snapshot notice differs')
+    return set(files)
+
+
 def corpora(require_checkouts):
     lock = json.loads((ROOT / 'references/sources.lock.json').read_text())
     inventory = json.loads((ROOT / 'tests/corpora/inventory.json').read_text())
     if lock['schema_version'] != 1 or inventory['schema_version'] != 1:
         raise ValueError('unsupported source lock/inventory version')
-    sources, available = {}, set()
+    sources, available, snapshots = {}, set(), {}
     config = subprocess.check_output(
         ['git', 'config', '-f', '.gitmodules', '--get-regexp', r'^submodule\..*\.(path|url)$'],
         cwd=ROOT, text=True)
@@ -105,6 +124,11 @@ def corpora(require_checkouts):
             raise ValueError(f'invalid/duplicate source pin: {identity}')
         sources[identity] = source
         checkout = contained(ROOT, path)
+        if source.get('distribution') == 'vendored-oracle-data':
+            snapshots[identity] = oracle_snapshot(source, checkout)
+            available.add(identity)
+            print(f'corpora: {identity}: {len(snapshots[identity])} pinned oracle-data/notice files verified offline')
+            continue
         prefix = f'submodule.{path}'
         if module_entries.get(prefix + '.path') != path or module_entries.get(prefix + '.url') != source['repository']:
             raise ValueError(f'submodule URL/path mismatch: {path}')
@@ -133,6 +157,11 @@ def corpora(require_checkouts):
         if key in seen or not re.fullmatch(r'[0-9a-f]{64}', specimen['sha256']):
             raise ValueError(f'invalid/duplicate specimen: {key}')
         seen.add(key)
+        if identity in snapshots and specimen['path'] not in snapshots[identity]:
+            if specimen.get('availability') != 'not-retained-in-oracle-snapshot':
+                raise ValueError(f'unclassified unavailable specimen: {key}')
+            print(f'corpora: NOT_RUN, upstream specimen not retained: {identity}/{specimen["path"]}')
+            continue
         fixture = contained(ROOT / source['path'], specimen['path'])
         if identity in available:
             data = fixture.read_bytes()
@@ -165,7 +194,7 @@ def main():
         from check_m8_release import check_preparation
         check_preparation()
         subprocess.run([sys.executable, '-m', 'unittest', 'discover', '-s',
-                        str(ROOT / 'tools/tests'), '-p', 'test_m8_release.py'], check=True)
+                        str(ROOT / 'tools/tests'), '-p', 'test_*.py'], check=True)
     if args.check in {'native-forms', 'all'}:
         native_forms()
         from check_m7a import check as check_m7a
