@@ -13,7 +13,7 @@ ROOT = Path(__file__).resolve().parents[1]
 
 
 def git(*args):
-    return subprocess.check_output(['git', *args], cwd=ROOT, text=True).strip()
+    return subprocess.check_output(['git', *args], cwd=ROOT, text=True, encoding='utf-8').strip()
 
 
 def contained(base, relative):
@@ -24,16 +24,16 @@ def contained(base, relative):
 
 
 def layers():
-    graph = json.loads((ROOT / 'tools/architecture.json').read_text())
+    graph = json.loads((ROOT / 'tools/architecture.json').read_text(encoding='utf-8'))
     allowed = graph['allowed_normal_dependencies']
     external = graph.get('allowed_external_dependencies', {})
     metadata = json.loads(subprocess.check_output(
-        ['cargo', 'metadata', '--locked', '--no-deps', '--format-version', '1'], cwd=ROOT, text=True))
+        ['cargo', 'metadata', '--locked', '--no-deps', '--format-version', '1'], cwd=ROOT, text=True, encoding='utf-8'))
     actual = {}
     for package in metadata['packages']:
         if package['license'] != 'MIT OR Apache-2.0':
             raise ValueError(f'{package["name"]}: licence differs from repository LICENSE')
-        manifest = tomllib.loads(Path(package['manifest_path']).read_text())
+        manifest = tomllib.loads(Path(package['manifest_path']).read_text(encoding='utf-8'))
         if manifest.get('lints', {}).get('workspace') is not True:
             raise ValueError(f'{package["name"]}: workspace safety lints not inherited')
         dependencies = package['dependencies']
@@ -109,14 +109,14 @@ def oracle_snapshot(source, checkout):
 
 
 def corpora(require_checkouts):
-    lock = json.loads((ROOT / 'references/sources.lock.json').read_text())
-    inventory = json.loads((ROOT / 'tests/corpora/inventory.json').read_text())
+    lock = json.loads((ROOT / 'references/sources.lock.json').read_text(encoding='utf-8'))
+    inventory = json.loads((ROOT / 'tests/corpora/inventory.json').read_text(encoding='utf-8'))
     if lock['schema_version'] != 1 or inventory['schema_version'] != 1:
         raise ValueError('unsupported source lock/inventory version')
     sources, available, snapshots = {}, set(), {}
     config = subprocess.check_output(
         ['git', 'config', '-f', '.gitmodules', '--get-regexp', r'^submodule\..*\.(path|url)$'],
-        cwd=ROOT, text=True)
+        cwd=ROOT, text=True, encoding='utf-8')
     module_entries = dict(line.split(' ', 1) for line in config.splitlines())
     for source in lock['sources']:
         identity, path, revision = source['id'], source['path'], source['commit']
@@ -175,7 +175,7 @@ def native_forms():
     # Historical docs/negative tests may name the retired format; product code may not.
     for group in ['crates', 'apps']:
         for path in (ROOT / group).glob('*/src/**/*.rs'):
-            text = path.read_text()
+            text = path.read_text(encoding='utf-8')
             if any(token in text for token in ['.tvform', 'TINY-VBA-FORM', 'form_archive']):
                 raise ValueError(f'retired custom form format in product source: {path.relative_to(ROOT)}')
     if any((ROOT / 'examples').rglob('*.tvform')):

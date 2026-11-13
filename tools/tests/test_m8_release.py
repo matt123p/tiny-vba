@@ -52,7 +52,7 @@ class ReleaseEvidence(unittest.TestCase):
     def mutate(self, change, index=0, producer='office'):
         ref = self.bundle['results'][index][producer]
         path = self.base / ref['path']
-        raw = json.loads(path.read_text())
+        raw = json.loads(path.read_text(encoding='utf-8'))
         change(raw)
         path.write_text(json.dumps(raw))
         ref['sha256'] = gate.digest(path)
@@ -105,7 +105,7 @@ class ReleaseEvidence(unittest.TestCase):
                        lambda raw: raw['environment'].update(platform='linux')]:
             with self.subTest(change=change):
                 ref = self.bundle['results'][0]['office']
-                before = (self.base / ref['path']).read_text()
+                before = (self.base / ref['path']).read_text(encoding='utf-8')
                 self.mutate(change)
                 with self.assertRaises(gate.InvalidFixture): self.result()
                 (self.base / ref['path']).write_text(before)

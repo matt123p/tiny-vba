@@ -192,7 +192,7 @@ def check_preparation(directory=DIRECTORY, root=ROOT, siblings=False):
                 require(path.is_relative_to(base.resolve()) and path.is_file()
                         and digest(path) == source['sha256'], 'changed/missing sibling source')
         if siblings:
-            sources = '\n'.join((root.parent / source['repository'] / source['path']).read_text()
+            sources = '\n'.join((root.parent / source['repository'] / source['path']).read_text(encoding='utf-8')
                                 for source in case['sources'])
             require(all('fn ' + entry + '(' in sources for entry in case['entrypoints']), 'missing recipe entrypoint')
         required = case['required_observations']
@@ -326,7 +326,7 @@ def release_report(bundle=None):
     manifest = check_preparation()
     local_path = ROOT / 'tests/fixtures/m8/selection.json'
     # Historical local receipts contain fractional durations, not VBA values.
-    local = json.loads((ROOT / 'tests/fixtures/m8/execution.json').read_text(),
+    local = json.loads((ROOT / 'tests/fixtures/m8/execution.json').read_text(encoding='utf-8'),
                        object_pairs_hook=unique_pairs, parse_constant=reject_number)
     if local['local_status'] == 'NOT_RUN':
         require(isinstance(local['gates'], list), 'local gate list')

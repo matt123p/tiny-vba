@@ -10,7 +10,8 @@ CFB paths emitted by the external library are normalized to `/` before becoming
 resource/storage identities. CFB names cannot contain backslashes, so the mapping
 is lossless. Import/export, embedded resources and storage metadata share it.
 Runtime source digests also use `/`, preserving the existing Linux hash algorithm
-while making identical Windows checkouts comparable.
+while making identical Windows checkouts comparable. Maintenance readers explicitly
+use UTF-8 rather than the host locale, including Windows CP1252 environments.
 
 The ReflexGrid upstream is unavailable publicly. Replace its submodule with only
 the four MIT oracle-data/notice files already pinned by the M4 and M8 selections.

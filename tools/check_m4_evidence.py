@@ -15,7 +15,7 @@ def sha(data):
 
 
 def fields(path):
-    header, body = path.read_text().split('---\n', 1)
+    header, body = path.read_text(encoding='utf-8').split('---\n', 1)
     result = {}
     for line in header.splitlines():
         key, value = line.split(' = ', 1)
@@ -27,7 +27,7 @@ def fields(path):
 
 def check(require_checkouts=False, directory=DIRECTORY, count=153, prefix="rfx-m4", bundle_path="apps/vba-cli/examples/support/m4_oracle_fixtures.rs"):
     DIRECTORY = directory
-    selection = json.loads((DIRECTORY / 'selection.json').read_text())
+    selection = json.loads((DIRECTORY / 'selection.json').read_text(encoding='utf-8'))
     expected_bytes = (DIRECTORY / 'selected-expected.json').read_bytes()
     if sha(expected_bytes) != selection['selected_expected_sha256']:
         raise ValueError('selected oracle expected data changed without review')
@@ -44,14 +44,14 @@ def check(require_checkouts=False, directory=DIRECTORY, count=153, prefix="rfx-m
             if not path.is_relative_to(sources.resolve()) or sha(path.read_bytes()) != digest:
                 raise ValueError(f'upstream evidence bytes changed: {name}')
         # Only data literals in three reviewed fixture tables are consumed.
-        tree = ast.parse((sources / 'tests/vba_excel_cases.py').read_text())
+        tree = ast.parse((sources / 'tests/vba_excel_cases.py').read_text(encoding='utf-8'))
         for node in tree.body:
             if isinstance(node, ast.AnnAssign) and isinstance(node.target, ast.Name) and node.target.id in {'EXPRESSIONS', 'FUNCTIONS'}:
                 source_data[node.target.id] = ast.literal_eval(node.value)
             if isinstance(node, ast.Assign) and any(isinstance(t, ast.Name) and t.id == 'HELPERS' for t in node.targets):
                 source_data['HELPERS'] = ast.literal_eval(node.value)
-        source_expected = json.loads((sources / 'tests/vba_excel_expected.json').read_text())
-        report = json.loads((sources / 'docs/excel-oracle.json').read_text())['checks']['vba-language']
+        source_expected = json.loads((sources / 'tests/vba_excel_expected.json').read_text(encoding='utf-8'))
+        report = json.loads((sources / 'docs/excel-oracle.json').read_text(encoding='utf-8'))['checks']['vba-language']
         for key, value in selection['oracle'].items():
             if key != 'locale' and report[key] != value:
                 raise ValueError(f'upstream oracle environment differs: {key}')
@@ -96,7 +96,7 @@ def check(require_checkouts=False, directory=DIRECTORY, count=153, prefix="rfx-m
                 actual += '\n' + match.group(0) + '\n'
             if actual != body:
                 raise ValueError(f'fixture is not the reviewed source adaptation: {ident}')
-    bundle=(ROOT / bundle_path).read_text()
+    bundle=(ROOT / bundle_path).read_text(encoding='utf-8')
     bundled=re.findall(rf'include_str!\(\s*"[^"]*/({re.escape(prefix)}-[0-9]{{3}})\.vbas"\s*\)',bundle)
     if len(bundled)!=count or set(bundled)!=ids:
         raise ValueError('native/WASI oracle fixture bundle differs')

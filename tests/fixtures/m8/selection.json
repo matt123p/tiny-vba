@@ -213,7 +213,7 @@
     {
       "repository": "tiny-vba",
       "path": "tools/check_m8.py",
-      "sha256": "3edf03cccdbf892c22cc731cfd58126fed44fd4979ab2a86cc1041a0fcddc4b8"
+      "sha256": "4bb640385b983466931fdcadd7f5a752a3bcad0ec0ea681b9c301ed1ed231e56"
     },
     {
       "repository": "tiny-vba",
@@ -223,12 +223,12 @@
     {
       "repository": "tiny-vba",
       "path": "tools/check_m4_evidence.py",
-      "sha256": "6fe73c7f9f20d1fe7f1c9efd8c5087aa5622880f24cf2e2d70ea08b4bf56f076"
+      "sha256": "3f73e7c84850ef05f085d070a444354d6b957b42fdc6bfe690731e13d8c11541"
     },
     {
       "repository": "tiny-vba",
       "path": "tools/check_m7a.py",
-      "sha256": "2aa254840b1647b7d0b3c2261c662308360693040cbc0b241c4c9daf4b58d25d"
+      "sha256": "5d0b96ad8319e6f29a703897833f1c416eecff0f15e5a03533e441ccbfb05c83"
     },
     {
       "repository": "tiny-vba",
@@ -253,7 +253,7 @@
     {
       "repository": "tiny-vba",
       "path": "tools/check_repository.py",
-      "sha256": "0693b47853dc816305295bf6e6f1c64c8ddf96a067d1dd1d8e51e23f6b42e934"
+      "sha256": "7518ae2fca293c8cbca7dcc3b120e154b93e0134376dc8c0f66862f77d7a81e9"
     },
     {
       "repository": "tiny-vba",
@@ -278,12 +278,27 @@
     {
       "repository": "tiny-vba",
       "path": "tools/check_m8_release.py",
-      "sha256": "9f4e0038cc56f6c910c5771abcb8aa66d84159a51ed435f2f956ea3a24868f54"
+      "sha256": "06c29f844221cc27068ccd7a3c30b57523d75e17e488f216f992c02ab0a4e595"
     },
     {
       "repository": "tiny-vba",
       "path": "tools/tests/test_m8_release.py",
-      "sha256": "d0116f7e91072826a2c5153b20aa586bec9486f13aeed78e9d26be917442c644"
+      "sha256": "56bbe4f52babb4d73a11ae87e35a5eed0632774eb3faef5c68d127fb94e69431"
+    },
+    {
+      "repository": "tiny-vba",
+      "path": "tools/tests/test_repository_utf8.py",
+      "sha256": "082784ac0bd03621d3de8640cb274dd993f67a35056b4268f36f7c5d15129bfb"
+    },
+    {
+      "repository": "tiny-vba",
+      "path": "tools/check_ui_provenance.py",
+      "sha256": "77fcc989315216cdedcbde17d5da13a5bcffbe03d8a41b641796df8fc9b72195"
+    },
+    {
+      "repository": "tiny-vba",
+      "path": "tools/check_m7.py",
+      "sha256": "c9f9f080898c153292803a3f7c5cdf37737b25a211e534a50027cfc5eaf4c824"
     }
   ],
   "baseline_selection_sha256": "9c158211fd2b360b352468bab3bc0e78cf70d5df99f2fce08473dd69542e6eef",

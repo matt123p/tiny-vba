@@ -8,7 +8,7 @@ import tomllib
 ROOT = Path(__file__).resolve().parents[1]
 
 def check():
-    sources = json.loads((ROOT / 'docs/provenance/vbe_sources.yaml').read_text())
+    sources = json.loads((ROOT / 'docs/provenance/vbe_sources.yaml').read_text(encoding='utf-8'))
     for source in sources['sources']:
         if not source['url'].startswith('https://learn.microsoft.com/'):
             raise ValueError('unexpected UI reference publisher')
@@ -17,14 +17,14 @@ def check():
             raise ValueError('reference cache escaped ignored evidence root')
         if cache.exists() and hashlib.sha256(cache.read_bytes()).hexdigest() != source['sha256']:
             raise ValueError('local UI evidence hash differs from provenance record')
-    manifest = json.loads((ROOT / 'docs/provenance/ui-dependencies.json').read_text())
+    manifest = json.loads((ROOT / 'docs/provenance/ui-dependencies.json').read_text(encoding='utf-8'))
     for notice in manifest['notices']:
         if hashlib.sha256((ROOT / notice['path']).read_bytes()).hexdigest() != notice['sha256']:
             raise ValueError(f'font notice changed: {notice["path"]}')
-    tracked = subprocess.check_output(['git', 'ls-files', '--cached', '--others', '--exclude-standard'], cwd=ROOT, text=True).splitlines()
+    tracked = subprocess.check_output(['git', 'ls-files', '--cached', '--others', '--exclude-standard'], cwd=ROOT, text=True, encoding='utf-8').splitlines()
     if any(path.startswith('.cache/') for path in tracked):
         raise ValueError('downloaded reference evidence must never enter Git')
-    lock = tomllib.loads((ROOT / 'Cargo.lock').read_text())
+    lock = tomllib.loads((ROOT / 'Cargo.lock').read_text(encoding='utf-8'))
     for package in lock['package']:
         name = package['name']
         if name in {'egui', 'eframe', 'egui-wgpu', 'egui-winit', 'egui_glow', 'egui_kittest', 'epaint', 'ecolor', 'emath', 'epaint_default_fonts'}:
