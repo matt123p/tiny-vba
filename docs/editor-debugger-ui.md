@@ -1,122 +1,61 @@
 # Editor and debugger UI contract
 
-M7A.6 native-only update (2026-11-08): the custom form codec/APIs, source-file
-routes, file filters and `.tvform` example are removed under
-[ADR 0099](decisions/0099-native-only-form-workflows.md). Insert UserForm now
-starts from an inert native template, and all form Save/Export/remove-export
-requests use native `.frm`/`.frx` snapshots. The CustomerForm demo and retained
-exchange/host tests use native files. No legacy importer or converter remains.
-M7A.6 is COMPLETE; shared and pinned-host gates pass. See the
-[acceptance record](m7a6-acceptance.md). M7A.7 combined acceptance remains next.
-Older incremental format/support notes below are historical and superseded.
+The reusable VBA editor/debugger and standalone shell belong in tiny-vba.
+`vba-ide` owns toolkit-independent source/project/session state and commands;
+`vba-ui-egui` renders panels; `vba-ide-app` owns native/browser IO and preferences.
+The host owns document integration. See [embedding](ui/embedding.md) for APIs.
 
-Status: M8 complete for its defined scope, with [completion corrections and verification](ui/m8-completion-audit.md), 2026-10-27. See
-[ADR 0016](decisions/0016-m8-embeddable-editor.md), [embedding/running](ui/embedding.md),
-[acceptance and remaining broader-spec features](ui/m8-acceptance.md) and the supplied
-[public-source specification](ui/craft_vba_editor_debugger_ui_spec.md).
-Ownership: [ADR 0002](decisions/0002-editor-debugger-ui.md).
+## Editing and navigation
 
-## Product and ownership
+The shared UI provides Project Explorer, Properties, module/procedure selectors,
+procedure-only and split views, bookmarks and navigation history. Editing includes
+undo/redo, clipboard, block indent/outdent/comment, automatic indentation/case,
+and literal scoped Find/Replace with case/whole-word options.
 
-tiny-vba delivers a reusable VBA editor/debugger UI and a standalone IDE. A developer must be able
-to edit and debug a host-free VBA module here without launching Gridcraft or installing Office.
-Gridcraft embeds the same components for workbook macros and supplies its Office/document bridge.
-The standalone IDE initially runs pure language programs and deterministic generic-host examples;
-it does not promise Excel objects without an application adapter.
+Code assistance uses source and immutable host metadata for scoped word/member
+completion, signature/parameter help, Quick Info, List Constants, definition
+navigation and Object Browser. It must not execute getters to discover members.
+Syntax colors, line numbers, live parser diagnostics, breakpoint markers and
+current-statement highlights track the correct source revision. Hidden attributes
+and original line endings survive [code projection](vba-attributes-and-editor-projection.md).
 
-## Gridcraft compatibility and visual rules
+## Execution and inspection
 
-- Use Rust, egui and eframe; align the full egui family and reviewed fork revisions with Gridcraft.
-  Avoid distinct egui versions whose context/widget types cannot be shared by the embedding host.
-  The standalone workspace owns its Cargo patches; embedding applications own theirs.
-- Offer embeddable panels independently of the eframe shell. Use the host's egui context, style,
-  theme tokens, fonts, icons and scaling. Do not reset global visuals or install fonts every frame.
-- Follow Gridcraft's theme::Tokens conventions for light/dark colours and syntax highlighting.
-  An injected theme mapping lets Gridcraft pass its actual token values without a dependency here
-  on Gridcraft's UI crate. Provide original standalone defaults and use tokens rather than ad hoc colours.
-- Match host spacing, typography, focus behaviour, keyboard navigation and widget conventions.
-  Actions have stable IDs, labels, enabled states and shortcuts; panels dispatch actions rather than
-  mutate the VM or workbook directly. Headless/programmatic actions never open dialogs.
-- Give controls accessible labels. Distinguish breakpoints, paused execution and errors with glyphs
-  as well as colour. Check text contrast at 4.5:1 and functional glyph contrast at 3:1 in both themes.
-- Use original or appropriately licensed assets with attribution. Follow Gridcraft's font policy:
-  craft-fonts is an optional external input; system/egui defaults work without it. Never ship vendor
-  artwork or fonts. Follow conventions without copying application source.
-- Preserve native and browser support. Platform file pickers, source persistence and host prompts
-  belong behind shell/host interfaces; core editor/session logic has no ambient filesystem access.
+Run/Continue, Break, Reset, Step Into/Over/Out, typed Locals/arrays, Call Stack,
+Watches, Quick Watch, Immediate and Output use native IDE/debugger commands.
+Watch expressions are bounded and read-only. Immediate function calls require
+explicit isolated-evaluation policy; host effects remain real. Set Next Statement
+accepts verified straight-line targets in the current frame only.
+See [debugger](debugger.md) for exact refusal and lifecycle rules.
 
-## Required editor and debugger surfaces
-
-| Surface | Required behaviour |
+| Shortcut | Action |
 |---|---|
-| Project/module browser | Select modules and procedures; show modified-source state; preserve source identities |
-| Source editor | VBA syntax colours, line numbers, indentation, selection, undo/redo, find, diagnostics with source spans |
-| Breakpoint gutter | Toggle and display source-statement breakpoints; distinguish unresolved breakpoints and multiple statements per line |
-| Execution view | Highlight the current statement and navigate from diagnostics and stack frames to its source |
-| Debug controls | Run, pause, continue, stop, step into/over/out; show session state and disable invalid actions |
-| Locals and stack | Inspect typed values and frames; validated supported local edits while paused |
-| Watches | Inspect supported expressions with explicit unsupported/side-effect status; no implicit arbitrary function execution |
-| Output | Display Debug.Print, runtime errors and diagnostics without freezing the UI |
+| F5 / F9 | Run or Continue / breakpoint |
+| F8 / Shift+F8 / Ctrl+Shift+F8 | Step Into / Over / Out |
+| Shift+F9 | Quick Watch |
+| Ctrl+G / Ctrl+L | Immediate / Call Stack |
+| Ctrl+R / F4 / F2 | Project Explorer / Properties / Object Browser |
+| Ctrl+Space / Ctrl+J | Completion |
 
-Opening/editing/saving plain source belongs here. Original Office project bytes, .xlsm/.docm
-packaging and binary VBA project writeback remain outside this initial UI contract. Editing paused
-source must mark compiled code stale; require an explicit stop/recompile/restart before running
-changed code. Do not imply live code replacement. Immediate Window execution is a later extension
-with explicit evaluation policy; read-only watches are part of the initial debugger UI gate.
+Forms add Toolbox, Properties, drag/resize, alignment, tab order and event-handler
+navigation. Runtime input executes ordinary callbacks through existing trust and
+debugger continuations. [Forms](forms.md) defines the designer/runtime/save profile.
 
-## State and host interfaces
+## Embedding and accessibility
 
-vba-ide owns stable source/module identities, editor buffers, diagnostics, debug action routing and
-session state. vba-ui-egui presents that state; vba-debug remains the toolkit-independent execution
-controller. UI updates consume bounded execution slices and output batches so an infinite VBA loop
-cannot block repaint, pause or cancellation. Source maps, breakpoint IDs and watch results refer to
-the compiled source version and pause/session generation; stale inspection handles are rejected.
+Mount panels in caller-owned Ui/context with independent widget namespaces.
+Use injected theme tokens, fonts and scaling; do not replace global host styles,
+fonts or window policy. Align the reviewed egui/eframe family through consuming-root
+Cargo patches. Host menus route stable action IDs/labels/shortcuts/enabled states.
+Bound execution/output work so repaint, pause and cancellation remain responsive.
 
-A host integration supplies project attachment, native foreign calls, document lifecycle and trust
-prompts through explicit interfaces. The embedding host controls window placement, shortcuts and
-prompt presentation. Closing a project, stopping execution or disconnecting releases host references
-and resources according to the host policy. Source import never auto-runs macros. Debugger
-expressions obey the execution capability policy. No mutable host borrow survives a pause.
+Give controls accessible labels and keyboard navigation. State needs glyphs as
+well as color. Text contrast is at least 4.5:1, functional glyphs at least 3:1.
+Use original/licensed assets with notices. Validate light/dark, narrow/scaled/focus
+and injected host themes, plus actual native/browser workflows.
 
-## Delivery and acceptance gates
-
-1. After the M3 executable debugger proof, add IDE state/actions, embeddable panels and a standalone
-   shell with a self-authored pure-language program. Show real source, breakpoints and stepping;
-   unavailable operations must be disabled or return an explicit unsupported diagnostic.
-2. Complete M8 with all required surfaces above. Edit/run a module, stop at a breakpoint, step through
-   nested calls, inspect the stack, edit a supported local and resume without replaying mutations.
-   Verify compile errors, runtime errors, cancellation, source changes and project close.
-3. Render and inspect native snapshots for light/dark themes, narrow layouts, scaling and focus.
-   Exercise keyboard controls, accessible labels, token contrast and a caller-supplied host theme.
-   Add checks for attributed assets/fonts when those inputs are introduced.
-4. Verify standalone native and browser builds, browser debugger interaction, and separate headless
-   builds that do not pull egui/eframe. Keep UI tests independent of corpus downloads and Office.
-5. In Gridcraft, embed these panels and run a real workbook-editing macro through pause/inspect/resume.
-   Verify theme/shortcut integration, recalc, undo policy and cleanup without duplicate writes.
-
-Steps 1–4 belong to tiny-vba; step 5 belongs to the Gridcraft integration. A CLI or DAP demonstration
-alone does not satisfy the visual UI acceptance gate. The implemented packages and reviewed DAG
-now cover native/web panels, explicit command routing and real VM-backed test harnesses. The
-acceptance report records verified local results and limitations; fork workbook integration and
-applicable remaining C0/C1 coverage are assigned in the
-[remaining plan](implementation-plan.md) and [UI scope index](ui/post-m8-roadmap.md).
-Historical M10's implemented profile and boundaries remain in
-[its acceptance map](ui/m10-implementation.md). New M2 owns classes/standard Office
-forms; M5 owns Excel events/UDFs; M6/M7 own remaining host/package acceptance.
-Third-party ActiveX/OLE controls not supplied with Office applications are out of
-scope. Native extensions, translation and AI assistance are removed from the plan.
-
-## Canonical source and normal code view (M6.10–M6.11)
-
-Canonical source retains exact metadata and newline bytes. The normal code view
-omits recognized attribute/export-header records; the View menu provides a
-read-only raw source/metadata inspector. CodeProjection maps visible UTF-8 byte
-positions to raw source for edits, search, completion, diagnostics, breakpoints,
-stepping and full/procedure/split views. First insertion into an attribute-only
-document preserves its header. Undo/redo and plain-source export retain metadata.
-
-Explorer and Properties show component code names, with export filenames in a
-separate Source file row. Description and supported Instancing are read-only.
-Document code-name changes require host validation and revision-checked
-acknowledgement; unsupported fork renames refuse without changing identity.
-See [ADR 0030](decisions/0030-attribute-metadata-and-code-projection.md).
+File IO, pickers and prompts stay behind shell/host interfaces. Headless commands
+never open dialogs. A save acknowledgement must match the exact source/design
+revision after persistence; a browser download request is not a commit receipt.
+Reset clears runtime state without undoing prior document effects or designer edits.
+See [testing](testing.md) for verification and [asset provenance](images/README.md).

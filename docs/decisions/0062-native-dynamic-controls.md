@@ -44,7 +44,7 @@ failed lookups. These optimizations preserve visibility, connection ordering,
 restoration, cancellation and explicit per-site host authorization.
 
 Further M7A.4 bindings, multiple selection, default/property/event/lifecycle and
-platform/resource requirements remain in [the runtime ledger](../m7a4-native-runtime.md).
+platform/resource requirements remain in [native forms contract](../forms.md).
 Native edited persistence and legacy format removal remain M7A.5/.6. Independently
 authored tests are not fresh Office traces; comparisons remain NOT_RUN under M8.5.
 

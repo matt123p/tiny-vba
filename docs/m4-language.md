@@ -1,5 +1,11 @@
 # M4 language profile and versioned IR
 
+This document defines the foundational scalar/array/handler profile and its IR 2/3
+contracts. Later intrinsic, class, host and form extensions supersede its original
+feature exclusions; see [compatibility](compatibility-matrix.md),
+[intrinsics](vba-intrinsic-functions.md) and [compiler versions](compiler.md#versioned-extensions).
+
+
 The `m4-conformance-v1` profile implements the reviewed M4 semantic subset. It builds on the M3
 explicit-frame VM, debugger, budgets and generic host protocol. [ADR 0011](decisions/0011-m4-language-extension.md)
 records the first extension; [ADR 0012](decisions/0012-m4-oracle-acceptance.md) completes
@@ -148,5 +154,5 @@ upstream-reported build/OS/date, selection, license, numerical evidence limits a
 
 Owning tests additionally cover whole-array aliases, ParamArray, Option Base and qualified Array,
 source-order reference capture, stale locations, host/debugger type checks, malformed IR and
-legacy capability refusal. No fresh local Office observation is claimed. New M8 in the remaining plan extends oracle coverage;
+legacy capability refusal. No fresh local Office observation is claimed. The expanded local conformance profile adds inherited library cases;
 unselected external specimens remain NOT_RUN.

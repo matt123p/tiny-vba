@@ -1,325 +1,73 @@
 # tiny-vba — instructions for agents
 
-M8 release preparation (2026-11-08): [ADR 0102](docs/decisions/0102-m8-release-evidence-gate.md)
-adds eleven source-pinned Office/fork comparison recipes and an offline typed-result
-validator. `python3 tools/check_m8_release.py --validate` checks preparation;
-its default release gate remains NOT_RUN without fresh Office observations and
-provenance review. Core CI checks preparation plus adversarial validator tests.
-See docs/m8-office-comparison.md. Product sources and old receipts are unchanged;
-M8.5 remains open and P9 stays deferred.
+Read the repository-local [development skill](.agents/skills/tiny-vba-development/SKILL.md)
+and the focused skills relevant to implementation/design work. Start with
+[architecture](docs/architecture.md), [compatibility](docs/compatibility-matrix.md)
+and the owning contract in the [documentation index](docs/README.md).
+Current user direction and adopted decisions take precedence over historical
+milestone wording. Routine choices within the agreed scope need no extra approval.
 
-M8 candidate (2026-11-08): ADR 0101 and docs/m8-acceptance.md own the new
-24-case inherited library selection, bounded parser/importer/VM mutation targets,
-asserted native/WASI benchmarks and 20 original host workbook workflows. Host
-scratch is temporary/reused under unchanged defaults; real copies/work remain
-cumulative. VarType returns the VbVarType enum's Long representation; QBColor
-uses the formal numeric table. Preserve original M7A receipts; changed trees
-require the reviewed M8 selection and fresh gates. The owner has no Office and
-requested continuation without it: M8.5 remains NOT_RUN and release validation
-stays open. P9 remains after M8. Older milestone directions below are historical.
+## Ownership and compatibility
 
-
-Current acceptance (2026-11-08): M7A.1–M7A.7 are COMPLETE for the owner-approved
-common native profile under [ADR 0100](docs/decisions/0100-common-native-forms-acceptance.md).
-Read [acceptance](docs/m7a-acceptance.md), reviewed selection/execution receipts and
-current progress. Next is M8 expanded conformance/hardening/release; P9 remains
-after M8 and fresh Office comparisons remain M8.5 NOT_RUN. Earlier incremental
-milestone/status instructions below are historical. Keep common workflow bugs,
-trust/bounds, native persistence receipts and the no-custom-format rule intact.
-Do not infer release acceptance, uncommon parity or fresh Office evidence.
-
-Current owner direction (2026-11-08): [ADR 0097](docs/decisions/0097-common-forms-scope-and-p9.md)
-supersedes historical instructions below that all inventoried forms parity must
-block M7A.4. M7A.4 is COMPLETE for [the common profile](docs/m7a4-common-profile.md).
-Uncommon/exhaustive extensions are [P9](docs/p9-forms-compatibility.md), after M8.
-M7A.5 persistence is complete for its explicit workflow profile. M7A.6 removal is
-complete; next is M7A.7 acceptance.
-Do not reopen the exhaustive M7A.4 gate or claim P9 behavior implemented. Bugs in
-included common workflows remain fixes. Safety/trust/bounds and fresh M8.5
-comparison requirements remain unchanged.
-
-ADR 0099 removes the custom codec/APIs/routes/examples. New forms are inert native
-templates and form file operations use native snapshots; do not restore a legacy
-importer/converter. Older codec ownership/support instructions below are historical
-and superseded. Use native fixtures; see implementation progress for M7A.6 gates.
-
-Adapted from Gridcraft's AGENTS.md and CLAUDE.md for this standalone interpreter.
-Read `docs/implementation-progress.md`, `docs/implementation-plan.md`, then the relevant
-architecture/decision document. The supplied design specifications are indexed in `docs/README.md`.
-Keep plans and progress committed and usable from this checkout.
-
-## Design skills for Codex and OpenCode
-
-Before implementation or a design review, read the repository-local
-[development skill](.agents/skills/tiny-vba-development/SKILL.md) and the focused skills it maps
-to the task. Both tools use this canonical `.agents/skills` tree. The
-[skill catalogue](docs/agent-skills.md) covers architecture, language semantics, debugger,
-editor UI, host integration and conformance. Load only the relevant skills.
-
-For each material design choice, identify its owning layer and current contract. Follow current
-user direction and adopted ADRs over historical supplied documents. Record material contract
-changes in docs/decisions and update affected architecture, progress and skills together.
-Routine implementation choices within the agreed scope do not require another approval step.
-
-## Scope and layering
-
-- Mirror applicable Excel/Word VBA behavior, native formats and workflows. Do not
-  add custom user-facing language features, file formats or control semantics.
-  Investigate uncertain behavior; report unsupported gaps instead of inventing it.
-- Implement a fresh Rust VBA engine. Never reuse `craft-vba` or copy another interpreter's implementation.
-- Gridcraft/Wordcraft forks own Office compatibility objects, member catalogues, document state,
-  host adapters, workbook/document UI, undo/recalc and OOXML packaging.
-- tiny-vba owns the reusable VBA editor/debugger UI and its standalone application. Follow
-  `docs/editor-debugger-ui.md` and ADR 0002; use Gridcraft-compatible egui/eframe and UI conventions.
-  Keep UI dependencies above compiler/runtime/VM/debugger-controller crates.
-- `vba-foreign` is a minimal host-neutral protocol, not a second Office AutomationHost.
-  Test doubles can record generic calls; Office-shaped contract tests belong in the forks.
-- Follow `docs/bytecode-vm-specification.md` and ADR 0004 for IR 1 operands, verification, calls,
-  checkpoint/continuation semantics and budgets; the specification is not implemented support.
-- The VM uses explicit frames/bytecode and statement checkpoints. Debugger hooks exist before feature expansion.
-  `vba-debug` controls the VM; the VM never depends on debugger/DAP/UI crates.
-- Follow `docs/architecture.md`; update the reviewed DAG in `tools/architecture.json` when justified.
-  `cargo xtask layers` enforces it. Test support stays out of shipping library dependencies.
+- Implement a fresh Rust VBA engine. Never reuse `craft-vba` or another
+  interpreter's implementation. Use public specifications and permitted black-box
+  observations; never inspect proprietary Office implementation binaries.
+- Mirror applicable Excel/Word behavior, native formats and workflows. Do not add
+  custom user-facing language features, file formats or control semantics.
+  Unsupported behavior fails explicitly.
+- Forks own Office objects/catalogues, document state, trust, OOXML, undo/recalc
+  and application integration. `vba-foreign` is a host-neutral native Rust protocol.
+  Office-shaped test doubles belong in the forks.
+- tiny-vba owns the reusable editor/debugger UI and standalone app. Toolkit/IO
+  dependencies stay above the engine and headless IDE model. The VM never
+  depends on debug/DAP/UI. Preserve [the reviewed graph](tools/architecture.json);
+  `cargo xtask layers` enforces it.
 
 ## Correctness and safety
 
-- Rust only for interpreter/product code. Python is limited to repository maintenance checks.
-- No unsafe, unwrap/expect, panic, todo/unimplemented or unchecked input indexing in production code.
-  Inherit workspace lints; return structured errors. Bound input-derived allocations, recursion and VM work.
-- Centralize VBA coercion, ByRef locations and error state. Preserve Empty/Null/Missing/Nothing/CVErr,
-  numeric widths, Currency/Date and array lower bounds. Do not flatten to JSON or f64.
-- Use native in-process calls on the host path. JSON is suitable for manifests, reports and DAP only.
-- Inject time, randomness, locale and prompts; no ambient filesystem/network/shell/COM in the VM.
-- Office project source extraction is read-only. Import must never execute macros.
-  No P-code execution or binary VBA project writeback yet; plain-source editing belongs to the IDE.
-- Never report success for unsupported syntax, instructions or host operations.
-- No vendor artwork or proprietary Office binaries. Independent code and properly licensed fixtures only.
-  Observe Office as a black box with permitted fixtures; do not inspect Office implementation binaries.
+- Product code is Rust; Python is for maintenance checks. Inherit workspace lints.
+  No unsafe, unwrap/expect, panic, todo/unimplemented or unchecked input indexing
+  in production code. Return structured errors and bound input-derived allocation,
+  recursion and execution work.
+- Centralize VBA coercion, ByRef locations and error state. Preserve exact tags,
+  numeric widths, Currency/Date and array lower bounds. Do not flatten to JSON/f64.
+- Use verified bytecode, explicit frames, statement checkpoints and versioned
+  capabilities. Resume must not replay effects. Preserve stale-handle checks,
+  cancellation and cumulative budgets across pauses/waits.
+- Inject time, randomness, locale and prompts. No ambient filesystem/network/shell/
+  COM in the VM. Watch inspection is inert; Immediate function evaluation requires
+  explicit policy and isolated execution.
+- Source extraction/attachment is inert. Ordinary document Save retains imported
+  VBA bytes; native form Save/Export and edited XLSM/DOCM copies use explicit,
+  revision-checked snapshots. Protected-project bypass, P-code execution and
+  cryptographic signature verification/resigning are unsupported.
+- Native forms use ordinary canonical VM state and `.frm`/`.frx` resources.
+  Keep original resources, authored design/source and runtime state separate.
+  Do not restore the retired custom codec/converter/routes. Follow [forms](docs/forms.md).
 
-## Test material and evidence
+## Evidence and verification
 
-- Read `tests/corpora/README.md` before corpus work. Pins/notices are in `references/sources.lock.json`;
-  specimen hashes and NOT_RUN status are in `tests/corpora/inventory.json`.
-- Do not edit upstream submodules, import implementation code, run downloaded scripts/macros,
-  or adopt unlicensed samples without an explicit reviewed change in policy/selection.
-- Rights, capability needs, host profile and expected outcomes must be established per selected specimen.
-  Pinning is not permission, safety review or a compatibility result.
-- Rust integration tests live under their owning crate's tests/; root tests/ holds shared data.
-- Test correct output types, error numbers, side effects, negative paths, budgets and pause/resume.
-  Fixes for crashes need minimized regression tests. Do not invent Microsoft oracle observations.
+Read [corpus policy](tests/corpora/README.md) before external corpus work.
+Do not edit upstream submodules, run downloaded scripts/macros or adopt unlicensed
+samples without an explicit reviewed policy/selection change. The reviewed MIT
+allowlist is the bounded execution exception. Pinning alone is not execution
+permission or a compatibility result. Retain third-party notices and original assets.
 
-## Development gates
+Rust integration tests belong under the owning crate/app; root `tests/` holds
+shared data. Verify types, errors, effects, negative paths, budgets and pause/resume.
+Crashes require minimized regressions. Preserve immutable selections and receipts;
+never invent Office observations. Common forms/local hardening acceptance does
+not satisfy fresh Office comparison: M8.5 remains NOT_RUN and release validation
+remains open. Historical P9 identifies unsupported uncommon/exhaustive forms scope.
 
-Run `cargo xtask ci`, `cargo xtask wasm` and `cargo xtask wasm-run`. Install wasm32-unknown-unknown and wasm32-wasip1 as needed; Node 18+ runs the WASI smoke gate.
-Local core tests must work without corpus checkouts or application siblings; corpus verification is separate.
-Use `cargo run -p vba-cli -- --help` for the current interface. M0 fixture validation, M1 subset parsing and M2 binding/verified IR compilation and the M3 runtime/debugger subset are implemented.
-See `docs/frontend.md` for syntax and `docs/compiler.md` for the narrower binding/lowering subset, IR verification and budgets; `docs/runtime.md` defines actual execution and host/debugger capabilities.
-Update affected architecture, compatibility, progress and decision documents with changes.
-Report exact tests run, support added, remaining gaps and the next smallest task.
+Run `cargo xtask ci`, `cargo xtask wasm` and `cargo xtask wasm-run` for implementation
+changes, plus affected UI/browser/host gates. For documentation-only changes,
+verify links, referenced commands and repository/evidence integrity. Report exact
+checks and unavailable coverage. See [testing](docs/testing.md) and
+[development](docs/developer-guide.md) for prerequisites.
 
-Gridcraft's shared craftrules checkout was not available during setup. Its applicable safety,
-clean-room, external-corpus and layering conventions are adapted here; no nonexistent sibling
-path is required for standalone work. Editor/debugger UI must follow the documented theme,
-accessibility, original-asset and font conventions; add UI snapshot/asset checks with the UI implementation.
-
-M4 is implemented for [the reviewed profile](docs/m4-language.md) under ADR 0011. Use the
-versioned IR 2 contract for handlers/arrays/intrinsics/persistent slots. Preserve legacy IR 1
-capability boundaries and the shared runtime coercion path, including constant/default binding.
-
-M4's external gate is complete under [ADR 0012](docs/decisions/0012-m4-oracle-acceptance.md),
-[the oracle report](docs/m4-oracle-report.md) and IR 3. The reviewed MIT allowlist is the only
-corpus execution exception: never run upstream scripts or import implementation code. Preserve
-Schema 1/2 evidence distinctions, raw results, all 153 cases and legacy IR capability limits.
-
-The selected new M2 class/standard-form profile is implemented under ADR 0024;
-read [its acceptance/format contract](docs/m2-acceptance.md). Keep generated form
-support out of saved authored source, design state independent of VM Reset,
-modal callbacks explicit and bounded, and save acknowledgments revision-checked.
-Binary Office form resources/package writeback remain outside this profile.
-
-M7 is complete for [the authored unchanged-document/package profile](docs/m7-acceptance.md).
-Read [ADR 0037](docs/decisions/0037-m7-package-preservation-and-writeback.md) before
-package/writeback work. Source decoding stays inert/read-only; package/trust policy
-stays in forks. `cargo xtask m7` is optional and requires sibling forks; core CI
-stays independent. Preserve original bytes separately from source exports; edited
-binary writeback and cryptographic signature verification remain unsupported.
-M7A is in progress; native Office forms and removal of `.tvform` precede M8.
-See [ADR 0038](docs/decisions/0038-native-office-forms-and-compatibility-only.md). Fresh Office comparisons remain NOT_RUN under M8.5.
-
-M7A is in progress; see [inventory/ledger](docs/m7a-inventory.md) and
-[ADR 0039](docs/decisions/0039-m7a-native-control-metadata.md). The initial native
-worksheet metadata reader is partial FC1.1; it does not render or execute controls.
-M7A.1/M7A.2 implement selected native UserForm import and attachment under
-[ADR 0040](docs/decisions/0040-native-userform-import-and-attachment.md) and the
-[property/event/format/host contracts](docs/m7a-control-contracts.md). Native
-edited persistence and `.tvform` removal are still unimplemented. M7A covers native UserForms (`.frm`/`.frx` and
-embedded resources), Office controls, native editing/persistence and removal of
-the legacy `.tvform` codec/routes/examples. Reuse compatible internals without
-keeping a parallel custom product format. Native edited package persistence needs
-the reviewed encoder/writeback/signature path; original-byte retention alone
-cannot satisfy M7A. Do not treat the historical M2 format choice as authorization
-to extend `.tvform`. The main plan and ADR 0038 supersede that choice.
-
-M7A.3 completes [worksheet-form-controls-v1](docs/m7a-worksheet-controls.md)
-under ADR 0041 in GridCraft: native Shape identity/state, engine bindings/undo/recalc,
-OOXML/VML edited persistence, optional ControlFormat APIs and trusted widget input.
-Preserve original package data separately; failed joins stay inert and callbacks
-use the existing bridge. This is not MSForms/ActiveX or UserForm edited-save support.
-M7A.4 is in progress; fresh Office observations remain NOT_RUN under M8.5.
-
-M7A.4 has started under [ADR 0042](docs/decisions/0042-userform-instance-routing.md).
-The [first instance packet](docs/m7a4-userform-instances.md) removes the
-predeclared-only restriction in shared tiny-vba. FormInstance keys separate native
-runtime objects from designer/source IDs; UI input/window scopes use those keys.
-Read-only VM class queries never instantiate objects; active and parked receivers
-remain lifetime roots. Keep Reset/source/resources inert. Broader lifecycle,
-control/property packets, fork integration and fresh Office evidence remain open.
-
-M7A.4 now also includes the [native runtime increment](docs/m7a4-native-runtime.md)
-under ADR 0043: six flat control families, selected property/input semantics,
-Controls/UserForms lookup and bounded transient project inspection. Canonical
-VM state remains authoritative; queries never load forms or invoke getters.
-Keep intrinsic providers/wait routing intact and do not extend .tvform. The
-milestone remains in progress with its remaining requirements recorded there.
-
-[ADR 0044](docs/decisions/0044-userform-window-and-code-lifetime.md) separates
-UserForm display/default ownership from referenced code lifetime. Named control
-getters reload; inert inspection does not. Generic root release validates class/
-object and protects document code names. Internal release waits remain bounded,
-report Running and preserve slice quotas; Terminate runs only at normal finalization.
-
-[ADR 0045](docs/decisions/0045-class-and-native-collection-enumerators.md) adds IR 9
-class enumerator metadata and native Controls/UserForms For Each. Preserve IR 1–8
-refusal, ordinary getter frames, nonreplayed waits, bounded receiver roots and
-active/parked snapshot object ownership. Native collection interfaces inspect
-canonical fields without another mutable store. M7A.4 remains in progress.
-
-[ADR 0046](docs/decisions/0046-lazy-project-class-variables.md) adds IR 10 scalar
-project-class/native-form As New. Preserve exact nominal storage/field aliases,
-lazy reads, inert inspection, source-order ByRef evaluation and initializer
-Stop/failure/retry. No external activation or per-location registry is added.
-
-[ADR 0047](docs/decisions/0047-native-forms-nominal-types-and-library-access.md) adds
-IR 11 class interfaces and native Forms type/library bindings. Keep older IR
-refusal, exact nominal identity, event-source/exposure checks, restoration budgets
-and source alias shadowing. Forms names belong in the IDE provider, never the VM.
-Source/reference attachment and inspection stay inert; no COM/registry is added.
-
-Native container focus/validation follows [ADR 0048](docs/decisions/0048-native-container-focus-and-validation.md).
-Keep ActiveControl and dirty/cancel state in ordinary generated classes. Focus
-commands execute VBA and require the same authorization and modal ownership as
-input; widget focus follows canonical state after cancellation/Stop/resume.
-Preserve typed ByVal return identity, inert source/resources and leaf event
-exposure. Broader M7A.4 control/platform semantics remain open.
-
-Native TextBox behavior follows [ADR 0049](docs/decisions/0049-native-textbox-selection-and-input.md).
-Keep UTF-16 text/selection canonical in ordinary classes, input/cursor commits
-atomic and executable input authorized. Preserve CRLF and scalar cursor mapping,
-native flags/resource identity, password masking and ordinary callback/debugger
-boundaries. Rendering must not replace host fonts/global policy or alter data on
-missing glyphs. No .tvform expansion or full M7A.4 acceptance is implied.
-
-Native numeric controls follow [ADR 0050](docs/decisions/0050-native-spinbutton-and-scrollbar.md).
-Keep Long state/events in ordinary classes, distinct binary records bounded and
-resource retention inert. Numeric input executes VBA and needs the same policy
-as other form commands. Preserve reversed bounds, error/coercion semantics and
-Change/spin/Scroll continuations. No .tvform expansion or full milestone sign-off.
-
-Native unbound ListBox follows [ADR 0051](docs/decisions/0051-native-unbound-listbox.md).
-Keep list/selection state in ordinary VM fields, bounded indexed row operations,
-executable input authorization, focus/validation and callback continuations. Do
-not expand .tvform or claim full list/binding/ComboBox/M7A.4 parity.
-
-Native ComboBox follows [ADR 0052](docs/decisions/0052-native-combobox.md).
-Reuse ordinary list rows, canonical UTF-16 text/selection/drop state and existing
-locale services/refusals. Preserve authorized input, typed validation, source/
-resource identity and nonreplayed Change/Click/drop continuations. No new codec,
-COM or second mutable store; broader M7A.4 work stays explicit.
-
-Native ListBox/ComboBox bulk loading follows [ADR 0053](docs/decisions/0053-native-list-array-loading.md).
-Keep source arrays independent, validate all cells before canonical replacement,
-and use ordinary control refresh/event continuations. No error-handler rank probes,
-new intrinsic or mutable host store; array reads and broader M7A.4 remain open.
-
-Native array readback follows [ADR 0054](docs/decisions/0054-native-list-array-readback.md):
-copy canonical cells with explicit bounds, preserving Err, selection and events.
-[ADR 0055](docs/decisions/0055-native-form-metadata-and-control-tips.md) keeps native
-metadata in ordinary fields and tooltip hover inert, bounded and theme-injected.
-Help/F1 routing, native persistence/removal and the broader M7A scope stay open.
-
-Native Frame containers follow [ADR 0056](docs/decisions/0056-native-frame-containers.md):
-bounded native parent storages, immediate child Controls/Parent identity, scoped
-TabIndex/option groups and nested ActiveControl/focus cancellation. Canonical state
-remains ordinary classes; effective ancestor flags, live relative geometry,
-clipping and accessible groups use the shared renderer. Original source/resources
-stay inert and unchanged. Further container/page/image/binding/platform semantics,
-native edited persistence and .tvform removal remain in M7A; fresh Office traces
-remain NOT_RUN under M8.5.
-
-[ADR 0057](docs/decisions/0057-native-tabstrip.md) adds selected native TabStrip
-records and separate ordinary Tab/Tabs identity, indexed/named lookup,
-enumeration/default selection and authorized widget input. Canonical state stays
-in ordinary classes; inert queries/rendering do not instantiate or execute VBA.
-MultiPage, dynamic tab mutation/index/name semantics and the remaining M7A.4
-ledger stay open. Native edited persistence and .tvform removal remain separate.
-
-[ADR 0058](docs/decisions/0058-native-multipage.md) adds selected native MultiPage
-f/o/x reconciliation, distinct Page/Pages identity, immediate child collections,
-selection-gated input/focus and actual page rendering. Internal tabs stay private;
-canonical state remains ordinary classes and source/resources stay inert. Indexed
-Click and repeated-selection behavior also correct the prior TabStrip contract.
-Dynamic page/tab mutation, further persistence/property/event/lifecycle cases and
-the full remaining M7A.4 ledger remain open. Native edited saving/removal stay
-M7A.5/.6; fresh Office traces remain NOT_RUN under M8.5.
-
-[ADR 0059](docs/decisions/0059-native-image-pictures.md) adds selected native Image,
-bounded inert BMP/GIF/JPEG/ICO decoding, canonical stdole picture identity and
-assignment, display properties and nonfocusable Click. Immutable raster assets
-and capped derivative texture caches preserve source/resources and existing VM
-budgets. Further picture metadata/platform/format and event/presentation cases,
-RefEdit, bindings, dynamic collections and remaining M7A.4 semantics stay open.
-Native edited saving/.tvform removal remain M7A.5/.6; Office traces remain NOT_RUN
-under M8.5.
-
-[ADR 0060](docs/decisions/0060-native-refedit.md) adds bounded inert RefEdit class-table
-resolution, ordinary typed RefEdit text/drop state and selected focus/validation/
-Change/DropButtonClick behavior. The shared renderer accepts host range-selection
-availability and collapses/restores modal RefEdit; GridCraft owns worksheet
-selection and authorization. Original source/resources stay separate. Broader
-RefEdit/platform/property/event/binding semantics and the unchanged M7A.4 ledger
-remain open. Native edited saving/removal stay M7A.5/.6; fresh Office traces stay
-NOT_RUN under M8.5.
-
-ADR 0077 adds canonical native window activation and separate keyboard receipt/
-destination ownership. Activation commands execute VBA and retain existing trust
-checks. External viewport focus and passive hover stay inert. Embedders must
-apply document activation before document input; automatic raw document barriers
-remain open. Preserve reentrant transition guards, modal ownership and bounded
-raw input; L01/L02 and full M7A.4 remain partial.
-
-ADR 0078 orders document activation at the raw-input boundary. Use the opaque
-non-reused SessionInstance, existing host authorization, bounded raw batches and
-completed document-pass acknowledgment. Keep debugger input available at Stop;
-repaint before replay after skipped/hidden document passes. Reset/source/document/
-trust/geometry changes and authored activation invalidate retained input. No new
-VM/foreign behavior or increased budget is implied; full M7A.4 remains partial.
-
-ADR 0098 implements explicit inert native form and source-only MS-OVBA encoders
-for M7A.5 beside the decoder. This supersedes historical decoder-only/no-encoder
-language for those explicit APIs, not ordinary package saves. Keep original import
-bytes separate; compile exact binary-save snapshots, remove stale compiled caches,
-reopen/check output and enforce project/source/design identity at acknowledgment.
-Hosts own signature removal and atomic package/file commit. Host workflows and
-final acceptance are still required before M7A.5 is complete.
-
-M7A.5 is COMPLETE for the explicit common-profile native form Save/Export and
-edited XLSM/DOCM copy workflows in docs/m7a5-acceptance.md. Both fork gates pass;
-receipts are in implementation progress. Ordinary document Save retains original
-VBA bytes, copy export retains editor dirty state, and browser download requests
-never acknowledge a disk commit. Next is M7A.6 legacy `.tvform` removal, then
-M7A.7 integration. Preserve the P9 and M8.5 boundaries.
-
-M7A.6 is COMPLETE under ADR 0099 and docs/m7a6-acceptance.md, with all shared and
-pinned-host gates passing. Next is M7A.7 combined acceptance. Do not restore the
-retired codec/APIs/routes/examples or a converter. Preserve native save receipts,
-original-byte ownership, common runtime behavior and the P9/M8.5 boundaries.
+Update the owning guide and compatibility claims with behavior changes. Record
+material architectural changes in `docs/decisions/`. Keep task plans, progress
+logs and session handoffs out of maintained reference docs; use Git history for
+past work. Two scope documents remain byte-for-byte historical evidence inputs,
+as explained in [testing](docs/testing.md).

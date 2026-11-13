@@ -1,10 +1,10 @@
 # 0016 — Embeddable Classic editor/debugger and executable UI harness
 
-Adopted and implemented, 2026-10-27. Implements ADR 0002 and the repository M8 gate;
-[the implementation plan](../ui/m8-implementation-plan.md) was written before code.
-The user-supplied [public-source specification](../ui/craft_vba_editor_debugger_ui_spec.md)
-is the functional/visual direction. Its full C0/C1 and Office integration programme is larger than
-M8; [acceptance and feature status](../ui/m8-acceptance.md) distinguish the delivered surfaces.
+Adopted and implemented, 2026-10-27, under ADR 0002. The maintained
+[UI contract](../editor-debugger-ui.md) describes the delivered surfaces;
+[testing and evidence](../testing.md) distinguishes authored UI results from
+Office comparisons. Original supplied specifications and implementation plans
+remain in Git history.
 
 ## Ownership and execution
 
@@ -69,7 +69,7 @@ claim follows from these standalone tests.
 ## Subsequent milestone allocation
 
 On explicit user direction, the remaining UI specification work is assigned to
-[planned M10–M14 milestones](../ui/post-m8-roadmap.md): classic completion, forms/class runtime,
+[UI contract](../editor-debugger-ui.md): classic completion, forms/class runtime,
 native extensions/non-Microsoft enhancements and translation, optional AI, and fork integration
 acceptance respectively. This scheduling amendment preserves the M8 baseline and layer/ownership
 contracts above; planned scope is not an implemented capability.

@@ -75,7 +75,7 @@ The project must be idle/reset; encoding, import and reopening never run handler
 No new dependency edge or VM/host capability is needed for this layering.
 
 Tests and exact gate results are recorded in implementation progress. Fresh Office
-comparisons remain M8.5 NOT_RUN. The [M7A.5 acceptance record](../m7a5-acceptance.md) signs off native export
+comparisons remain M8.5 NOT_RUN. The [M7A.5 acceptance record](../forms.md) signs off native export
 and explicit edited macro-enabled copy workflows with executable evidence.
 M7A.6 legacy-format removal, M7A.7 final integration and P9 extensions stay separate.
 

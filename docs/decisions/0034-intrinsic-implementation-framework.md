@@ -2,9 +2,9 @@
 
 Adopted 2026-11-01 for implementation under M6A, on owner direction to prepare
 a concrete framework for Luna. **Implemented and verified under M6A.** The
-[acceptance record](../m6a-acceptance.md) gives the resulting profile and evidence.
+[acceptance record](../testing.md) gives the resulting profile and evidence.
 
-Use [the M6A framework](../m6a-implementation-framework.md) as the task entry point.
+Use [intrinsic design](../intrinsic-design.md) as the task entry point.
 Keep a single typed descriptor catalogue in vba-values and one intrinsic argument
 binder. Preserve source-order evaluation with an explicit declaration-order call
 plan, structural omissions, per-parameter value modes and module comparison.

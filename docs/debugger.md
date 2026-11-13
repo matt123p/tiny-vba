@@ -1,7 +1,5 @@
 # Debugger design contract
 
-Status: M3 headless VM/controller implemented, extended by M8 UI and M10 advanced debugging (2026-10-28). See [runtime APIs](runtime.md), [embedding](ui/embedding.md) and [M10 acceptance](ui/m10-implementation.md).
-
 The reusable graphical editor/debugger and standalone IDE belong in tiny-vba. They are required
 product work under [ADR 0002](decisions/0002-editor-debugger-ui.md) and the
 [UI contract](editor-debugger-ui.md). Gridcraft embeds these panels; it owns the document bridge.
@@ -17,21 +15,20 @@ source maps and statement checkpoints. Its inspection hooks are independent of v
 The debugger controller owns source breakpoints, run/pause/continue/step into/over/out, local inspection
 and validated local updates. Multiple statements on one line retain distinct IDs.
 
-M3 must prove pause/edit/resume without restarting the procedure or repeating host writes, including
+Pause/edit/resume must work without restarting the procedure or repeating host writes, including
 nested calls and loops. Do not keep mutable host borrows across pauses. Default watch inspection must
 not invoke arbitrary Property Get/functions with side effects or bypass capability checks.
 
 DAP is optional and publishes supported capabilities explicitly. Disconnect/cancel/stale objects and
 host close during pause require explicit lifecycle outcomes, with no retained document locks.
 
-M10 adds Quick Watch, context-scoped conditional/change watches, local array
+The debugger provides Quick Watch, context-scoped conditional/change watches, local array
 index inspection/typed element edits and runtime error-trapping controls.
 Conditional evaluation is read-only and bounded. Set Next Statement supports
 verified straight-line current-frame checkpoints only. Immediate calls require
 an explicit policy and execute in an isolated child VM; host effects remain real.
 See [ADR 0018](decisions/0018-m10-classic-tools-and-debugger-policy.md) for exact
-bounds, refusals and stale-state rules. Class-specific error trapping belongs to
-new M2 in the [remaining plan](implementation-plan.md).
+bounds, refusals and stale-state rules. Class-specific trapping follows the implemented class/error contracts.
 
 Run the external single-session stdio adapter with
 `cargo run -p vba-cli --features dap -- dap [source.bas]`. Launch may instead

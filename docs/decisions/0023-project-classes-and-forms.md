@@ -6,7 +6,7 @@ Updated 2026-10-29: the generic class/document-state core is implemented in IR 7
 Declared events/WithEvents/RaiseEvent and the three editor error modes are implemented.
 The selected form model/designer, static binding and runtime/exchange acceptance
 are complete under [ADR 0024](0024-standard-form-execution-and-exchange.md) and
-[the acceptance report](../m2-acceptance.md). The [staged record](../m2-classes-and-forms.md)
+[the acceptance report](../forms.md). The [staged record](../forms.md)
 retains earlier incomplete checkpoints.
 
 Class modules are project source, separate from registered foreign object types.

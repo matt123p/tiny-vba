@@ -1,8 +1,7 @@
 # tiny-vba — agent entry point
 
-Read and follow [AGENTS.md](AGENTS.md), the shared repository instructions for all coding agents.
-This replaces Gridcraft's duplicate app-specific guidance with one canonical interpreter policy.
-
-Start with [progress](docs/implementation-progress.md), [plan](docs/implementation-plan.md),
-and [architecture](docs/architecture.md). The repository-local development skill is
-[.agents/skills/tiny-vba-development/SKILL.md](.agents/skills/tiny-vba-development/SKILL.md).
+Follow [AGENTS.md](AGENTS.md), the canonical repository instructions.
+Use [architecture](docs/architecture.md), [compatibility](docs/compatibility-matrix.md)
+and the relevant contract in the [documentation index](docs/README.md).
+The [development skill](.agents/skills/tiny-vba-development/SKILL.md) routes to
+focused architecture, language, debugger, UI, host and conformance guidance.

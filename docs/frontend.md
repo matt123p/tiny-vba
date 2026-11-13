@@ -1,4 +1,4 @@
-# M1 source frontend
+# Source frontend
 
 Implemented 2026-10-26 in `vba-syntax`; no external Rust dependencies. Parsing is
 syntax validation, not binding, type checking, execution or an Office compatibility result.
@@ -14,7 +14,9 @@ cargo test -p vba-syntax
 The first command prints `PARSED examples/pure-vba/Arithmetic.bas: 1 procedures
 (syntax only; use check or run)` and the procedure's name/range. Invalid input returns
 exit 2 and reports `invalid.bas:3:19: VBA0101` at the unexpected `)`.
-`check`, `compile` and `disasm` now implement the narrower [M2 compiler subset](compiler.md); `run` executes the narrower [M3 runtime subset](runtime.md).
+`check`, `compile` and `disasm` use the [compiler](compiler.md); `run` executes
+the [runtime profile](runtime.md). The first-slice grammar table below is historical;
+the extension sections and current compatibility matrix describe later support.
 
 ## API and source ownership
 
@@ -76,7 +78,7 @@ Unicode/newlines, malformed literals, expression/control/token/identifier budget
 truncated/generated malformed input. CLI tests cover source reads, extensions, diagnostics
 and failure exit codes. M0 cases remain NOT_RUN for execution.
 
-The [reviewed external grammar report](m1-corpus-report.md) records the separate optional
+The [reviewed external grammar report](testing.md) records the separate optional
 five-file corpus evaluation. Local tests do not depend on corpus checkouts.
 
 ## M6 With-statement syntax
@@ -102,7 +104,7 @@ intrinsic calls use the deterministic registry. See [current acceptance](m4-orac
 The parser preserves For Each ... In ... Next (optional matching control), including
 nested loops and Exit For. Binding requires Variant/Object collection controls,
 Variant native-array controls and distinct nested control variables. Other loop
-constructs are unchanged. See [M1 implementation](m1-defaults-and-collections.md).
+constructs are unchanged. See [M1 implementation](host-integration.md).
 
 ## M2 class syntax increment
 
@@ -119,14 +121,14 @@ pause/resume. State transfer remaps objects and preserves subscription ordering.
 Unknown events, mismatched handler signatures, Optional/ParamArray/named/omitted
 event arguments and foreign WithEvents mutation are refused. Editor Options
 exposes all-error, class-module and unhandled-error trapping. Forms remain pending;
-see docs/m2-classes-and-forms.md for exact checkpoint and remaining work.
+see docs/forms.md for the supported class/form boundary.
 
 ## M2 form lifecycle syntax
 
 Load and Unload accept a target expression and retain their own source statement
 checkpoint. Binding requires a statically resolved project form lifecycle member;
 parsing alone never loads or executes a form. Selected form/event generation and
-unsupported resource boundaries are documented in [M2 acceptance](m2-acceptance.md).
+unsupported resource boundaries are documented in [M2 acceptance](forms.md).
 
 ## Owned VBA attributes (M6.9)
 

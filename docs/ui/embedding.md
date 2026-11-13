@@ -1,13 +1,13 @@
 # Running and embedding the VBA editor
 
-New M1.1 callers may explicitly configure executable enum/constant references via
+Callers may explicitly configure executable enum/constant references via
 `Ide::configure_reference_bindings(ReferenceSet)`. This updates discovery from the
 same validated snapshot used by ordinary and isolated compilation. Reset before
 reconfiguration. Existing `configure_metadata` is display-only; neither API loads
 libraries. Nominal object values require an explicit read-only host type resolver
 configured through `configure_type_resolver`; scalar/array Immediate snapshots
 retain their nominal identity. See
-[the M1 profile](../m1-host-references.md).
+[the M1 profile](../host-integration.md).
 
 The same `vba-ide` model and `vba-ui-egui` renderer power the standalone native app, browser app and
 render harness. Neither Gridcraft nor Wordcraft is a build dependency.
@@ -27,8 +27,9 @@ Shift+F8 steps over and Ctrl+Shift+F8 steps out. Ctrl+G focuses Immediate, Ctrl+
 Ctrl+R shows Project Explorer, F4 shows Properties, F2 shows the symbol browser, Ctrl+F opens find,
 and Ctrl+S requests source save. UI Reset stops execution and discards runtime state; it retains
 host side effects. Native import/export/save accepts bounded UTF-8 `.bas` source and preserves
-line endings and attributes. Browser transfer currently uses explicit copy/paste source panels.
-Closing modified source requires save or explicit discard. No binary Office project is rewritten.
+line endings and attributes. Browser transfer supports explicit uploads/downloads.
+Closing modified source requires save or explicit discard. Explicit native form and
+edited package-copy workflows are described in [forms](../forms.md).
 
 The CLI also accepts `--script commands.txt` with commands `break <line>`, `run`, `continue`,
 `step`, `next`, `out`, `locals`, `stack`, `print <expression>`, `set <name = expression>`,
@@ -72,8 +73,9 @@ active editor surface. Host toolbars can instead call `Ide::dispatch` directly.
 Populate source with `Ide::add_module(name, text)` and retain the returned `SourceId` mapping to
 the host's project/module identities. These are plain source buffers. Preserve the original Office
 project parts and opaque unsupported components in the host; adding source never executes it.
-Current execution accepts standard modules; classes, document events and UserForms need later
-language/host contracts. Unsupported structures must not be silently converted or discarded.
+Use explicit component kinds and the supported class/document/UserForm contracts when
+attaching richer projects; see [host integration](../host-integration.md) and [forms](../forms.md).
+Unsupported structures must not be silently converted or discarded.
 
 Call `Ide::configure_host(imports, roots, catalog)` before launch. `Import` and native object roots
 use the M5 contract; the host's own identity/generation model remains authoritative. Optional
@@ -117,135 +119,9 @@ browser PNGs. `VBA_PLAYWRIGHT_MODULE` can point to an external cached Playwright
 The committed tests assert commands, geometry, accessibility and contrast; PNGs are reproducible
 inspection output, not a checked-in Microsoft or cross-platform pixel baseline.
 
-## M8 code-assistance corrections
 
-Completion now works from design-time source declarations and supplied `ApiMember` entries, including
-simple typed receivers. Typing a word/period or Ctrl+Space/Ctrl+J opens a caret-anchored list; arrows,
-Enter/Tab, Escape and pointer selection work in the source editor. Basic project signature help is
-nonexecuting metadata. Live parser failures are separate `Module::syntax_diagnostics`; they render
-red/underlined affected lines and clear on correction without Compile or diagnostic navigation.
-Use the model's checked editor/source byte projection when implementing another frontend; original
-source bytes/line endings remain authoritative. Compatible same-host reruns retain Static values;
-Reset clears the invocation/project state. Host identity changes prevent state transfer.
+## Forms and persistence
 
-`cargo xtask ui` also writes `light-completion`, `dark-completion`, `light-syntax-error` and
-`dark-syntax-error` PNGs. Chromium uses real keyboard source replacement, member completion and
-execution (`8`), then syntax error/correction, and captures `browser-completion`/`browser-syntax-error`.
-The standalone page's hidden source mirror and live feedback status are harness observations; they
-do not introduce web APIs into the embeddable model/panels. All images stay ignored under `reports/ui/`.
-See specification section 16 and the provenance manifest for public reference examples/cache hashes.
-
-## Ordinary editor commands — historical M8 baseline
-
-| Operation | M8 support and verification |
-|---|---|
-| Undo / Redo | Source shortcuts Ctrl+Z / Ctrl+Y or Ctrl+Shift+Z (Command equivalents on macOS); functional Edit menu entries; keyboard and menu regression tests. History uses the toolkit's bounded, grouped undo behavior. |
-| Cut / Copy / Paste | Selection-aware keyboard clipboard operations; Copy/Cut produce real clipboard output; multiline Paste updates source through the same revision/size checks. Native Edit-menu Paste requests the platform clipboard. Chromium verifies the real clipboard round trip. |
-| Browser Paste menu | Disabled with a shortcut explanation: use Ctrl+V / Cmd+V or the browser paste command. Browser clipboard permission/user-gesture policy belongs to the browser shell. |
-| Selection/navigation/deletion | Pointer selection, Shift selection, Select All, arrows/Home/End and word/document navigation, Backspace/Delete and selection replacement use the source widget; regression tests cover Select All, Shift+End, deletion and Unicode source. |
-| New lines / indentation | Enter inserts new lines; Tab inserts indentation at the caret and Shift+Tab removes caret indentation. Untouched LF/CRLF/CR bytes remain intact. This does not implement automatic indentation or whole-block indent/outdent. |
-| Find / Replace | Literal, case-sensitive current-module search; Find Next advances then wraps; bounded Replace All. |
-| Remaining editing workflows | Whole-block indentation/comment commands, automatic indentation/case correction, bookmarks, richer find options, split/procedure views and docking/customisation remain M10. M8 does not claim every conventional editor feature. |
-
-Selection and undo/redo survive temporary Edit-menu focus. Escape cancels completion while keeping
-source focus; accepting completion and immediately typing within the same rendered frame preserves
-the new text. These interaction details have permanent regressions rather than relying on the
-presence of toolkit keyboard bindings alone.
-
-## M10 classic tools
-
-[M10 acceptance](m10-implementation.md) and [ADR 0018](../decisions/0018-m10-classic-tools-and-debugger-policy.md)
-supersede the historical M8 limitations above. Edit now offers selected-line
-indent/outdent/comment, shared source Undo/Redo across all views, literal scoped
-Find/Replace (module/procedure/project, direction, case, whole word), Enter
-indentation/case correction, definitions and constants. F3/Shift+F3 repeat Find;
-Ctrl+M indents in source and imports when Project Explorer owns focus.
-
-View supplies procedure-only/split views, bookmarks/history, pane placement and
-toolbar visibility/order. File supplies validated rename and explicit removal
-choices. Options/preferences retain layout and editing settings, not source or
-evaluation permission. Native file IO remains shell-owned. Browser Source File
-offers an explicit `.bas` chooser and real UTF-8 download; import does not run
-code and downloading does not acknowledge a successful save or clear dirty state.
-
-Quick Watch (Shift+F9), conditional/change watch contexts, array-index inspection
-and typed local edits use native IDE commands. Set Next Statement (Ctrl+F9)
-supports verified straight-line current-frame checkpoints. Immediate function
-calls are off by default; opting in permits isolated bounded execution with real
-host effects, not shared paused-project mutation. Reference/constant metadata
-enriches Quick/Parameter Info and Object Browser without loading libraries.
-
-DAP is optional: `--features dap` enables the CLI stdio adapter and JSON dependency.
-It is not used by the native or embedded egui debugger. It accepts an explicitly
-preloaded source or launch `sourceCode`; unknown/unsupported requests fail clearly.
-Host effect policy, source/pause identity and lifecycle checks remain in the IDE.
-
-## M2 forms
-
-`Ide::add_form`, `edit_form`, `generate_form_handler`, `run_form`, `form_event`,
-`import_form` and `export_form` share design and actual VM execution across native,
-browser and embedding surfaces. The same `EditorUi` mounts the designer/runtime.
-Save/export use existing owned host requests; `mark_saved` checks combined source/
-design revisions. Hosts persist the payload and keep package/trust policy.
-The standalone shell accepts `.bas`, `.cls` and `.tvform`; the browser uses explicit
-upload/download. The original sample is `examples/forms/CustomerForm.tvform`.
-See [M2 profile, workflow, format and acceptance](../m2-acceptance.md).
-
-Native application-window activation follows ADR 0077. The inert
-`Ide::form_active_window` and `form_instance_window_active` inspect canonical
-provider state. `FormCommand::InstanceWindowFocus` executes VBA and needs the same
-host authorization as control input. The renderer emits it for modeless window
-presses; external viewport focus does not represent a document-window transition.
-`EditorUi::document_window_activated` builds the explicit executable command for a
-host document activation. Dispatch it before document input and suspend input
-while its callbacks run/Stop; automatic raw document-canvas buffering/replay is
-not supplied by this helper and remains unimplemented in the two consumers.
-
-The authored Chromium activation fixture is reproducible with
-`cargo run -p vba-project --example native_form_fixture -- /tmp/native-window --window-activation`,
-then run `tools/ui-browser/native-window-activation.cjs` with
-`VBA_NATIVE_FIXTURE_DIR=/tmp/native-window` and the usual Playwright environment.
-It verifies reentrant modal-to-modeless Show, physical header switching and Hide
-restoration through the actual web UI. It is not fresh Office evidence.
-
-ADR 0078: after offering synthetic events, call EditorUi::document_raw_input
-before begin_pass, passing the host document/window lifetime identity, authorized
-canvas bounds and canvas visibility. Dispatch returned commands through the
-existing authorization gate; on failure call cancel_document_input. A None canvas
-cancels input on lost trust or invalid host context; a hidden canvas stalls replay
-while debugger input remains available. After the callback, document_input_ready
-allows the embedding to restore the requested document view. Call
-document_input_applied only after a completed, non-discarded document UI pass;
-request hidden paint while document_input_pending. The helper retains only bounded
-raw input; SessionInstance and ordinary VBA remain the execution authority.
-
-ADR 0079 keeps the same host API: earlier native key/text/paste/IME events in a
-document-press batch enter the existing keyboard queue. Deactivation waits for
-callbacks/defaults and an IME composition that started before the press. Continue
-and Reset keep their normal paths. Keep calling the raw hook even while stopped;
-it owns IME continuations and leaves debugger shortcuts available. The host must
-continue repainting/service ticks while document_input_pending is true.
-
-ADR 0080: optional Theme.form_color is a pure UI lookup from an original OLE_COLOR
-Long to an optional Color32. Leave it None for standard RGB and injected theme
-roles. Supply it for exact platform or client palette entries; returning None
-keeps the default projection or displays the unavailable-client-palette message.
-Explicit RGB values bypass this resolver. It never authorizes execution or changes the canonical value.
-
-
-ADR 0081: Theme.form_font optionally maps an inert FormFont snapshot to an
-already installed egui FontId family for the requested face/weight/style. The
-renderer owns the native point-size conversion and validates returned families
-against the caller's atlas; it never acquires font files. Return None to use a
-matching installed named family or the host's existing fallback. The callback
-can select an italic face; when it resolves a face the renderer does not add
-synthetic italics. Underline/strikethrough remain local text decorations.
-
-Native text widgets emit `FormCommand::InstanceTextEdit` for an actual edit and
-`InstanceText` for selection-only movement (ADR 0092). Both execute code and
-require the same host preparation. Custom adapters should call
-`Ide::form_instance_text_edit` when replacing text, including an autocompleted
-suffix whose replacement leaves the final text unchanged. Existing
-`form_instance_text` callers keep comparison-based updates. Keep these commands
-in input order; AutoTab completes through ordinary validation/focus callbacks and
-may Stop or wait before the destination receives focus.
+See [forms](../forms.md) for native import, designer/runtime behavior, revision-checked
+save snapshots, browser transfers and edited package-copy export. Original project
+bytes, authored source/design and running VM values have separate ownership.

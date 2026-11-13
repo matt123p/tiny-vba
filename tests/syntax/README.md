@@ -6,4 +6,4 @@ Rust integration tests live in `crates/vba-syntax/tests/frontend.rs` and also pa
 and all 20 M0 scenario bodies. None executes VBA. Normal tests need no external checkout.
 
 See [frontend](../../docs/frontend.md) for the grammar matrix/bounds and
-[the external grammar report](../../docs/m1-corpus-report.md) for the separate opt-in allowlist.
+[the external grammar report](../../docs/testing.md) for the separate opt-in allowlist.

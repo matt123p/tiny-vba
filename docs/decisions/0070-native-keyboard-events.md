@@ -40,7 +40,7 @@ References:
 
 - [Microsoft Forms KeyDown/KeyUp](https://learn.microsoft.com/en-us/office/vba/language/reference/user-interface-help/keydown-keyup-events)
 - [Microsoft Forms KeyPress](https://learn.microsoft.com/en-us/office/vba/language/reference/user-interface-help/keypress-event)
-- [M7A.4 completion checklist](../m7a4-completion-checklist.md)
+- [M7A.4 completion checklist](../forms.md)
 
 Shared validation PASS: full CI, WASM compilation, actual WASI suite and the
 final eight-case keyboard target, all 24 native form UI cases, UI/native/web

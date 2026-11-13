@@ -59,7 +59,7 @@ native form mutation/navigation execute under the existing budgets.
 This increment does not close Controls.Add/Remove, list multiple selection and
 bindings, broader input/property/event/lifecycle/platform/resource parity, native
 edited persistence (M7A.5), or legacy format removal (M7A.6). The complete remaining
-M7A.4 ledger stays in [the runtime record](../m7a4-native-runtime.md).
+M7A.4 ledger stays in [the runtime record](../forms.md).
 
 Primary contracts:
 

@@ -37,5 +37,5 @@ live state. Native UserForm resource encoding remains M7A.5, and ActiveX remains
 outside this worksheet Form Control profile.
 
 The exact supported properties, limits, refusals and authored evidence are in
-[the M7A.3 contract](../m7a-worksheet-controls.md). No fresh Office observation or
+[the M7A.3 contract](../forms.md). No fresh Office observation or
 blanket Excel compatibility claim follows; M8.5 comparisons remain NOT_RUN.

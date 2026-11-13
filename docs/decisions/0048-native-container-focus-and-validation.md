@@ -64,4 +64,4 @@ reported evidence, not a fresh observation or an adopted macro/fixture.
 These public contracts are not fresh measured event traces. Recursive redirection,
 container/activation boundaries, boolean-family update timing, full update/binding/coercion and keyboard/mouse
 ordering, selection/multiline/password, further native families/resources and
-platform packets remain in the [runtime work record](../m7a4-native-runtime.md).
+platform packets remain in the [runtime work record](../forms.md).

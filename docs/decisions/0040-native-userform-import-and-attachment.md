@@ -18,7 +18,7 @@ non-cached classes, pictures, bindings, default/cancel, accelerators and additio
 behavior variants refuse explicitly. These are declared profile limits, not
 claims that those Office features are absent or an authorization to invent them.
 Broader controls and lifecycle semantics remain M7A.4. See the
-[property/event/format/host matrix](../m7a-control-contracts.md).
+[property/event/format/host matrix](../forms.md).
 
 `vba-ide` now depends on `vba-project`, adding one reviewed downward edge. It maps
 validated native data into the existing shared form designer/runtime. Neither

@@ -48,4 +48,4 @@ Independently authored native tests cover validation/budgets/priority/qualificat
 source spans, actual enum/constant execution, scoping, invalid writes/calls,
 missing references, IDE reset guards and isolated compilation. VM and IDE reference
 tests run under WASI. No new external corpus or Office oracle observation is claimed.
-See [the implementation log](../m1-host-references.md) for gates and continuation.
+See [the implementation log](../host-integration.md) for gates and continuation.

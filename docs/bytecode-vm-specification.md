@@ -4,7 +4,7 @@ Version: IR 1 base with versioned extensions through IR 11. Date: 2026-10-26. St
 [ADR 0004](decisions/0004-bytecode-vm-contract.md). M2 structural IR/verifier/lowering and M3 execution subset implemented. See [compiler](compiler.md) and [runtime](runtime.md).
 
 This document defines the M2/M3 instruction representation, verifier, calling convention and execution
-lifecycle. It supplements section 6 of the preserved [implementation specification](vba-interpreter-rust-implementation-spec.md).
+lifecycle. See [architecture](architecture.md) for current owners and layering.
 Current code implements [M0 foundations](decisions/0003-m0-source-scenarios-foreign.md), the M1 frontend, [M2 compilation](compiler.md) and [M3 runtime subset](runtime.md).
 Structural verification alone adds no execution result; the M3 runtime contract records actual execution evidence.
 
@@ -110,7 +110,7 @@ Programmatically supplied entry values are validated and bound before Ready; the
 The initial generic host target can therefore be an Object-valued entry parameter without an Office
 global registry or an object literal embedded in bytecode.
 
-ScalarKind is the shared declared-type descriptor planned in vba-values: Variant, Boolean, Byte,
+ScalarKind is the shared declared-type descriptor in vba-values: Variant, Boolean, Byte,
 Integer, Long, LongLong, Single, Double, Currency, Date, String and Object. Empty/Null/Missing/Nothing/
 CVErr are Value states, not extra declared types. Variant slots retain the actual Value tag without
 wrapping it in another Value variant. Object declarations carry only the generic external-reference

@@ -19,19 +19,3 @@ Each skill links to the authoritative contracts; skills do not replace decision 
 new product scope. Current user direction and adopted decisions take precedence over historical
 supplied specifications. Record material contract changes and update affected skills together.
 Skills guide agent judgement; dependency checks and behavioural/visual evidence still verify the work.
-
-## Using the skills
-
-Both tools can choose skills from their descriptions. For explicit use, ask, for example:
-
-- Codex: “Use $tiny-vba-editor-ui to implement the breakpoint gutter.”
-- OpenCode: “Use the tiny-vba-editor-ui skill to implement the breakpoint gutter.”
-- Either: “Review this new dependency using tiny-vba-architecture.”
-
-If skills are absent from the tool's list, verify the project working directory, inspect local skill
-permissions/overrides and restart the session if necessary. No user-level installation, symlinks,
-plugin connection or tool-specific config changes are required for this repository layout.
-
-Discovery references checked 2026-10-26:
-[Codex skill discovery](https://learn.chatgpt.com/docs/build-skills) and
-[OpenCode skill discovery](https://opencode.ai/v2/docs/skills).

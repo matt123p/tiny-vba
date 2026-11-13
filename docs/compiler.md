@@ -1,314 +1,86 @@
-Current compiler additions are in [the M4 language contract](m4-language.md) and
-[ADR 0012](decisions/0012-m4-oracle-acceptance.md); current default target is ir7-structural:
-IR 1/2 remain supported. Array parameter/layout metadata, ParamArray packing and named reference
-capture are checked before execution. The historical M2/M4-first-slice restrictions below are
-superseded only by those explicitly documented additions.
+# Compiler and verified bytecode
 
-New M1.1 additionally supports qualified declared-type syntax and explicit
-`CompileOptions.references` / `bind_with_references` snapshots. Registered host
-enum types bind to Long; typed reference constants resolve in expressions,
-constant declarations, defaults and bounds. Source symbols retain precedence.
-Missing/undefined types and references fail explicitly. Nominal host object types
-carry verified IR 5 identity and require a host resolver for non-Nothing values;
-they are not aliases for Object. See
-[the exact profile](m1-host-references.md) and
-[ADR 0020](decisions/0020-explicit-host-reference-snapshots.md).
-The nominal extension and legacy-consumer refusal are in
-[ADR 0021](decisions/0021-nominal-host-object-types.md).
+`vba-semantics` binds the source AST, `vba-compiler` lowers it, and `vba-ir`
+verifies the resulting bytecode. Only IR constructs opaque immutable
+`VerifiedProgram` values. Compilation does not execute VBA or host operations.
 
-IR 8 defines and verifies M6A `IntrinsicCall` and contextual `BinaryCompare`
-instructions. Named or omitted intrinsic calls and StrComp, InStr, InStrRev,
-Replace, Split and Filter lower to explicit plans; unchanged fully positional calls for
-other functions retain legacy instructions. Contextual comparisons capture the
-calling module's Option Compare mode and require an injected provider when
-string operands need collation. See the [IR 8 contract](bytecode-vm-specification.md#ir-8-extended-intrinsic-calls).
-
-# M2 binding and verified bytecode
-
-Updated for [M4 / IR 2](m4-language.md), adopted by [ADR 0011](decisions/0011-m4-language-extension.md).
-The additions there supersede the historical M2 subset/refusals below. Default compilation now targets
-ir3-structural, preserving IR 1 instruction shapes and emitting IR 2 for extension features.
-
-Implemented 2026-10-26. `vba-semantics` binds the M1 AST; `vba-compiler` lowers it;
-`vba-ir` owns IR 1, structural verification, opaque immutable `VerifiedProgram` and disassembly.
-Compilation alone executes no VM or VBA runtime operation. M3 now provides the separate [runtime profile](runtime.md). The target `ir1-structural`
-advertises the shapes of IR 1 operations for verification, not an executable compatibility profile.
+## CLI and capability selection
 
 ```sh
 cargo run -p vba-cli -- check examples/pure-vba/Arithmetic.bas
 cargo run -p vba-cli -- compile examples/pure-vba/M2Control.bas --entry Answer
 cargo run -p vba-cli -- disasm examples/pure-vba/Arithmetic.bas
-cargo test -p vba-semantics -p vba-ir -p vba-compiler
 ```
 
-`check` and `compile` both perform the full parse/bind/lower/verify pipeline and print
-`VERIFIED ... (structural target; use run for execution)`. `disasm` prints the same verified program's diagnostic
-text. These commands accept UTF-8 standard `.bas` modules and default to entry `Answer`;
-`--entry <name>` selects another entry. Errors return exit 2, with source coordinates when
-available. There is no bytecode file format, binary loader or persisted compile output.
+`check` and `compile` run parse/bind/lower/verify; `disasm` emits diagnostic text
+for the verified program. These commands accept UTF-8 standard modules and an
+explicit entry name. There is no persisted bytecode file format or binary loader.
 
-Arithmetic's reviewed [golden](../tests/semantics/m2/answer.disasm) has Integer constants 6/7,
-Long result slot 0, max_stack 3, and the specified instructions:
+`CompileOptions::default()` selects `ir7-structural`. Execution callers must select
+`CompileOptions { capabilities: vba_vm::capabilities(), ..Default::default() }`
+and use the VM's actual capabilities, currently through IR 14. The VM verifies
+compatibility again at session creation. A caller-provided capability set cannot
+enable unimplemented instructions. Older structural targets retain their own
+feature/version refusal rules; recompile source rather than relabeling a program.
 
-```text
-0000 Checkpoint(SiteId(0))
-0001 RefLocal(LocalSlot(0))
-0002 Const(ConstantId(0))
-0003 Const(ConstantId(1))
-0004 Binary(Multiply)
-0005 WriteRef(Value)
-0006 Jump(Pc(7))
-0007 Checkpoint(SiteId(1))
-0008 Return
-```
+## Binding
 
-M3 now executes this example as Long 42. Neither VERIFIED nor the presence
-of an operation in `Capabilities::ir1_structural()` claims runtime support.
+Names are case-insensitive. Source identities remain distinct across modules;
+module/procedure visibility, declaration shadowing, Option Explicit, component
+kind and reference snapshots control resolution. Host metadata must be supplied
+explicitly; metadata discovery never activates external objects/libraries.
+See [module contexts](vba_module_types_and_execution_contexts.md) and
+[name/object resolution](vba_excel_context_and_object_resolution.md).
 
-## Binding boundary
+Bound calls retain nominal types, parameter modes and canonical ByRef locations.
+Named/optional/omitted arguments preserve source-order evaluation and map into
+declaration order without replay. Omitted argument metadata is distinct from a
+runtime Missing/Empty/Null value. Shared runtime coercion handles constants,
+defaults and typed values; the binder does not implement another conversion path.
 
-| Construct | Implemented M2 behavior |
-|---|---|
-| Modules and procedures | Ordered standard modules, unique SourceIds, case-insensitive procedure names, forward/recursive lookup, local-module precedence and public cross-module calls; private procedures stay module-local |
-| Scopes | Procedure-wide parameters, Function result, scalar Dim locals and literal Consts; local symbols shadow module constants; implicit Variant locals without Option Explicit |
-| Option Explicit | Reject every unresolved variable with its exact identifier span; procedure calls must resolve regardless of this option |
-| Declarations | All 12 ScalarKind descriptors, required ByVal/ByRef parameters, Function result types; omitted type means Variant; no coercion implementation is implied |
-| Calls | Exact positional present arity, Sub/value distinction, ByVal expressions, exact-declared-kind local ByRef; Function results used as statements are dropped explicitly |
-| Expressions | Decimal nonnegative Integer/Long literals (including % and & suffixes within range), strings, Boolean, Empty/Null/Nothing, local/constant names, parentheses, unary minus/Not and the IR 1 binary operator tags |
-| Assignment | Local/result value assignment and explicit Set mode; Set targets must be Object/Variant; dynamic assignment/conversion rules remain runtime work |
-| Control | If/ElseIf/Else including inline forms, Exit in a matching context, Stop, numeric For with scalar Integer/Long/Variant counter and positive integral literal step (default 1); matching Next name |
-| Constants | Literal untyped module/procedure Const only; exact tags retained; cross-module Const lookup, typed Const and computed constant expressions fail explicitly |
+The implemented language profile includes supported scalars/arrays, numeric and
+collection loops, handlers, persistent module/Static state, project classes,
+properties/default members, events and explicit host imports. Native form support
+is supplied by the IDE through ordinary classes and typed references, not Office
+names inside the compiler/VM. Unsupported syntax or binding shapes produce
+structured diagnostics rather than successful placeholder operations.
 
-The historical M2 subset rejected persistent module variables, classes/properties, default-member
-binding, arrays, optional/default/named/omitted direct VBA arguments, parenthesized direct arguments,
-nonlocal ByRef, identifier type suffix binding, unknown types, unary plus, Is/Like, nondecimal/wider/
-floating/Currency literals, Option Compare Text, computed/nonpositive/nonintegral For steps, and
-all syntax outside M1. All procedures are bound, even if the selected entry never calls them.
-A later M6A extension implements Option Compare Text through IR 8 contextual
-comparisons, retaining the required-provider refusal at runtime.
-A ByRef entry is rejected; a ByVal entry records its required launch kinds but receives no values
-until M3. Dynamic operand combinations are deliberately not inferred from structural verification.
+## Lowering and verification
 
-The Rust library `compile_modules` accepts ordered `ParseResult`s with distinct source identities.
-Only a syntax-valid result can enter binding. The CLI currently takes one source file. Source
-snapshots, revision, spelling, declaration spans and statement identities are retained; no paths
-are reopened by the compiler. Metadata identifiers have the IR 256-byte ceiling.
+Lowering is deterministic and emits explicit frames, stack operations, source
+maps and statement checkpoints. Distinct statements on one line retain distinct
+identities. Call continuations preserve caller operands and resume without
+re-evaluating effects. Hidden support/attribute records do not become authored
+breakpoint sites. See [attribute projection](vba-attributes-and-editor-projection.md).
 
-## Lowering and source mapping
+Verification checks instruction operands, indices, stack effects and joins,
+branch/checkpoint targets, call signatures, location types, source maps and
+capability requirements before execution. Work and input-derived metadata are
+bounded. Resource failures are distinct from unsupported features and VBA errors.
+The [bytecode specification](bytecode-vm-specification.md) defines the foundational
+IR 1 layout; versioned decisions define the extensions.
 
-Parameters occupy the first slots, followed by the hidden Function result, declared locals in
-source order, implicit locals in first bound-use order, then hidden compiler scratch slots.
-Procedure IDs follow module/declaration order. CFG blocks are built with symbolic targets and
-flattened by a deterministic iterative traversal (true edge first), so PCs need not follow source
-line order. Site IDs follow emitted PCs. Constants are interned by exact tag/payload and reordered
-by first emitted use; equal Integer/Long payloads remain distinct. Unreachable blocks, their calls
-and constants are removed; the complete nonexecutable statement table remains.
+## Versioned extensions
 
-Every emitted block starts with Checkpoint and ends with Jump/Branch/Return. Calls inside an
-expression share the enclosing checkpoint, preserve their operand prefix, and keep argument
-emission order. Colon-separated statements have different StatementIds/sites. Dim/Const statements
-have hidden source checkpoints; initial local values are a runtime storage obligation, not repeated
-initialization on reaching Dim. Stop immediately precedes a Jump. End If and procedure endings
-have explicit sites. Synthetic procedure exits use the End Sub/Function statement identity.
+| IR | Contract | Decision |
+|---|---|---|
+| 1 | Stack bytecode, verification, checkpoints and explicit continuations | [0004](decisions/0004-bytecode-vm-contract.md), [0006](decisions/0006-m2-binding-and-verification.md) |
+| 2 | Arrays, handlers, intrinsics and persistent slots | [0011](decisions/0011-m4-language-extension.md) |
+| 3 | Array-layout/parameter metadata and canonical reference captures | [0012](decisions/0012-m4-oracle-acceptance.md) |
+| 4 | Host roots and native protocol binding | [0013](decisions/0013-m5-host-contract.md) |
+| 5 | Nominal host object types | [0021](decisions/0021-nominal-host-object-types.md) |
+| 6 | Default members and collection enumeration | [0022](decisions/0022-default-members-and-enumeration.md) |
+| 7 | Project classes, instances and form execution | [0023](decisions/0023-project-classes-and-forms.md), [0024](decisions/0024-standard-form-execution-and-exchange.md) |
+| 8 | Descriptor-verified extended intrinsic calls/context | [0034](decisions/0034-intrinsic-implementation-framework.md) |
+| 9 | Class enumerator metadata | [0045](decisions/0045-class-and-native-collection-enumerators.md) |
+| 10 | Lazy scalar project-class/native-form As New | [0046](decisions/0046-lazy-project-class-variables.md) |
+| 11 | Nominal class interfaces and Forms bindings | [0047](decisions/0047-native-forms-nominal-types-and-library-access.md) |
+| 12 | Inert runtime class names/TypeName | [0064](decisions/0064-native-runtime-type-names.md) |
+| 13 | VarType default-value inspection through ordinary frames/authorized calls | [0067](decisions/0067-vartype-default-value-inspection.md) |
+| 14 | Lazy project-class/native-form array elements | [0068](decisions/0068-lazy-project-class-array-elements.md) |
 
-For captures start/limit/step in three hidden scratch slots, then initializes the counter. A hidden
-first test avoids a duplicate immediate source stop; subsequent visible tests share the For
-StatementId but have distinct sites. Next has a checkpoint before counter advance. Bounds are not
-re-evaluated on the backedge. This is the restricted lowering contract; runtime loop conversion and
-overflow cases must be tested before M3 execution support is declared.
-
-`resume_next` records the next retained source-order statement site (None at procedure exit),
-not an arbitrary next instruction. IR 1 has no Resume execution; complex branch/loop Resume
-semantics require the later versioned handler contract. Compiler output always passes the same
-whole-program verifier used for untrusted hand-built IR.
-
-## Verifier and budgets
-
-Verification checks every procedure, source/revision identity, constant payload, signature/slot
-layout, launch signature, instruction operand, declared feature/op/conversion capability, checkpoint
-ownership, statement-contained span, unique site PC, call ownership and exact ByRef reference kind.
-Every block has empty entry/exit stacks (Branch consumes its sole Value). V and Location never
-substitute for one another. All branch targets are checkpoints. Reachability uses an iterative
-worklist; a reachable self-loop is valid, and unreachable blocks/falloff are rejected. Maximum stack
-must exactly match the computed maximum. Foreign descriptors verify Call/Get/Let/Set, Value/
-Reference/Omitted modes, names and ordering, without implementing source-level host binding or dispatch.
-
-`verify(Program, &Capabilities, &VerifyLimits)` is the sole VerifiedProgram constructor. Its accessor
-returns only `&Program`; mutable/cloned unverified tables must be verified again. `measure_stack`
-checks other invariants and reports maxima for the compiler; it never returns a verified program.
-Unknown IR versions/features/profiles/capabilities return VBA0022, malformed IR VBA0020, verifier
-budget exhaustion VBA0021. Binder errors use VBA0110/0111; lowering errors VBA0120/0121;
-unsupported language forms retain VBA0001. Errors do not return a partially executable program.
-
-Defaults follow the [IR 1 limits](bytecode-vm-specification.md): 256 sources/16 MiB source text,
-4,096 procedures, 65,536 instructions per procedure/1,048,576 total, 65,536 constants/16 MiB
-constant payload, 4,096 slots and stack entries, and 256 call arguments. Each procedure's source,
-checkpoint and call tables is independently capped at the total instruction limit. Verification
-charges 256 logical bytes per table cell plus source/name/constant buffers, with 64 MiB payload
-and 8,388,608 scanned entries as separate ceilings. Limits can be lowered by callers.
-
-Binding preflights the AST iteratively before cloning it, bounds depth at 64, charges 256 bytes
-per node, 64 per retained token, source/string buffers and constant substitutions, with 64 MiB
-logical payload and 1,048,576 visits. Constant expansion is charged before cloning. Compiler
-emission charges 256 bytes per instruction/metadata cell and three copies of interned constant
-payload (pool/key/canonicalization), with a separate 64 MiB ceiling; it checks instruction/slot/
-constant counts before growth. Disassembly has a separate 64 MiB output ceiling and fallible
-String reservations. Vectors use fallible reservations at input-derived growth points; bounded
-standard-library tree/string/AST clones may still rely on Rust's allocator. These are conservative
-logical accounting limits per stage, not an RSS guarantee. No runtime budget is consumed by M2.
-
-## Evidence and remaining gates
-
-`vba-semantics/tests/binding.rs`, `vba-ir/tests/verification.rs`, `vba-compiler/tests/compiler.rs`
-and CLI integration tests cover positive/negative binding, exact errors, slot/constant/site order,
-nested/same-line calls, If/For/ByRef lowering, the full Answer golden, version/feature rejection,
-all IR 1 stack instruction shapes, malformed indexes/blocks/metadata/calls, all verifier budget
-dimensions, exact UTF-16/float-bit disassembly and bounded constant amplification. Tests are
-independent of corpus checkouts and Office. All 20 M0 scenario execution statuses stay NOT_RUN.
-Native CI, library WASM compilation and the M3 native/WASI execution gate are required.
-
-## M3 source extension
-
-The binder/compiler now support generic member Call/Get/Let/Set on an explicitly declared Object
-local or parameter. Calls and member applications use Call; plain reads use Get; member assignments
-retain Let/Set. Source foreign arguments are ByVal or omitted with names preserved; foreign ByRef
-snapshot descriptors are verified/tested separately. Nested/default/indexed property ambiguity and
-implicit Office globals remain unsupported. These sites need explicit embedding permissions at
-runtime. See [M3 contract](runtime.md); runtime operations never enter the compiler layer.
-
-## New M1.2/M1.3: unnamed members and collection loops
-
-ADR 0022 adds IR 6 features `default-members-v6` and `enumeration-v6`.
-Object applications preserve the target and argument list, including nested
-applications, named/omitted operands and native ByRef snapshots. Explicit property
-writes retain Let/Set and parameter lists. The reserved `$value` argument carries
-the assignment operand after named indexes; `$target` is internal VM metadata and
-is removed before host dispatch. Older profiles reject these operations.
-
-Object-reference evaluation is separate from value evaluation. Assignments,
-operators, conditions and scalar intrinsic/ByVal parameter contexts resolve an
-object's default Get; Set and object/Variant parameter contexts retain identity.
-Default-property ByRef arguments are temporaries; dynamically typed array element
-arguments retain canonical aliases and exact declared-kind checks.
-
-`For Each control In group` evaluates its group once. Controls are Variant or
-Object/registered object types, and arrays require Variant. Nested loops cannot
-reuse a control; matching Next names and Exit For are checked. Verified init,
-advance and cleanup instructions retain source/Next checkpoints. Native arrays
-use live element reads; host collection enumeration uses a bounded owned snapshot.
-See [implementation and evidence](m1-defaults-and-collections.md). Earlier
-historical restrictions on default/collection syntax above are superseded here.
-
-## M2 class profile
-
-IR 7 `project-classes-v7` adds explicitly parsed Class/Document components,
-project-local nominal types, New, Me, Get/Let/Set accessors, Exit Property,
-predeclared document state and Is identity without default-value conversion.
-Instance fields use verified storage roles; source/statement spans remain the
-original source. Getter/setter IR procedure identities are distinct while class
-member names remain unchanged. The project reference namespace is reserved only
-when actual project classes are present; class-free legacy embeddings retain
-their external reference/host identity behavior. See [scope and remaining work](m2-classes-and-forms.md).
-This addition does not imply form designer, foreign event subscriptions, As New,
-Friend/static member binding or Office document-event/package support.
-
-M2's IR 7 source-event increment supports public/default Event declarations and
-scalar project-typed WithEvents fields in class/document modules. RaiseEvent uses
-verified required signatures and synchronous ordinary frames, preserves connection
-order and canonical ByRef across sinks, and retains queued receivers through
-pause/resume. State transfer remaps objects and preserves subscription ordering.
-Unknown events, mismatched handler signatures, Optional/ParamArray/named/omitted
-event arguments and foreign WithEvents mutation are refused. Editor Options
-exposes all-error, class-module and unhandled-error trapping. The selected form runtime/designer and source exchange are implemented under ADR 0024;
-see [M2 acceptance](m2-acceptance.md) for current scope and evidence.
-
-## M2 completion: static members and form input
-
-Under ADR 0024, typed project members validate names, visibility, access kinds,
-named/required/ByRef parameters and chained nominal receivers before execution.
-Matching property accessors have coherent index/value signatures; assignment
-value parameters are ByVal. Named native-field ArgumentGet captures require IR7;
-ordinary public field arguments alias canonical locations, while parenthesized
-expressions stay temporary. Late-bound Object/Variant retain runtime checks.
-Load/Unload bind to checked project form lifecycle methods. The IDE appends form
-class support to compiler input, retaining authored handler offsets and saving
-only original source plus design. See [M2 acceptance](m2-acceptance.md).
-
-Getter aliases resolve before chained member Get/Call/Let/Set under
-[ADR 0025](decisions/0025-getter-alias-member-dispatch.md). Method aliases retain
-the existing fixed-call shortcut. Hosts can therefore expose dynamic roots while
-objects captured by source retain their identity. No IR version changes.
-
-## M6 metadata and host-event capability
-
-Owned attributes are nonexecutable. The supported `Property Get` default member
-uses integer attribute IDs (including signed zero); default fields/functions and
-unsupported activation requests diagnose explicitly. IR 9 additionally admits
-public zero-argument Object-returning Function/Property Get enumerators with
-VB_UserMemId = -4 under class-enumerators-v9. Object results may use explicit
-nominal reference types such as stdole.IUnknown; malformed metadata and older targets
-refuse. See [ADR 0045](decisions/0045-class-and-native-collection-enumerators.md).
-Foreign nominal WithEvents fields require `host-events-v1`; older capability
-sets refuse them. The host supplies and validates actual event signatures before
-any callback runs. See [ADR 0029](decisions/0029-host-event-subscriptions.md) and
-[ADR 0030](decisions/0030-attribute-metadata-and-code-projection.md).
-
-## Variant For counters (2026-11-01)
-
-Explicit or implicit scalar Variant loop counters use the existing numeric loop
-lowering and shared arithmetic. Variant bounds are evaluated once and validated
-through shared numeric conversion before assigning the counter. Numeric addition
-with zero normalizes strings/Empty while retaining supported numeric widths;
-invalid/Null bounds raise ordinary catchable VBA errors. Integer/Long counters
-keep their existing conversions. Array, Boolean, String and Object controls
-remain refused. Positive integral literal Step (default 1) remains the declared
-profile; this change does not add dynamic or negative Step support.
-
-## Host optional defaults (2026-11-03)
-
-IR 8 capability `host-procedure-defaults-v1` retains standard-procedure optional/default and ParamArray
-metadata for explicit host calls. Earlier targets retain static call-site expansion and
-required standard parameters. Verification requires IR 8 and the declared feature; this
-adds no opcode. [ADR 0036](decisions/0036-suspended-host-project-calls.md) defines ownership.
-Qualified type members accept contextual keyword spelling, including `External.Name`.
-
-[ADR 0046](decisions/0046-lazy-project-class-variables.md) adds scalar project-class
-and native-form As New under IR 10 `auto-instancing-v10`, including module/static/
-instance storage, canonical ByRef preparation and constructor Stop/failure/retry.
-Reads construct only when Nothing; declaration/Set targets and inspection remain
-inert. Arrays and external activation refuse explicitly. Native designer launch
-constructs non-predeclared forms explicitly. Broader M7A.4 requirements remain open.
-
-[ADR 0047](decisions/0047-native-forms-nominal-types-and-library-access.md) adds
-IR 11 nominal class interfaces with bounded event exposure. The native Forms
-provider binds MSForms form/control/collection/return types and qualified
-VBA.UserForms through explicit source-function aliases; scope shadows and missing
-references remain authoritative. Ordinary canonical values/frames are retained.
-This is not full native lifecycle/event/control parity or edited persistence.
-
-## Runtime class names — IR 12
-
-`CompileOptions.class_runtime_names` optionally supplies a bounded display name
-for an existing project class. Owners must exist and be unique ignoring ASCII
-case; names are verified identifiers of at most 128 bytes. The compiler emits
-`runtime-class-names-v12` and IR 12 only when such metadata is supplied. Nominal
-identity and authored class names remain independent of TypeName presentation.
-Older consumers refuse IR 12. See [ADR 0064](decisions/0064-native-runtime-type-names.md).
-
-
-[ADR 0068](decisions/0068-lazy-project-class-array-elements.md) adds IR 14
-array auto_new declarations and TouchElement(declaration-slot). Lowering touches
-only referenced elements and ByRef actuals, retaining source-order argument
-capture and index evaluation once. Set targets and whole-array reads stay inert.
-Older capabilities reject array metadata/instructions. No intrinsic or ambient
-host authority is added. Scalar auto-instancing retains IR 10 selection.
-
-
-ADR 0081 adds selected native font metadata, ordinary typed Font objects, copied
-container defaults and inert UI snapshots. Font sizes retain Currency precision;
-local typography and optional caller-owned face selection preserve global host
-styles/fonts. The static nominal metadata ceiling is 8,192, with the existing
-64 MiB metadata/work bounds and VM/4,096-permission limits unchanged. The separate
-ADR 0073 event regression still stays below 4,096. Replacement/ambient/platform
-font behavior and the unchanged full M7A.4 checklist remain open; fresh Office
-comparisons remain M8.5 NOT_RUN. See [ADR 0081](decisions/0081-native-form-fonts.md).
+The [runtime](runtime.md), [intrinsic design](intrinsic-design.md) and
+[forms](forms.md) guides describe execution and ownership. Tests under
+`vba-semantics`, `vba-compiler` and `vba-ir` cover binding, deterministic
+lowering/disassembly, malformed programs and legacy capability refusals.
+Actual native/WASI execution is separate evidence; see [testing](testing.md).

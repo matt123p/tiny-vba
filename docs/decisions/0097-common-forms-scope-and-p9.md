@@ -13,7 +13,7 @@ basic properties, text/list/choice/container state, common input and events,
 appearance and debugger/trust/budget behavior. The existing implementation and
 accepted shared/pinned-host assertions already satisfy it; no product change or
 invented Office behavior is needed. Further supported controls remain available.
-The revised [checklist](../m7a4-completion-checklist.md) maps the accepted cases
+The revised [checklist](../forms.md) maps the accepted cases
 to executable evidence, while [P9](../p9-forms-compatibility.md) preserves the
 former outstanding IDs and audit requirements. Unsupported deferred behavior
 remains unsupported, not PASS. A bug in included common behavior remains a fix.
@@ -38,4 +38,4 @@ canonical form state/orchestration, vba-ui-egui rendering/input and the forks
 Office document/binding/trust/package state. Shared and pinned-host full gates
 from ADR 0096 remain valid for the unchanged product. Focused common model/UI
 suites and repository/document consistency checks verify the closure change;
-[progress](../implementation-progress.md) records their actual results.
+[testing and evidence](../testing.md) records their actual results.

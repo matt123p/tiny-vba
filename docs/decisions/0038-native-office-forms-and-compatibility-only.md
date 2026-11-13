@@ -5,7 +5,7 @@ Date: 2026-11-04. Status: adopted on explicit owner direction.
 ## Decision
 
 Insert **M7A — Native Office forms and removal of .tvform** between accepted M7
-and M8. Activate the [Office forms/control work breakdown](../office-forms-controls-implementation-plan.md)
+and M8. Activate the [native forms contract](../forms.md)
 under M7A, retaining its FC task IDs. Native forms are now scheduled work and a
 prerequisite for the declared M8 release profile, rather than a deferred backlog.
 M7 and earlier acceptance records remain evidence of their historical profiles.
@@ -74,5 +74,5 @@ Office formats. No runtime feature is added or removed by this planning change.
 This direction supersedes ADR 0024's custom exchange-format choice, the former
 forms-plan deferral and current guidance to extend/preserve `.tvform` as a product
 format. It preserves the useful shared runtime/design/debugger invariants and the
-historical M2/M7 results. The [remaining plan](../implementation-plan.md) now starts
+historical M2/M7 results. The [testing and evidence](../testing.md) now starts
 at M7A; M8 task IDs stay unchanged.

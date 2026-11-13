@@ -4,7 +4,7 @@ Format support superseded: [ADR 0099](0099-native-only-form-workflows.md) remove
 the custom codec/APIs and file routes. Historical execution/suspension evidence
 remains; native file and package-copy workflows now follow ADR 0098.
 
-Date: 2026-10-29. Status: adopted and implemented; [acceptance](../m2-acceptance.md) passed.
+Date: 2026-10-29. Status: adopted and implemented; [acceptance](../forms.md) passed.
 
 M2 completes the selected Label/TextBox/CommandButton profile above the existing
 IR7 project-class contract. `vba-ide` owns design documents, source handler

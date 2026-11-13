@@ -26,4 +26,4 @@ GridCraft binds workbook/sheet roots by code name and scopes unqualified Applica
 Range/Cells/Rows/Columns construction to the callback's worksheet owner without changing active
 selection. Its host catalogue still determines which document members work. Event ordering,
 EnableEvents, mutation sources, trust and undo/recalculation coordination remain application-fork
-responsibilities. The declared M5 profile was accepted on 2026-10-30; see the [M5 acceptance map](../m5-acceptance.md).
+responsibilities. The declared M5 profile was accepted on 2026-10-30; see the [M5 acceptance map](../testing.md).

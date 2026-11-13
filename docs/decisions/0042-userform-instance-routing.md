@@ -41,4 +41,4 @@ Native source/resources and design remain unchanged by runtime values. No native
 encoder or custom-format extension is added. Full default-instance replacement,
 loaded UserForms collection/type binding, activation/focus/event ordering, broader
 controls, host pin updates and fresh Office comparisons remain later M7A.4 work.
-The exact implementation and evidence are in [the packet record](../m7a4-userform-instances.md).
+The exact implementation and evidence are in [the packet record](../forms.md).

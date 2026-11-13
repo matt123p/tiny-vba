@@ -22,4 +22,4 @@ handle or controller target in a new execution. SessionInstance's constructor re
 This changes the unfrozen M3 runtime API; it does not change any IR instruction or serialized ABI.
 IR 1 remains unchanged. Regression tests and the shared native/WASI smoke program cover rejected
 old-handle reads/edits and ignored stale breakpoint/step bindings after client-ID reuse. See
-[acceptance audit](../m2-m3-acceptance-audit.md) and [runtime contract](../runtime.md).
+[acceptance audit](../testing.md) and [runtime contract](../runtime.md).

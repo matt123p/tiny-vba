@@ -47,5 +47,5 @@ the same existing wait-token routing. In particular adding a form cannot replace
 an embedding's MsgBox provider. Reset cancels tokens without running cleanup.
 
 Scope, authored evidence, current gates and remaining M7A.4 work are maintained in
-[the runtime record](../m7a4-native-runtime.md). Fresh Excel/Word observations remain
+[the runtime record](../forms.md). Fresh Excel/Word observations remain
 NOT_RUN under M8.5; public specifications and authored tests remain distinct.

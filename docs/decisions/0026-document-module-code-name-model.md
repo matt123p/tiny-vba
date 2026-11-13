@@ -19,4 +19,4 @@ This adds no crate dependency, IR operand, host protocol operation, or automatic
 event behavior. ADR 0027 defines the generic owner binding and callback path; the
 GridCraft adapter resolves and supplies live workbook/worksheet objects. M5.1
 handler signature/workflow acceptance and real workbook/worksheet evidence passed
-for the declared profile; see the [M5 acceptance map](../m5-acceptance.md).
+for the declared profile; see the [M5 acceptance map](../testing.md).

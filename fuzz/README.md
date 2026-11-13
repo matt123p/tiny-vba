@@ -31,4 +31,4 @@ fuzz dependency is introduced. Minimized accounting regressions live under
 `crates/vba-vm/tests/host.rs`; runtime type/palette regressions live in their owning
 crate tests. Preserve any future discovered crash input and add a regression
 before claiming a fix. Eight asserted native/WASI performance cases run through
-`cargo xtask m8-bench`; see [M8 evidence](../docs/m8-acceptance.md).
+`cargo xtask m8-bench`; see [M8 evidence](../docs/testing.md).

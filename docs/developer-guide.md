@@ -1,58 +1,61 @@
 # Developer guide
 
-Use the commands in [README](../README.md). Product code is Rust; maintenance checks require Python 3.11+.
-`rust-toolchain.toml` pins the compiler; Cargo.lock records the workspace resolution. MSRV is declared as 1.95;
-current verification uses the pinned toolchain, not a separate MSRV CI run.
+Use the Rust toolchain pinned in [rust-toolchain.toml](../rust-toolchain.toml) and
+the checked-in Cargo.lock. Product code is Rust; maintenance checks require Python
+3.11+. The declared minimum Rust version is 1.95; the pinned toolchain is the
+verification environment, not evidence of a separate MSRV run.
 
-`cargo xtask ci` is the native gate. `cargo xtask wasm` checks all libraries for wasm32-unknown-unknown;
-it requires `rustup target add wasm32-unknown-unknown`. Run `cargo xtask wasm-run` for identical native/WASI acceptance; it additionally needs
-Node 18+ and `rustup target add wasm32-wasip1`.
-`cargo xtask layers` reads Cargo metadata and compares normal dependencies to the reviewed acyclic graph.
-`cargo xtask corpora` validates Git/source pins and available hashes. The strict Python form in README also
-requires all submodules to be initialized. CI tests native Linux/macOS/Windows, library WASM, and strict corpus integrity separately.
+## Build and run
 
-Rust tests live under `crates/<owner>/tests/` or `apps/vba-cli/tests/`, not root tests/.
-Root tier directories hold shared input/expected data; use CARGO_MANIFEST_DIR to locate fixtures reliably.
-Keep generated artifacts under ignored reports/. External macros never run as part of native checks.
-For M0 fixtures, run `cargo run -p vba-cli -- conformance validate tests/fixtures/m0/arithmetic.vbas`.
-Validation succeeds for well-formed [schema 1](scenario-format.md), reports NOT_RUN, and never executes VBA.
-See [ADR 0003](decisions/0003-m0-source-scenarios-foreign.md) for source/location identities and explicit
-pending-host cancellation obligations. M1 implements a bounded source-aware lexer/parser:
-`cargo run -p vba-cli -- parse examples/pure-vba/Arithmetic.bas`. See [frontend](frontend.md) for
-the subset, diagnostics, AST and [syntax-only corpus report](m1-corpus-report.md).
-Before compiler/VM work, read the adopted
-[bytecode/VM specification](bytecode-vm-specification.md) and [ADR 0004](decisions/0004-bytecode-vm-contract.md).
-They define the IR 1 layout/verifier/continuation contracts and M2/M3 acceptance cases.
-M3 now executes the [runtime subset](runtime.md) via `vba-cli run`; use the Rust m3_smoke example
-for host wait/debugger/cancel acceptance. M2 now implements vba-compiler, binding, IR verification and disassembly; see [the compiler contract](compiler.md).
+```sh
+cargo run -p vba-ide-app
+cargo run -p vba-cli -- parse examples/pure-vba/Arithmetic.bas
+cargo run -p vba-cli -- run examples/pure-vba/Arithmetic.bas --entry Answer
+cargo run -p vba-cli -- debug examples/pure-vba/Arithmetic.bas --entry Answer
+cargo run -p vba-cli -- --help
+```
 
-To update a source pin, fetch/checkout an explicitly chosen commit in that submodule, inspect upstream notices
-and specimen changes without running it, then update the source lock and affected inventory hashes together.
-Stage the gitlink and metadata together; review the diff and run strict corpus verification. Do not use moving
-branches or silently rewrite expected outputs. Do not commit modified upstream source as interpreter code.
+For an external debugger, enable the optional adapter:
+`cargo run -p vba-cli --features dap -- dap examples/pure-vba/Arithmetic.bas`.
+See [embedding](ui/embedding.md) for host mounting and native/browser source transfer.
 
-The app forks should consume a published or revision-pinned tiny-vba dependency at their upper composition layer.
-No local sibling path or all-project workspace is needed. A separate integration workbench may be added later.
+## Validate changes
 
-The editor/debugger UI and standalone IDE are developed here, following
-[the UI contract](editor-debugger-ui.md). Gridcraft consumes the embeddable UI package.
-When UI packages land, add separate UI build/snapshot/accessibility checks and explicit headless
-package checks; the existing workspace-wide WASM library gate must be reviewed for the new layout.
-Use the same reviewed egui family revisions as the embedding host: Cargo patches are applied
-by the consuming workspace root, so standalone and embedding workspaces must align their pins.
+```sh
+cargo xtask ci
+rustup target add wasm32-unknown-unknown wasm32-wasip1
+cargo xtask wasm
+cargo xtask wasm-run
+```
 
-Validation must run from the intended checkout: xtask now discovers its runtime workspace and logs
-`xtask workspace: ...`. It does not trust the executable's compiled-in source path, which can refer
-to a different clone in a shared build cache. The cross-checkout integration test covers this case;
-wasm-run also honors CARGO_TARGET_DIR when finding the built artifact. Current execution uses
-m4-scalars-v1; recompile legacy M3 programs instead of relabeling their verification target.
+Use Node 22 for reproducible WASI/host/browser checks. UI work also needs
+`cargo xtask ui`, `cargo xtask ui-native` (a display or `xvfb-run -a`) and
+`cargo xtask web`. Browser packaging requires wasm-bindgen-cli 0.2.126; the
+maintenance browser harness uses its separately locked Playwright tooling.
+[Testing](testing.md) explains optional host, fuzz, benchmark and corpus gates.
 
-## Editor/debugger development
+Run checks from the intended checkout. xtask logs its discovered workspace rather
+than trusting a path compiled into a cached executable. WASI artifact lookup honors
+`CARGO_TARGET_DIR`. Tests belong under the owning crate/app's `tests/`; root `tests/`
+holds shared fixtures. Locate fixtures through `CARGO_MANIFEST_DIR`.
+Generated reports and downloaded evidence belong in ignored `reports/` and
+`.cache/evidence/`, with provenance/notices tracked separately.
 
-Use [the M8 embedding/harness guide](ui/embedding.md). `cargo xtask ui` runs toolkit-independent,
-interaction, embedding and source-IO tests and generates original paused-session snapshots.
-`cargo xtask ui-native` needs a native display (or Xvfb on Linux); `cargo xtask web` needs
-wasm-bindgen-cli 0.2.126. The browser smoke uses the separately locked maintenance-only Playwright
-tool. Engine/IDE-model builds have no GUI dependencies. See the acceptance report for exact tested
-surfaces and broader product/fork gates. Keep downloaded references only in `.cache/evidence/`;
-track provenance observations/hashes and licensed redistribution notices, not reference copies.
+## Make a change
+
+Start with [architecture](architecture.md), the relevant contract in the
+[documentation index](README.md), and [AGENTS.md](../AGENTS.md). Preserve the
+reviewed dependency graph and headless build boundary. Align the egui family and
+patch revisions with the consuming workspace; Cargo patches belong to its root.
+
+Update the owning contract and compatibility claims when behavior changes. Add an
+architectural decision for a material contract/ownership change, rather than
+appending a progress diary to multiple guides. Keep plans, task checklists and
+session handoffs out of maintained reference documentation; Git history retains
+removed implementation narratives. Immutable evidence selections/receipts must
+retain their identities and must not be presented as fresh results.
+
+External source updates require an explicitly chosen commit, notice/specimen
+review, and matching source-lock/inventory hashes. Stage the gitlink and metadata
+together, then run strict corpus checks. Do not execute upstream scripts/macros
+or import implementation code. See [corpus policy](../tests/corpora/README.md).

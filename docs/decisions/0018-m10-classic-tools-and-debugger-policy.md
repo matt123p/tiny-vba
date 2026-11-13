@@ -61,7 +61,7 @@ adapter, not arbitrary attach, remote debugging or an editor extension package.
 
 ## Verification and limits
 
-The [M10 acceptance map](../ui/m10-implementation.md) records authored core,
+The [M10 acceptance map](../debugger.md) records authored core,
 interaction, process, WASI, real browser and native capture evidence. M8 evidence
 remains historical and its regressions still run. Exact Office geometry remains
 unverified; this decision neither implements M11 forms/classes nor broadens the

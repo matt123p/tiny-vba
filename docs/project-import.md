@@ -1,4 +1,4 @@
-# Read-only VBA project import
+# VBA project import
 
 Implemented M6, 2026-10-27, under [ADR 0014](decisions/0014-m6-project-decoding.md).
 
@@ -84,30 +84,27 @@ See [ADR 0030](decisions/0030-attribute-metadata-and-code-projection.md).
 
 ## Authored package acceptance (2026-11-04)
 
-[M7](m7-acceptance.md) exercises this decoder through actual `.xlsm`/`.docm`
+[M7](testing.md) exercises this decoder through actual `.xlsm`/`.docm`
 package workflows in both forks. WordCraft now attaches decoded source inertly
 when constructing its editor project; GridCraft retains its owner/code-name checks
 and adds related graph preservation. Original bytes and canonical source have
 separate assertions. Cache/source consistency remains `NotChecked`; a decoded
 project is not proof of valid P-code or a verified signature. The
 [writeback/signature contract](decisions/0037-m7-package-preservation-and-writeback.md)
-adds no encoder to this crate.
+describes the original preservation boundary. Explicit source-only encoding is
+now available separately; see [native persistence](forms.md).
 
-## Native UserForms — M7A.2
+## Native UserForms and explicit encoding
 
-Under [ADR 0040](decisions/0040-native-userform-import-and-attachment.md),
 `ModuleKind::UserForm` and `Module::form` retain designer identity, exact source,
-attributes and native resources independently. A BaseClass declaration requires
-its MODULESTREAMNAME designer storage, VBFrame and native f/o streams. The initial
-profile accepts immediate cached Label/TextBox/CommandButton children; unknown
-classes, hierarchy/resources and behavioral variants refuse explicitly.
+attributes and native resources independently. Embedded imports reconcile designer
+storage, VBFrame and admitted f/o/x resources before attachment.
+`forms::decode_export` consumes native `.frm` bytes, an explicit code page and
+caller-supplied `.frx` bytes. `forms::companion_name` returns a validated local
+basename; no codec performs filesystem access. Records, strings, counts and
+resource budgets are checked before a result is published.
 
-`forms::decode_export` separately consumes native `.frm` bytes, explicit code page
-and caller-supplied `.frx` bytes. `forms::companion_name` returns only a validated
-local basename; no codec performs filesystem access. Record/object/site/string
-lengths, counts and resource budgets are checked before publishing a result.
-See the [native control/format/host contracts](m7a-control-contracts.md) for exact
-profile dispositions and limits. `Ide::attach_native_form` supplies the shared
-designer/code/debugger workflow without initialization or host authorization.
-Native edited saving/export is still unsupported; original snapshots do not
-represent saved source/design edits.
+`Ide::attach_native_form` is inert. Unsupported/malformed control or resource
+variants refuse before mutation. Import is separate from native Save/Export and
+source-only project encoding; original resources remain separate from edited
+snapshots. [Forms](forms.md) defines the current profile and writeback boundaries.
