@@ -75,7 +75,8 @@ The full capture and typed-result protocol is in [release validation](m8-office-
 ## CI environments and candidate identity
 
 Native CI runs independently on Linux, Windows and macOS (matrix fail-fast is
-disabled). Linux rendering tests require the software Vulkan/EGL packages installed
+disabled). Linux uses Ubuntu 24.04; native/UI tests run serially for software-driver
+stability. Linux rendering tests require the software Vulkan/EGL packages installed
 by the workflow. The dedicated UI job retains browser/native capture coverage.
 CFB resource/storage identities and runtime digest paths use `/` on every OS.
 

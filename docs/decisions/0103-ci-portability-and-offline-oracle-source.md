@@ -2,7 +2,9 @@
 
 Date: 2026-11-13. Status: adopted for the CI repair.
 
-Native CI runs all three supported OS jobs independently. Linux installs software
+Native CI runs all three supported OS jobs independently. Linux uses the tested
+Ubuntu 24.04 image; native/UI tests run serially to avoid concurrent graphics-driver
+creation/teardown crashes seen on the moving Ubuntu 26.04 image. Linux installs software
 Vulkan/EGL before running the workspace tests; rendered tests are not skipped.
 CFB paths emitted by the external library are normalized to `/` before becoming
 resource/storage identities. CFB names cannot contain backslashes, so the mapping

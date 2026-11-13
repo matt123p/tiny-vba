@@ -4,7 +4,7 @@
   "date": "2026-11-13",
   "local_status": "NOT_RUN",
   "office_observations": "NOT_RUN",
-  "selection_sha256": "0d4f295310d908baea48921d2b220f8c800c1c301be7a13facc0fbadc3d59f76",
+  "selection_sha256": "1fbb381d2bb7316949974477c71f72fb1036a8542749dea4129a3fdba31f9c8b",
   "runtime_tree_sha256": "8c8c9bf918aa450bd5bc171f1db726a12f36a79fcfdf4c2956d7dcaf5d3542a7",
   "evidence_basis": [
     "authored-contract",
