@@ -1043,44 +1043,14 @@ fn typename_uses_verified_runtime_metadata_without_default_getters_or_losing_ide
 }
 
 #[test]
-fn static_host_permission_budget_bounds_derived_and_supplied_allowlists() -> R {
+fn host_permissions_are_bounded_by_the_program_sites() -> R {
+    // More sites than the former fixed cap of 4,096.
+    const SITES: usize = 5000;
     let mut main = String::from("Function Answer(ByVal target As Object) As Long\n");
-    for _ in 0..vba_vm::HostBinding::MAX_STATIC_PERMISSIONS {
+    for _ in 0..SITES {
         main.push_str("target.Touch\n");
     }
     main.push_str("Answer=1\nEnd Function");
-    let source = SourceFile::new(SourceId(1), "Main.bas".into(), main.clone())?;
-    let p = vba_compiler::compile(
-        &source,
-        &CompileOptions {
-            capabilities: vba_vm::capabilities(),
-            ..Default::default()
-        },
-    )?;
-    let mut binding = vba_vm::HostBinding::for_program(&p, 7, Default::default())?;
-    assert_eq!(
-        binding.permitted.len(),
-        vba_vm::HostBinding::MAX_STATIC_PERMISSIONS
-    );
-    let _ = Session::new(
-        p.clone(),
-        1,
-        vec![Value::Nothing],
-        Some(binding.clone()),
-        Limits::default(),
-    )?;
-    binding.permitted.insert((
-        vba_ir::ProcedureId(0),
-        vba_ir::ForeignSiteId(vba_vm::HostBinding::MAX_STATIC_PERMISSIONS as u32),
-    ));
-    let error = Session::new(p, 1, vec![Value::Nothing], Some(binding), Limits::default())
-        .err()
-        .ok_or("oversized supplied allowlist accepted")?;
-    assert!(error.message.contains("host permission limit"));
-    main = main.replace(
-        "Answer=1\nEnd Function",
-        "target.Touch\nAnswer=1\nEnd Function",
-    );
     let source = SourceFile::new(SourceId(1), "Main.bas".into(), main)?;
     let p = vba_compiler::compile(
         &source,
@@ -1089,7 +1059,42 @@ fn static_host_permission_budget_bounds_derived_and_supplied_allowlists() -> R {
             ..Default::default()
         },
     )?;
-    assert!(vba_vm::HostBinding::for_program(&p, 7, Default::default()).is_err());
+    let binding = vba_vm::HostBinding::for_program(&p, 7, Default::default())?;
+    assert_eq!(binding.permitted.len(), SITES);
+    let _ = Session::new(
+        p.clone(),
+        1,
+        vec![Value::Nothing],
+        Some(binding.clone()),
+        Limits::default(),
+    )?;
+    // A supplied table with more entries than the program has sites.
+    let mut oversized = binding.clone();
+    oversized
+        .permitted
+        .insert((vba_ir::ProcedureId(0), vba_ir::ForeignSiteId(SITES as u32)));
+    let error = Session::new(
+        p.clone(),
+        1,
+        vec![Value::Nothing],
+        Some(oversized),
+        Limits::default(),
+    )
+    .err()
+    .ok_or("oversized supplied allowlist accepted")?;
+    assert!(error.message.contains("host permission limit"));
+    // A supplied table of the right size that names a site the program does not have.
+    let mut foreign = binding;
+    foreign
+        .permitted
+        .remove(&(vba_ir::ProcedureId(0), vba_ir::ForeignSiteId(0)));
+    foreign
+        .permitted
+        .insert((vba_ir::ProcedureId(0), vba_ir::ForeignSiteId(SITES as u32)));
+    let error = Session::new(p, 1, vec![Value::Nothing], Some(foreign), Limits::default())
+        .err()
+        .ok_or("unknown permitted site accepted")?;
+    assert!(error.message.contains("invalid permitted foreign site"));
     Ok(())
 }
 

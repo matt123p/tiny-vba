@@ -128,3 +128,4 @@ and evidence references.
 
 - [0103 — CI portability and offline oracle source](0103-ci-portability-and-offline-oracle-source.md)
 - [0104 — Frame aliases for embedding-generated code](0104-generated-code-frame-aliases.md)
+- [0105 — Host permissions bounded by the program](0105-program-bounded-host-permissions.md)

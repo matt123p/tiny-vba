@@ -614,7 +614,14 @@ impl Session {
             }
         }
         if let Some(binding) = &binding {
-            if binding.permitted.len() > HostBinding::MAX_STATIC_PERMISSIONS {
+            // Each entry names a distinct site of this program, so a table larger
+            // than the program's own site count cannot be valid.
+            let sites = p
+                .procedures
+                .iter()
+                .try_fold(0usize, |n, p| n.checked_add(p.foreign.len()))
+                .ok_or_else(resource)?;
+            if binding.permitted.len() > sites {
                 return Err(command("host permission limit"));
             }
             for (procedure, site) in &binding.permitted {
@@ -4577,10 +4584,10 @@ impl Host for NoHost {
 }
 
 impl HostBinding {
-    /// Maximum authorized static call sites, separate from executed-call limits.
-    pub const MAX_STATIC_PERMISSIONS: usize = 4096;
-
     /// Explicitly authorize this compiled program's foreign sites for the supplied host roots.
+    ///
+    /// The table has one entry per foreign site of the verified program, so the
+    /// verifier's table limits bound its size.
     pub fn for_program(
         program: &ir::VerifiedProgram,
         identity: u64,
@@ -4589,9 +4596,6 @@ impl HostBinding {
         let mut permitted = BTreeSet::new();
         for (procedure, p) in program.program().procedures.iter().enumerate() {
             for site in 0..p.foreign.len() {
-                if permitted.len() >= Self::MAX_STATIC_PERMISSIONS {
-                    return Err(command("host permission limit"));
-                }
                 permitted.insert((
                     ir::ProcedureId(u32::try_from(procedure).map_err(|_| resource())?),
                     ir::ForeignSiteId(u32::try_from(site).map_err(|_| resource())?),

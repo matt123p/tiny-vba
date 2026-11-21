@@ -117,7 +117,7 @@ host effects and direct ByRef writes remain observable after failure. VBA handle
 ## Generic host lifecycle
 
 HostBinding records the expected host identity, an allowlist of `(ProcedureId, ForeignSiteId)`
-(cap 4,096 entries) and named host roots (cap 64). Roots are `ObjectRef` values whose `host` must
+(at most one entry per foreign site of the program, ADR 0105) and named host roots (cap 64). Roots are `ObjectRef` values whose `host` must
 equal the binding identity; names are case-insensitive and unique. Compiled source cannot grant
 permissions or roots. Every procedure local with an IR 4 `HostRoot` role must be bound at launch or
 `Session::new` refuses; each root local initializes to its bound reference and stays hidden from
