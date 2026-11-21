@@ -55,7 +55,9 @@ VbaEntries=data
 VbaTotal=n
 End Sub
 "#;
-pub(crate) fn root(handlers: &std::collections::BTreeSet<String>) -> String {
+/// `kinds` are the control kinds with a support class in this project; the
+/// factory creates only those and raises error 429 for any other ProgID.
+pub(crate) fn root(handlers: &std::collections::BTreeSet<String>, kinds: &[ControlKind]) -> String {
     let mut s = String::from(
         r#"
 Public WithEvents VbaContext As VbaFormControlContext
@@ -136,7 +138,10 @@ kind=CStr(data(0))
         ControlKind::TabStrip,
         ControlKind::MultiPage,
         ControlKind::Image,
-    ] {
+    ]
+    .into_iter()
+    .filter(|kind| kinds.contains(kind))
+    {
         s.push_str(&format!(
             "If LCase(kind)=\"forms.{}.1\" Then\nSet control=New VbaForm{}\nkind=\"{}\"\nEnd If\n",
             kind.name().to_ascii_lowercase(),

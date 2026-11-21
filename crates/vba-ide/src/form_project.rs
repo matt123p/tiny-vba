@@ -471,6 +471,38 @@ pub(super) fn vba_string(s: &str) -> String {
 fn boolean(b: bool) -> &'static str {
     if b { "True" } else { "False" }
 }
+/// Every control kind that has a generated support class, in the order that
+/// fixes each class's source identity.
+pub(crate) const SUPPORT_KINDS: [ControlKind; 16] = [
+    ControlKind::Label,
+    ControlKind::TextBox,
+    ControlKind::CommandButton,
+    ControlKind::CheckBox,
+    ControlKind::OptionButton,
+    ControlKind::ToggleButton,
+    ControlKind::ScrollBar,
+    ControlKind::SpinButton,
+    ControlKind::ListBox,
+    ControlKind::ComboBox,
+    ControlKind::Frame,
+    ControlKind::TabStrip,
+    ControlKind::MultiPage,
+    ControlKind::Page,
+    ControlKind::Image,
+    ControlKind::RefEdit,
+];
+/// Whether authored code may call `Controls.Add`. This is a conservative text
+/// test: any module that has both the words `Controls` and `Add`, in code,
+/// strings or comments, counts.
+fn may_add_controls(text: &str) -> bool {
+    let mut controls = false;
+    let mut add = false;
+    for word in text.split(|c: char| !(c.is_ascii_alphanumeric() || c == '_')) {
+        controls |= word.eq_ignore_ascii_case("controls");
+        add |= word.eq_ignore_ascii_case("add");
+    }
+    controls && add
+}
 pub(crate) fn class_name(kind: ControlKind) -> &'static str {
     match kind {
         ControlKind::Label => "VbaFormLabel",
@@ -807,6 +839,7 @@ fn compiled_form(
     module: &Module,
     native: Option<&NativeForm>,
     ranges: bool,
+    kinds: &[ControlKind],
 ) -> Result<String> {
     form.validate()?;
     let current = native
@@ -823,7 +856,7 @@ fn compiled_form(
     };
     let mut source = module.text.clone();
     if native.is_some() {
-        source.push_str(&crate::form_dynamic::root(&handlers));
+        source.push_str(&crate::form_dynamic::root(&handlers, kinds));
         source.push_str(&crate::form_colors::members(true, true));
         source.push_str(&crate::form_font::members(true));
         source.push_str(&crate::form_appearance::members(None));
@@ -1366,6 +1399,24 @@ pub struct FormInstance {
 }
 
 impl Ide {
+    /// The control kinds the project can create: the kinds in any form's
+    /// design, or every kind when authored code may call `Controls.Add`. Page
+    /// is always kept, because the shared Pages collection refers to it.
+    pub(crate) fn form_support_kinds(&self) -> Vec<ControlKind> {
+        if self.modules.iter().any(|m| may_add_controls(&m.text)) {
+            return SUPPORT_KINDS.to_vec();
+        }
+        SUPPORT_KINDS
+            .into_iter()
+            .filter(|kind| {
+                *kind == ControlKind::Page
+                    || self
+                        .forms
+                        .values()
+                        .any(|d| d.form().controls.iter().any(|c| c.kind == *kind))
+            })
+            .collect()
+    }
     fn default_form_instance(&self, id: SourceId) -> Result<FormInstance> {
         let form = self.forms.get(&id).ok_or_else(|| error("unknown form"))?;
         let session = self
@@ -1897,6 +1948,7 @@ impl Ide {
     pub(crate) fn form_modules(&self) -> Result<Vec<vba_syntax::ParseResult>> {
         let mut modules = Vec::new();
         let services = self.form_services_requested();
+        let kinds = self.form_support_kinds();
         for m in &self.modules {
             if let Some(designer) = self.forms.get(&m.id) {
                 modules.push(parse(
@@ -1908,6 +1960,7 @@ impl Ide {
                             m,
                             self.native_forms.get(&m.id),
                             self.form_range_import().is_some(),
+                            &kinds,
                         )?,
                     )?,
                     ModuleKind::Class,
@@ -1920,26 +1973,10 @@ impl Ide {
             }
         }
         if !self.forms.is_empty() {
-            for (i, kind) in [
-                ControlKind::Label,
-                ControlKind::TextBox,
-                ControlKind::CommandButton,
-                ControlKind::CheckBox,
-                ControlKind::OptionButton,
-                ControlKind::ToggleButton,
-                ControlKind::ScrollBar,
-                ControlKind::SpinButton,
-                ControlKind::ListBox,
-                ControlKind::ComboBox,
-                ControlKind::Frame,
-                ControlKind::TabStrip,
-                ControlKind::MultiPage,
-                ControlKind::Page,
-                ControlKind::Image,
-                ControlKind::RefEdit,
-            ]
-            .into_iter()
-            .enumerate()
+            for (i, kind) in SUPPORT_KINDS
+                .into_iter()
+                .enumerate()
+                .filter(|(_, kind)| kinds.contains(kind))
             {
                 let mut source =
                     crate::form_controls::control_class(kind, self.form_range_import().is_some());

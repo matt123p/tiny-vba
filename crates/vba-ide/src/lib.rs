@@ -2251,3 +2251,62 @@ mod document_module_tests {
         Ok(())
     }
 }
+
+#[cfg(test)]
+mod form_support_tests {
+    use super::*;
+    use crate::forms::{Bounds, ControlKind, DesignEdit};
+
+    fn classes(ide: &Ide) -> Result<Vec<String>> {
+        Ok(ide
+            .form_modules()?
+            .iter()
+            .map(|m| m.module.source.name().to_owned())
+            .filter(|name| name.starts_with("VbaForm"))
+            .collect())
+    }
+
+    #[test]
+    fn support_classes_follow_the_kinds_a_project_can_create() -> Result<()> {
+        let mut ide = Ide::new();
+        let id = ide.add_form("Plain")?;
+        ide.edit_form(
+            id,
+            DesignEdit::Add(
+                ControlKind::Label,
+                Bounds {
+                    left: 12.0,
+                    top: 12.0,
+                    width: 120.0,
+                    height: 24.0,
+                },
+            ),
+        )?;
+        let pruned = classes(&ide)?;
+        for kept in ["VbaFormLabel.cls", "VbaFormPage.cls", "VbaFormControls.cls"] {
+            assert!(
+                pruned.iter().any(|n| n == kept),
+                "{kept} missing: {pruned:?}"
+            );
+        }
+        for gone in [
+            "VbaFormCheckBox.cls",
+            "VbaFormMultiPage.cls",
+            "VbaFormRefEdit.cls",
+        ] {
+            assert!(!pruned.iter().any(|n| n == gone), "{gone} kept: {pruned:?}");
+        }
+        // Code that may call Controls.Add keeps every kind.
+        ide.add_module(
+            "Main.bas",
+            "Sub Main()\nDim c As Object\nSet c=Plain.Controls\nc.Add \"Forms.CheckBox.1\"\nEnd Sub",
+        )?;
+        let all = classes(&ide)?;
+        for kind in crate::form_project::SUPPORT_KINDS {
+            let name = format!("{}.cls", crate::form_project::class_name(kind));
+            assert!(all.contains(&name), "{name} missing: {all:?}");
+        }
+        assert!(all.len() > pruned.len());
+        Ok(())
+    }
+}

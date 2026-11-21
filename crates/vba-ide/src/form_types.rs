@@ -363,19 +363,22 @@ impl Ide {
                 event_names: events.then(Vec::new),
             })
         };
-        bindings.insert(
-            "VbaFormRefEdit".into(),
-            vec![
-                vba_ir::ClassInterface {
-                    ty: references
-                        .object_type("RefEdit.RefEdit")?
-                        .ok_or_else(|| error("RefEdit reference missing"))?,
-                    events: true,
-                    event_names: Some(vec!["Change".into(), "DropButtonClick".into()]),
-                },
-                claim("Control", false)?,
-            ],
-        );
+        let kinds = self.form_support_kinds();
+        if kinds.contains(&ControlKind::RefEdit) {
+            bindings.insert(
+                "VbaFormRefEdit".into(),
+                vec![
+                    vba_ir::ClassInterface {
+                        ty: references
+                            .object_type("RefEdit.RefEdit")?
+                            .ok_or_else(|| error("RefEdit reference missing"))?,
+                        events: true,
+                        event_names: Some(vec!["Change".into(), "DropButtonClick".into()]),
+                    },
+                    claim("Control", false)?,
+                ],
+            );
+        }
         for (kind, name) in [
             (ControlKind::Label, "Label"),
             (ControlKind::TextBox, "TextBox"),
@@ -392,7 +395,10 @@ impl Ide {
             (ControlKind::MultiPage, "MultiPage"),
             (ControlKind::Page, "Page"),
             (ControlKind::Image, "Image"),
-        ] {
+        ]
+        .into_iter()
+        .filter(|(kind, _)| kinds.contains(kind))
+        {
             let mut specific = claim(name, kind != ControlKind::Page)?;
             specific.event_names = Some(match kind {
                 ControlKind::Page => vec![],

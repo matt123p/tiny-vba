@@ -4,12 +4,12 @@
   "date": "2026-11-20",
   "local_status": "NOT_RUN",
   "office_observations": "NOT_RUN",
-  "selection_sha256": "cddb5bdc5e847769f07ecabb53d0ef7857990ad5d499349354b4ad45a85be78e",
-  "runtime_tree_sha256": "a9b2c3f854df5094505b8c4a0ba99abbdbfa83e83d2d16f4eadbde88f72e911f",
+  "selection_sha256": "1550d96ea1f62e2cc95d3389235442b2c33a2b429e24c88496c1c3186054df39",
+  "runtime_tree_sha256": "53add4db8681d424716cfc1118a13bd79ba0fc66350d3f1786f6527158413810",
   "evidence_basis": [
     "authored-contract",
     "inherited-mac-oracle"
   ],
   "gates": [],
-  "notes": "Generated control field name candidate. Historical full local/host receipts are archived under baseline-2026-11-08 and do not certify this changed tree. Fresh checks are recorded separately; remote platform results require GitHub Actions."
+  "notes": "Used control support class candidate. Historical full local/host receipts are archived under baseline-2026-11-08 and do not certify this changed tree. Fresh checks are recorded separately; remote platform results require GitHub Actions."
 }

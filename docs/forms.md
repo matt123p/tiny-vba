@@ -24,6 +24,12 @@ have independent state. `Load`, modal/modeless `Show`, `Hide`, `Unload`, close
 cancellation and ordinary lifecycle handlers use the same frames and debugger
 continuations as other VBA. Inspection does not instantiate objects or call getters.
 
+A project gets a generated support class only for the control kinds in its
+forms' designs, plus Page. When any module has both the words `Controls` and
+`Add`, so that code may create controls at run time, every kind is kept.
+Otherwise `Controls.Add` with the ProgID of a missing kind raises error 429.
+Declarations such as `As MSForms.CheckBox` do not depend on the support class.
+
 | Area | Supported contract |
 |---|---|
 | Properties | Applicable Name/Caption, geometry, Enabled/Visible, TabStop/TabIndex, Tag and ControlTipText |
