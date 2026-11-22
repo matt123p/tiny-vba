@@ -8,7 +8,7 @@
   ],
   "office_observations": "NOT_RUN",
   "m7a_baseline_tree_sha256": "a6b1acaa2f6da29d4ef603bfee9c26b285113e52d30bd11c850df1845023e420",
-  "runtime_tree_sha256": "d97d7935ab73d31841f087a8ab26803634119d04d528b05d03ad6cbfa510d178",
+  "runtime_tree_sha256": "1a238c962ef1710fd2ad65796299bb527aca1f612ec8bb702e9c0984f1ea0a31",
   "artifacts": [
     {
       "repository": "tiny-vba",

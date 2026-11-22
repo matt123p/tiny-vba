@@ -17,7 +17,10 @@ MSForms WithEvents events; ADR 0047's event exposure remains unchanged.
 
 ActiveControl is read-only. Initial Show selects the first visible enabled
 non-label TabStop control by current TabIndex; Hide preserves its selection and
-Unload releases it. SetFocus can select a non-tab-stop control. Unavailable
+Unload releases it. SetFocus on a loaded form that is not yet visible, for
+example in UserForm_Initialize, checks its target as usual and records it
+without Enter/Exit or update events; the next Show focuses that control instead
+of the first in tab order, unless it is no longer available. SetFocus can select a non-tab-stop control. Unavailable
 focus targets fail with error 2110 and preserve the prior selection. Physical
 native input is one ordinary form callback: focus validation completes before
 its text/click action. Default/Cancel keyboard activation uses an ordinary button

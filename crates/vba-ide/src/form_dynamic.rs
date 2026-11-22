@@ -85,7 +85,7 @@ Else
 Set result=VbaLookup(target.VbaParentKey)
 End If
 ElseIf operation=5 Then
-VbaMoveFocus target
+VbaRequestFocus target
 target.VbaFocusConfirmed=True
 ElseIf operation=6 Then
 VbaTabChange target,target.VbaTabIndex,CInt(argument)

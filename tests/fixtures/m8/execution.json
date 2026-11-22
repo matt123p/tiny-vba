@@ -4,12 +4,12 @@
   "date": "2026-11-22",
   "local_status": "NOT_RUN",
   "office_observations": "NOT_RUN",
-  "selection_sha256": "535049d052b2db3b75962372542f340cb21380c45baa23f68b7e0d7d2526df80",
-  "runtime_tree_sha256": "d97d7935ab73d31841f087a8ab26803634119d04d528b05d03ad6cbfa510d178",
+  "selection_sha256": "fa479e9bf722411ad7f580be62865711de9a2b1fb3cf12452662c02ec51a89f2",
+  "runtime_tree_sha256": "1a238c962ef1710fd2ad65796299bb527aca1f612ec8bb702e9c0984f1ea0a31",
   "evidence_basis": [
     "authored-contract",
     "inherited-mac-oracle"
   ],
   "gates": [],
-  "notes": "Project instance reference counting and linear form tab ranking and UserForm inside size candidate. Historical full local and host receipts remain archived under baseline-2026-11-08. Fresh checks are recorded separately; remote platform results require GitHub Actions."
+  "notes": "Project instance reference counting and linear form tab ranking and UserForm inside size and SetFocus before Show candidate. Historical full local and host receipts remain archived under baseline-2026-11-08. Fresh checks are recorded separately; remote platform results require GitHub Actions."
 }

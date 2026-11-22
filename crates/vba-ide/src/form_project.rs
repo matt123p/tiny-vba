@@ -1297,7 +1297,7 @@ fn compiled_form(
     }
     source.push_str("VbaLoaded=False\n");
     if native.is_some() {
-        source.push_str("Set VbaActiveControl=Nothing\n");
+        source.push_str("Set VbaActiveControl=Nothing\nSet VbaPendingFocus=Nothing\n");
     }
     for c in &form.controls {
         source.push_str(&format!("Set Vba_{}=Nothing\n", c.name));

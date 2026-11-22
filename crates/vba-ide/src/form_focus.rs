@@ -49,6 +49,7 @@ pub(crate) fn members(form: &Form, handlers: &BTreeSet<String>) -> String {
     let mut source = String::from(
         r#"
 Private VbaFocusSerial As Long
+Private VbaPendingFocus As Object
 Public Property Get ActiveControl() As Object
 If Not VbaLoaded Then Class_Initialize
 Set ActiveControl=VbaPublicActive
@@ -127,11 +128,30 @@ If Not VbaEligible(target) Then Exit Sub
 Set VbaActiveControl=target
 VbaSetAncestorFocus target
 End Sub
+Public Sub VbaRequestFocus(ByVal target As Object)
+If Not VbaLoaded Or VbaVisible Then
+VbaMoveFocus target
+Exit Sub
+End If
+If target Is Nothing Then Err.Raise 2110
+If target.VbaKind=1 Or target.VbaKind=15 Or Not target.Enabled Or Not target.Visible Then Err.Raise 2110
+Set target=VbaFocusTarget(target)
+If Not VbaEligible(target) Then Err.Raise 2110
+Set VbaPendingFocus=target
+End Sub
 Public Sub VbaFocusIndex(ByVal index As Long)
 VbaMoveFocus VbaAllControls.Item(index)
 End Sub
 Private Sub VbaInitialFocus()
 Dim control As Object,best As Object,scan As Long,kind As Integer
+If Not (VbaPendingFocus Is Nothing) Then
+Set control=VbaPendingFocus
+Set VbaPendingFocus=Nothing
+If VbaEligible(control) Then
+VbaMoveFocus control
+Exit Sub
+End If
+End If
 If Not (VbaActiveControl Is Nothing) Then Exit Sub
 Dim entries() As Object
 entries=VbaAllControls.VbaEntries
@@ -297,7 +317,7 @@ End Sub
         )
     }) {
         source.push_str(&format!(
-            "Private Sub Vba_{0}_VbaFocusRequested(ByVal target As Object)\nVbaMoveFocus target\ntarget.VbaFocusConfirmed=True\nEnd Sub\n",
+            "Private Sub Vba_{0}_VbaFocusRequested(ByVal target As Object)\nVbaRequestFocus target\ntarget.VbaFocusConfirmed=True\nEnd Sub\n",
             control.name
         ));
     }
