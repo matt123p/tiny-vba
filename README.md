@@ -11,6 +11,8 @@ including GridCraft and WordCraft.
 
 ## Try it
 
+For a pinned checkout, use the [`v0.0.3` source tag](https://github.com/matt123p/tiny-vba/tree/v0.0.3).
+
 With the Rust toolchain in [rust-toolchain.toml](rust-toolchain.toml) installed,
 run these commands from this checkout:
 
